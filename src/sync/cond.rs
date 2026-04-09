@@ -3,7 +3,7 @@
 use crate::{
     error::Errno,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{EINVAL, ETIMEDOUT},
         pthread::*,
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},

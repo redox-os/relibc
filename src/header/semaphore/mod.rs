@@ -4,7 +4,7 @@
 
 use crate::{
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME},
     },
     platform::types::{c_char, c_int, c_long, c_uint, clockid_t},

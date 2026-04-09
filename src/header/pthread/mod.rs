@@ -7,7 +7,7 @@ use core::{cell::Cell, ptr::NonNull};
 
 use crate::{
     error::Errno,
-    header::{bits_time::timespec, sched::*},
+    header::{bits_timespec::timespec, sched::*},
     platform::{
         Pal, Sys,
         types::{

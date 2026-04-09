@@ -13,7 +13,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         crypt::{crypt_data, crypt_r},
         errno::{self, ENAMETOOLONG},
         fcntl, limits,

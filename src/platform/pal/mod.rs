@@ -5,7 +5,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_select::timeval,

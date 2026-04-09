@@ -7,7 +7,7 @@
 sys_includes = ["sys/types.h"]
 include_guard = "_SYS_STAT_H"
 after_includes = """
-#include <bits/time.h> // for timespec
+#include <bits/timespec.h> // for timespec
 
 #define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
 #define S_ISCHR(mode)  (((mode) & S_IFMT) == S_IFCHR)

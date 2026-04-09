@@ -3,7 +3,7 @@
 
 use crate::{
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
     },
     platform::types::{c_uint, clockid_t},

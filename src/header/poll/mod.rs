@@ -7,7 +7,7 @@ use core::{mem, ptr, slice};
 use crate::{
     fs::File,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::EBADF,
         signal::sigset_t,
         sys_epoll::{

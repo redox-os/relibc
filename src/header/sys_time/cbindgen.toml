@@ -3,7 +3,7 @@ sys_includes = ["sys/types.h", "sys/select.h"]
 include_guard = "_SYS_TIME_H"
 language = "C"
 after_includes = """
-#include <bits/time.h> // for timespec
+#include <bits/timespec.h> // for timespec
 
 #define timeradd(x,y,res) (void) (\
         (res)->tv_sec = (x)->tv_sec + (y)->tv_sec + (((x)->tv_usec + (y)->tv_usec) / 1000000), \

@@ -12,7 +12,7 @@ use crate::{
 use crate::header::{
     bits_arpainet::htons,
     bits_socklen_t::socklen_t,
-    bits_time::timespec,
+    bits_timespec::timespec,
     errno::*,
     netinet_in::{IPPROTO_UDP, in_addr, sockaddr_in},
     sys_socket::{
