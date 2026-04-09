@@ -6,7 +6,7 @@ use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
         signal::sigevent,
         stdlib::getenv,

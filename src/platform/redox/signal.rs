@@ -5,7 +5,7 @@ use super::{
 use crate::{
     error::{Errno, Result},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{EINVAL, ENOSYS},
         signal::{
             SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGALRM, SIGEV_SIGNAL,

@@ -1,8 +1,11 @@
-use super::super::{Pal, types::*};
+use super::super::{
+    Pal,
+    types::{c_int, c_uint, pid_t},
+};
 use crate::{
     error::{Errno, Result},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         signal::{sigaction, siginfo_t, sigset_t, sigval, stack_t},
         sys_time::itimerval,
     },

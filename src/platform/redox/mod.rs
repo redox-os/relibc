@@ -26,7 +26,7 @@ use crate::{
     error::{Errno, Result},
     fs::File,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{
             EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM,
             ENOSYS, EOPNOTSUPP, EPERM,

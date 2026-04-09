@@ -8,7 +8,7 @@
 sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_SCHED_H"
 after_includes = """
-#include <bits/time.h> // for timespec
+#include <bits/timespec.h> // for timespec
 """
 language = "C"
 style = "Tag"

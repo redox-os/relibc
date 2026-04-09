@@ -20,7 +20,7 @@ pub use self::{
 use crate::{
     error::Errno,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{EAGAIN, EINTR, ETIMEDOUT},
     },
     out::Out,
