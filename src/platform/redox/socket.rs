@@ -71,11 +71,12 @@ unsafe fn bind_or_connect(
         }
         AF_UNSPEC => match op {
             SocketCall::Bind => {
-                //bind is not a valid socket call for AF_UNSPEC
+                // Bind is not a valid socket call for AF_UNSPEC
                 return Err(Errno(EAFNOSUPPORT));
             }
             SocketCall::Connect => {
-                format!("0.0.0.0:0")
+                // When a connect is made using AF_UNSPEC TCP and UDP need to disconnect from the default peer
+                format!("disconnect")
             }
             _ => unreachable!(),
         },
