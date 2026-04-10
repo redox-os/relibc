@@ -704,6 +704,16 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
             }
             _ => return Some(Err(())),
         };
+        // "For b, B, d, i, o, u, x, and X conversions,
+        // if a precision is specified, the 0 flag is ignored."
+        match fmt {
+            'b' | 'B' | 'd' | 'i' | 'o' | 'u' | 'x' | 'X' => {
+                if precision.is_some() {
+                    zero = false;
+                }
+            }
+            _ => (),
+        }
 
         Some(Ok(PrintfFmt::Arg(PrintfArg {
             index,
