@@ -13,7 +13,7 @@ use super::{
 use crate::{
     error::{Errno, Result},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         signal::{SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigset_t, sigval, stack_t},
         sys_select::timeval,
         sys_time::{self, itimerval},

@@ -53,7 +53,7 @@ pub struct cmsghdr {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 // FIXME: CheckVsLibcCrate
 pub struct ucred {
     pub pid: pid_t,
@@ -63,6 +63,9 @@ pub struct ucred {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_cmsghdr(cmsghdr: cmsghdr) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn _cbindgen_export_ucred(ucred: ucred) {}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]

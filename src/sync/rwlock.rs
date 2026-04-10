@@ -7,7 +7,7 @@ use core::{
 use crate::{
     error::{Errno, Result},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{EINVAL, ETIMEDOUT},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
     },

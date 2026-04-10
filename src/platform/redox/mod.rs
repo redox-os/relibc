@@ -26,7 +26,7 @@ use crate::{
     error::{Errno, Result},
     fs::File,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{
             EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM,
             ENOSYS, EOPNOTSUPP, EPERM,
@@ -102,7 +102,7 @@ macro_rules! path_from_c_str {
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
-/// Redox syscall implementation of the platform abstraction layer.
+/// Redox syscall implementation of [`Pal`].
 pub struct Sys;
 
 impl Pal for Sys {

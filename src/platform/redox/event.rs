@@ -1,7 +1,7 @@
 use core::mem::size_of;
 
 use crate::header::{
-    bits_time::timespec,
+    bits_timespec::timespec,
     fcntl::{O_CLOEXEC, O_CREAT, O_RDWR},
     signal::sigset_t,
 };

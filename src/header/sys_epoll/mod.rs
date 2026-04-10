@@ -1,6 +1,6 @@
 //! `sys/epoll.h` implementation.
 //!
-//! Non-POSIX, see: <http://man7.org/linux/man-pages/man7/epoll.7.html>.
+//! Non-POSIX, see <http://man7.org/linux/man-pages/man7/epoll.7.html>.
 
 use core::ptr;
 
@@ -27,6 +27,7 @@ pub const EPOLL_CTL_ADD: c_int = 1;
 pub const EPOLL_CTL_DEL: c_int = 2;
 pub const EPOLL_CTL_MOD: c_int = 3;
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union epoll_data {
@@ -41,6 +42,7 @@ impl Default for epoll_data {
     }
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
 #[cfg(all(target_os = "redox", target_pointer_width = "64"))]
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -55,6 +57,7 @@ pub struct epoll_event {
     pub _pad: u64, // 8 bytes
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
 #[cfg(not(all(target_os = "redox", target_pointer_width = "64")))]
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -63,11 +66,13 @@ pub struct epoll_event {
     pub data: epoll_data,
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_create.2.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn epoll_create(_size: c_int) -> c_int {
     epoll_create1(0)
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_create1.2.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn epoll_create1(flags: c_int) -> c_int {
     trace_expr!(
@@ -77,6 +82,7 @@ pub extern "C" fn epoll_create1(flags: c_int) -> c_int {
     )
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_ctl.2.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn epoll_ctl(
     epfd: c_int,
@@ -96,6 +102,7 @@ pub unsafe extern "C" fn epoll_ctl(
     )
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_wait.2.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn epoll_wait(
     epfd: c_int,
@@ -106,6 +113,7 @@ pub unsafe extern "C" fn epoll_wait(
     unsafe { epoll_pwait(epfd, events, maxevents, timeout, ptr::null()) }
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_wait.2.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn epoll_pwait(
     epfd: c_int,
