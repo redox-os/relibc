@@ -13,7 +13,9 @@ use crate::{
     header::{
         sys_select::timeval,
         sys_time::{gettimeofday, timezone},
-    }, out::Out, platform::types::{c_int, c_short, c_ushort, time_t}
+    },
+    out::Out,
+    platform::types::{c_int, c_short, c_ushort, time_t},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/timeb.h.html>.
