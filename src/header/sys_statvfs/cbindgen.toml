@@ -1,3 +1,7 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_statvfs.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/statvfs.h> header shall define the fsblkcnt_t and fsfilcnt_t types as described in <sys/types.h>."
 sys_includes = ["sys/types.h"]
 include_guard = "_SYS_STATVFS_H"
 language = "C"
