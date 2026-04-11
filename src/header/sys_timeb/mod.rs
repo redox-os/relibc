@@ -7,8 +7,6 @@
 //! Specifications Issue 6, and the entire `sys/timeb.h` header was removed in
 //! Issue 7.
 
-use core::ptr::NonNull;
-
 use crate::{
     header::{
         sys_select::timeval,
