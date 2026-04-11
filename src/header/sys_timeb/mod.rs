@@ -13,8 +13,7 @@ use crate::{
     header::{
         sys_select::timeval,
         sys_time::{gettimeofday, timezone},
-    },
-    platform::types::{c_int, c_short, c_ushort, time_t},
+    }, out::Out, platform::types::{c_int, c_short, c_ushort, time_t}
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/timeb.h.html>.
@@ -30,12 +29,11 @@ pub struct timeb {
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/ftime.html>.
 ///
 /// # Safety
-/// The caller must ensure that `tp` is convertible to a `&mut
-/// MaybeUninit<timeb>`.
+/// The caller must ensure that `tp` is convertible to an [`Out<timeb>`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
     // SAFETY: the caller is required to ensure that the pointer is valid.
-    let tp_maybe_uninit = unsafe { NonNull::new_unchecked(tp).as_uninit_mut() };
+    let mut tp_out = unsafe { Out::nonnull(tp) };
 
     let mut tv = timeval::default();
     let mut tz = timezone::default();
@@ -46,7 +44,7 @@ pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
         return -1;
     }
 
-    tp_maybe_uninit.write(timeb {
+    tp_out.write(timeb {
         time: tv.tv_sec,
         millitm: (tv.tv_usec / 1000) as c_ushort,
         timezone: tz.tz_minuteswest as c_short,
