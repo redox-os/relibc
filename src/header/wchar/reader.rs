@@ -1,5 +1,6 @@
 use super::{FILE, SEEK_SET, fseek_locked, ftell_locked};
 use crate::{
+    c_str::WStr,
     header::{
         errno::EILSEQ,
         wchar::{MB_CUR_MAX, get_char_encoded_length, mbrtowc},
@@ -13,13 +14,13 @@ use crate::{
 };
 use core::{iter::Iterator, ptr};
 
-struct BufferReader {
-    buf: *const wint_t,
+pub(crate) struct BufferReader<'a> {
+    buf: WStr<'a>,
     position: usize,
 }
 
-impl From<*const wint_t> for BufferReader {
-    fn from(buff: *const wint_t) -> Self {
+impl<'a> From<WStr<'a>> for BufferReader<'a> {
+    fn from(buff: WStr<'a>) -> Self {
         BufferReader {
             buf: buff,
             position: 0,
@@ -27,21 +28,17 @@ impl From<*const wint_t> for BufferReader {
     }
 }
 
-impl Iterator for BufferReader {
+impl<'a> Iterator for BufferReader<'a> {
     type Item = Result<wint_t, i32>;
-
     fn next(&mut self) -> Option<Self::Item> {
-        let wchar = unsafe { *self.buf.add(self.position) };
-        if wchar == 0 {
-            None
-        } else {
-            self.position += 1;
-            Some(Ok(wchar))
-        }
+        self.buf.split_first_char().map(|(c, r)| {
+            self.buf = r;
+            Ok(wint_t::from(c))
+        })
     }
 }
 
-struct FileReader<'a> {
+pub(crate) struct FileReader<'a> {
     f: &'a mut FILE,
     position: off_t,
 }
@@ -80,7 +77,7 @@ impl<'a> FileReader<'a> {
         let mut wc: wchar_t = 0;
         unsafe {
             mbrtowc(
-                &mut wc,
+                &raw mut wc,
                 buf.as_ptr() as *const c_char,
                 encoded_length,
                 ptr::null_mut(),
@@ -118,7 +115,7 @@ impl<'a> From<&'a mut FILE> for FileReader<'a> {
 
 pub enum Reader<'a> {
     FILE(FileReader<'a>),
-    BUFFER(BufferReader),
+    BUFFER(BufferReader<'a>),
 }
 
 impl<'a> Iterator for Reader<'a> {
@@ -138,8 +135,8 @@ impl<'a> From<&'a mut FILE> for Reader<'a> {
     }
 }
 
-impl<'a> From<*const wchar_t> for Reader<'a> {
-    fn from(buff: *const wchar_t) -> Self {
-        Self::BUFFER((buff as *const wint_t).into())
+impl<'a> From<WStr<'a>> for Reader<'a> {
+    fn from(buff: WStr<'a>) -> Self {
+        Self::BUFFER(buff.into())
     }
 }

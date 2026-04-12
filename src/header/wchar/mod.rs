@@ -327,11 +327,11 @@ pub unsafe extern "C" fn vswscanf(
     format: *const wchar_t,
     __valist: va_list,
 ) -> c_int {
-    unsafe { wscanf::scanf(s.into(), format.into(), __valist) }
-    /*
-        let reader = (s.cast::<wint_t>()).into();
-        unsafe { wscanf::scanf(reader, format, __valist) }
-    */
+    unsafe {
+        let format = WStr::from_ptr(format);
+        let s = WStr::from_ptr(s);
+        wscanf::scanf(s.into(), format.into(), __valist)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fwscanf.html>.
@@ -1035,12 +1035,11 @@ pub unsafe extern "C" fn vfwscanf(
 
     let f: &mut FILE = &mut *file;
     let reader: Reader = f.into();
-    unsafe { wscanf::scanf(reader, format.into(), __valist) }
-    /*
-        let f: &mut FILE = &mut file;
-        let reader: LookAheadReader = f.into();
-        unsafe { wscanf::scanf(reader, format, __valist) }
-    */
+
+    unsafe {
+        let format = WStr::from_ptr(format);
+        wscanf::scanf(reader, format.into(), __valist)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vwscanf.html>.
