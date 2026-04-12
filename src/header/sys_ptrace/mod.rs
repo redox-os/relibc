@@ -1,4 +1,4 @@
-//! `ptrace.h` implementation.
+//! `sys/ptrace.h` implementation.
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/ptrace.2.html>.
 
@@ -26,6 +26,7 @@ pub const PTRACE_SYSEMU: c_int = 31;
 pub const PTRACE_SYSEMU_SINGLESTEP: c_int = 32;
 
 // Can't use "params: ..." syntax, because... guess what? Cbingen again :(
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/ptrace.2.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ptrace(request: c_int, mut __valist: ...) -> c_int {
     // Musl also just grabs the arguments from the varargs...

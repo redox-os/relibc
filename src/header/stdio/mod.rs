@@ -578,10 +578,9 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
 
     helpers::_fdopen(fd, unsafe { CStr::from_ptr(mode) })
         .map(Box::into_raw)
-        .map_err(|err| {
+        .inspect_err(|err| {
             // TODO: guard type
             if let Ok(()) = Sys::close(fd) {}; // TODO handle error
-            err
         })
         .or_errno_null_mut()
 }

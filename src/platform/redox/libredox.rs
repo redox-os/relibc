@@ -12,7 +12,7 @@ use syscall::{
 
 use crate::{
     header::{
-        bits_iovec::iovec, bits_time::timespec, errno::EINVAL, signal::sigaction,
+        bits_iovec::iovec, bits_timespec::timespec, errno::EINVAL, signal::sigaction,
         sys_stat::UTIME_NOW,
     },
     out::Out,
