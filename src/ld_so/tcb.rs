@@ -50,7 +50,7 @@ pub struct Tcb {
     pub generic: GenericTcb<OsSpecific>,
     /// Pointer to a list of initial TLS data
     pub masters_ptr: *mut Master,
-    /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
+    /// Size of the masters list in bytes (multiple of `mem::size_of::<Master>()`)
     pub masters_len: usize,
     /// Index of last copied Master
     pub num_copied_masters: usize,

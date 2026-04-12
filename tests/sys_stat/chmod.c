@@ -1,5 +1,3 @@
-#define _GNU_SOURCE // Linux to run locally
-
 #include <fcntl.h>
 #include <limits.h>
 #include <stdbool.h>

@@ -5,7 +5,7 @@ use crate::{
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct timespec {
     pub tv_sec: time_t,
     pub tv_nsec: c_long,

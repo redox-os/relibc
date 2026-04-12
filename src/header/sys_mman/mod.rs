@@ -34,6 +34,7 @@ pub const MAP_TYPE: c_int = 0x000F;
 pub const MAP_ANON: c_int = 0x0020;
 pub const MAP_ANONYMOUS: c_int = MAP_ANON;
 pub const MAP_STACK: c_int = 0x20000;
+/// cbindgen:ignore
 pub const MAP_FAILED: *mut c_void = usize::wrapping_neg(1) as *mut c_void;
 
 pub const MREMAP_MAYMOVE: c_int = 1;

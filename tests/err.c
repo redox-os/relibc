@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// does not compile with glibc
+#ifndef __GLIBC__
+
 __attribute__((nonnull(2)))
 static void vwarn_test(int code, const char* fmt, ...) {
     va_list ap;
@@ -45,7 +48,14 @@ int main(void) {
     // two functions handle everything internally.
     errc(EXIT_SUCCESS, EUSERS, "Bye. It's crowded.");
 
+
     // Unreachable
     puts("err did not exit");
     return EXIT_FAILURE;
 }
+
+#else
+int main(void) {
+    exit(0);
+}
+#endif

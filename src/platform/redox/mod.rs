@@ -13,7 +13,7 @@ use redox_rt::{
 use syscall::{
     self, EILSEQ, ESRCH, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
     data::{Map, TimeSpec as redox_timespec},
-    dirent::{DirentHeader, DirentKind},
+    dirent::DirentHeader,
 };
 
 use self::{
@@ -26,7 +26,7 @@ use crate::{
     error::{Errno, Result},
     fs::File,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{
             EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM,
             ENOSYS, EOPNOTSUPP, EPERM,
@@ -102,7 +102,7 @@ macro_rules! path_from_c_str {
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
-/// Redox syscall implementation of the platform abstraction layer.
+/// Redox syscall implementation of [`Pal`].
 pub struct Sys;
 
 impl Pal for Sys {
@@ -270,7 +270,7 @@ impl Pal for Sys {
     }
 
     fn fchmod(fd: c_int, mode: mode_t) -> Result<()> {
-        syscall::fchmod(fd as usize, mode as u16)?;
+        libredox::fchmod(fd as usize, mode as u16)?;
         Ok(())
     }
 
@@ -279,16 +279,30 @@ impl Pal for Sys {
         if MASK & flags != 0 {
             return Err(Errno(EOPNOTSUPP));
         }
-        let path = path
+        let mut path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
+
+        if path.is_empty() {
+            if flags & AT_EMPTY_PATH == AT_EMPTY_PATH {
+                if dirfd == AT_FDCWD {
+                    path = ".";
+                } else {
+                    return Sys::fchmod(dirfd, mode);
+                }
+            } else {
+                // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
+                return Err(Errno(ENOENT));
+            }
+        }
+
         let file = openat2(dirfd, path, flags, 0)?;
-        syscall::fchmod(*file as usize, mode as u16)?;
+        libredox::fchmod(*file as usize, mode as u16)?;
         Ok(())
     }
 
     fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> Result<()> {
-        syscall::fchown(fd as usize, owner as u32, group as u32)?;
+        libredox::fchown(fd as usize, owner as u32, group as u32)?;
         Ok(())
     }
 
@@ -484,12 +498,12 @@ impl Pal for Sys {
     }
 
     fn fsync(fd: c_int) -> Result<()> {
-        syscall::fsync(fd as usize)?;
+        libredox::fsync(fd as usize)?;
         Ok(())
     }
 
     fn ftruncate(fd: c_int, len: off_t) -> Result<()> {
-        syscall::ftruncate(fd as usize, len as usize)?;
+        libredox::ftruncate(fd as usize, len as usize)?;
         Ok(())
     }
 
@@ -523,63 +537,7 @@ impl Pal for Sys {
     }
 
     fn getdents(fd: c_int, buf: &mut [u8], opaque: u64) -> Result<usize> {
-        //println!("GETDENTS {} into ({:p}+{})", fd, buf.as_ptr(), buf.len());
-
-        const HEADER_SIZE: usize = size_of::<DirentHeader>();
-
-        // Use syscall if it exists.
-        match unsafe {
-            syscall::syscall5(
-                syscall::SYS_GETDENTS,
-                fd as usize,
-                buf.as_mut_ptr() as usize,
-                buf.len(),
-                HEADER_SIZE,
-                opaque as usize,
-            )
-        } {
-            Err(Error {
-                errno: EOPNOTSUPP | ENOSYS,
-            }) => (),
-            other => {
-                //println!("REAL GETDENTS {:?}", other);
-                return Ok(other?);
-            }
-        }
-
-        // Otherwise, for legacy schemes, assume the buffer is pre-arranged (all schemes do this in
-        // practice), and just read the name. If multiple names appear, pretend it didn't happen
-        // and just use the first entry.
-
-        let (header, name) = buf.split_at_mut(size_of::<DirentHeader>());
-
-        let bytes_read = Sys::pread(fd, name, opaque as i64)? as usize;
-        if bytes_read == 0 {
-            return Ok(0);
-        }
-
-        let (name_len, advance) = match name[..bytes_read].iter().position(|c| *c == b'\n') {
-            Some(idx) => (idx, idx + 1),
-
-            // Insufficient space for NUL byte, or entire entry was not read. Indicate we need a
-            // larger buffer.
-            None if bytes_read == name.len() => return Err(Errno(EINVAL)),
-
-            None => (bytes_read, name.len()),
-        };
-        name[name_len] = b'\0';
-
-        let record_len = u16::try_from(size_of::<DirentHeader>() + name_len + 1)
-            .map_err(|_| Error::new(ENAMETOOLONG))?;
-        header.copy_from_slice(&DirentHeader {
-            inode: 0,
-            next_opaque_id: opaque + advance as u64,
-            record_len,
-            kind: DirentKind::Unspecified as u8,
-        });
-        //println!("EMULATED GETDENTS");
-
-        Ok(record_len.into())
+        Ok(libredox::getdents(fd as usize, buf, opaque)?)
     }
 
     fn dir_seek(_fd: c_int, _off: u64) -> Result<()> {
@@ -611,10 +569,52 @@ impl Pal for Sys {
         redox_rt::sys::posix_getresugid().rgid as gid_t
     }
 
-    fn getgroups(list: Out<[gid_t]>) -> Result<c_int> {
-        // TODO
-        todo_skip!(0, "getgroups({}, {:p}): not implemented", list.len(), list);
-        Err(Errno(ENOSYS))
+    fn getgroups(mut list: Out<[gid_t]>) -> Result<c_int> {
+        // FIXME: this operation doesn't scale when group/passwd file grows
+
+        let uid = Self::geteuid();
+        let pwd = crate::header::pwd::getpwuid(uid);
+
+        if pwd.is_null() {
+            return Err(Errno(ENOENT));
+        }
+
+        let username = unsafe { CStr::from_ptr((*pwd).pw_name) };
+        let username = username.to_bytes_with_nul();
+        let mut count = 0;
+
+        unsafe {
+            use crate::header::grp;
+            grp::setgrent();
+
+            while let Some(grp) = grp::getgrent().as_ref() {
+                let mut i = 0;
+                let mut found = false;
+
+                while !(*grp.gr_mem.offset(i)).is_null() {
+                    let member = CStr::from_ptr(*grp.gr_mem.offset(i));
+                    if member.to_bytes_with_nul() == username {
+                        found = true;
+                        break;
+                    }
+                    i += 1;
+                }
+
+                if found {
+                    if !list.is_empty() && (count as usize) < list.len() {
+                        list.index(count).write(grp.gr_gid);
+                    }
+                    count += 1;
+                }
+            }
+            grp::endgrent();
+        }
+
+        if !list.is_empty() && (count as usize) > list.len() {
+            return Err(Errno(EINVAL));
+        }
+
+        Ok(count as i32)
     }
 
     fn getpagesize() -> usize {
@@ -999,17 +999,18 @@ impl Pal for Sys {
         let length = length.get();
         let total_offset = offset.checked_add(length).ok_or(Errno(EFBIG))?;
 
-        let mut stat = syscall::Stat::default();
-        syscall::fstat(fd as usize, &mut stat)?;
+        let mut stat: stat = unsafe { mem::zeroed() };
+        unsafe { libredox::fstat(fd as usize, &mut stat)? };
+        let st_size = stat.st_size as u64;
         // The difference between total_offset and the file size is the number of bytes to
         // allocate. So, if it's negative then the file is already large enough and we don't
         // need to do any extra work.
         if let Some(total_len) = total_offset
-            .checked_sub(stat.st_size)
-            .and_then(|diff| stat.st_size.checked_add(diff))
+            .checked_sub(st_size)
+            .and_then(|diff| st_size.checked_add(diff))
         {
             let total_len: usize = total_len.try_into().map_err(|_| Errno(EFBIG))?;
-            syscall::ftruncate(fd as usize, total_len)?;
+            libredox::ftruncate(fd as usize, total_len)?;
         }
 
         Ok(())
@@ -1297,6 +1298,7 @@ impl Pal for Sys {
             timer_st.next_wake_time = itimerspec::default();
             timer_st.thread = ptr::null_mut();
             timer_st.caller_thread = caller_thread;
+            timer_st.process_pid = 0;
             timer_buf
         };
 
@@ -1325,7 +1327,7 @@ impl Pal for Sys {
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
 
         if timer_st.evp.sigev_notify == SIGEV_NONE {
-            if timespec::subtract(timer_st.next_wake_time.it_value, now).is_none() {
+            if timespec::subtract(timer_st.next_wake_time.it_value.clone(), now.clone()).is_none() {
                 // error here means the timer is disarmed
                 let _ = timer_update_wake_time(timer_st);
             }
@@ -1336,8 +1338,8 @@ impl Pal for Sys {
             itimerspec::default()
         } else {
             itimerspec {
-                it_interval: timer_st.next_wake_time.it_interval,
-                it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
+                it_interval: timer_st.next_wake_time.it_interval.clone(),
+                it_value: timespec::subtract(timer_st.next_wake_time.it_value.clone(), now)
                     .unwrap_or_default(),
             }
         });
@@ -1476,15 +1478,24 @@ impl Pal for Sys {
             Ok(())
         };
 
+        // The file format is currently as follows:
+        // <sysname>\n e.g. "Redox"
+        // <release>\n e.g. "0.9.0"
+        // <machine>\n e.g. "x86_64"
+        // <version>\n e.g. "yyyy-mm-ddThh:mm:ssZ"
+
+        // A future file format might add the domainname.
+
+        // nodename is handled above with /etc/hostname, and the domainname is
+        // currently zeroed out.
+
         read_line(sysname.as_slice_mut().cast_slice_to::<u8>())?;
         read_line(release.as_slice_mut().cast_slice_to::<u8>())?;
         read_line(machine.as_slice_mut().cast_slice_to::<u8>())?;
+        read_line(version.as_slice_mut().cast_slice_to::<u8>())?;
 
-        // Version is not provided
-        version.as_slice_mut().zero();
-
-        // Redox doesn't provide domainname in sys:uname
-        //read_line(domainname.as_slice_mut())?;
+        // Redox doesn't provide domainname in uname scheme
+        //read_line(domainname.as_slice_mut().cast_slice_to::<u8>())?;
         domainname.as_slice_mut().zero();
 
         Ok(())

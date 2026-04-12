@@ -91,8 +91,8 @@ install-libs: headers libs
 
 install-tests: tests
 	$(MAKE) -C tests
-	mkdir -p "$(DESTDIR)/bin/relibc-tests"
-	cp -vr tests/bins_static/* "$(DESTDIR)/bin/relibc-tests/"
+	mkdir -p "$(DESTDIR)/relibc-tests"
+	cp -vr tests/build_$(TARGET)/* "$(DESTDIR)/relibc-tests/"
 
 install: install-headers install-libs
 

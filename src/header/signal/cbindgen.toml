@@ -1,7 +1,7 @@
 sys_includes = ["bits/signal.h", "stdint.h", "sys/types.h", "bits/pthread.h", "features.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 after_includes = """
-#include <bits/time.h> // for timespec
+#include <bits/timespec.h> // for timespec
 #include <bits/signal.h>
 """
 language = "C"

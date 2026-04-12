@@ -6,7 +6,7 @@ use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
         signal::sigevent,
         stdlib::getenv,
@@ -66,6 +66,9 @@ pub(crate) struct timer_internal_t {
     pub caller_thread: crate::pthread::OsTid,
     // relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
+    // When non-zero, timer_routine delivers SIGALRM via kill(process_pid, sig)
+    // instead of rlct_kill (thread-specific). Used by alarm().
+    pub process_pid: platform::types::pid_t,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
@@ -480,7 +483,7 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
         (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
         (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
         (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
-        (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc() as _;
+        (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc().into();
         (*tm).tm_zone = tz_name.into_raw().cast();
     }
 
@@ -714,7 +717,7 @@ unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let offset = local_time.offset();
     t.tm_isdst = offset.dst_offset().num_hours() as _;
     // Get the UTC offset in seconds
-    t.tm_gmtoff = offset.fix().local_minus_utc() as _;
+    t.tm_gmtoff = offset.fix().local_minus_utc().into();
 
     let tm_zone = {
         let mut timezone_names = TIMEZONE_NAMES.lock();

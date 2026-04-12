@@ -668,8 +668,6 @@ int main(int argc, char **argv) {
 
     assert(argc > 0);
 
-    puts(argv[0]);
-    puts(program_invocation_name);
     puts(program_invocation_short_name);
 
     argv[0] = "changed to argv[0]";

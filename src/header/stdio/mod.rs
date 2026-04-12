@@ -140,8 +140,8 @@ pub struct FILE {
 impl Read for FILE {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
         let unget_read_size = cmp::min(out.len(), self.unget.len());
-        for i in 0..unget_read_size {
-            out[i] = self.unget.pop().unwrap();
+        for inner in out.iter_mut().take(unget_read_size) {
+            *inner = self.unget.pop().unwrap();
         }
         if unget_read_size != 0 {
             return Ok(unget_read_size);
@@ -578,10 +578,9 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
 
     helpers::_fdopen(fd, unsafe { CStr::from_ptr(mode) })
         .map(Box::into_raw)
-        .map_err(|err| {
+        .inspect_err(|err| {
             // TODO: guard type
             if let Ok(()) = Sys::close(fd) {}; // TODO handle error
-            err
         })
         .or_errno_null_mut()
 }

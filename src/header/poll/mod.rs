@@ -7,7 +7,7 @@ use core::{mem, ptr, slice};
 use crate::{
     fs::File,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         errno::EBADF,
         signal::sigset_t,
         sys_epoll::{
@@ -66,8 +66,8 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
     };
 
     let mut closed = 0;
-    for i in 0..fds.len() {
-        let pfd = &mut fds[i];
+    for (i, fd) in fds.iter_mut().enumerate() {
+        let pfd = fd;
 
         pfd.revents = 0;
 

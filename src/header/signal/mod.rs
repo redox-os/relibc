@@ -2,13 +2,13 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 
-use core::{arch::global_asm, mem, ptr};
+use core::{mem, ptr};
 
 use cbitset::BitSet;
 
 use crate::{
     error::{Errno, ResultExt},
-    header::{bits_time::timespec, errno, setjmp},
+    header::{bits_timespec::timespec, errno, setjmp},
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{
@@ -110,24 +110,6 @@ pub type siginfo_t = siginfo;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>
 pub type stack_t = sigaltstack;
-
-#[cfg(target_arch = "aarch64")]
-global_asm!(include_str!("sigsetjmp/aarch64/sigsetjmp.s"));
-
-#[cfg(target_arch = "riscv64")]
-global_asm!(include_str!("sigsetjmp/riscv64/sigsetjmp.s"));
-
-#[cfg(target_arch = "x86")]
-global_asm!(
-    include_str!("sigsetjmp/i386/sigsetjmp.s"),
-    options(att_syntax)
-);
-
-#[cfg(target_arch = "x86_64")]
-global_asm!(
-    include_str!("sigsetjmp/x86_64/sigsetjmp.s"),
-    options(att_syntax)
-);
 
 unsafe extern "C" {
     pub fn sigsetjmp(jb: *mut u64, savemask: i32) -> i32;
@@ -296,6 +278,7 @@ pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
 /// Present in issue 7. Removed in issue 8.
 ///
 /// Use of this function is unspecified in a multi-threaded process.
+#[allow(clippy::missing_transmute_annotations)]
 #[unsafe(no_mangle)]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
@@ -342,6 +325,7 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/signal.html>.
+#[allow(clippy::missing_transmute_annotations)]
 #[unsafe(no_mangle)]
 pub extern "C" fn signal(
     sig: c_int,

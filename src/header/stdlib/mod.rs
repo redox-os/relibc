@@ -4,8 +4,8 @@
 
 use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
 use rand::{
-    Rng, SeedableRng,
-    distributions::{Alphanumeric, Distribution, Uniform},
+    RngExt, SeedableRng,
+    distr::{Alphanumeric, Distribution, Uniform},
 };
 use rand_jitter::JitterRng;
 use rand_xorshift::XorShiftRng;
@@ -66,7 +66,7 @@ static mut RNG: Option<XorShiftRng> = None;
 static RNG_SAMPLER: Once<Uniform<c_int>> = Once::new();
 
 fn rng_sampler() -> &'static Uniform<c_int> {
-    RNG_SAMPLER.call_once(|| Uniform::new_inclusive(0, RAND_MAX))
+    RNG_SAMPLER.call_once(|| Uniform::new_inclusive(0, RAND_MAX).expect("within bounds"))
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/_Exit.html>.
@@ -1248,19 +1248,24 @@ pub unsafe extern "C" fn secure_getenv(name: *const c_char) -> *mut c_char {
 /// state.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
-    static mut BUFFER: [c_ushort; 3] = [0; 3];
+    static RETURN_BUFFER: RawCell<[c_ushort; 3]> = RawCell::new([0; 3]);
 
     let mut params = rand48::params_mut();
     let mut xsubi = rand48::xsubi_lock();
 
+    // SAFETY: the caller is required to ensure seed16v is convertible to
+    // &[c_ushort; 3].
     let seed16v_ref: &[c_ushort; 3] = unsafe { slice::from_raw_parts(seed16v, 3) }
         .try_into()
         .unwrap();
 
-    unsafe { BUFFER = (*xsubi).into() };
+    // SAFETY: the caller is required to ensure exclusive access to
+    // RETURN_BUFFER.
+    let return_buffer_mut = unsafe { RETURN_BUFFER.unsafe_mut() };
+    *return_buffer_mut = (*xsubi).into();
     *xsubi = seed16v_ref.into();
     params.reset();
-    (&raw mut BUFFER).cast()
+    RETURN_BUFFER.as_mut_ptr().cast()
 }
 
 unsafe fn copy_kv(
@@ -1425,7 +1430,7 @@ pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
         unsafe { convert_integer(s.offset(2), 16) }
             .map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
-        unsafe { convert_integer(s, 16) }.map(|(val, idx, overflow)| (val, idx, overflow))
+        unsafe { convert_integer(s, 16) }
     }
 }
 

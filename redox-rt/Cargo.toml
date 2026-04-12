@@ -9,13 +9,13 @@ description = "Libc-independent runtime for Redox"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags = "2"
-goblin = { version = "0.7", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
-plain = "0.2"
-ioslice = { version = "0.6", default-features = false }
-redox_syscall = "0.7"
-redox-path = "0.3.0"
-redox_protocols = { package = "libredox", version = "0.1.14", default-features = false, features = ["protocol"] }
+bitflags.workspace = true
+goblin = { version = "0.10", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
+plain.workspace = true
+ioslice.workspace = true
+redox_syscall.workspace = true
+redox-path.workspace = true
+redox_protocols.workspace = true
 
 generic-rt = { path = "../generic-rt" }
 

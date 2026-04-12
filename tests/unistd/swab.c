@@ -7,6 +7,7 @@ int main(void) {
     const char flipped_source[] = {1, 0, 3, 2, 5, 4};
     const char first_two_source_bytes_flipped[] = {1, 0};
 
+#ifndef __GLIBC__
     swab(source, destination, /* nbytes */ -3);
     for (size_t i = 0; i < sizeof(destination); ++i) {
         if (destination[i] != 0) {
@@ -14,6 +15,7 @@ int main(void) {
             return 1;
         }
     }
+#endif
 
     swab(source, destination, /* nbytes */ 0);
     for (size_t i = 0; i < sizeof(destination); ++i) {

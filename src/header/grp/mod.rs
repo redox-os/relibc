@@ -395,7 +395,7 @@ pub unsafe extern "C" fn getgrnam_r(
                 grp.reference.gr_name,
                 name,
                 strlen(grp.reference.gr_name).min(strlen(name)),
-            ) > 0
+            ) == 0
         } {
             unsafe {
                 *result_buf = grp.reference;

@@ -23,6 +23,10 @@ use crate::{
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 ///
+/// Note that the `timeval` struct was specified for
+/// [`sys/time.h`](crate::header::sys_time) in the Open Group Base
+/// Specifications Issue 7 and prior, see
+/// <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
 #[repr(C)]
 #[derive(Default)]
 pub struct timeval {
@@ -131,8 +135,12 @@ pub fn select_epoll(
     } else {
         match timeout {
             Some(timeout) => {
-                //TODO: Check for overflow
-                ((timeout.tv_sec as c_int) * 1000) + ((timeout.tv_usec as c_int) / 1000)
+                let sec_ms = (timeout.tv_sec as c_int).checked_mul(1000);
+                let usec_ms = (timeout.tv_usec as c_int) / 1000;
+                match sec_ms.and_then(|s| s.checked_add(usec_ms)) {
+                    Some(s) => s as c_int,
+                    None => c_int::MAX,
+                }
             }
             None => -1,
         }

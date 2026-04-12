@@ -95,6 +95,8 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0x0D => unsafe { dev.write_ioctl::<drm_set_client_cap>(buf, SET_CLIENT_CAP) },
         0xA0 => unsafe { dev.read_write_ioctl::<drm_mode_card_res>(buf, MODE_CARD_RES) },
         0xA1 => unsafe { dev.read_write_ioctl::<drm_mode_crtc>(buf, MODE_GET_CRTC) },
+        0xA2 => unsafe { dev.read_write_ioctl::<drm_mode_crtc>(buf, MODE_SET_CRTC) },
+        0xA3 => unsafe { dev.write_ioctl::<drm_mode_cursor>(buf, MODE_CURSOR) },
         0xA6 => unsafe { dev.read_write_ioctl::<drm_mode_get_encoder>(buf, MODE_GET_ENCODER) },
         0xA7 => unsafe { dev.read_write_ioctl::<drm_mode_get_connector>(buf, MODE_GET_CONNECTOR) },
         0xAA => unsafe { dev.read_write_ioctl::<drm_mode_get_property>(buf, MODE_GET_PROPERTY) },
@@ -105,6 +107,10 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xAD => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_GET_FB) },
         0xAE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_ADD_FB) },
         0xAF => unsafe { dev.read_write_ioctl::<standin_for_uint>(buf, MODE_RM_FB) },
+        0xB0 => unsafe {
+            dev.read_write_ioctl::<drm_mode_crtc_page_flip_target>(buf, MODE_PAGE_FLIP)
+        },
+        0xB1 => unsafe { dev.read_write_ioctl::<drm_mode_fb_dirty_cmd>(buf, MODE_DIRTYFB) },
         0xB2 => unsafe { dev.read_write_ioctl::<drm_mode_create_dumb>(buf, MODE_CREATE_DUMB) },
         0xB3 => unsafe { dev.read_write_ioctl::<drm_mode_map_dumb>(buf, MODE_MAP_DUMB) },
         0xB4 => unsafe { dev.read_write_ioctl::<drm_mode_destroy_dumb>(buf, MODE_DESTROY_DUMB) },
@@ -113,6 +119,7 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xB9 => unsafe {
             dev.read_write_ioctl::<drm_mode_obj_get_properties>(buf, MODE_OBJ_GET_PROPERTIES)
         },
+        0xBB => unsafe { dev.write_ioctl::<drm_mode_cursor2>(buf, MODE_CURSOR2) },
         0xCE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_GET_FB2) },
         _ => {
             todo_skip!(

@@ -13,12 +13,14 @@ use crate::{
     error::ResultExt,
     header::{
         arpa_inet::inet_aton,
+        bits_arpainet::{htons, ntohl},
+        bits_socklen_t::socklen_t,
         errno::*,
         fcntl::O_RDONLY,
-        netinet_in::{htons, in_addr, ntohl, sockaddr_in, sockaddr_in6},
+        netinet_in::{in_addr, sockaddr_in, sockaddr_in6},
         stdlib::atoi,
         strings::strcasecmp,
-        sys_socket::{constants::AF_INET, sa_family_t, sockaddr, socklen_t},
+        sys_socket::{constants::AF_INET, sa_family_t, sockaddr},
         unistd::SEEK_SET,
     },
     platform::{
@@ -238,7 +240,7 @@ pub unsafe extern "C" fn gethostbyaddr(
         H_ERRNO.set(NO_RECOVERY);
         return ptr::null_mut();
     }
-    let addr: in_addr = unsafe { *(v as *mut in_addr) };
+    let addr: in_addr = unsafe { (*(v as *mut in_addr)).clone() };
 
     // check the hosts file first
     let mut p: *mut hostent;
@@ -276,7 +278,7 @@ pub unsafe extern "C" fn gethostbyaddr(
     host_aliases.push(ptr::null_mut());
     unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
 
-    match lookup_addr(addr).map(|host_names| host_names.into_iter().next()) {
+    match lookup_addr(addr.clone()).map(|host_names| host_names.into_iter().next()) {
         Ok(Some(host_name)) => {
             unsafe { _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes() };
             unsafe {

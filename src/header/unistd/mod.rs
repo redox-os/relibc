@@ -13,7 +13,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         crypt::{crypt_data, crypt_r},
         errno::{self, ENAMETOOLONG},
         fcntl, limits,
@@ -24,7 +24,7 @@ use crate::{
     },
     out::Out,
     platform::{
-        self, ERRNO, Pal, Sys,
+        self, ERRNO, Pal, PalSignal, Sys,
         types::{
             c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
             size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
@@ -137,28 +137,7 @@ pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
-    // TODO setitimer is unimplemented on Redox and obsolete
-    let timer = sys_time::itimerval {
-        it_value: timeval {
-            tv_sec: time_t::from(seconds),
-            tv_usec: 0,
-        },
-        ..Default::default()
-    };
-    let mut otimer = sys_time::itimerval::default();
-
-    let errno_backup = platform::ERRNO.get();
-    let secs =
-        if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &raw const timer, &raw mut otimer) }
-            < 0
-        {
-            0
-        } else {
-            otimer.it_value.tv_sec as c_uint + if otimer.it_value.tv_usec > 0 { 1 } else { 0 }
-        };
-    platform::ERRNO.set(errno_backup);
-
-    secs
+    Sys::alarm(seconds)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chdir.html>.
@@ -482,9 +461,9 @@ pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut 
             .expect("no nul-byte in getcwd string")
             + 1;
         let heap_buf = unsafe { platform::alloc(len).cast::<c_char>() };
-        for i in 0..len {
+        for (i, inner) in stack_buf.iter().enumerate().take(len) {
             unsafe {
-                *heap_buf.add(i) = stack_buf[i];
+                *heap_buf.add(i) = *inner;
             }
         }
         heap_buf
@@ -1160,9 +1139,13 @@ pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
+    #[cfg(not(target_arch = "x86"))]
+    let tv_nsec = c_long::from((useconds % 1_000_000) * 1000);
+    #[cfg(target_arch = "x86")]
+    let tv_nsec = ((useconds % 1_000_000) * 1000) as c_long;
     let rqtp = timespec {
         tv_sec: time_t::from(useconds / 1_000_000),
-        tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
+        tv_nsec,
     };
     let rmtp = ptr::null_mut();
     unsafe { Sys::nanosleep(&raw const rqtp, rmtp) }
@@ -1213,8 +1196,8 @@ unsafe fn with_argv(
     };
     out[0].write(arg0);
 
-    for i in 1..argc {
-        out[i].write(unsafe { va.arg::<*const c_char>() });
+    for inner in out.iter_mut().take(argc).skip(1) {
+        (*inner).write(unsafe { va.arg::<*const c_char>() });
     }
     out[argc].write(core::ptr::null());
     // NULL

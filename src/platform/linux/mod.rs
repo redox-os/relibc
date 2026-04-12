@@ -4,7 +4,9 @@ use core::arch::asm;
 use super::{Pal, types::*};
 use crate::{
     c_str::CStr,
+    error::{Errno, Result},
     header::{
+        bits_timespec::timespec,
         dirent::dirent,
         errno::{EINVAL, EIO},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
@@ -14,6 +16,7 @@ use crate::{
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
+        sys_utsname::utsname,
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET},
     },
@@ -22,10 +25,6 @@ use crate::{
 };
 use core::{num::NonZeroU64, ptr};
 // use header::sys_times::tms;
-use crate::{
-    error::{Errno, Result},
-    header::{bits_time::timespec, sys_utsname::utsname},
-};
 
 mod epoll;
 mod ptrace;
@@ -67,7 +66,7 @@ pub fn e_raw(sys: usize) -> Result<usize> {
     }
 }
 
-/// Linux syscall implementation of the platform abstraction layer.
+/// Linux syscall implementation of [`Pal`].
 pub struct Sys;
 
 impl Sys {

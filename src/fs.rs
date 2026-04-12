@@ -3,9 +3,11 @@ use crate::{
     error::{Errno, ResultExt},
     header::{
         fcntl::O_CREAT,
+        sys_stat::stat,
         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
     },
     io,
+    out::Out,
     platform::{Pal, Sys, types::*},
 };
 use core::ops::Deref;
@@ -55,6 +57,12 @@ impl File {
 
     pub fn set_len(&self, size: u64) -> Result<(), Errno> {
         Sys::ftruncate(self.fd, size as off_t).map_err(Errno::sync)
+    }
+
+    pub fn fstat(&self) -> Result<stat, Errno> {
+        let mut file_st = stat::default();
+        Sys::fstat(self.fd, Out::from_mut(&mut file_st)).map_err(Errno::sync)?;
+        Ok(file_st)
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {

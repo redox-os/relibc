@@ -6,7 +6,7 @@ use crate::{
     c_str::CStr,
     error::ResultExt,
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         fcntl::{O_NOFOLLOW, O_PATH},
     },
     out::Out,

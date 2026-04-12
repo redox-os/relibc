@@ -62,21 +62,28 @@ unused_variables = "allow" # TODO review occurrences (too many for now)
 [lints]
 workspace = true
 
+[workspace.dependencies]
+bitflags = "2"
+ioslice = { version = "0.6", default-features = false }
+plain = "0.2"
+redox-path = "0.3"
+redox_protocols = { package = "libredox", version = "0.1.14", default-features = false, features = ["protocol"] }
+redox_syscall = "0.7.3"
+
 [build-dependencies]
 cc = "1"
 
 [dependencies]
-bitflags = "2"
+bitflags.workspace = true
 cbitset = "0.2"
 posix-regex = { version = "0.1.4", features = ["no_std"] }
 
-# TODO: For some reason, rand_jitter hasn't been updated to use the latest rand_core
-rand = { version = "0.8", default-features = false, features = ["small_rng"] }
-rand_xorshift = "0.3"
-rand_jitter = "0.4"
+rand = { version = "0.10", default-features = false }
+rand_xorshift = "0.5"
+rand_jitter = "0.6"
 
 memchr = { version = "2.2.0", default-features = false }
-plain = "0.2"
+plain.workspace = true
 unicode-width = "0.1"
 __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
 md5-crypto = { package = "md-5", version = "0.10.6", default-features = false }
@@ -111,20 +118,21 @@ features = ["elf", "read_core"]
 sc = "0.2.7"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.7.3"
+redox_syscall.workspace = true
 redox-rt = { path = "redox-rt" }
-redox-path = "0.3"
+redox-path.workspace = true
 redox_event = { version = "0.4.6", default-features = false, features = [
     "redox_syscall",
 ] }
-ioslice = { version = "0.6", default-features = false }
+ioslice.workspace = true
 redox-ioctl = { path = "redox-ioctl" }
-redox_protocols = { package = "libredox", version = "0.1.14", default-features = false, features = ["protocol"] }
+redox_protocols.workspace = true
 
 [features]
 # to enable trace level, take out this `no_trace`
-default = ["check_against_libc_crate", "no_trace"]
+default = ["check_against_libc_crate", "ld_so_cache", "no_trace"]
 check_against_libc_crate = ["__libc_only_for_layout_checks"]
+ld_so_cache = []
 no_trace = ["log/release_max_level_debug"]
 # for very verbose activity beyond trace level
 trace_tls = []

@@ -90,6 +90,7 @@ impl<W: WriteByte> WriteByte for &mut W {
     }
 }
 
+/// An implementation of [`core::fmt::Write`] for a file descriptor.
 pub struct FileWriter(pub c_int, Option<Errno>);
 
 impl FileWriter {
@@ -120,6 +121,7 @@ impl WriteByte for FileWriter {
     }
 }
 
+/// An implementation of [`Read`] for a file descriptor.
 pub struct FileReader(pub c_int);
 
 impl FileReader {
@@ -144,6 +146,7 @@ impl Read for FileReader {
     }
 }
 
+/// An implementation of [`Write`]/[`core::fmt::Write`] for a byte array.
 pub struct StringWriter(pub *mut u8, pub usize);
 impl Write for StringWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -184,6 +187,8 @@ impl WriteByte for StringWriter {
     }
 }
 
+/// An implementation of [`Write`]/[`core::fmt::Write`] for a byte array,
+/// without buffer overflow protection.
 pub struct UnsafeStringWriter(pub *mut u8);
 impl Write for UnsafeStringWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -213,16 +218,18 @@ impl WriteByte for UnsafeStringWriter {
     }
 }
 
+/// An implementation of [`Read`] for a byte array, without buffer over-read
+/// protection.
 pub struct UnsafeStringReader(pub *const u8);
 impl Read for UnsafeStringReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         unsafe {
-            for i in 0..buf.len() {
+            for (i, inner) in buf.iter_mut().enumerate() {
                 if *self.0 == 0 {
                     return Ok(i);
                 }
 
-                buf[i] = *self.0;
+                *inner = *self.0;
                 self.0 = self.0.offset(1);
             }
             Ok(buf.len())
@@ -230,6 +237,8 @@ impl Read for UnsafeStringReader {
     }
 }
 
+/// A wrapper that keeps track of the number of bytes written with the
+/// underlying writer `T`.
 pub struct CountingWriter<T> {
     pub inner: T,
     pub written: usize,

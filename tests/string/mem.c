@@ -21,7 +21,7 @@ int main(void) {
     puts("Correct memrchr");
     char arr2[51];
     memset(arr2, 0, 51); // Compiler builtin, should work
-    memccpy((void *)arr2, (void *)arr, 1, 100);
+    memccpy((void *)arr2, (void *)arr, 1, 51);
     if (arr[50] != 1) {
         puts("Incorrect memccpy");
         exit(EXIT_FAILURE);

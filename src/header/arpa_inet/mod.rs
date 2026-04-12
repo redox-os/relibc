@@ -10,9 +10,11 @@ use core::{
 use crate::{
     c_str::CStr,
     header::{
+        bits_arpainet::ntohl,
+        bits_socklen_t::socklen_t,
         errno::{EAFNOSUPPORT, ENOSPC},
-        netinet_in::{INADDR_NONE, in_addr, in_addr_t, ntohl},
-        sys_socket::{constants::AF_INET, socklen_t},
+        netinet_in::{INADDR_NONE, in_addr, in_addr_t},
+        sys_socket::constants::AF_INET,
     },
     platform::{
         self,
@@ -212,9 +214,13 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
         };
         let src_cstr = unsafe { CStr::from_ptr(src) };
         let mut octets = unsafe { str::from_utf8_unchecked(src_cstr.to_bytes()).split('.') };
-        for i in 0..4 {
-            if let Some(n) = octets.next().and_then(|x| u8::from_str(x).ok()) {
-                s_addr[i] = n;
+        for part in s_addr.iter_mut().take(4) {
+            if let Some(n) = octets
+                .next()
+                .filter(|x| !x.len() > 3)
+                .and_then(|x| u8::from_str(x).ok())
+            {
+                *part = n;
             } else {
                 return 0;
             }

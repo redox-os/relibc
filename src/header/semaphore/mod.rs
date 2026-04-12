@@ -4,7 +4,7 @@
 
 use crate::{
     header::{
-        bits_time::timespec,
+        bits_timespec::timespec,
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME},
     },
     platform::types::{c_char, c_int, c_long, c_uint, clockid_t},
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn sem_clockwait(
     clock_id: clockid_t,
     abstime: *const timespec,
 ) -> c_int {
-    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), clock_id) {}; // TODO handle error
+    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { (*abstime).clone() }), clock_id) {}; // TODO handle error
 
     0
 }
@@ -104,7 +104,8 @@ pub unsafe extern "C" fn sem_clockwait(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_timedwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec) -> c_int {
-    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), CLOCK_REALTIME) {}; // TODO handle error
+    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { (*abstime).clone() }), CLOCK_REALTIME) {
+    }; // TODO handle error
 
     0
 }

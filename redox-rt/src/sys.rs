@@ -6,7 +6,7 @@ use core::{
 
 use ioslice::IoSlice;
 use syscall::{
-    CallFlags, EINVAL, ERESTART, TimeSpec,
+    CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
     data::StdFsCallMeta,
     error::{self, EINTR, ENODEV, ESRCH, Error, Result},
 };
@@ -526,4 +526,7 @@ pub fn std_fs_call_wo(fd: usize, payload: &[u8], metadata: &StdFsCallMeta) -> Re
 }
 pub fn std_fs_call_rw(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
     sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
+    std_fs_call_ro(fd, stat, &StdFsCallMeta::new(StdFsCallKind::Fstat, 0, 0))
 }

@@ -444,9 +444,23 @@ fn pad<W: Write>(
     Ok(())
 }
 
-fn float_string(float: c_double, precision: usize, trim: bool) -> String {
+fn float_string(float: c_double, precision: usize, trim: bool, alternate: bool) -> String {
+    // The Rust format! macro doesn't keep the dot on precision = 0 and alternate = true,
+    // so we have to perform a fix-up
+    //
+    // POSIX.1-2024 says "... if the precision is zero and no '#' flag is present,
+    // no radix character shall appear."
+    //
+    // This case is covered here.
     let mut string = format!("{:.p$}", float, p = precision);
-    if trim && string.contains('.') {
+    //
+    // Additionally, it says "For a, A, e, E, f, F, g, and G conversion specifiers,
+    // the result shall always contain a radix character, even if no digits follow
+    // the radix character."
+    //
+    if alternate && precision == 0 {
+        string.push('.');
+    } else if trim && string.contains('.') {
         let truncate = {
             let slice = string.trim_end_matches('0');
             let mut truncate = slice.len();
@@ -477,6 +491,7 @@ fn fmt_float_exp<W: Write>(
     w: &mut W,
     exp_fmt: char,
     trim: bool,
+    alternate: bool,
     precision: usize,
     float: c_double,
     exp: isize,
@@ -491,7 +506,7 @@ fn fmt_float_exp<W: Write>(
         exp_len += 1;
     }
 
-    let string = float_string(float, precision, trim);
+    let string = float_string(float, precision, trim, alternate);
     let len = string.len() + 2 + 2.max(exp_len);
 
     pad(w, !left, b' ', len..pad_space)?;
@@ -512,13 +527,14 @@ fn fmt_float_exp<W: Write>(
 fn fmt_float_normal<W: Write>(
     w: &mut W,
     trim: bool,
+    alternate: bool,
     precision: usize,
     float: c_double,
     left: bool,
     pad_space: usize,
     pad_zero: usize,
 ) -> io::Result<usize> {
-    let string = float_string(float, precision, trim);
+    let string = float_string(float, precision, trim, alternate);
 
     pad(w, !left, b' ', string.len()..pad_space)?;
     let bytes = if string.starts_with('-') {
@@ -610,9 +626,8 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
         self.format = first_percent.split_first().expect("must be %").1;
 
         let mut peekahead = self.format;
-        let index = pop_index(&mut peekahead).map(|i| {
+        let index = pop_index(&mut peekahead).inspect(|i| {
             self.format = peekahead;
-            i
         });
 
         // Flags:
@@ -705,6 +720,16 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
             }
             _ => return Some(Err(())),
         };
+        // "For b, B, d, i, o, u, x, and X conversions,
+        // if a precision is specified, the 0 flag is ignored."
+        match fmt {
+            'b' | 'B' | 'd' | 'i' | 'o' | 'u' | 'x' | 'X' => {
+                if precision.is_some() {
+                    zero = false;
+                }
+            }
+            _ => (),
+        }
 
         Some(Ok(PrintfFmt::Arg(PrintfArg {
             index,
@@ -951,7 +976,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
-                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&raw const i) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
@@ -959,7 +984,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     let precision = precision.unwrap_or(6);
 
                     fmt_float_exp(
-                        w, fmt, false, precision, float, exp, left, pad_space, pad_zero,
+                        w, fmt, false, alternate, precision, float, exp, left, pad_space, pad_zero,
                     )?;
                 } else {
                     fmt_float_nonfinite(w, float, fmtcase.unwrap(), left, pad_space, pad_zero)?;
@@ -970,13 +995,15 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
-                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&raw const i) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
                     let precision = precision.unwrap_or(6);
 
-                    fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
+                    fmt_float_normal(
+                        w, false, alternate, precision, float, left, pad_space, pad_zero,
+                    )?;
                 } else {
                     fmt_float_nonfinite(w, float, fmtcase.unwrap(), left, pad_space, pad_zero)?;
                 }
@@ -986,7 +1013,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
-                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&raw const i) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
@@ -1001,7 +1028,8 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         // because that's how x/floor(log10(x)) works
                         let precision = precision.saturating_sub(1);
                         fmt_float_exp(
-                            w, exp_fmt, !alternate, precision, log, exp, left, pad_space, pad_zero,
+                            w, exp_fmt, !alternate, alternate, precision, log, exp, left,
+                            pad_space, pad_zero,
                         )?;
                     } else {
                         // Length of integral part will be the exponent of
@@ -1011,7 +1039,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         let len = 1 + cmp::max(0, exp) as usize;
                         let precision = precision.saturating_sub(len);
                         fmt_float_normal(
-                            w, !alternate, precision, float, left, pad_space, pad_zero,
+                            w, !alternate, alternate, precision, float, left, pad_space, pad_zero,
                         )?;
                     }
                 } else {

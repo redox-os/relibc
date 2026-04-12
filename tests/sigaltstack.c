@@ -40,7 +40,8 @@ int main(void) {
     int status;
 
     stack_size = 1024 * 1024; // TODO?
-    assert(stack_size >= MINSIGSTKSZ * 100);
+    // in glibc MINSIGSTKSZ is a sysconf(MINSIGSTKSZ) macro
+    assert(stack_size >= (size_t)MINSIGSTKSZ * 100);
     stack_base = mmap(NULL, stack_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     ERROR_IF(mmap, stack_base, == MAP_FAILED);
 

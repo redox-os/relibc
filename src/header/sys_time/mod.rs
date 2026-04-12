@@ -1,11 +1,15 @@
 //! `sys/time.h` implementation.
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_time.h.html>.
+//!
+//! Note that since the Open Group Base Specifications Issue 8, the
+//! [`timeval`] struct has been moved to
+//! the [`sys/select.h`](crate::header::sys_select) header.
 
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    header::{bits_time::timespec, sys_select::timeval},
+    header::{bits_timespec::timespec, sys_select::timeval},
     out::Out,
     platform::{
         Pal, PalSignal, Sys,
@@ -37,14 +41,6 @@ pub const ITIMER_VIRTUAL: c_int = 1;
 /// Group Base Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
 pub const ITIMER_PROF: c_int = 2;
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_time.h.html>.
-///
-/// TODO: specified for `sys/select.h` in modern POSIX?
-#[repr(C)]
-pub struct fd_set {
-    pub fds_bits: [c_long; 16usize],
-}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
 ///
@@ -131,11 +127,11 @@ pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c
         [
             timespec {
                 tv_sec: unsafe { (*times.offset(0)).tv_sec },
-                tv_nsec: (unsafe { (*times.offset(0)).tv_usec } as c_long) * 1000,
+                tv_nsec: c_long::from(unsafe { (*times.offset(0)).tv_usec }) * 1000,
             },
             timespec {
                 tv_sec: unsafe { (*times.offset(1)).tv_sec },
-                tv_nsec: (unsafe { (*times.offset(1)).tv_usec } as c_long) * 1000,
+                tv_nsec: c_long::from(unsafe { (*times.offset(1)).tv_usec }) * 1000,
             },
         ]
         .as_ptr()

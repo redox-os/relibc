@@ -4,19 +4,19 @@
 .type __sigsetjmp,@function
 sigsetjmp:
 __sigsetjmp:
-	test %esi,%esi
+	test esi, esi
 	jz 1f
 
-	popq 64(%rdi)
-	mov %rbx,72+8(%rdi)
-	mov %rdi,%rbx
+	pop [rdi + 64]
+	mov qword ptr [rdi + 8 + 72], rbx
+	mov rbx, rdi
 
 	call setjmp
 
-	pushq 64(%rbx)
-	mov %rbx,%rdi
-	mov %eax,%esi
-	mov 72+8(%rbx),%rbx
+	push [rbx + 64]
+	mov rdi, rbx
+	mov esi, eax
+	mov rbx, qword ptr [rbx + 8 + 72]
 
 .hidden __sigsetjmp_tail
 	jmp __sigsetjmp_tail

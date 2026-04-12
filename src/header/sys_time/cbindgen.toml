@@ -1,9 +1,28 @@
-sys_includes = ["sys/types.h", "features.h", "sys/select.h"]
+# sys/types.h brings in features.h (needed for #[deprecated] annotations)
+sys_includes = ["sys/types.h", "sys/select.h"]
 include_guard = "_SYS_TIME_H"
 language = "C"
 after_includes = """
-#include <bits/time.h> // for timespec
-#include <bits/sys/time.h>
+#include <bits/timespec.h> // for timespec
+
+#define timeradd(x,y,res) (void) (\
+        (res)->tv_sec = (x)->tv_sec + (y)->tv_sec + (((x)->tv_usec + (y)->tv_usec) / 1000000), \
+        (res)->tv_usec = ((x)->tv_usec + (y)->tv_usec) % 1000000 \
+    )
+#define timersub(x,y,res) (void) ( \
+        (res)->tv_sec = (x)->tv_sec - (y)->tv_sec, \
+        (res)->tv_usec = ((x)->tv_usec - (y)->tv_usec), \
+        ((res)->tv_usec < 0) && ((res)->tv_sec -= 1, (res)->tv_usec += 1000000) \
+    )
+#define timerclear(t) (void) ( \
+        (t)->tv_sec = 0, \
+        (t)->tv_usec = 0 \
+    )
+#define timerisset(t) ((t)->tv_sec || (t)->tv_usec)
+#define timercmp(x,y,op) ((x)->tv_sec == (y)->tv_sec ? \
+    (x)->tv_usec op (y)->tv_usec \
+    : \
+    (x)->tv_sec op (y)->tv_sec)
 """
 style = "Tag"
 no_includes = true
