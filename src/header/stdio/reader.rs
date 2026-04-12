@@ -1,39 +1,29 @@
 use super::{FILE, SEEK_SET, fseek_locked, ftell_locked};
-use crate::{
-    io::Read,
-    platform::types::{c_char, off_t},
-};
+use crate::{c_str::CStr, io::Read, platform::types::off_t};
 use core::iter::Iterator;
 
-struct BufferReader {
-    buf: *const u8,
-    position: usize,
+pub(crate) struct BufferReader<'a> {
+    buf: CStr<'a>,
 }
 
-impl From<*const u8> for BufferReader {
-    fn from(buff: *const u8) -> Self {
-        Self {
-            buf: buff,
-            position: 0,
-        }
+impl<'a> From<CStr<'a>> for BufferReader<'a> {
+    fn from(buff: CStr<'a>) -> Self {
+        Self { buf: buff }
     }
 }
 
-impl Iterator for BufferReader {
+impl<'a> Iterator for BufferReader<'a> {
     type Item = Result<u8, i32>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let byte = unsafe { *self.buf.add(self.position) };
-        if byte == 0 {
-            None
-        } else {
-            self.position += 1;
-            Some(Ok(byte))
-        }
+        self.buf.split_first_char().map(|(c, r)| {
+            self.buf = r;
+            u8::try_from(c).map_err(|_| -1)
+        })
     }
 }
 
-struct FileReader<'a> {
+pub(crate) struct FileReader<'a> {
     f: &'a mut FILE,
     position: off_t,
 }
@@ -65,7 +55,7 @@ impl<'a> From<&'a mut FILE> for FileReader<'a> {
 
 pub enum Reader<'a> {
     FILE(FileReader<'a>),
-    BUFFER(BufferReader),
+    BUFFER(BufferReader<'a>),
 }
 
 impl<'a> Iterator for Reader<'a> {
@@ -85,8 +75,8 @@ impl<'a> From<&'a mut FILE> for Reader<'a> {
     }
 }
 
-impl<'a> From<*const c_char> for Reader<'a> {
-    fn from(buff: *const c_char) -> Self {
-        Self::BUFFER((buff as *const u8).into())
+impl<'a> From<CStr<'a>> for Reader<'a> {
+    fn from(buff: CStr<'a>) -> Self {
+        Self::BUFFER(buff.into())
     }
 }

@@ -1522,16 +1522,12 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
         return -1;
     }
 
-    let f: &mut FILE = &mut *file;
-    let reader: Reader = f.into();
-    unsafe { scanf::scanf(reader, format.into(), ap) }
-    /*
-    ret
-    =======
     let f: &mut FILE = &mut file;
-    let reader: LookAheadReader = f.into();
-    unsafe { scanf::scanf(reader, format, ap) }
-    */
+    let reader: Reader = f.into();
+    unsafe {
+        let format = CStr::from_ptr(format);
+        scanf::scanf(reader, format.into(), ap)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
@@ -1559,9 +1555,11 @@ pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_in
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfscanf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    unsafe { scanf::scanf(s.into(), format.into(), ap) }
-    //    let reader = (s.cast::<u8>()).into();
-    //    unsafe { scanf::scanf(reader, format, ap) }
+    unsafe {
+        let format = CStr::from_ptr(format);
+        let s = CStr::from_ptr(s);
+        scanf::scanf(s.into(), format.into(), ap)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
@@ -1571,9 +1569,11 @@ pub unsafe extern "C" fn sscanf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    unsafe { scanf::scanf(s.into(), format.into(), __valist.as_va_list()) }
-    //let reader = (s.cast::<u8>()).into();
-    // unsafe { scanf::scanf(reader, format, __valist.as_va_list()) }
+    unsafe {
+        let format = CStr::from_ptr(format);
+        let s = CStr::from_ptr(s);
+        scanf::scanf(s.into(), format.into(), __valist.as_va_list())
+    }
 }
 
 pub unsafe fn flush_io_streams() {
