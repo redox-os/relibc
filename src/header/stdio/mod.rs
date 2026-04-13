@@ -17,7 +17,7 @@ use core::{
 };
 
 use crate::{
-    c_str::CStr,
+    c_str::{CStr, Thin},
     c_vec::CVec,
     error::{ResultExt, ResultExtPtrMut},
     fs::File,
@@ -50,8 +50,8 @@ mod getdelim;
 mod ext;
 mod helpers;
 pub mod printf;
-mod reader;
-mod scanf;
+pub mod reader;
+pub mod scanf;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
@@ -1523,7 +1523,7 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
     }
 
     let f: &mut FILE = &mut file;
-    let reader: Reader = f.into();
+    let reader: Reader<Thin> = f.into();
     unsafe {
         let format = CStr::from_ptr(format);
         scanf::scanf(reader, format.into(), ap)

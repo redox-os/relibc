@@ -13,7 +13,7 @@ use crate::{
         stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc},
         string,
         time::*,
-        wchar::{reader::Reader, utf8::get_char_encoded_length},
+        wchar::reader::Reader,
         wctype::*,
     },
     iter::{NulTerminated, NulTerminatedInclusive},
@@ -26,10 +26,11 @@ use crate::{
     },
 };
 
-mod reader;
 mod utf8;
 mod wprintf;
 mod wscanf;
+
+pub use utf8::get_char_encoded_length;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/wchar.h.html>.
 #[repr(C)]
