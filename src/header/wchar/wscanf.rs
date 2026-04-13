@@ -217,12 +217,12 @@ unsafe fn inner_scanf<T: Kind>(
                     let mut dot = false;
 
                     while width.map(|w| w > 0).unwrap_or(true)
-                        && ((wwchar as u8 >= b'0' && wwchar as u8 <= b'7')
-                            || (radix >= 10 && (wwchar as u8 >= b'8' && wwchar as u8 <= b'9'))
-                            || (float && !dot && wwchar as u8 == b'.')
+                        && (('0'..='7').contains(&wwchar)
+                            || (radix >= 10 && ('8'..='9').contains(&wwchar))
+                            || (float && !dot && wwchar == '.')
                             || (radix == 16
-                                && ((wwchar as u8 >= b'a' && wwchar as u8 <= b'f')
-                                    || (wwchar as u8 >= b'A' && wwchar as u8 <= b'F'))))
+                                && (('a'..='f').contains(&wwchar)
+                                    || ('A'..='F').contains(&wwchar))))
                     {
                         if auto
                             && n.is_empty()
@@ -251,7 +251,7 @@ unsafe fn inner_scanf<T: Kind>(
                             // Don't allow another dot
                             dot = true;
                         }
-                        n.push(wc_as_char!(wchar));
+                        n.push(wwchar);
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
                             break;
@@ -361,7 +361,7 @@ unsafe fn inner_scanf<T: Kind>(
                 's' => {
                     macro_rules! parse_string_type {
                         ($type:ident) => {
-                            while (wc_as_char!(wchar)).is_whitespace() {
+                            while wwchar.is_whitespace() {
                                 if !read!() {
                                     return Ok(matched);
                                 }
@@ -370,9 +370,7 @@ unsafe fn inner_scanf<T: Kind>(
                             let mut ptr: Option<*mut $type> =
                                 if ignore { None } else { Some(ap.arg()) };
 
-                            while width.map(|w| w > 0).unwrap_or(true)
-                                && !(wc_as_char!(wchar)).is_whitespace()
-                            {
+                            while width.map(|w| w > 0).unwrap_or(true) && !wwchar.is_whitespace() {
                                 if let Some(ref mut ptr) = ptr {
                                     **ptr = wwchar as $type;
                                     *ptr = ptr.offset(1);
@@ -442,7 +440,6 @@ unsafe fn inner_scanf<T: Kind>(
                     let mut matches = Vec::new();
                     let invert = if cc == '^' {
                         c = next_char(&mut format)?;
-                        cc = wc_as_char!(c);
                         true
                     } else {
                         false
