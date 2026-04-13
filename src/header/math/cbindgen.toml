@@ -1,0 +1,10 @@
+# Note: changing this file requires `make clean`.
+sys_includes = []
+include_guard = "_RELIBC_MATH_H"
+language = "C"
+style = "Type"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
