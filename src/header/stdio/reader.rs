@@ -19,7 +19,7 @@ use core::{
     ptr::{self},
 };
 
-pub(crate) struct BufferReader<'a, T: Kind> {
+pub struct BufferReader<'a, T: Kind> {
     buf: NulStr<'a, T>,
 }
 
@@ -46,7 +46,7 @@ impl<'a, T: Kind> Iterator for BufferReader<'a, T> {
     }
 }
 
-pub(crate) struct FileReader<'a, T: Kind> {
+pub struct FileReader<'a, T: Kind> {
     f: &'a mut FILE,
     position: off_t,
     phantom: PhantomData<T>,
@@ -161,15 +161,9 @@ impl<'a, T: Kind> Iterator for Reader<'a, T> {
     }
 }
 
-impl<'a> From<&'a mut FILE> for Reader<'a, Wide> {
+impl<'a, T: Kind> From<&'a mut FILE> for Reader<'a, T> {
     fn from(f: &'a mut FILE) -> Self {
-        Self::FILE(f.into(), PhantomData::<Wide>)
-    }
-}
-
-impl<'a> From<&'a mut FILE> for Reader<'a, Thin> {
-    fn from(f: &'a mut FILE) -> Self {
-        Self::FILE(f.into(), PhantomData::<Thin>)
+        Self::FILE(f.into(), PhantomData::<T>)
     }
 }
 

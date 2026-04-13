@@ -1,19 +1,11 @@
 use super::reader::Reader;
-use crate::{c_str::Kind, header::stdio::reader::get_char_from_wint, platform::types::*};
+use crate::{
+    c_str::Kind,
+    header::stdio::{printf::IntKind, reader::get_char_from_wint},
+    platform::types::*,
+};
 use alloc::{string::String, vec::Vec};
 use core::{ffi::VaList as va_list, iter::Peekable};
-
-#[derive(PartialEq, Eq)]
-enum IntKind {
-    Byte,
-    Short,
-    Int,
-    Long,
-    LongLong,
-    IntMax,
-    PtrDiff,
-    Size,
-}
 
 #[derive(PartialEq, Eq)]
 enum CharKind {
