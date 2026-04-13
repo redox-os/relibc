@@ -1,5 +1,5 @@
 use super::reader::Reader;
-use crate::platform::types::*;
+use crate::{c_str::Kind, platform::types::*};
 use alloc::{string::String, vec::Vec};
 use core::{ffi::VaList as va_list, iter::Peekable};
 
@@ -21,23 +21,38 @@ enum CharKind {
     Wide,
 }
 
-unsafe fn next_char(lar: &mut Peekable<Reader<'_>>) -> Result<wint_t, c_int> {
+fn next_char<T: Kind>(lar: &mut Peekable<Reader<'_, T>>) -> Result<T::Char, c_int> {
     if let Some(c) = lar.next().transpose()? {
         Ok(c)
     } else {
-        Ok(0)
+        Ok(T::Char::from(0u8))
+    }
+}
+
+fn get_char_from_wint<T: Kind>(wc: wint_t) -> Result<T::Char, i32> {
+    if let Some(wc_char) = T::chars_from_bytes(&wc.to_be_bytes())
+        && wc_char.len() == 1
+    {
+        Ok(wc_char[0])
+    } else {
+        Err(-1)
     }
 }
 
 macro_rules! wc_as_char {
     ($c:ident) => {
-        char::try_from($c).map_err(|_| -1)?
+        char::try_from($c.into()).map_err(|_| -1)?
     };
 }
 
-unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<c_int, c_int> {
+unsafe fn inner_scanf<T: Kind>(
+    mut r: Reader<T>,
+    format: Reader<T>,
+    mut ap: va_list,
+) -> Result<c_int, c_int> {
     let mut matched = 0;
-    let mut wchar = 0;
+    let mut wchar: T::Char = T::NUL;
+    let mut wwchar: char = '\0';
     let mut skip_read = false;
     let mut count = 0;
     let mut format = format.peekable();
@@ -48,6 +63,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                 None => false,
                 Some(Ok(b)) => {
                     wchar = b;
+                    wwchar = wc_as_char!(wchar);
                     count += 1;
                     true
                 }
@@ -78,36 +94,40 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
     }
 
     while format.peek().is_some() {
-        let mut c = unsafe { next_char(&mut format)? };
+        let mut c = next_char(&mut format)?;
+        let mut cc: char = wc_as_char!(c);
 
-        if c as u8 == b' ' {
+        if cc == ' ' {
             maybe_read!(noreset);
 
-            while (wc_as_char!(wchar)).is_whitespace() {
+            while (wwchar).is_whitespace() {
                 if !read!() {
                     return Ok(matched);
                 }
             }
 
             skip_read = true;
-        } else if c as u8 != b'%' {
+        } else if cc != '%' {
             maybe_read!();
             if c != wchar {
                 return Ok(matched);
             }
         } else {
-            c = unsafe { next_char(&mut format) }?;
+            c = next_char(&mut format)?;
+            cc = wc_as_char!(c);
 
             let mut ignore = false;
-            if c as u8 == b'*' {
+            if cc == '*' {
                 ignore = true;
-                c = unsafe { next_char(&mut format) }?;
+                c = next_char(&mut format)?;
+                cc = wc_as_char!(c);
             }
 
             let mut width = String::new();
-            while c as u8 >= b'0' && c as u8 <= b'9' {
-                width.push(wc_as_char!(c));
-                c = unsafe { next_char(&mut format) }?;
+            while cc.is_ascii_digit() {
+                width.push(cc);
+                c = next_char(&mut format)?;
+                cc = wc_as_char!(c);
             }
             let mut width = if width.is_empty() {
                 None
@@ -125,75 +145,71 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
             let mut kind = IntKind::Int;
             let mut c_kind = CharKind::Ascii;
             loop {
-                match c as u8 {
-                    b'h' => {
+                match cc {
+                    'h' => {
                         if kind == IntKind::Short || kind == IntKind::Byte {
                             kind = IntKind::Byte;
                         } else {
                             kind = IntKind::Short;
                         }
                     }
-                    b'j' => kind = IntKind::IntMax,
-                    b'l' => {
+                    'j' => kind = IntKind::IntMax,
+                    'l' => {
                         if kind == IntKind::Long || kind == IntKind::LongLong {
                             kind = IntKind::LongLong;
                         } else {
                             kind = IntKind::Long;
                         }
                     }
-                    b'q' | b'L' => kind = IntKind::LongLong,
-                    b't' => kind = IntKind::PtrDiff,
-                    b'z' => kind = IntKind::Size,
+                    'q' | 'L' => kind = IntKind::LongLong,
+                    't' => kind = IntKind::PtrDiff,
+                    'z' => kind = IntKind::Size,
                     // If kind is Long, means we found a 'l' before finding 'c' or 's'. In this
                     // case the format corresponds to a wide char/string
-                    b'c' | b's' if kind == IntKind::Long => {
+                    'c' | 's' if kind == IntKind::Long => {
                         c_kind = CharKind::Wide;
                         break;
                     }
                     _ => break,
                 }
 
-                c = unsafe { next_char(&mut format) }?;
+                c = next_char(&mut format)?;
+                cc = wc_as_char!(c);
             }
 
-            if c as u8 != b'n' {
+            if cc != 'n' {
                 maybe_read!(noreset);
             }
-            match c as u8 {
-                b'%' => {
-                    while (wc_as_char!(wchar)).is_whitespace() {
+            match cc {
+                '%' => {
+                    while (wwchar).is_whitespace() {
                         if !read!() {
                             return Ok(matched);
                         }
                     }
 
-                    if wchar as u8 != b'%' {
+                    if wwchar != '%' {
                         return Err(matched);
                     } else if !read!() {
                         return Ok(matched);
                     }
                 }
 
-                b'd' | b'i' | b'o' | b'u' | b'x' | b'X' | b'f' | b'e' | b'g' | b'E' | b'a'
-                | b'p' => {
-                    while (wc_as_char!(wchar)).is_whitespace() {
+                'd' | 'i' | 'o' | 'u' | 'x' | 'X' | 'f' | 'e' | 'g' | 'E' | 'a' | 'p' => {
+                    while wwchar.is_whitespace() {
                         if !read!() {
                             return Ok(matched);
                         }
                     }
 
-                    let pointer = c as u8 == b'p';
+                    let pointer = cc == 'p';
                     // Pointers aren't automatic, but we do want to parse "0x"
-                    let auto = c as u8 == b'i' || pointer;
-                    let float = c as u8 == b'f'
-                        || c as u8 == b'e'
-                        || c as u8 == b'g'
-                        || c as u8 == b'E'
-                        || c as u8 == b'a';
+                    let auto = cc == 'i' || pointer;
+                    let float = cc == 'f' || cc == 'e' || cc == 'g' || cc == 'E' || cc == 'a';
 
-                    let mut radix = match c as u8 {
-                        b'o' => 8,
-                        b'x' | b'X' | b'p' => 16,
+                    let mut radix = match cc {
+                        'o' => 8,
+                        'x' | 'X' | 'p' => 16,
                         _ => 10,
                     };
 
@@ -201,16 +217,16 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                     let mut dot = false;
 
                     while width.map(|w| w > 0).unwrap_or(true)
-                        && ((wchar as u8 >= b'0' && wchar as u8 <= b'7')
-                            || (radix >= 10 && (wchar as u8 >= b'8' && wchar as u8 <= b'9'))
-                            || (float && !dot && wchar as u8 == b'.')
+                        && ((wwchar as u8 >= b'0' && wwchar as u8 <= b'7')
+                            || (radix >= 10 && (wwchar as u8 >= b'8' && wwchar as u8 <= b'9'))
+                            || (float && !dot && wwchar as u8 == b'.')
                             || (radix == 16
-                                && ((wchar as u8 >= b'a' && wchar as u8 <= b'f')
-                                    || (wchar as u8 >= b'A' && wchar as u8 <= b'F'))))
+                                && ((wwchar as u8 >= b'a' && wwchar as u8 <= b'f')
+                                    || (wwchar as u8 >= b'A' && wwchar as u8 <= b'F'))))
                     {
                         if auto
                             && n.is_empty()
-                            && wchar as u8 == b'0'
+                            && wwchar == '0'
                             && width.map(|w| w > 0).unwrap_or(true)
                         {
                             if !pointer {
@@ -221,7 +237,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                                 return Ok(matched);
                             }
                             if width.map(|w| w > 0).unwrap_or(true)
-                                && (wchar as u8 == b'x' || wchar as u8 == b'X')
+                                && (wwchar == 'x' || wwchar == 'X')
                             {
                                 radix = 16;
                                 width = width.map(|w| w - 1);
@@ -231,7 +247,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                             }
                             continue;
                         }
-                        if wchar as u8 == b'.' {
+                        if wwchar == '.' {
                             // Don't allow another dot
                             dot = true;
                         }
@@ -282,13 +298,10 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                         } else {
                             parse_type!(c_float);
                         }
-                    } else if c as u8 == b'p' {
+                    } else if cc == 'p' {
                         parse_type!(size_t, *mut c_void);
                     } else {
-                        let unsigned = c as u8 == b'o'
-                            || c as u8 == b'u'
-                            || c as u8 == b'x'
-                            || c as u8 == b'X';
+                        let unsigned = cc == 'o' || cc == 'u' || cc == 'x' || cc == 'X';
 
                         match kind {
                             IntKind::Byte => {
@@ -345,7 +358,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                     }
                 }
 
-                b's' => {
+                's' => {
                     macro_rules! parse_string_type {
                         ($type:ident) => {
                             while (wc_as_char!(wchar)).is_whitespace() {
@@ -361,7 +374,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                                 && !(wc_as_char!(wchar)).is_whitespace()
                             {
                                 if let Some(ref mut ptr) = ptr {
-                                    **ptr = wchar as $type;
+                                    **ptr = wwchar as $type;
                                     *ptr = ptr.offset(1);
                                 }
                                 width = width.map(|w| w - 1);
@@ -389,7 +402,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                     }
                 }
 
-                b'c' => {
+                'c' => {
                     macro_rules! parse_char_type {
                         ($type:ident) => {
                             let ptr: Option<*mut $type> = if ignore {
@@ -400,7 +413,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
 
                             for i in 0..width.unwrap_or(1) {
                                 if let Some(ptr) = ptr {
-                                    unsafe { *ptr.add(i) = wchar as $type };
+                                    unsafe { *ptr.add(i) = wwchar as $type };
                                 }
                                 width = width.map(|w| w - 1);
                                 if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -422,12 +435,14 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                     }
                 }
 
-                b'[' => {
-                    c = unsafe { next_char(&mut format) }?;
+                '[' => {
+                    c = next_char(&mut format)?;
+                    cc = wc_as_char!(c);
 
                     let mut matches = Vec::new();
-                    let invert = if c as u8 == b'^' {
-                        c = unsafe { next_char(&mut format) }?;
+                    let invert = if cc == '^' {
+                        c = next_char(&mut format)?;
+                        cc = wc_as_char!(c);
                         true
                     } else {
                         false
@@ -436,23 +451,24 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                     let mut prev;
                     loop {
                         matches.push(c);
-                        prev = c;
-                        c = unsafe { next_char(&mut format) }?;
-                        if c as u8 == b'-' {
+                        prev = c.into();
+                        c = next_char(&mut format)?;
+                        cc = wc_as_char!(c);
+                        if cc == '-' {
                             if prev as u8 == b']' {
                                 continue;
                             }
-                            c = unsafe { next_char(&mut format) }?;
-                            if c as u8 == b']' {
-                                matches.push('-' as wint_t);
+                            c = next_char(&mut format)?;
+                            if cc == ']' {
+                                matches.push(get_char_from_wint::<T>('-' as wint_t)?);
                                 break;
                             }
                             prev += 1;
-                            while prev < c {
-                                matches.push(prev);
+                            while prev < c.into() {
+                                matches.push(get_char_from_wint::<T>(prev as wint_t)?);
                                 prev += 1;
                             }
-                        } else if c as u8 == b']' {
+                        } else if cc == ']' {
                             break;
                         }
                     }
@@ -468,7 +484,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                     while width.map(|w| w > 0).unwrap_or(true) && invert != matches.contains(&wchar)
                     {
                         if let Some(ref mut ptr) = ptr {
-                            unsafe { **ptr = wchar as c_char };
+                            unsafe { **ptr = wwchar as c_char };
                             *ptr = unsafe { ptr.offset(1) };
                             data_stored = true;
                         }
@@ -487,7 +503,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                         matched += 1;
                     }
                 }
-                b'n' => {
+                'n' => {
                     if !ignore {
                         unsafe { *ap.arg::<*mut c_int>() = count as c_int };
                     }
@@ -499,7 +515,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
                 return Ok(matched);
             }
 
-            if width != Some(0) && c as u8 != b'n' {
+            if width != Some(0) && cc != 'n' {
                 // It didn't hit the width, so an extra character was read and matched.
                 // But this character did not match so let's reuse it.
                 skip_read = true;
@@ -509,7 +525,7 @@ unsafe fn inner_scanf(mut r: Reader, format: Reader, mut ap: va_list) -> Result<
     Ok(matched)
 }
 
-pub unsafe fn scanf(r: Reader, format: Reader, ap: va_list) -> c_int {
+pub unsafe fn scanf<T: Kind>(r: Reader<T>, format: Reader<T>, ap: va_list) -> c_int {
     match unsafe { inner_scanf(r, format, ap) } {
         Ok(n) => n,
         Err(n) => n,

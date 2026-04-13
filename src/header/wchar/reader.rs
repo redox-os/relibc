@@ -1,6 +1,6 @@
 use super::{FILE, SEEK_SET, fseek_locked, ftell_locked};
 use crate::{
-    c_str::WStr,
+    c_str::{Kind, NulStr, WStr, Wide},
     header::{
         errno::EILSEQ,
         wchar::{MB_CUR_MAX, get_char_encoded_length, mbrtowc},
@@ -12,89 +12,112 @@ use crate::{
         types::{c_char, off_t, wchar_t, wint_t},
     },
 };
-use core::{iter::Iterator, ptr};
+use core::{
+    iter::Iterator,
+    marker::PhantomData,
+    ptr::{self},
+};
 
-pub(crate) struct BufferReader<'a> {
-    buf: WStr<'a>,
-    position: usize,
+pub(crate) struct BufferReader<'a, T: Kind> {
+    buf: NulStr<'a, T>,
 }
 
-impl<'a> From<WStr<'a>> for BufferReader<'a> {
+impl<'a> From<WStr<'a>> for BufferReader<'a, Wide> {
     fn from(buff: WStr<'a>) -> Self {
-        BufferReader {
-            buf: buff,
-            position: 0,
-        }
+        BufferReader { buf: buff }
     }
 }
 
-impl<'a> Iterator for BufferReader<'a> {
-    type Item = Result<wint_t, i32>;
+impl<'a, T: Kind> Iterator for BufferReader<'a, T> {
+    type Item = Result<T::Char, i32>;
+
     fn next(&mut self) -> Option<Self::Item> {
-        self.buf.split_first_char().map(|(c, r)| {
+        self.buf.split_first().map(|(c, r)| {
             self.buf = r;
-            Ok(wint_t::from(c))
+            Ok(c)
         })
     }
 }
 
-pub(crate) struct FileReader<'a> {
+pub(crate) struct FileReader<'a, T: Kind> {
     f: &'a mut FILE,
     position: off_t,
+    phantom: PhantomData<T>,
 }
 
-impl<'a> FileReader<'a> {
+impl<'a, T: Kind> FileReader<'a, T> {
     // Gets the wchar at the current position
     #[inline]
-    fn get_curret_wchar(&mut self) -> Result<Option<(wint_t, usize)>, i32> {
-        let buf = &mut [0; MB_CUR_MAX as usize];
-        let mut encoded_length = 0;
-        let mut bytes_read = 0;
+    fn get_curret_char(&mut self) -> Result<Option<(T::Char, usize)>, i32> {
+        if T::IS_THIN_NOT_WIDE {
+            let mut buf: [u8; 1] = [0];
+            match self.f.read(&mut buf) {
+                Ok(0) => Ok(None),
+                Ok(n) => Ok(Some((T::Char::from(buf[0]), n))),
+                Err(_) => Err(-1),
+            }
+        } else {
+            let buf = &mut [0; MB_CUR_MAX as usize];
+            let mut encoded_length = 0;
+            let mut bytes_read = 0;
 
-        loop {
-            match self.f.read(&mut buf[bytes_read..bytes_read + 1]) {
-                Ok(0) => return Ok(None),
-                Ok(_) => {}
-                Err(_) => return Err(-1),
+            loop {
+                match self.f.read(&mut buf[bytes_read..bytes_read + 1]) {
+                    Ok(0) => return Ok(None),
+                    Ok(_) => {}
+                    Err(_) => return Err(-1),
+                }
+
+                bytes_read += 1;
+
+                if bytes_read == 1 {
+                    encoded_length = if let Some(el) = get_char_encoded_length(buf[0]) {
+                        el
+                    } else {
+                        ERRNO.set(EILSEQ);
+                        return Self::get_char_from_wint(WEOF).map(|c| Some((c, 0)));
+                    };
+                }
+
+                if bytes_read >= encoded_length {
+                    break;
+                }
             }
 
-            bytes_read += 1;
-
-            if bytes_read == 1 {
-                encoded_length = if let Some(el) = get_char_encoded_length(buf[0]) {
-                    el
-                } else {
-                    ERRNO.set(EILSEQ);
-                    return Ok(Some((WEOF, 0)));
-                };
+            let mut wc: wchar_t = 0;
+            unsafe {
+                mbrtowc(
+                    &raw mut wc,
+                    buf.as_ptr().cast::<c_char>(),
+                    encoded_length,
+                    ptr::null_mut(),
+                );
             }
 
-            if bytes_read >= encoded_length {
-                break;
-            }
+            Self::get_char_from_wint(wc as wint_t).map(|c| Some((c, encoded_length)))
+
+            // Ok(Some((wc as wint_t, encoded_length)))
         }
+    }
 
-        let mut wc: wchar_t = 0;
-        unsafe {
-            mbrtowc(
-                &raw mut wc,
-                buf.as_ptr() as *const c_char,
-                encoded_length,
-                ptr::null_mut(),
-            );
+    fn get_char_from_wint(wc: wint_t) -> Result<T::Char, i32> {
+        if let Some(wc_char) = T::chars_from_bytes(&wc.to_be_bytes())
+            && wc_char.len() == 1
+        {
+            Ok(wc_char[0])
+        } else {
+            Err(-1)
         }
-
-        Ok(Some((wc as wint_t, encoded_length)))
     }
 }
 
-impl<'a> Iterator for FileReader<'a> {
-    type Item = Result<wint_t, i32>;
+impl<'a, T: Kind> Iterator for FileReader<'a, T> {
+    type Item = Result<T::Char, i32>;
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe { fseek_locked(self.f, self.position, SEEK_SET) };
 
-        match self.get_curret_wchar() {
+        match self.get_curret_char() {
             Ok(Some((wc, encoded_length))) => {
                 unsafe { fseek_locked(self.f, self.position, SEEK_SET) };
                 self.position += encoded_length as off_t;
@@ -106,36 +129,40 @@ impl<'a> Iterator for FileReader<'a> {
     }
 }
 
-impl<'a> From<&'a mut FILE> for FileReader<'a> {
+impl<'a> From<&'a mut FILE> for FileReader<'a, Wide> {
     fn from(f: &'a mut FILE) -> Self {
         let position = unsafe { ftell_locked(f) } as i64;
-        FileReader { f, position }
+        FileReader {
+            f,
+            position,
+            phantom: PhantomData::<Wide>,
+        }
     }
 }
 
-pub enum Reader<'a> {
-    FILE(FileReader<'a>),
-    BUFFER(BufferReader<'a>),
+pub enum Reader<'a, T: Kind> {
+    FILE(FileReader<'a, T>, PhantomData<T>),
+    BUFFER(BufferReader<'a, T>),
 }
 
-impl<'a> Iterator for Reader<'a> {
-    type Item = Result<wint_t, i32>;
+impl<'a, T: Kind> Iterator for Reader<'a, T> {
+    type Item = Result<T::Char, i32>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::FILE(r) => r.next(),
+            Self::FILE(r, _) => r.next(),
             Self::BUFFER(r) => r.next(),
         }
     }
 }
 
-impl<'a> From<&'a mut FILE> for Reader<'a> {
+impl<'a> From<&'a mut FILE> for Reader<'a, Wide> {
     fn from(f: &'a mut FILE) -> Self {
-        Self::FILE(f.into())
+        Self::FILE(f.into(), PhantomData::<Wide>)
     }
 }
 
-impl<'a> From<WStr<'a>> for Reader<'a> {
+impl<'a> From<WStr<'a>> for Reader<'a, Wide> {
     fn from(buff: WStr<'a>) -> Self {
         Self::BUFFER(buff.into())
     }

@@ -5,7 +5,7 @@
 use core::{char, ffi::VaList as va_list, mem, ptr, slice};
 
 use crate::{
-    c_str::WStr,
+    c_str::{WStr, Wide},
     header::{
         ctype::isspace,
         errno::{EILSEQ, ENOMEM, ERANGE},
@@ -1033,8 +1033,8 @@ pub unsafe extern "C" fn vfwscanf(
         return -1;
     }
 
-    let f: &mut FILE = &mut *file;
-    let reader: Reader = f.into();
+    let f: &mut FILE = &mut file;
+    let reader: Reader<Wide> = f.into();
 
     unsafe {
         let format = WStr::from_ptr(format);
