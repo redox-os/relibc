@@ -349,7 +349,7 @@ pub trait Pal {
     /// Platform implementation of [`sched_yield()`](crate::header::sched::sched_yield) from [`sched.h`](crate::header::sched).
     fn sched_yield() -> Result<()>;
 
-    /// Platform implementation of [`setgroups()`](crate::header::unistd::setgroups) from [`unistd.h`](crate::header::unistd) (TODO: should be `grp.h`?).
+    /// Platform implementation of [`setgroups()`](crate::header::grp::setgroups) from [`grp.h`](crate::header::grp).
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()>;
 
     /// Platform implementation of [`setpgid()`](crate::header::unistd::setpgid) from [`unistd.h`](crate::header::unistd).

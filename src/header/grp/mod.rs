@@ -18,12 +18,14 @@ use alloc::{
 };
 
 use crate::{
+    error::ResultExt,
     fs::File,
-    header::{errno, fcntl, limits, string::strlen, unistd},
-    io,
-    io::{BufReader, Lines, prelude::*},
-    platform,
-    platform::types::{c_char, c_int, c_void, gid_t, size_t},
+    header::{errno, fcntl, limits, string::strlen},
+    io::{self, BufReader, Lines, prelude::*},
+    platform::{
+        self, Pal, Sys,
+        types::{c_char, c_int, c_void, gid_t, size_t},
+    },
 };
 
 use super::{errno::*, string::strncmp};
@@ -544,5 +546,13 @@ pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &raw mut count) < 0 } {
         return -1;
     }
-    unsafe { unistd::setgroups(count as size_t, groups.as_ptr()) }
+    unsafe { setgroups(count as size_t, groups.as_ptr()) }
+}
+
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/setgroups.2.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
+    unsafe { Sys::setgroups(size, list) }
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
