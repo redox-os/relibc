@@ -40,6 +40,9 @@ pub const TCSANOW: c_int = 0;
 pub const TCSADRAIN: c_int = 1;
 pub const TCSAFLUSH: c_int = 2;
 
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_export_winsize(winsize: winsize) {}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/termios.h.html>.
 #[cfg(target_os = "linux")]
 #[repr(C)]

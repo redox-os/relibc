@@ -14,6 +14,7 @@ use crate::{
     header::{
         arpa_inet::inet_aton,
         bits_iovec::iovec,
+        bits_safamily_t::sa_family_t,
         bits_socklen_t::socklen_t,
         errno::{
             EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK, EOPNOTSUPP,
@@ -24,7 +25,7 @@ use crate::{
         sys_select::timeval,
         sys_socket::{
             CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
-            constants::*, msghdr, sa_family_t, sockaddr, ucred,
+            constants::*, msghdr, sockaddr, ucred,
         },
         sys_un::sockaddr_un,
     },
