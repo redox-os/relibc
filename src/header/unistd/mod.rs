@@ -899,16 +899,6 @@ pub extern "C" fn setgid(gid: gid_t) -> c_int {
         .or_minus_one_errno()
 }
 
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/setgroups.2.html>.
-///
-/// TODO: specified in `grp.h`?
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
-    unsafe { Sys::setgroups(size, list) }
-        .map(|()| 0)
-        .or_minus_one_errno()
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setpgid.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {

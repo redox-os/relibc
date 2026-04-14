@@ -1,3 +1,10 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/glob.h.html
+#
+# Spec quotations relating to includes:
+# - "The <glob.h> header shall define the size_t type as described in <sys/types.h>."
+#
+# size_t is defined in stddef.h (sys/types.h gets size_t by including stddef.h)
+# just use stddef.h to avoid importing all of sys/types.h
 sys_includes = ["stddef.h"]
 include_guard = "_RELIBC_GLOB_H"
 language = "C"
