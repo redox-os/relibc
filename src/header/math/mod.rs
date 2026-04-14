@@ -2,9 +2,11 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/math.h.html>.
 
-use crate::platform::types::{c_double, c_float, c_int};
+use crate::platform::types::{c_double, c_float, c_int, c_long, c_longlong};
 
-// TODO constants (some already defined in C)
+// TODO move constants from cbindgen (openlibm)
+// TODO all is* function is defined as "real-floating", so it can both f32 and f64
+// TODO cover edge cases (EDOM and ERANGE)
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/acos.html>.
 #[unsafe(no_mangle)]
@@ -384,6 +386,34 @@ pub unsafe extern "C" fn ilogbf(x: c_float) -> c_int {
 
 // TODO ilogbl (long double)
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isfinite.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn isfinite(x: c_double) -> c_int {
+    if x.is_finite() { 1 } else { 0 }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isinf.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn isinf(x: c_double) -> c_int {
+    match x {
+        f64::INFINITY => 1,
+        f64::NEG_INFINITY => -1,
+        _ => 0,
+    }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isnan.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn isnan(x: c_double) -> c_int {
+    if x.is_nan() { 1 } else { 0 }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isnormal.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn isnormal(x: c_double) -> c_int {
+    if x.is_normal() { 1 } else { 0 }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/j0.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn j0(x: c_double) -> c_double {
@@ -416,26 +446,53 @@ pub unsafe extern "C" fn ldexpf(x: c_float, exp: c_int) -> c_float {
 
 // TODO ldexpl (long double)
 
+#[unsafe(no_mangle)]
+static mut signgam: c_int = 0;
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lgamma.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lgamma(x: c_double) -> c_double {
-    libm::lgamma(x)
+    let (a, b) = libm::lgamma_r(x);
+    unsafe { signgam = b };
+    a
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lgamma.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lgammaf(x: c_float) -> c_float {
-    libm::lgammaf(x)
+    let (a, b) = libm::lgammaf_r(x);
+    unsafe { signgam = b };
+    a
 }
 
 // TODO lgammal (long double)
 
-// TODO llrint (c_double to c_longlong)
-// TODO llrintf (c_float to c_longlong)
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/llrint.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn llrint(x: c_double) -> c_longlong {
+    libm::rint(x) as _
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/llrintf.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn llrintf(x: c_float) -> c_longlong {
+    libm::rintf(x) as _
+}
+
 // TODO llrintl (long double to c_longlong)
 
-// TODO llround (c_double to c_longlong)
-// TODO llroundf (c_float to c_longlong)
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/llround.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn llround(x: c_double) -> c_longlong {
+    libm::round(x) as _
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/llroundf.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn llroundf(x: c_float) -> c_longlong {
+    libm::roundf(x) as _
+}
+
 // TODO llroundl (long double to c_longlong)
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/log.html>.
@@ -486,8 +543,20 @@ pub unsafe extern "C" fn log2f(x: c_float) -> c_float {
 
 // TODO log2l (long double)
 
-// TODO logb (c_double)
-// TODO logbf (c_float)
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/logb.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn logb(x: c_double) -> c_double {
+    // TODO: errno
+    libm::ilogb(x) as _
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/logbf.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn logbf(x: c_float) -> c_float {
+    // TODO: errno
+    libm::ilogbf(x) as _
+}
+
 // TODO logbl (long double)
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/log.html>.
@@ -498,12 +567,34 @@ pub unsafe extern "C" fn logf(x: c_float) -> c_float {
 
 // TODO logl (long double)
 
-// TODO lrint (c_double)
-// TODO lrintf (c_float)
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lrint.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lrint(x: c_double) -> c_long {
+    // TODO: errno
+    libm::rint(x) as _
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lrintf.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lrintf(x: c_float) -> c_long {
+    // TODO: errno
+    libm::rintf(x) as _
+}
+
 // TODO lrintl (long double)
 
-// TODO lround (c_double)
-// TODO lroundf (c_float)
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lround.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lround(x: c_double) -> c_long {
+    libm::round(x) as _
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lroundf.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lroundf(x: c_float) -> c_long {
+    libm::roundf(x) as _
+}
+
 // TODO lroundl (long double)
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/modf.html>.
@@ -533,8 +624,18 @@ pub unsafe extern "C" fn modff(value: c_float, iptr: *mut c_float) -> c_float {
 // TODO nanf (c_float)
 // TODO nanl (long double)
 
-// TODO nearbyint (c_double)
-// TODO nearbyintf (c_float)
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nearbyint.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn nearbyint(x: c_double) -> c_double {
+    libm::rint(x)
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nearbyintf.html>.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn nearbyintf(x: c_float) -> c_float {
+    libm::rintf(x)
+}
+
 // TODO nearbyintl (long double)
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nextafter.html>.
