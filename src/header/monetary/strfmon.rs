@@ -14,6 +14,7 @@ use libm::{fabs, pow, round, trunc};
 /// Returns:
 /// - The number of characters written (excluding the null terminator), or -1 if
 ///   an error occurs (e.g., invalid input, buffer overflow)
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn strfmon(
     s: *mut c_char,        // Output buffer
     maxsize: usize,        // Maximum size of the buffer
