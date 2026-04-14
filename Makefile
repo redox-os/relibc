@@ -7,19 +7,26 @@ CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 CC_WRAPPER?=
 RUSTCFLAGS?=
 LINKFLAGS?=-lgcc
+USE_RUST_LIBM?=
 TESTBIN?=
 export OBJCOPY?=objcopy
 
 export CARGO_TARGET_DIR?=$(shell pwd)/target
 BUILD?=$(CARGO_TARGET_DIR)/$(TARGET)
 CARGOFLAGS+=--target=$(TARGET)
+EXCEPT_MATH=-not -name "math"
+FEATURE_MATH=
+ifneq ($(USE_RUST_LIBM),)
+FEATURE_MATH=--features math_libm
+EXCEPT_MATH=
+endif
 
 TARGET_HEADERS?=$(BUILD)/include
 export CFLAGS=-I$(TARGET_HEADERS)
 
 PROFILE?=release
 
-HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
+HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" $(EXCEPT_MATH) -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
 
@@ -37,12 +44,14 @@ headers: $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
 	mkdir -p $(TARGET_HEADERS)
 	cp -r include/* $(TARGET_HEADERS)
+ifeq ($(USE_RUST_LIBM),)
 	cp "openlibm/include"/*.h $(TARGET_HEADERS)
 	cp "openlibm/src"/*.h $(TARGET_HEADERS)
+endif
 	@set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
-		echo -e "\033[0;36;49mWriting Header $$header\033[0m"; \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
+			echo -e "\033[0;36;49mWriting Header $$header\033[0m"; \
 			out=`echo "$$header" | sed 's/_/\//g'`; \
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
@@ -83,7 +92,9 @@ install-libs: headers libs
 	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/$(LD_SO_PATH)"
+ifeq ($(USE_RUST_LIBM),)
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
+endif
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
@@ -149,7 +160,7 @@ $(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/li
 # Debug targets
 
 $(BUILD)/debug/librelibc.a: $(SRC)
-	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
+	$(CARGO) rustc $(CARGOFLAGS) $(FEATURE_MATH) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
 	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
 	./stripcore.sh "$@"
 	touch $@
@@ -205,6 +216,12 @@ $(BUILD)/openlibm: openlibm
 	mv $@.partial $@
 	touch $@
 
+ifeq ($(USE_RUST_LIBM),)
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/$(PROFILE)/librelibc.a
 	$(MAKE) -s AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
+else
+$(BUILD)/openlibm/libopenlibm.a:
+	mkdir -p "$(BUILD)/openlibm"
+	$(AR) -rcs "$(BUILD)/openlibm/libopenlibm.a"
+endif

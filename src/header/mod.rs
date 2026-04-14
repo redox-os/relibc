@@ -44,8 +44,9 @@ pub mod libgen;
 pub mod limits;
 pub mod locale;
 pub mod malloc;
-// pub mod math; // TODO unfinished, uncomment when ready to export
-// math.h implemented in C // TODO replace openlibm with rust libm as above
+// TODO unfinished, unguard feature when ready
+#[cfg(feature = "math_libm")]
+pub mod math;
 pub mod monetary;
 // TODO: mqueue.h
 // TODO: ndbm.h
