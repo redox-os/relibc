@@ -2,6 +2,7 @@ sys_includes = ["stddef.h", "stdint.h", "sys/types.h"]
 include_guard = "_RELIBC_SYS_SOCKET_H"
 after_includes = """
 #include <bits/iovec.h> // for iovec from sys/uio.h
+#include <bits/safamily-t.h> // for sa_family_t
 #include <bits/socklen-t.h> // for socklen_t
 """
 trailer = """
