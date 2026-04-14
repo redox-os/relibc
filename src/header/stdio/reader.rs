@@ -82,7 +82,7 @@ impl<'a, T: Kind> FileReader<'a, T> {
                         el
                     } else {
                         ERRNO.set(EILSEQ);
-                        return get_char_from_wint::<T>(WEOF).map(|c| Some((c, 0)));
+                        return Self::get_char_from_wint(WEOF).map(|c| Some((c, 0)));
                     };
                 }
 
@@ -101,18 +101,18 @@ impl<'a, T: Kind> FileReader<'a, T> {
                 );
             }
 
-            get_char_from_wint::<T>(wc as wint_t).map(|c| Some((c, encoded_length)))
+            Self::get_char_from_wint(wc as wint_t).map(|c| Some((c, encoded_length)))
         }
     }
-}
 
-pub fn get_char_from_wint<T: Kind>(wc: wint_t) -> Result<T::Char, i32> {
-    if let Some(wc_char) = T::chars_from_bytes(&wc.to_be_bytes())
-        && wc_char.len() == 1
-    {
-        Ok(wc_char[0])
-    } else {
-        Err(-1)
+    fn get_char_from_wint(wc: wint_t) -> Result<T::Char, i32> {
+        if let Some(wc_char) = T::chars_from_bytes(&wc.to_be_bytes())
+            && wc_char.len() == 1
+        {
+            Ok(wc_char[0])
+        } else {
+            Err(-1)
+        }
     }
 }
 
