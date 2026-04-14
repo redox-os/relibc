@@ -145,7 +145,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                     'z' => kind = IntKind::Size,
                     // If kind is Long, means we found a 'l' before finding 'c' or 's'. In this
                     // case the format corresponds to a wide char/string
-                    'c' | 's' if kind == IntKind::Long => {
+                    'c' | 's' if kind == IntKind::Long && !T::IS_THIN_NOT_WIDE => {
                         c_kind = CharKind::Wide;
                         break;
                     }
