@@ -17,7 +17,7 @@ use core::{
 };
 
 use crate::{
-    c_str::CStr,
+    c_str::{CStr, Thin},
     c_vec::CVec,
     error::{ResultExt, ResultExtPtrMut},
     fs::File,
@@ -36,6 +36,7 @@ use crate::{
         types::{c_char, c_int, c_long, c_uint, c_ulonglong, c_void, off_t, size_t},
     },
 };
+use reader::Reader;
 
 pub use self::constants::*;
 mod constants;
@@ -48,10 +49,9 @@ mod getdelim;
 
 mod ext;
 mod helpers;
-mod lookaheadreader;
 pub mod printf;
-mod scanf;
-use lookaheadreader::LookAheadReader;
+pub mod reader;
+pub mod scanf;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
@@ -1523,8 +1523,11 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
     }
 
     let f: &mut FILE = &mut file;
-    let reader: LookAheadReader = f.into();
-    unsafe { scanf::scanf(reader, format, ap) }
+    let reader: Reader<Thin> = f.into();
+    unsafe {
+        let format = CStr::from_ptr(format);
+        scanf::scanf(reader, format.into(), ap)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
@@ -1552,8 +1555,11 @@ pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_in
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfscanf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    let reader = (s.cast::<u8>()).into();
-    unsafe { scanf::scanf(reader, format, ap) }
+    unsafe {
+        let format = CStr::from_ptr(format);
+        let s = CStr::from_ptr(s);
+        scanf::scanf(s.into(), format.into(), ap)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
@@ -1563,8 +1569,11 @@ pub unsafe extern "C" fn sscanf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    let reader = (s.cast::<u8>()).into();
-    unsafe { scanf::scanf(reader, format, __valist.as_va_list()) }
+    unsafe {
+        let format = CStr::from_ptr(format);
+        let s = CStr::from_ptr(s);
+        scanf::scanf(s.into(), format.into(), __valist.as_va_list())
+    }
 }
 
 pub unsafe fn flush_io_streams() {
