@@ -36,7 +36,7 @@ pub unsafe fn inner_scanf<T: Kind>(
     mut ap: va_list,
 ) -> Result<c_int, c_int> {
     let mut matched = 0;
-    let mut wchar: char = '\0';
+    let mut character: char = '\0';
     let mut skip_read = false;
     let mut count = 0;
     let mut format = format.peekable();
@@ -46,7 +46,7 @@ pub unsafe fn inner_scanf<T: Kind>(
             match r.next() {
                 None => false,
                 Some(Ok(b)) => {
-                    wchar = wc_as_char!(b);
+                    character = wc_as_char!(b);
                     count += 1;
                     true
                 }
@@ -82,7 +82,7 @@ pub unsafe fn inner_scanf<T: Kind>(
         if c == ' ' {
             maybe_read!(noreset);
 
-            while (wchar).is_whitespace() {
+            while (character).is_whitespace() {
                 if !read!() {
                     return Ok(matched);
                 }
@@ -91,7 +91,7 @@ pub unsafe fn inner_scanf<T: Kind>(
             skip_read = true;
         } else if c != '%' {
             maybe_read!();
-            if c != wchar {
+            if c != character {
                 return Ok(matched);
             }
         } else {
@@ -160,13 +160,13 @@ pub unsafe fn inner_scanf<T: Kind>(
             }
             match c {
                 '%' => {
-                    while (wchar).is_whitespace() {
+                    while (character).is_whitespace() {
                         if !read!() {
                             return Ok(matched);
                         }
                     }
 
-                    if wchar != '%' {
+                    if character != '%' {
                         return Err(matched);
                     } else if !read!() {
                         return Ok(matched);
@@ -174,7 +174,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                 }
 
                 'd' | 'i' | 'o' | 'u' | 'x' | 'X' | 'f' | 'e' | 'g' | 'E' | 'a' | 'p' => {
-                    while wchar.is_whitespace() {
+                    while character.is_whitespace() {
                         if !read!() {
                             return Ok(matched);
                         }
@@ -195,15 +195,16 @@ pub unsafe fn inner_scanf<T: Kind>(
                     let mut dot = false;
 
                     while width.map(|w| w > 0).unwrap_or(true)
-                        && (('0'..='7').contains(&wchar)
-                            || (radix >= 10 && ('8'..='9').contains(&wchar))
-                            || (float && !dot && wchar == '.')
+                        && (('0'..='7').contains(&character)
+                            || (radix >= 10 && ('8'..='9').contains(&character))
+                            || (float && !dot && character == '.')
                             || (radix == 16
-                                && (('a'..='f').contains(&wchar) || ('A'..='F').contains(&wchar))))
+                                && (('a'..='f').contains(&character)
+                                    || ('A'..='F').contains(&character))))
                     {
                         if auto
                             && n.is_empty()
-                            && wchar == '0'
+                            && character == '0'
                             && width.map(|w| w > 0).unwrap_or(true)
                         {
                             if !pointer {
@@ -214,7 +215,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                                 return Ok(matched);
                             }
                             if width.map(|w| w > 0).unwrap_or(true)
-                                && (wchar == 'x' || wchar == 'X')
+                                && (character == 'x' || character == 'X')
                             {
                                 radix = 16;
                                 width = width.map(|w| w - 1);
@@ -224,11 +225,11 @@ pub unsafe fn inner_scanf<T: Kind>(
                             }
                             continue;
                         }
-                        if wchar == '.' {
+                        if character == '.' {
                             // Don't allow another dot
                             dot = true;
                         }
-                        n.push(wchar);
+                        n.push(character);
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
                             break;
@@ -338,7 +339,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                 's' => {
                     macro_rules! parse_string_type {
                         ($type:ident) => {
-                            while wchar.is_whitespace() {
+                            while character.is_whitespace() {
                                 if !read!() {
                                     return Ok(matched);
                                 }
@@ -347,9 +348,10 @@ pub unsafe fn inner_scanf<T: Kind>(
                             let mut ptr: Option<*mut $type> =
                                 if ignore { None } else { Some(ap.arg()) };
 
-                            while width.map(|w| w > 0).unwrap_or(true) && !wchar.is_whitespace() {
+                            while width.map(|w| w > 0).unwrap_or(true) && !character.is_whitespace()
+                            {
                                 if let Some(ref mut ptr) = ptr {
-                                    **ptr = wchar as $type;
+                                    **ptr = character as $type;
                                     *ptr = ptr.offset(1);
                                 }
                                 width = width.map(|w| w - 1);
@@ -388,7 +390,7 @@ pub unsafe fn inner_scanf<T: Kind>(
 
                             for i in 0..width.unwrap_or(1) {
                                 if let Some(ptr) = ptr {
-                                    unsafe { *ptr.add(i) = wchar as $type };
+                                    unsafe { *ptr.add(i) = character as $type };
                                 }
                                 width = width.map(|w| w - 1);
                                 if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -453,10 +455,11 @@ pub unsafe fn inner_scanf<T: Kind>(
 
                     // While we haven't used up all the width, and it matches
                     let mut data_stored = false;
-                    while width.map(|w| w > 0).unwrap_or(true) && invert != matches.contains(&wchar)
+                    while width.map(|w| w > 0).unwrap_or(true)
+                        && invert != matches.contains(&character)
                     {
                         if let Some(ref mut ptr) = ptr {
-                            unsafe { **ptr = wchar as c_char };
+                            unsafe { **ptr = character as c_char };
                             *ptr = unsafe { ptr.offset(1) };
                             data_stored = true;
                         }
