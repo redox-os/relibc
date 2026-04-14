@@ -2,7 +2,11 @@ use super::reader::Reader;
 use crate::{
     c_str::Kind,
     header::stdio::{printf::IntKind, reader::get_char_from_wint},
-    platform::types::*,
+    platform::types::{
+        c_char, c_double, c_float, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulong,
+        c_ulonglong, c_ushort, c_void, intmax_t, ptrdiff_t, size_t, ssize_t, uintmax_t, wchar_t,
+        wint_t,
+    },
 };
 use alloc::{string::String, vec::Vec};
 use core::{ffi::VaList as va_list, iter::Peekable};

@@ -1,7 +1,7 @@
 use crate::{
     c_str::{self, WStr},
     header::stdio::{reader::Reader, scanf::inner_scanf},
-    platform::types::*,
+    platform::types::c_int,
 };
 use core::ffi::VaList as va_list;
 
