@@ -180,7 +180,6 @@ pub unsafe fn inner_scanf<T: Kind>(
                         }
                     }
 
-
                     let pointer = c == 'p';
                     // Pointers aren't automatic, but we do want to parse "0x"
                     let auto = c == 'i' || pointer;
@@ -191,7 +190,6 @@ pub unsafe fn inner_scanf<T: Kind>(
                         'x' | 'X' | 'p' => 16,
                         _ => 10,
                     };
-
 
                     let mut n = String::new();
                     let mut dot = false;

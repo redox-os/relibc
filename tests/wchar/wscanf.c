@@ -100,14 +100,3 @@ int main ()
 
   return 0;
 }
-
-/*
-	wchar_t world[6];
-	int value;
-	int ret = swscanf(L"hello world 42", L"hello %5ls %d", world, &value);
-	// int ret = swscanf(L"42", L"%d", &value);
-
-	// wprintf(L"swscanf gave '%ls' instead of '%ls'", world, L"world");
-	printf("swscanf gave '%d' instead of %d", value, 42);
-    printf("ret %d\n", ret);
-*/
