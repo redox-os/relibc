@@ -56,6 +56,7 @@ int main ()
     test(L"%lc %f", L"π 3.14", &p, &p.wc, &p.fa);
     test(L"test: %2i%n", L"test: 0xFF", &p, &p.ia, &p.ib);
     test(L"hello world%%", L"hello world%", &p);
+    test(L"hello %5ls %d", L"hello world 42", &p, &p.wstring1, &p.ia);
     test(L"h%1[ae]ll%1[^a] wor%1[^\n]%[d]", L"hello world", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test(L"h%1[ae]ll%1[^a] wor%1[^\n]%[d]", L"halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test(L"%[^a]%[b]", L"testbbbb", &p, &p.string1, &p.string2);
@@ -98,3 +99,14 @@ int main ()
 
   return 0;
 }
+
+/*
+	wchar_t world[6];
+	int value;
+	int ret = swscanf(L"hello world 42", L"hello %5ls %d", world, &value);
+	// int ret = swscanf(L"42", L"%d", &value);
+
+	// wprintf(L"swscanf gave '%ls' instead of '%ls'", world, L"world");
+	printf("swscanf gave '%d' instead of %d", value, 42);
+    printf("ret %d\n", ret);
+*/
