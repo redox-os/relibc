@@ -57,6 +57,7 @@ int main ()
     test(L"test: %2i%n", L"test: 0xFF", &p, &p.ia, &p.ib);
     test(L"hello world%%", L"hello world%", &p);
     test(L"hello %5ls %d", L"hello world 42", &p, &p.wstring1, &p.ia);
+    test(L"bye %ls %d", L"bye planet 84", &p, &p.wstring2, &p.ia);
     test(L"h%1[ae]ll%1[^a] wor%1[^\n]%[d]", L"hello world", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test(L"h%1[ae]ll%1[^a] wor%1[^\n]%[d]", L"halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test(L"%[^a]%[b]", L"testbbbb", &p, &p.string1, &p.string2);
