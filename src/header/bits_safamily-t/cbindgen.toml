@@ -7,9 +7,7 @@
 # - netinet/in.h
 # - sys/socket.h
 # - sys/un.h
-#
-# stdint.h included for uint16_t
-sys_includes = ["stdint.h"]
+sys_includes = []
 include_guard = "_RELIBC_BITS_SA_FAMILY_T_H"
 language = "C"
 style = "type"
