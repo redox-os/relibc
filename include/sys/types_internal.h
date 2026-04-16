@@ -16,7 +16,11 @@ typedef unsigned id_t;
 typedef long ssize_t;
 typedef long long time_t;
 typedef unsigned int useconds_t;
+#if defined(__linux__)
+typedef long suseconds_t;
+#else
 typedef int suseconds_t;
+#endif
 typedef long clock_t;
 typedef int clockid_t;
 typedef void* timer_t;
