@@ -1,1 +1,3 @@
-pub type sa_family_t = u16;
+use crate::platform::types::c_ushort;
+
+pub type sa_family_t = c_ushort;
