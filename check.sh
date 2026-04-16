@@ -31,12 +31,6 @@ show_help() {
     echo "  TARGET              Sets the default target (overridden by --target)"
 }
 
-if ! command -v redoxer &> /dev/null; then
-    echo "Error: 'redoxer' CLI not found."
-    echo "Please install it: cargo install redoxer"
-    exit 1
-fi
-
 if ! command -v cbindgen &> /dev/null; then
     echo "Error: 'cbindgen' CLI not found."
     echo "Please install it: cargo install cbindgen"
@@ -96,6 +90,14 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+if [ "$IS_HOST" -eq 0 ]; then
+if ! command -v redoxer &> /dev/null; then
+    echo "Error: 'redoxer' CLI not found."
+    echo "Please install it: cargo install redoxer"
+    exit 1
+fi
+fi
 
 run_redoxer() {
     export TARGET=$1
