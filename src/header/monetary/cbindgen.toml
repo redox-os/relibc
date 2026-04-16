@@ -15,6 +15,7 @@ language = "C"
 style = "tag"
 no_includes = true
 cpp_compat = true
+usize_is_size_t = true
 
 [enum]
 prefix_with_name = true
