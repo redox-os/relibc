@@ -122,7 +122,7 @@ Relibc has a test suite that also runs every time a new commit get pushed. You c
 Couple of notes:
 
 - Relibc and its tests will rebuild if files changed, however switching between arch or host requires you to run `make clean`
-- Redoxer is needed to run tests for Redox. You can install it using `cargo install redoxer`
+- Redoxer is needed to run tests for Redox without `--host`. You can install it using `cargo install redoxer`
 - Tests can hangs, the test runner can anticipate this, assuming the kernel doesn't hang too.
 
 ## Issues
