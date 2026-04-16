@@ -1392,9 +1392,9 @@ pub unsafe extern "C" fn vfprintf(file: *mut FILE, format: *const c_char, ap: va
 pub unsafe extern "C" fn fprintf(
     file: *mut FILE,
     format: *const c_char,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
-    unsafe { vfprintf(file, format, __valist.as_va_list()) }
+    unsafe { vfprintf(file, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vdprintf.html>.
@@ -1411,8 +1411,8 @@ pub unsafe extern "C" fn vdprintf(fd: c_int, format: *const c_char, ap: va_list)
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dprintf.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn dprintf(fd: c_int, format: *const c_char, mut __valist: ...) -> c_int {
-    unsafe { vdprintf(fd, format, __valist.as_va_list()) }
+pub unsafe extern "C" fn dprintf(fd: c_int, format: *const c_char, __valist: ...) -> c_int {
+    unsafe { vdprintf(fd, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfprintf.html>.
@@ -1423,8 +1423,8 @@ pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fprintf.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn printf(format: *const c_char, mut __valist: ...) -> c_int {
-    unsafe { vfprintf(&raw mut *stdout, format, __valist.as_va_list()) }
+pub unsafe extern "C" fn printf(format: *const c_char, __valist: ...) -> c_int {
+    unsafe { vfprintf(&raw mut *stdout, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfprintf.html>.
@@ -1447,9 +1447,9 @@ pub unsafe extern "C" fn vasprintf(
 pub unsafe extern "C" fn asprintf(
     strp: *mut *mut c_char,
     format: *const c_char,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
-    unsafe { vasprintf(strp, format, __valist.as_va_list()) }
+    unsafe { vasprintf(strp, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfprintf.html>.
@@ -1475,13 +1475,13 @@ pub unsafe extern "C" fn snprintf(
     s: *mut c_char,
     n: size_t,
     format: *const c_char,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
     unsafe {
         printf::printf(
             &mut platform::StringWriter(s.cast::<u8>(), n),
             CStr::from_ptr(format),
-            __valist.as_va_list(),
+            __valist,
         )
     }
 }
@@ -1503,13 +1503,13 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 pub unsafe extern "C" fn sprintf(
     s: *mut c_char,
     format: *const c_char,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
     unsafe {
         printf::printf(
             &mut platform::UnsafeStringWriter(s.cast::<u8>()),
             CStr::from_ptr(format),
-            __valist.as_va_list(),
+            __valist,
         )
     }
 }
@@ -1535,9 +1535,9 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
 pub unsafe extern "C" fn fscanf(
     file: *mut FILE,
     format: *const c_char,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
-    unsafe { vfscanf(file, format, __valist.as_va_list()) }
+    unsafe { vfscanf(file, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfscanf.html>.
@@ -1548,8 +1548,8 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_int {
-    unsafe { vfscanf(&raw mut *stdin, format, __valist.as_va_list()) }
+pub unsafe extern "C" fn scanf(format: *const c_char, __valist: ...) -> c_int {
+    unsafe { vfscanf(&raw mut *stdin, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfscanf.html>.
@@ -1567,12 +1567,12 @@ pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va
 pub unsafe extern "C" fn sscanf(
     s: *const c_char,
     format: *const c_char,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
     unsafe {
         let format = CStr::from_ptr(format);
         let s = CStr::from_ptr(s);
-        scanf::scanf(s.into(), format.into(), __valist.as_va_list())
+        scanf::scanf(s.into(), format.into(), __valist)
     }
 }
 
