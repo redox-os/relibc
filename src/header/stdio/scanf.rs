@@ -361,6 +361,12 @@ pub unsafe fn inner_scanf<T: Kind>(
                                 }
                             }
 
+                            // If we read the width, we end up in the last character of was
+                            // intended to be read, so we advance one
+                            if let Some(0) = width {
+                                read!();
+                            }
+
                             if let Some(ptr) = ptr {
                                 *ptr = 0;
                                 matched += 1;
