@@ -1,4 +1,5 @@
-sys_includes = ["sys/socket.h", "netinet/in.h", "features.h"]
+# netinet/in.h brings in sys/socket.h
+sys_includes = ["netinet/in.h", "features.h"]
 include_guard = "_RELIBC_NETDB_H"
 trailer = """
 #define h_errno (*__h_errno_location())

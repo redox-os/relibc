@@ -19,6 +19,7 @@ use crate::{
             c_char, c_double, c_int, c_long, clock_t, clockid_t, pid_t, size_t, time_t, timer_t,
         },
     },
+    raw_cell::RawCell,
     sync::{Mutex, MutexGuard},
 };
 use alloc::collections::BTreeSet;
@@ -90,7 +91,7 @@ pub struct tm {
 unsafe impl Sync for tm {}
 
 // The C Standard says that localtime and gmtime return the same pointer.
-static mut TM: tm = blank_tm();
+static GMTIME_LOCALTIME_RETURN_TM: RawCell<tm> = RawCell::new(blank_tm());
 
 // The C Standard says that ctime and asctime return the same pointer.
 static mut ASCTIME: [c_char; 26] = [0; 26];
@@ -103,20 +104,25 @@ unsafe impl Sync for TzName {}
 // Name storage for the `tm_zone` field.
 static TIMEZONE_NAMES: Mutex<OnceCell<BTreeSet<CString>>> = Mutex::new(OnceCell::new());
 
-// Hold `TIMEZONE_LOCK` when updating `tzname`, `timezone`, and `daylight`.
+// relibc functions should hold `TIMEZONE_LOCK` when accessing `daylight`,
+// `timezone`, and `tzname`. However, it cannot guard those variables against
+// user access (see `tzset()` specs for details).
 static TIMEZONE_LOCK: Mutex<(Option<CString>, Option<CString>)> = Mutex::new((None, None));
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
+// Should only be accessed by relibc when `TIMEZONE_LOCK` is held
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
 #[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut daylight: c_int = 0;
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
+// Should only be accessed by relibc when `TIMEZONE_LOCK` is held
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
 #[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut timezone: c_long = 0;
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
+// Should only be accessed by relibc when `TIMEZONE_LOCK` is held
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
 #[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
@@ -320,40 +326,93 @@ pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
+///
+/// # Safety
+/// The caller is required to ensure that:
+/// * `timer` is a valid pointer
+/// * the function has exclusive access to the static `tm` structure it
+///   returns. This includes avoiding simultaneous calls to this function as
+///   well as to [`localtime()`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
-    unsafe { gmtime_r(timer, &raw mut TM) }
+    // SAFETY: the caller is required to uphold the safety requirements for
+    // `gmtime_r()` in addition to exclusive access to
+    // `GMTIME_LOCALTIME_RETURN_TM`.
+    unsafe { gmtime_r(timer, GMTIME_LOCALTIME_RETURN_TM.as_mut_ptr()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
+///
+/// # Safety
+/// The caller is required to ensure that:
+/// * `timer` is a valid pointer
+/// * `result` is convertible to an [`Out<tm>`].
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
-    let _ = get_localtime(unsafe { *clock }, result);
+pub unsafe extern "C" fn gmtime_r(timer: *const time_t, result: *mut tm) -> *mut tm {
+    // SAFETY: the caller is required to ensure that `timer` is a valid pointer.
+    let timer_val = unsafe { *timer };
+
+    // SAFETY: the caller is required to ensure that `result` is convertible
+    // to an `Out<tm>`.
+    let result_out = unsafe { Out::nonnull(result) };
+
+    let _ = get_localtime(timer_val, result_out);
     result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localtime.html>.
+///
+/// # Safety
+/// The caller is required to ensure that:
+/// * `timer` is a valid pointer
+/// * the function has exclusive access to the static `tm` structure it
+///   returns. This implies avoiding simultaneous calls to this function as
+///   well as to [`gmtime()`]
+/// * the variables [`daylight`], [`timezone`] and [`tzname`] are not accessed
+///   by user code for the duration of the call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
-    unsafe { localtime_r(clock, &raw mut TM) }
+pub unsafe extern "C" fn localtime(timer: *const time_t) -> *mut tm {
+    // SAFETY: the caller is required to uphold the safety requirements for
+    // `localtime_r()` in addition to exclusive access to
+    // `GMTIME_LOCALTIME_RETURN_TM`.
+    unsafe { localtime_r(timer, GMTIME_LOCALTIME_RETURN_TM.as_mut_ptr()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localtime.html>.
+///
+/// # Safety
+/// The caller is required to ensure that:
+/// * `timer` is a valid pointer
+/// * `result` is convertible to an [`Out<tm>`]
+/// * the variables [`daylight`], [`timezone`] and [`tzname`] are not accessed
+///   by user code for the duration of the call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
+pub unsafe extern "C" fn localtime_r(timer: *const time_t, result: *mut tm) -> *mut tm {
+    // SAFETY: the caller is required to ensure that `timer` is a valid pointer.
+    let timer_val = unsafe { *timer };
+
+    // SAFETY: the caller is required to ensure that `result` is convertible
+    // to an `Out<tm>`.
+    let result_out = unsafe { Out::nonnull(result) };
+
     let mut lock = TIMEZONE_LOCK.lock();
-    clear_timezone(&mut lock);
-    if let (Some(std_time), dst_time) = get_localtime(unsafe { *clock }, t) {
+
+    // SAFETY: the caller is required to ensure that `daylight`, `timezone`
+    // and `tzname` are not accessed by user code.
+    unsafe { clear_timezone(&mut lock) };
+    if let (Some(std_time), dst_time) = get_localtime(timer_val, result_out) {
+        // SAFETY: the caller is required to ensure that `daylight`,
+        // `timezone` and `tzname` are not accessed by user code.
         unsafe { set_timezone(&mut lock, &std_time, dst_time) };
     }
-    t
+    result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mktime.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     let mut lock = TIMEZONE_LOCK.lock();
-    clear_timezone(&mut lock);
+    unsafe { clear_timezone(&mut lock) };
 
     let year = unsafe { (*timeptr).tm_year } + 1900;
     let month = (unsafe { (*timeptr).tm_mon } + 1) as _;
@@ -575,10 +634,16 @@ pub unsafe extern "C" fn timespec_getres(res: *mut timespec, base: c_int) -> c_i
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
+///
+/// # Safety
+/// The caller must ensure that [`daylight`], [`timezone`] and [`tzname`] are
+/// not accessed by user code for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tzset() {
     let mut lock = TIMEZONE_LOCK.lock();
-    clear_timezone(&mut lock);
+    // SAFETY: the caller is required to ensure that `daylight`, `timezone`
+    // and `tzname` are not accessed by user code.
+    unsafe { clear_timezone(&mut lock) };
 
     let tz = time_zone();
     let datetime = now();
@@ -589,6 +654,8 @@ pub unsafe extern "C" fn tzset() {
         MappedLocalTime::None => return,
     };
 
+    // SAFETY: the caller is required to ensure that `daylight`, `timezone`
+    // and `tzname` are not accessed by user code.
     unsafe { set_timezone(&mut lock, &std_time, dst_time) }
 }
 
@@ -615,15 +682,28 @@ fn convert_tm_generic<Tz: TimeZone>(tz: &Tz, tm_val: &tm) -> Option<DateTime<Tz>
     }
 }
 
-fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>) {
+/// # Safety
+/// The caller must ensure that `daylight`, `timezone` and `tzname` are not
+/// accessed by user code for the duration of the call (relibc functions are
+/// required to hold `TIMEZONE_LOCK` when accessing these).
+unsafe fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>) {
     guard.0 = None;
     guard.1 = None;
-    unsafe {
-        tzname.0[0] = ptr::null_mut();
-        tzname.0[1] = ptr::null_mut();
-        timezone = 0;
-        daylight = 0;
-    }
+
+    // SAFETY: the caller is required to ensure access exclusively for the
+    // holder of `TIMEZONE_LOCK`.
+    let daylight_mut = unsafe { &mut *(&raw mut daylight) };
+    // SAFETY: the caller is required to ensure access exclusively for the
+    // holder of `TIMEZONE_LOCK`.
+    let timezone_mut = unsafe { &mut *(&raw mut timezone) };
+    // SAFETY: the caller is required to ensure access exclusively for the
+    // holder of `TIMEZONE_LOCK`.
+    let tzname_mut = unsafe { &mut *(&raw mut tzname) };
+
+    (*tzname_mut).0[0] = ptr::null_mut();
+    (*tzname_mut).0[1] = ptr::null_mut();
+    *timezone_mut = 0;
+    *daylight_mut = 0;
 }
 
 #[inline(always)]
@@ -684,22 +764,26 @@ fn now() -> NaiveDateTime {
 }
 
 #[inline(always)]
-fn get_localtime(clock: time_t, t: *mut tm) -> (Option<DateTime<Tz>>, Option<DateTime<Tz>>) {
+fn get_localtime(
+    timer: time_t,
+    mut result: Out<tm>,
+) -> (Option<DateTime<Tz>>, Option<DateTime<Tz>>) {
     let tz = time_zone();
 
     // Convert UTC time to local time
-    let (std_time, dst_time) = match tz.timestamp_opt(clock, 0) {
+    let (std_time, dst_time) = match tz.timestamp_opt(timer, 0) {
         MappedLocalTime::Single(t) => (Some(t), None),
         // This variant contains the two possible results, in the order (earliest, latest).
         MappedLocalTime::Ambiguous(t1, t2) => (Some(t2), Some(t1)),
         MappedLocalTime::None => return (None, None),
     };
 
-    unsafe { ptr::write(t, datetime_to_tm(&std_time.unwrap())) };
+    let localtime = datetime_to_tm(&std_time.unwrap());
+    result.write(localtime);
     (std_time, dst_time)
 }
 
-unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
+fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let tz = local_time.timezone().name();
     let tz = tz.strip_prefix("Etc/").unwrap_or(tz);
 
@@ -731,37 +815,45 @@ unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     t
 }
 
+/// # Safety
+/// The caller must ensure that `daylight`, `timezone` and `tzname` are not
+/// accessed by user code for the duration of the call (relibc functions are
+/// required to hold `TIMEZONE_LOCK` when accessing these).
 unsafe fn set_timezone(
     guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>,
     std: &DateTime<Tz>,
     dst: Option<DateTime<Tz>>,
 ) {
+    // SAFETY: the caller is required to ensure access exclusively for the
+    // holder of `TIMEZONE_LOCK`.
+    let daylight_mut = unsafe { &mut *(&raw mut daylight) };
+    // SAFETY: the caller is required to ensure access exclusively for the
+    // holder of `TIMEZONE_LOCK`.
+    let timezone_mut = unsafe { &mut *(&raw mut timezone) };
+    // SAFETY: the caller is required to ensure access exclusively for the
+    // holder of `TIMEZONE_LOCK`.
+    let tzname_mut = unsafe { &mut *(&raw mut tzname) };
+
     let ut_offset = std.offset();
 
     guard.0 = Some(CString::new(ut_offset.abbreviation().expect("Wrong timezone")).unwrap());
-    unsafe {
-        tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
-    }
+    tzname_mut.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
 
     match dst {
         Some(dst) => {
             guard.1 =
                 Some(CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap());
-            unsafe {
-                tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
-            }
-            unsafe { daylight = 1 };
+            tzname_mut.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
+            *daylight_mut = 1;
         }
         None => {
             guard.1 = None;
-            unsafe {
-                tzname.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
-            }
-            unsafe { daylight = 0 };
+            tzname_mut.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+            *daylight_mut = 0;
         }
     }
 
-    unsafe { timezone = -c_long::from(ut_offset.fix().local_minus_utc()) };
+    *timezone_mut = -c_long::from(ut_offset.fix().local_minus_utc());
 }
 
 #[inline(always)]

@@ -9,11 +9,13 @@ pub mod bits_iovec;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
 pub mod bits_pthread;
+#[path = "bits_safamily-t/mod.rs"]
+pub mod bits_safamily_t;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
 pub mod bits_timespec;
 // complex.h implemented in C
-// cpio.h implemented in C
+pub mod cpio;
 pub mod crypt;
 pub mod ctype;
 // TODO: curses.h (deprecated)
@@ -44,8 +46,9 @@ pub mod libgen;
 pub mod limits;
 pub mod locale;
 pub mod malloc;
-// pub mod math; // TODO unfinished, uncomment when ready to export
-// math.h implemented in C // TODO replace openlibm with rust libm as above
+// TODO unfinished, unguard feature when ready
+#[cfg(feature = "math_libm")]
+pub mod math;
 pub mod monetary;
 // TODO: mqueue.h
 // TODO: ndbm.h

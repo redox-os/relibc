@@ -7,7 +7,6 @@ use crate::platform::types::{
     c_ushort, ssize_t,
 };
 
-pub const HOST_NAME_MAX: usize = 64;
 pub const NAME_MAX: usize = 255;
 pub const PASS_MAX: usize = 128;
 pub const PATH_MAX: usize = 4096;
@@ -115,6 +114,16 @@ pub const COLL_WEIGHTS_MAX: c_long = _POSIX2_COLL_WEIGHTS_MAX;
 pub const EXPR_NEST_MAX: c_long = _POSIX2_EXPR_NEST_MAX;
 pub const LINE_MAX: c_long = _POSIX2_LINE_MAX;
 pub const RE_DUP_MAX: c_long = _POSIX2_RE_DUP_MAX;
+pub const HOST_NAME_MAX: c_long = _POSIX_HOST_NAME_MAX;
+pub const LOGIN_NAME_MAX: c_long = 255;
+pub const GETENTROPY_MAX: c_long = 256;
+pub const LINK_MAX: c_long = 127;
+pub const PIPE_BUF: c_long = 4096;
+pub const FILESIZEBITS: c_long = 64;
+pub const MAX_CANON: c_long = _POSIX_MAX_CANON;
+pub const MAX_INPUT: c_long = _POSIX_MAX_INPUT;
+pub const SYMLINK_MAX: c_long = _POSIX_SYMLINK_MAX;
+pub const POSIX_ALLOC_SIZE_MIN: c_long = 4096;
 
 pub const PTHREAD_DESTRUCTOR_ITERATIONS: c_long = _POSIX_THREAD_DESTRUCTOR_ITERATIONS;
 // TODO: What should this limit be? Both glibc and musl have it as 1024

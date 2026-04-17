@@ -1,0 +1,21 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html
+#
+# The sys/socket header should define this type.
+# It is split out to avoid other headers from including all of sys/socket.
+#
+# POSIX headers that require sa_family_t:
+# - netinet/in.h
+# - sys/socket.h
+# - sys/un.h
+sys_includes = []
+include_guard = "_RELIBC_BITS_SA_FAMILY_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+
+[export]
+include = ["sa_family_t"]
+
+[enum]
+prefix_with_name = true

@@ -42,6 +42,8 @@ int main(void) {
     test("%c%3c", "hello", &p, &p.c, &p.string1);
     test("test: %2i%n", "test: 0xFF", &p, &p.ia, &p.ib);
     test("hello world%%", "hello world%", &p);
+    test("hello %5ls %d", "hello world 42", &p, &p.string1, &p.ia);
+    test("bye %ls %d", "bye planet 84", &p, &p.string2, &p.ia);
     test("h%1[ae]ll%1[^a] wor%1[^\n]%[d]", "hello world", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test("h%1[ae]ll%1[^a] wor%1[^\n]%[d]", "halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test("h%1[ae]ll%1[^a] wor%1[^\n]%[d]", "halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);

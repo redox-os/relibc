@@ -14,6 +14,7 @@ use crate::{
     header::{
         arpa_inet::inet_aton,
         bits_iovec::iovec,
+        bits_safamily_t::sa_family_t,
         bits_socklen_t::socklen_t,
         errno::{
             EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK, EOPNOTSUPP,
@@ -24,7 +25,7 @@ use crate::{
         sys_select::timeval,
         sys_socket::{
             CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
-            constants::*, msghdr, sa_family_t, sockaddr, ucred,
+            constants::*, msghdr, sockaddr, ucred,
         },
         sys_un::sockaddr_un,
     },
@@ -71,11 +72,12 @@ unsafe fn bind_or_connect(
         }
         AF_UNSPEC => match op {
             SocketCall::Bind => {
-                //bind is not a valid socket call for AF_UNSPEC
+                // Bind is not a valid socket call for AF_UNSPEC
                 return Err(Errno(EAFNOSUPPORT));
             }
             SocketCall::Connect => {
-                format!("0.0.0.0:0")
+                // When a connect is made using AF_UNSPEC TCP and UDP need to disconnect from the default peer
+                format!("disconnect")
             }
             _ => unreachable!(),
         },

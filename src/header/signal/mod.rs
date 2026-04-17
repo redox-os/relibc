@@ -112,13 +112,13 @@ pub type siginfo_t = siginfo;
 pub type stack_t = sigaltstack;
 
 unsafe extern "C" {
-    pub fn sigsetjmp(jb: *mut u64, savemask: i32) -> i32;
+    pub fn sigsetjmp(jb: *mut c_ulonglong, savemask: c_int) -> c_int;
 }
 
 //NOTE for the following two functions, to see why they're implemented slightly differently from their intended behavior, read
 //     https://git.musl-libc.org/cgit/musl/commit/?id=583e55122e767b1586286a0d9c35e2a4027998ab
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __sigsetjmp_tail(jb: *mut u64, ret: i32) -> i32 {
+unsafe extern "C" fn __sigsetjmp_tail(jb: *mut c_ulonglong, ret: c_int) -> c_int {
     let set = jb.wrapping_add(9);
     if ret > 0 {
         unsafe { sigprocmask(SIG_SETMASK, set, ptr::null_mut()) };
@@ -129,7 +129,7 @@ unsafe extern "C" fn __sigsetjmp_tail(jb: *mut u64, ret: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn siglongjmp(jb: *mut u64, ret: i32) {
+pub unsafe extern "C" fn siglongjmp(jb: *mut c_ulonglong, ret: c_int) {
     unsafe { setjmp::longjmp(jb, ret) };
 }
 

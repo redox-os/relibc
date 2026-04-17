@@ -1,4 +1,4 @@
-use crate::platform::types::c_char;
+use crate::platform::types::{c_char, size_t, ssize_t};
 
 use super::{DEFAULT_MONETARY, FormatFlags, LocaleMonetaryInfo, apply_grouping};
 use alloc::string::{String, ToString};
@@ -14,12 +14,13 @@ use libm::{fabs, pow, round, trunc};
 /// Returns:
 /// - The number of characters written (excluding the null terminator), or -1 if
 ///   an error occurs (e.g., invalid input, buffer overflow)
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn strfmon(
     s: *mut c_char,        // Output buffer
-    maxsize: usize,        // Maximum size of the buffer
+    maxsize: size_t,       // Maximum size of the buffer
     format: *const c_char, // Format string
     mut args: ...          // Variadic arguments for monetary values
-) -> isize {
+) -> ssize_t {
     // Validate input pointers and buffer size
     if s.is_null() || format.is_null() || maxsize == 0 {
         return -1; // Invalid input
@@ -150,7 +151,7 @@ pub unsafe extern "C" fn strfmon(
         return -1; // Buffer overflow
     }
     buffer[pos] = 0; // Null-terminate the buffer
-    pos as isize // Return the number of characters written
+    pos as ssize_t // Return the number of characters written
 }
 
 /// Formats a monetary value into the given `buffer` using locale-specific rules

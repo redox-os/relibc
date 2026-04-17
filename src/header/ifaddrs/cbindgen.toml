@@ -1,4 +1,5 @@
-sys_includes = ["features.h", "netinet/in.h", "sys/socket.h"]
+# netinet/in.h brings in sys/socket.h
+sys_includes = ["features.h", "netinet/in.h"]
 include_guard = "_RELIBC_IFADDRS_H"
 language = "C"
 style = "Tag"
