@@ -374,6 +374,4 @@ typedef __UINTMAX_TYPE__ uintmax_t;
 #endif
 #endif
 
-typedef long sig_atomic_t;
-
 #endif /* _GCC_STDINT_H */
