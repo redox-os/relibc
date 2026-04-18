@@ -1,7 +1,20 @@
 sys_includes = ["stddef.h", "alloca.h", "wchar.h", "features.h"]
 include_guard = "_RELIBC_STDLIB_H"
 trailer = """
+#ifndef _RELIBC_STDLIB_EXTRA_H
+#define _RELIBC_STDLIB_EXTRA_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 long double strtold(const char *nptr, char **endptr);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
 """
 language = "C"
 style = "Type"
