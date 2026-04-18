@@ -20,6 +20,7 @@ typedef struct siginfo siginfo_t;
 typedef unsigned long long sigset_t;
 typedef struct ucontext ucontext_t;
 typedef struct mcontext mcontext_t;
+typedef long sig_atomic_t;
 
 struct sigaction {
   union {
