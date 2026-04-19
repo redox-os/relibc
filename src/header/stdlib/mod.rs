@@ -146,9 +146,9 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
         platform::ERRNO.set(EINVAL);
         return ptr::null_mut();
     }
-    /* The size-is-multiple-of-alignment requirement is the only
-     * difference between aligned_alloc() and memalign(). */
-    unsafe { memalign(alignment, size) }
+    let mut pointer = ptr::null_mut();
+    unsafe { posix_memalign(ptr::from_mut(&mut pointer), alignment, size) };
+    pointer
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/at_quick_exit.html>.
