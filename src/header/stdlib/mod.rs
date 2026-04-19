@@ -1113,6 +1113,7 @@ pub unsafe extern "C" fn rand() -> c_int {
 /// # Deprecation
 /// The `rand_r()` function was marked as obsolescent in the Open Group Base
 /// Specifications Issue 7, and the function was removed in Issue 8.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
     if seed.is_null() {

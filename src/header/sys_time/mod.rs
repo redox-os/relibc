@@ -117,6 +117,7 @@ pub unsafe extern "C" fn setitimer(
 /// # Deprecation
 /// The `utimes()` function was marked legacy in the Open Group Base
 /// Specifications Issue 6, and then unmarked in Issue 7.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };

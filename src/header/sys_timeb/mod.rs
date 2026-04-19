@@ -18,6 +18,7 @@ use crate::{
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/timeb.h.html>.
+#[deprecated]
 #[repr(C)]
 #[derive(Default)]
 pub struct timeb {
@@ -32,6 +33,7 @@ pub struct timeb {
 /// # Safety
 /// The caller must ensure that `tp` is convertible to a `&mut
 /// MaybeUninit<timeb>`.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
     // SAFETY: the caller is required to ensure that the pointer is valid.

@@ -315,6 +315,7 @@ pub unsafe extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
 ///
 /// Marked legacy in SUS Version 2.
 // #[unsafe(no_mangle)]
+#[deprecated]
 pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
     let mut buf: Vec<c_char> = vec![0; 256];
     let mut pwd: pwd::passwd = unsafe { mem::zeroed() };
@@ -894,6 +895,7 @@ pub unsafe extern "C" fn getchar_unlocked() -> c_int {
 /// `fgets` is recommended instead, which is what this implementation calls.
 ///
 /// Get a string from `stdin`
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gets(s: *mut c_char) -> *mut c_char {
     unsafe { fgets(s, c_int::MAX, &raw mut *stdin) }
@@ -904,6 +906,7 @@ pub unsafe extern "C" fn gets(s: *mut c_char) -> *mut c_char {
 /// Was marked legacy and removed in issue 6.
 ///
 /// Get an integer from `stream`
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getw(stream: *mut FILE) -> c_int {
     let mut ret: c_int = 0;
@@ -1125,6 +1128,7 @@ pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
 /// Marked legacy in SUS Version 2.
 ///
 /// Put an integer `w` into `stream`
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn putw(w: c_int, stream: *mut FILE) -> c_int {
     (unsafe {
@@ -1258,6 +1262,7 @@ pub unsafe extern "C" fn setvbuf(
 /// See <https://pubs.opengroup.org/onlinepubs/009604599/functions/tempnam.html>.
 ///
 /// Marked obsolescent in issue 7.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut c_char {
     unsafe fn is_appropriate(pos_dir: *const c_char) -> bool {
@@ -1331,6 +1336,7 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tmpnam.html>.
 ///
 /// Marked obsolescent in issue 7.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
     let buf = if s.is_null() {
@@ -1343,6 +1349,7 @@ pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
     unsafe { tmpnam_inner(buf, 1) }
 }
 
+#[deprecated]
 unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_char {
     const TEMPLATE: &[u8] = b"XXXXXX\0";
 

@@ -911,6 +911,7 @@ pub unsafe extern "C" fn wcstoull(
 ///
 /// Marked legacy in issue 6.
 /// Encouraged to use `wcsstr` instead, which this implementation simply forwards to.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcswcs(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
     unsafe { wcsstr(ws1, ws2) }

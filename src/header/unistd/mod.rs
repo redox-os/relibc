@@ -38,7 +38,10 @@ pub use crate::header::pthread::fork_hooks;
 // Inclusion of ctermid() prototype marked as obsolescent since Issue 7, cf.
 // <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/unistd.h.html>.
 // cuserid() marked legacy in Issue 5.
-pub use crate::header::stdio::{ctermid, cuserid};
+#[deprecated]
+pub use crate::header::stdio::ctermid;
+#[allow(deprecated)]
+pub use crate::header::stdio::cuserid;
 
 // TODO: implement and reexport fcntl functions:
 //pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
