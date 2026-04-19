@@ -27,10 +27,11 @@ use crate::{
     platform::{Pal, Sys, types::c_int},
 };
 use core::{
+    hint,
     mem::MaybeUninit,
     ops::Deref,
     ptr,
-    sync::atomic::{self, AtomicI32, AtomicI32 as AtomicInt, AtomicU32},
+    sync::atomic::{AtomicI32, AtomicI32 as AtomicInt, AtomicU32},
 };
 
 const FUTEX_WAIT: c_int = 0;
@@ -154,7 +155,7 @@ where
 {
     // First, try spinning for really short durations
     for _ in 0..999 {
-        atomic::spin_loop_hint();
+        hint::spin_loop();
         if attempt(word) == AttemptStatus::Desired {
             return;
         }
