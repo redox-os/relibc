@@ -11,7 +11,7 @@ TEST_RUNNER?=
 
 .PHONY: all clean run expected verify
 
-all: $(BINS)
+all: build
 
 clean:
 	rm -rf $(BUILD)/bins_* $(BUILD)/gen $(BUILD)/target
