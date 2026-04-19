@@ -10,18 +10,21 @@ use super::{
     },
     Sys, e_raw,
 };
+#[allow(deprecated)]
+use crate::header::sys_time::itimerval;
 use crate::{
     error::{Errno, Result},
     header::{
         bits_timespec::timespec,
         signal::{SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigset_t, sigval, stack_t},
         sys_select::timeval,
-        sys_time::{self, itimerval},
+        sys_time,
     },
     platform,
 };
 
 impl PalSignal for Sys {
+    #[allow(deprecated)]
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
         unsafe {
             e_raw(syscall!(GETITIMER, which, ptr::from_mut(out)))?;
@@ -58,6 +61,7 @@ impl PalSignal for Sys {
         Ok(())
     }
 
+    #[allow(deprecated)]
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
         e_raw(unsafe {
             syscall!(

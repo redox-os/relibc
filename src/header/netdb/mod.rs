@@ -348,7 +348,10 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     // Some implementations just skip resolution and copy the address to h_name
     if let Some(s_addr) = parse_ipv4_string(name_str) {
         let addr = in_addr { s_addr };
-        return unsafe { gethostbyaddr(ptr::from_ref(&addr).cast::<c_void>(), 4, AF_INET) };
+        return unsafe {
+            #[allow(deprecated)]
+            gethostbyaddr(ptr::from_ref(&addr).cast::<c_void>(), 4, AF_INET)
+        };
     }
 
     // check the hosts file first
@@ -1137,6 +1140,7 @@ pub extern "C" fn herror(prefix: *const c_char) {
     let code = H_ERRNO.get();
     // Safety: `hstrerror` handles every error code case and always returns a valid C string
     let error = unsafe {
+        #[allow(deprecated)]
         let msg_cstr = CStr::from_ptr(hstrerror(code));
         str::from_utf8_unchecked(msg_cstr.to_bytes())
     };

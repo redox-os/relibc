@@ -9,6 +9,8 @@ use core::{
     ptr, slice,
 };
 
+#[allow(deprecated)]
+use crate::platform::types::useconds_t;
 use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
@@ -27,12 +29,12 @@ use crate::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{
             c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
-            size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
+            size_t, ssize_t, suseconds_t, time_t, uid_t,
         },
     },
 };
 
-pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
+pub use self::{brk::*, getopt::*, pathconf::*, sysconf::*};
 pub use crate::header::pthread::fork_hooks;
 
 // Inclusion of ctermid() prototype marked as obsolescent since Issue 7, cf.
@@ -1118,6 +1120,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 /// The `ualarm()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 6, and removed in Issue 7.
 #[deprecated]
+#[allow(deprecated)]
 #[unsafe(no_mangle)]
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
     // TODO setitimer is unimplemented on Redox and obsolete
@@ -1167,6 +1170,7 @@ pub unsafe extern "C" fn unlinkat(fd: c_int, path: *const c_char, flags: c_int) 
 /// The `usleep()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 6, and removed in Issue 7.
 #[deprecated]
+#[allow(deprecated)]
 #[unsafe(no_mangle)]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     #[cfg(not(target_arch = "x86"))]

@@ -219,7 +219,6 @@ struct Custom {
 ///
 /// [`io::Error`]: struct.Error.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[allow(deprecated)]
 #[non_exhaustive]
 pub enum ErrorKind {
     /// An entity was not found, often a file.

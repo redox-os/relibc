@@ -147,7 +147,10 @@ pub struct itimerspec {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
-    unsafe { asctime_r(timeptr, (&raw mut ASCTIME).cast()) }
+    unsafe {
+        #[allow(deprecated)]
+        asctime_r(timeptr, (&raw mut ASCTIME).cast())
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/asctime.html>.
@@ -296,7 +299,10 @@ pub unsafe extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec)
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
-    unsafe { asctime(localtime(clock)) }
+    unsafe {
+        #[allow(deprecated)]
+        asctime(localtime(clock))
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/ctime.html>.
@@ -310,7 +316,10 @@ pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut
     // Using MaybeUninit<tm> seems to cause a panic during the build process
     let mut tm1 = blank_tm();
     unsafe { localtime_r(clock, &raw mut tm1) };
-    unsafe { asctime_r(&raw const tm1, buf) }
+    unsafe {
+        #[allow(deprecated)]
+        asctime_r(&raw const tm1, buf)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/difftime.html>.

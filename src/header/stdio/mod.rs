@@ -1299,7 +1299,12 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
         };
 
         // use the same mechanism as tmpnam to get the file name
-        if unsafe { tmpnam_inner(out_buf, dirname_len + 1 + prefix_len) }.is_null() {
+        if unsafe {
+            #[allow(deprecated)]
+            tmpnam_inner(out_buf, dirname_len + 1 + prefix_len)
+        }
+        .is_null()
+        {
             // failed to find a valid file name, so we need to free the buffer
             unsafe { platform::free(out_buf.cast()) };
             out_buf = ptr::null_mut();
@@ -1346,7 +1351,10 @@ pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
     };
 
     unsafe { *buf = b'/' as _ };
-    unsafe { tmpnam_inner(buf, 1) }
+    unsafe {
+        #[allow(deprecated)]
+        tmpnam_inner(buf, 1)
+    }
 }
 
 #[deprecated]
@@ -1359,7 +1367,10 @@ unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_cha
     };
 
     let err = platform::ERRNO.get();
-    unsafe { stdlib::mktemp(buf) };
+    unsafe {
+        #[allow(deprecated)]
+        stdlib::mktemp(buf)
+    };
     platform::ERRNO.set(err);
 
     if unsafe { *buf } == 0 {
