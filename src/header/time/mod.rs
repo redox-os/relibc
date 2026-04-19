@@ -769,7 +769,9 @@ fn time_zone() -> Tz {
 fn now() -> NaiveDateTime {
     let mut now = timespec::default();
     if Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut now)).is_ok() {}; // TODO what to do if Err?
-    NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
+    DateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
+        .unwrap_or_default()
+        .naive_local()
 }
 
 #[inline(always)]
