@@ -32,8 +32,9 @@ use crate::{
             ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
-            self, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
-            F_GETLK, F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
+            self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
+            AT_SYMLINK_NOFOLLOW, F_GETLK, F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW,
+            F_UNLCK, F_WRLCK, flock,
         },
         limits,
         pthread::{pthread_cancel, pthread_create},
@@ -107,7 +108,15 @@ pub struct Sys;
 
 impl Pal for Sys {
     fn access(path: CStr, mode: c_int) -> Result<()> {
-        let fd = FdGuard::new(Sys::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
+        Sys::faccessat(AT_FDCWD, path, mode, 0)
+    }
+
+    fn faccessat(fd: c_int, path: CStr, mode: c_int, flags: c_int) -> Result<()> {
+        let fd = FdGuard::new(Sys::openat(fd, path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
+
+        if (flags & !(AT_EACCESS)) != 0 {
+            return Err(Errno(EINVAL));
+        }
 
         if mode == F_OK {
             return Ok(());
@@ -117,11 +126,22 @@ impl Pal for Sys {
 
         fd.fstat(&mut stat)?;
 
-        let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
+        let Resugid {
+            ruid,
+            rgid,
+            euid,
+            egid,
+            ..
+        } = redox_rt::sys::posix_getresugid();
+        let (uid, gid) = if (flags & AT_EACCESS) == AT_EACCESS {
+            (euid, egid)
+        } else {
+            (ruid, rgid)
+        };
 
-        let perms = (if stat.st_uid == ruid {
+        let perms = (if stat.st_uid == uid {
             stat.st_mode >> (3 * 2)
-        } else if stat.st_gid == rgid {
+        } else if stat.st_gid == gid {
             stat.st_mode >> (3 * 1)
         } else {
             stat.st_mode
@@ -277,7 +297,7 @@ impl Pal for Sys {
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            return Err(Errno(EINVAL));
         }
         let mut path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
@@ -303,6 +323,21 @@ impl Pal for Sys {
 
     fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> Result<()> {
         libredox::fchown(fd as usize, owner as u32, group as u32)?;
+        Ok(())
+    }
+
+    fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()> {
+        const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
+        if MASK & flags != 0 {
+            return Err(Errno(EINVAL));
+        }
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let file = openat2(fildes, path, flags, 0)?;
+        libredox::fchown(
+            *file as usize,
+            owner.try_into().map_err(|_| Errno(EINVAL))?,
+            group.try_into().map_err(|_| Errno(EINVAL))?,
+        )?;
         Ok(())
     }
 

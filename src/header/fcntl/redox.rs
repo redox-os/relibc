@@ -30,7 +30,11 @@ pub const O_NDELAY: c_int = O_NONBLOCK;
 
 // Flags for capability based "at" functions
 pub const AT_FDCWD: c_int = -100;
-pub const AT_SYMLINK_NOFOLLOW: c_int = 0x0200;
-pub const AT_SYMLINK_FOLLOW: c_int = 0x2000;
-pub const AT_EMPTY_PATH: c_int = 0x4000;
+pub const AT_SYMLINK_NOFOLLOW: c_int = 0x200;
 pub const AT_REMOVEDIR: c_int = 0x200;
+// Used by linkat()
+pub const AT_SYMLINK_FOLLOW: c_int = 0x2000;
+// nonstandard extension, but likely to be in a future standard
+pub const AT_EMPTY_PATH: c_int = 0x4000;
+// only used for faccessat()
+pub const AT_EACCESS: c_int = 0x400;
