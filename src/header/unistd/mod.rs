@@ -54,6 +54,8 @@ mod brk;
 mod getopt;
 mod getpass;
 mod pathconf;
+#[cfg(target_os = "linux")]
+pub mod syscall;
 mod sysconf;
 
 pub const F_OK: c_int = 0;
