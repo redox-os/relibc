@@ -13,8 +13,8 @@ use crate::{
     platform::{
         Pal, Sys,
         types::{
-            blkcnt_t, blksize_t, c_char, c_int, dev_t, gid_t, ino_t, mode_t, nlink_t, off_t, uid_t,
-            useconds_t,
+            blkcnt_t, blksize_t, c_char, c_int, c_long, dev_t, gid_t, ino_t, mode_t, nlink_t,
+            off_t, uid_t,
         },
     },
 };
@@ -52,8 +52,8 @@ pub const S_ISUID: c_int = 0o4_000;
 pub const S_ISGID: c_int = 0o2_000;
 pub const S_ISVTX: c_int = 0o1_000;
 
-pub const UTIME_NOW: useconds_t = (1 << 30) - 1;
-pub const UTIME_OMIT: useconds_t = (1 << 30) - 2;
+pub const UTIME_NOW: c_long = (1 << 30) - 1;
+pub const UTIME_OMIT: c_long = (1 << 30) - 2;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html>.
 #[repr(C)]

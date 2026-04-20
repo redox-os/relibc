@@ -69,6 +69,7 @@ pub struct timezone {
 /// The `getitimer()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
+#[allow(deprecated)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
     Sys::getitimer(which, unsafe { &mut *value })
@@ -100,6 +101,7 @@ pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c
 /// The `setitimer()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
+#[allow(deprecated)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setitimer(
     which: c_int,
@@ -117,6 +119,7 @@ pub unsafe extern "C" fn setitimer(
 /// # Deprecation
 /// The `utimes()` function was marked legacy in the Open Group Base
 /// Specifications Issue 6, and then unmarked in Issue 7.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
