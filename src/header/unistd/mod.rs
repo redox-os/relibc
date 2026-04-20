@@ -17,8 +17,7 @@ use crate::{
     header::{
         bits_timespec::timespec,
         crypt::{crypt_data, crypt_r},
-        errno::{self, ENAMETOOLONG},
-        fcntl, limits,
+        errno, fcntl, limits,
         stdlib::getenv,
         sys_ioctl, sys_resource,
         sys_select::timeval,
@@ -45,12 +44,13 @@ pub use crate::header::stdio::ctermid;
 #[allow(deprecated)]
 pub use crate::header::stdio::cuserid;
 
-// TODO: implement and reexport fcntl functions:
-//pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
-
 use super::{
     errno::{E2BIG, EINVAL, ENOMEM},
     stdio::snprintf,
+};
+// Export *at functions because unistd.h includes them.
+pub use crate::header::fcntl::{
+    faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat,
 };
 
 use crate::header::signal::{sigprocmask, sigset_t, sigsuspend};
@@ -333,18 +333,6 @@ pub unsafe extern "C" fn execve(
 ) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
     unsafe { Sys::execve(path, argv, envp) }
-        .map(|()| unreachable!())
-        .or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn fexecve(
-    fd: c_int,
-    argv: *const *mut c_char,
-    envp: *const *mut c_char,
-) -> c_int {
-    unsafe { Sys::fexecve(fd, argv, envp) }
         .map(|()| unreachable!())
         .or_minus_one_errno()
 }
@@ -712,22 +700,6 @@ pub unsafe extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_i
     Sys::link(path1, path2).map(|()| 0).or_minus_one_errno()
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/linkat.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn linkat(
-    fd1: c_int,
-    path1: *const c_char,
-    fd2: c_int,
-    path2: *const c_char,
-    flags: c_int,
-) -> c_int {
-    let path1 = unsafe { CStr::from_ptr(path1) };
-    let path2 = unsafe { CStr::from_ptr(path2) };
-    Sys::linkat(fd1, path1, fd2, path2, flags)
-        .map(|()| 0)
-        .or_minus_one_errno()
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lockf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
@@ -876,25 +848,6 @@ pub unsafe extern "C" fn readlink(
         .or_minus_one_errno()
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readlink.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn readlinkat(
-    dirfd: c_int,
-    pathname: *const c_char,
-    buf: *mut c_char,
-    len: size_t,
-) -> ssize_t {
-    let pathname = unsafe { CStr::from_ptr(pathname) };
-    let buf = unsafe { slice::from_raw_parts_mut(buf.cast(), len) };
-    Sys::readlinkat(dirfd, pathname, buf)
-        .map(|read| {
-            read.try_into()
-                .map_err(|_| Errno(ENAMETOOLONG))
-                .or_minus_one_errno()
-        })
-        .or_minus_one_errno()
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/rmdir.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
@@ -1031,16 +984,6 @@ pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> 
     Sys::symlink(path1, path2).map(|()| 0).or_minus_one_errno()
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/symlinkat.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn symlinkat(path1: *const c_char, fd: c_int, path2: *const c_char) -> c_int {
-    let path1 = unsafe { CStr::from_ptr(path1) };
-    let path2 = unsafe { CStr::from_ptr(path2) };
-    Sys::symlinkat(path1, fd, path2)
-        .map(|()| 0)
-        .or_minus_one_errno()
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sync.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn sync() {
@@ -1153,15 +1096,6 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
 pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
     Sys::unlink(path).map(|()| 0).or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/unlinkat.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn unlinkat(fd: c_int, path: *const c_char, flags: c_int) -> c_int {
-    let path = unsafe { CStr::from_ptr(path) };
-    Sys::unlinkat(fd, path, flags)
-        .map(|()| 0)
-        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/usleep.html>.

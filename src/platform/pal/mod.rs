@@ -37,6 +37,9 @@ pub trait Pal {
     /// Platform implementation of [`access()`](crate::header::unistd::access) from [`unistd.h`](crate::header::unistd).
     fn access(path: CStr, mode: c_int) -> Result<()>;
 
+    /// Platform implementation of [`faccessat()`](crate::header::unistd::faccessat) from [`unistd.h`](crate::header::unistd).
+    fn faccessat(fd: c_int, path: CStr, amode: c_int, flags: c_int) -> Result<()>;
+
     /// Platform implementation of [`brk()`](crate::header::unistd::brk) from [`unistd.h`](crate::header::unistd).
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void>;
 
@@ -94,6 +97,9 @@ pub trait Pal {
 
     /// Platform implementation of [`fchown()`](crate::header::unistd::fchown) from [`unistd.h`](crate::header::unistd).
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()>;
+
+    /// Platform implementation of [`fchownat()`](crate::header::unistd::fchownat) from [`unistd.h`](crate::header::unistd).
+    fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()>;
 
     /// Platform implementation of [`fdatasync()`](crate::header::unistd::fdatasync) from [`unistd.h`](crate::header::unistd).
     fn fdatasync(fildes: c_int) -> Result<()>;

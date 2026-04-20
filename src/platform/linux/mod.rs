@@ -81,14 +81,12 @@ impl Sys {
 }
 
 impl Pal for Sys {
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn access(path: CStr, mode: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
+        Sys::faccessat(AT_FDCWD, path, mode, 0)
     }
 
-    #[cfg(target_arch = "aarch64")]
-    fn access(path: CStr, mode: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(FACCESSAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
+    fn faccessat(fd: c_int, path: CStr, amode: c_int, flags: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(FACCESSAT, fd, path.as_ptr(), amode, flags) }).map(|_| ())
     }
 
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
@@ -104,11 +102,14 @@ impl Pal for Sys {
     }
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        let flags: c_int = 0;
+        Sys::fchownat(AT_FDCWD, path, owner, group, 0)
+    }
+
+    fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()> {
         e_raw(unsafe {
             syscall!(
                 FCHOWNAT,
-                AT_FDCWD,
+                fildes,
                 path.as_ptr(),
                 owner as u32,
                 group as u32,

@@ -2,14 +2,18 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fcntl.h.html>.
 
-use core::num::NonZeroU64;
+use core::{num::NonZeroU64, slice};
 
 use crate::{
     c_str::CStr,
-    error::ResultExt,
+    error::{Errno, ResultExt},
+    header::errno::ENAMETOOLONG,
     platform::{
         Pal, Sys,
-        types::{c_char, c_int, c_short, c_ulonglong, mode_t, off_t, pid_t},
+        types::{
+            c_char, c_int, c_short, c_ulonglong, gid_t, mode_t, off_t, pid_t, size_t, ssize_t,
+            uid_t,
+        },
     },
 };
 
@@ -121,4 +125,99 @@ pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, length: off_t
         .err()
         .map(|e| e.0)
         .unwrap_or_default()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readlinkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn readlinkat(
+    dirfd: c_int,
+    pathname: *const c_char,
+    buf: *mut c_char,
+    len: size_t,
+) -> ssize_t {
+    let pathname = unsafe { CStr::from_ptr(pathname) };
+    let buf = unsafe { slice::from_raw_parts_mut(buf.cast(), len) };
+    Sys::readlinkat(dirfd, pathname, buf)
+        .map(|read| {
+            read.try_into()
+                .map_err(|_| Errno(ENAMETOOLONG))
+                .or_minus_one_errno()
+        })
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/linkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn linkat(
+    fd1: c_int,
+    path1: *const c_char,
+    fd2: c_int,
+    path2: *const c_char,
+    flags: c_int,
+) -> c_int {
+    let path1 = unsafe { CStr::from_ptr(path1) };
+    let path2 = unsafe { CStr::from_ptr(path2) };
+    Sys::linkat(fd1, path1, fd2, path2, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/symlinkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn symlinkat(path1: *const c_char, fd: c_int, path2: *const c_char) -> c_int {
+    let path1 = unsafe { CStr::from_ptr(path1) };
+    let path2 = unsafe { CStr::from_ptr(path2) };
+    Sys::symlinkat(path1, fd, path2)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/unlinkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn unlinkat(fd: c_int, path: *const c_char, flags: c_int) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::unlinkat(fd, path, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fexecve.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fexecve(
+    fd: c_int,
+    argv: *const *mut c_char,
+    envp: *const *mut c_char,
+) -> c_int {
+    unsafe { Sys::fexecve(fd, argv, envp) }
+        .map(|()| unreachable!())
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/faccessat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn faccessat(
+    fd: c_int,
+    path: *const c_char,
+    mode: c_int,
+    flags: c_int,
+) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::faccessat(fd, path, mode, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/faccessat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fchownat(
+    fd: c_int,
+    path: *const c_char,
+    owner: uid_t,
+    group: gid_t,
+    flags: c_int,
+) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::fchownat(fd, path, owner, group, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
