@@ -6,22 +6,28 @@ use core::{
 use super::{
     super::{
         PalSignal,
-        types::{c_int, c_uint, pid_t, time_t},
+        types::{c_int, c_uint, pid_t},
     },
     Sys, e_raw,
 };
+#[allow(deprecated)]
+use crate::header::sys_time::itimerval;
 use crate::{
     error::{Errno, Result},
     header::{
         bits_timespec::timespec,
-        signal::{SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigset_t, sigval, stack_t},
-        sys_select::timeval,
-        sys_time::{self, itimerval},
+        signal::{
+            SA_RESTORER, SI_QUEUE, SIGALRM, SIGEV_SIGNAL, sigaction, sigevent, siginfo_t, sigset_t,
+            sigval, stack_t,
+        },
+        time,
     },
-    platform,
+    out::Out,
+    platform::{self, Pal, types::timer_t},
 };
 
 impl PalSignal for Sys {
+    #[allow(deprecated)]
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
         unsafe {
             e_raw(syscall!(GETITIMER, which, ptr::from_mut(out)))?;
@@ -58,6 +64,7 @@ impl PalSignal for Sys {
         Ok(())
     }
 
+    #[allow(deprecated)]
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
         e_raw(unsafe {
             syscall!(
@@ -72,22 +79,40 @@ impl PalSignal for Sys {
 
     /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
     fn alarm(seconds: c_uint) -> c_uint {
-        let timer = itimerval {
-            it_value: timeval {
-                tv_sec: time_t::from(seconds),
-                tv_usec: 0,
-            },
-            ..Default::default()
+        let mut signal_event = sigevent {
+            sigev_value: sigval { sival_int: 0 },
+            sigev_signo: SIGALRM as c_int,
+            sigev_notify: SIGEV_SIGNAL,
+            sigev_notify_attributes: ptr::null_mut(),
+            sigev_notify_function: None,
         };
-        let mut otimer = itimerval::default();
+        let mut timerid: timer_t = Default::default();
+        let timer = unsafe {
+            time::timer_create(
+                time::CLOCK_REALTIME,
+                ptr::from_mut(&mut signal_event),
+                ptr::from_mut(&mut timerid),
+            )
+        };
+        let value = time::itimerspec {
+            it_value: timespec {
+                tv_sec: i64::from(seconds),
+                tv_nsec: 0,
+            },
+            it_interval: timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+        };
+        let mut ovalue = Default::default();
+
         let errno_backup = platform::ERRNO.get();
-        let secs = if Self::setitimer(sys_time::ITIMER_REAL, &timer, Some(&mut otimer)).is_err() {
+        if Sys::timer_settime(timerid, 0, &value, Some(Out::from_mut(&mut ovalue))).is_err() {
+            platform::ERRNO.set(errno_backup);
             0
         } else {
-            otimer.it_value.tv_sec as c_uint + if otimer.it_value.tv_usec > 0 { 1 } else { 0 }
-        };
-        platform::ERRNO.set(errno_backup);
-        secs
+            ovalue.it_value.tv_sec as c_uint + if ovalue.it_value.tv_nsec > 0 { 1 } else { 0 }
+        }
     }
 
     fn sigaction(

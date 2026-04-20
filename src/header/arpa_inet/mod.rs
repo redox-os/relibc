@@ -145,7 +145,10 @@ pub extern "C" fn inet_netof(r#in: in_addr) -> in_addr_t {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
-    ntohl(unsafe { inet_addr(cp) })
+    ntohl(unsafe {
+        #[allow(deprecated)]
+        inet_addr(cp)
+    })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_addr.html>.

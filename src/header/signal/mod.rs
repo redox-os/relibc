@@ -292,6 +292,7 @@ pub extern "C" fn sigignore(sig: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/siginterrupt.html>.
 ///
 /// Marked obsolescent in issue 7. Removed in issue 8.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();

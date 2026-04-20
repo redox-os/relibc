@@ -9,15 +9,15 @@
 
 use core::ptr::NonNull;
 
+#[allow(deprecated)]
+use crate::header::sys_time::gettimeofday;
 use crate::{
-    header::{
-        sys_select::timeval,
-        sys_time::{gettimeofday, timezone},
-    },
+    header::{sys_select::timeval, sys_time::timezone},
     platform::types::{c_int, c_short, c_ushort, time_t},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/timeb.h.html>.
+#[deprecated]
 #[repr(C)]
 #[derive(Default)]
 pub struct timeb {
@@ -32,6 +32,8 @@ pub struct timeb {
 /// # Safety
 /// The caller must ensure that `tp` is convertible to a `&mut
 /// MaybeUninit<timeb>`.
+#[deprecated]
+#[allow(deprecated)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
     // SAFETY: the caller is required to ensure that the pointer is valid.
@@ -42,10 +44,15 @@ pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
 
     // SAFETY: tv and tz are created above, and thus will coerce to valid
     // pointers.
-    if unsafe { gettimeofday(&raw mut tv, &raw mut tz) } < 0 {
+    if unsafe {
+        #[allow(deprecated)]
+        gettimeofday(&raw mut tv, &raw mut tz)
+    } < 0
+    {
         return -1;
     }
 
+    #[allow(deprecated)]
     tp_maybe_uninit.write(timeb {
         time: tv.tv_sec,
         millitm: (tv.tv_usec / 1000) as c_ushort,
