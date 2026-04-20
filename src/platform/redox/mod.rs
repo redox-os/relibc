@@ -32,8 +32,8 @@ use crate::{
             ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
-            self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, F_GETLK, F_OFD_GETLK, F_OFD_SETLK,
-            F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
+            self, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
+            F_GETLK, F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
         limits,
         pthread::{pthread_cancel, pthread_create},
@@ -772,6 +772,29 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()> {
+        // make sure the flags passed are valid.
+        // valid states: AT_SYMLINK_FOLLOW, or 0.
+        if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
+            return Err(Errno(EINVAL));
+        }
+        let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
+
+        // By default, we don't follow the symlink if there is one.
+        // We only follow it if AT_SYMLINK_FOLLOW is passed in flags.
+        // We represent this by setting O_NOFOLLOW by default, and clearing it
+        // if AT_SYMLINK_FOLLOW is present.
+        let mut oflags = fcntl::O_PATH | fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW;
+        if (flags & AT_SYMLINK_FOLLOW) == AT_SYMLINK_FOLLOW {
+            oflags &= !fcntl::O_NOFOLLOW;
+        }
+
+        let file = File::openat(fd1, oldpath, oflags)?;
+        let newpath = openat2_path(fd2, newpath, 0)?;
+        syscall::flink(*file as usize, newpath)?;
+        Ok(())
+    }
+
     fn lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
         Ok(syscall::lseek(fd as usize, offset as isize, whence as usize)? as off_t)
     }
@@ -1240,7 +1263,12 @@ impl Pal for Sys {
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {
-        let mut file = File::create(
+        Sys::symlinkat(path1, AT_FDCWD, path2)
+    }
+
+    fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
+        let mut file = File::createat(
+            fd,
             path2,
             fcntl::O_WRONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
             0o777,
@@ -1508,6 +1536,17 @@ impl Pal for Sys {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
         redox_rt::sys::unlink(&canon, 0)?;
+        Ok(())
+    }
+
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
+        if (flags & !AT_REMOVEDIR) != 0 {
+            return Err(Errno(EINVAL));
+        }
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let path = openat2_path(fd, path, 0)?;
+        let canon = canonicalize(&path)?;
+        redox_rt::sys::unlink(&canon, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
         Ok(())
     }
 
