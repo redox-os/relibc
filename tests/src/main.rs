@@ -115,6 +115,23 @@ fn print_tabbed(output: Vec<u8>, name: &str) {
     }
 }
 
+#[cfg(target_os = "redox")]
+fn print_kernel_version() {
+    let Ok(uname) = fs::read_to_string("/scheme/sys/uname") else {
+        eprintln!("kernel version: unable to get one");
+        return;
+    };
+    eprintln!(
+        "kernel version: {}",
+        uname
+            .lines()
+            .last()
+            .map(|s| s.get(..8))
+            .flatten()
+            .unwrap_or("?")
+    );
+}
+
 fn main() {
     let mut failures = Vec::new();
     let timeout = Duration::from_secs(10);
@@ -122,6 +139,9 @@ fn main() {
     let bins: Vec<String> = env::args().skip(1).collect();
     let single_test = bins.len() == 1;
     let expected_dir = find_expected_dir();
+
+    #[cfg(target_os = "redox")]
+    print_kernel_version();
 
     for bin in bins {
         let status_only = bin.starts_with(STATUS_ONLY);
