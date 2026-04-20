@@ -5,11 +5,11 @@ use core::ptr;
 #[repr(C)]
 pub enum RTLDState {
     /// Mapping change is complete.
-    RT_CONSISTENT,
+    RtConsistent,
     /// Beginning to add a new object.
-    RT_ADD,
+    RtAdd,
     /// Beginning to remove an object mapping.
-    RT_DELETE,
+    RtDelete,
 }
 
 /// Data structure for sharing debugging information from the
@@ -41,7 +41,7 @@ impl RTLDDebug {
         r_version: 1,
         r_map: ptr::null_mut::<LinkMap>(),
         r_brk: _dl_debug_state,
-        state: RTLDState::RT_CONSISTENT,
+        state: RTLDState::RtConsistent,
         r_ldbase: 0,
     };
 
