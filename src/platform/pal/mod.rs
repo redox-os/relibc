@@ -225,6 +225,9 @@ pub trait Pal {
     /// Platform implementation of [`link()`](crate::header::unistd::link) from [`unistd.h`](crate::header::unistd).
     fn link(path1: CStr, path2: CStr) -> Result<()>;
 
+    /// Platform implementation of [`linkat()`](crate::header::unistd::linkat) from [`unistd.h`](crate::header::unistd).
+    fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()>;
+
     /// Platform implementation of [`lseek()`](crate::header::unistd::lseek) from [`unistd.h`](crate::header::unistd).
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t>;
 
@@ -370,6 +373,9 @@ pub trait Pal {
     /// Platform implementation of [`symlink()`](crate::header::unistd::symlink) from [`unistd.h`](crate::header::unistd).
     fn symlink(path1: CStr, path2: CStr) -> Result<()>;
 
+    /// Platform implementation of [`symlinkat()`](crate::header::unistd::symlinkat) from [`unistd.h`](crate::header::unistd).
+    fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()>;
+
     /// Platform implementation of [`sync()`](crate::header::unistd::sync) from [`unistd.h`](crate::header::unistd).
     fn sync() -> Result<()>;
 
@@ -399,6 +405,9 @@ pub trait Pal {
 
     /// Platform implementation of [`unlink()`](crate::header::unistd::unlink) from [`unistd.h`](crate::header::unistd).
     fn unlink(path: CStr) -> Result<()>;
+
+    /// Platform implementation of [`unlinkat()`](crate::header::unistd::unlinkat) from [`unistd.h`](crate::header::unistd).
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()>;
 
     /// Platform implementation of [`waitpid()`](crate::header::sys_wait::waitpid) from [`sys/wait.h`](crate::header::sys_wait).
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t>;

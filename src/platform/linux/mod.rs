@@ -487,17 +487,12 @@ impl Pal for Sys {
     }
 
     fn link(path1: CStr, path2: CStr) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                LINKAT,
-                AT_FDCWD,
-                path1.as_ptr(),
-                AT_FDCWD,
-                path2.as_ptr(),
-                0
-            )
-        })
-        .map(|_| ())
+        Sys::linkat(AT_FDCWD, path1, AT_FDCWD, path2, 0)
+    }
+
+    fn linkat(fd1: c_int, path1: CStr, fd2: c_int, path2: CStr, flags: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(LINKAT, fd1, path1.as_ptr(), fd2, path2.as_ptr(), flags) })
+            .map(|_| ())
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
@@ -817,7 +812,11 @@ impl Pal for Sys {
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }).map(|_| ())
+        Sys::symlinkat(path1, AT_FDCWD, path2)
+    }
+
+    fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
+        e_raw(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), fd, path2.as_ptr()) }).map(|_| ())
     }
 
     fn sync() -> Result<()> {
@@ -874,7 +873,11 @@ impl Pal for Sys {
     }
 
     fn unlink(path: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }).map(|_| ())
+        Sys::unlinkat(AT_FDCWD, path, 0)
+    }
+
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(UNLINKAT, fd, path.as_ptr(), flags) }).map(|_| ())
     }
 
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t> {
