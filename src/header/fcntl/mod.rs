@@ -2,18 +2,14 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fcntl.h.html>.
 
-use core::{num::NonZeroU64, slice};
+use core::num::NonZeroU64;
 
 use crate::{
     c_str::CStr,
-    error::{Errno, ResultExt},
-    header::errno::ENAMETOOLONG,
+    error::ResultExt,
     platform::{
         Pal, Sys,
-        types::{
-            c_char, c_int, c_short, c_ulonglong, gid_t, mode_t, off_t, pid_t, size_t, ssize_t,
-            uid_t,
-        },
+        types::{c_char, c_int, c_short, c_ulonglong, mode_t, off_t, pid_t},
     },
 };
 
