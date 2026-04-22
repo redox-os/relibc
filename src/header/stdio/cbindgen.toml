@@ -7,8 +7,6 @@ trailer = """
 // XXX: this is only here because cbindgen can't handle string constants
 #define P_tmpdir "/tmp"
 
-typedef struct FILE FILE;
-
 // A typedef doesn't suffice, because libgmp uses this definition to check if
 // STDIO was loaded.
 #define FILE FILE
