@@ -1,10 +1,11 @@
 sys_includes = ["stdarg.h", "stddef.h", "stdint.h", "sys/types.h", "features.h"]
 include_guard = "_RELIBC_STDIO_H"
 trailer = """
+#ifndef _RELIBC_BITS_STDIO_H
+#define _RELIBC_BITS_STDIO_H
+
 // XXX: this is only here because cbindgen can't handle string constants
 #define P_tmpdir "/tmp"
-
-typedef struct FILE FILE;
 
 // A typedef doesn't suffice, because libgmp uses this definition to check if
 // STDIO was loaded.
@@ -13,6 +14,8 @@ typedef struct FILE FILE;
 #define stdin stdin
 #define stdout stdout
 #define stderr stderr
+
+#endif // _RELIBC_BITS_STDIO_H
 """
 language = "C"
 style = "Type"
