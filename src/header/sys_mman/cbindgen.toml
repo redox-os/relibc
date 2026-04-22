@@ -1,6 +1,9 @@
 sys_includes = ["stdarg.h", "stdint.h", "sys/types.h"]
-include_guard = "_SYS_MMAN_H"
-trailer = "#define MAP_FAILED ((void *) -1)"
+include_guard = "_RELIBC_SYS_MMAN_H"
+after_includes = """
+
+#define MAP_FAILED ((void *) -1)
+"""
 language = "C"
 style = "Tag"
 no_includes = true
