@@ -1,0 +1,45 @@
+sys_includes = ["stddef.h"]
+# TODO: figure out how to export void* type
+after_includes = """
+
+typedef void* timer_t;
+"""
+include_guard = "_RELIBC_SYS_TYPES_INTERNAL_H"
+language = "C"
+style = "Type"
+no_includes = true
+
+[export]
+include = [
+  "blksize_t",
+  "dev_t",
+  "ino_t",
+  "reclen_t",
+  "gid_t",
+  "uid_t",
+  "mode_t",
+  "nlink_t",
+  "off_t",
+  "pid_t",
+  "id_t",
+  "ssize_t",
+  "time_t",
+  "useconds_t",
+  "suseconds_t",
+  "clock_t",
+  "clockid_t",
+  "blkcnt_t",
+  "fsblkcnt_t",
+  "fsfilcnt_t",
+  "u_char",
+  "uchar",
+  "u_short",
+  "ushort",
+  "u_int",
+  "uint",
+  "u_long",
+  "ulong",
+  "quad_t",
+  "u_quad_t",
+  "caddr_t"
+]
