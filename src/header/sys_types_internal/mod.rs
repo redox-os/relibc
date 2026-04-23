@@ -7,7 +7,9 @@
 //! <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/types.h.html>
 //! for the old specification.
 
-use crate::platform::types::{c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
+use crate::platform::types::{
+    c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
+};
 
 /// Used for block sizes.
 pub type blksize_t = c_long;
