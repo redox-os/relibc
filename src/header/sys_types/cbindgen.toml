@@ -10,7 +10,7 @@
 no_includes = true
 sys_includes = [
     # Import most necessary, internal types first
-    "sys/types_internal.h",
+    "sys/types/internal.h",
 
     "bits/pthread.h",
     "features.h",
