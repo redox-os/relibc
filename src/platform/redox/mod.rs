@@ -799,14 +799,6 @@ impl Pal for Sys {
         Self::fchown(*file, owner, group)
     }
 
-    fn link(oldpath: CStr, newpath: CStr) -> Result<()> {
-        let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
-
-        let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
-        syscall::flink(*file as usize, newpath)?;
-        Ok(())
-    }
-
     fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()> {
         // make sure the flags passed are valid.
         // valid states: AT_SYMLINK_FOLLOW, or 0.
@@ -844,15 +836,6 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
-        File::create(
-            path,
-            fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
-            0o777,
-        )?;
-        Ok(())
-    }
-
     fn mkfifoat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
         Sys::mknodat(
             dir_fd,
@@ -862,17 +845,8 @@ impl Pal for Sys {
         )
     }
 
-    fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
-        Sys::mknod(path, syscall::MODE_FIFO as mode_t | (mode & 0o777), 0)
-    }
-
     fn mknodat(dir_fd: c_int, path_name: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         File::createat(dir_fd, path_name, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode)?;
-        Ok(())
-    }
-
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<(), Errno> {
-        File::create(path, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode)?;
         Ok(())
     }
 
@@ -1173,17 +1147,14 @@ impl Pal for Sys {
         }
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
-        let file = File::open(
-            pathname,
-            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
-        )?;
-        Self::read(*file, out)
-    }
-
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
         let path = str::from_utf8(path.to_bytes()).map_err(|_| Errno(ENOENT))?;
-        let file = openat2(dirfd, path, 0, fcntl::O_RDONLY | fcntl::O_SYMLINK)?;
+        let file = openat2(
+            dirfd,
+            path,
+            0,
+            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
+        )?;
         Sys::read(*file, out)
     }
 
