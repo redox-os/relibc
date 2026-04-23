@@ -625,7 +625,7 @@ impl Linker {
             Resolve::Now
         };
 
-        _r_debug.lock().state = RTLDState::RT_ADD;
+        _r_debug.lock().state = RTLDState::RtAdd;
         _dl_debug_state();
 
         let mut new_objects = Vec::new();
@@ -758,7 +758,7 @@ impl Linker {
             self.register_object(obj);
         }
 
-        _r_debug.lock().state = RTLDState::RT_CONSISTENT;
+        _r_debug.lock().state = RTLDState::RtConsistent;
         _dl_debug_state();
 
         Ok(loaded_dso)
