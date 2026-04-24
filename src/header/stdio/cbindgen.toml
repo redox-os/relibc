@@ -7,6 +7,9 @@ trailer = """
 // XXX: this is only here because cbindgen can't handle string constants
 #define P_tmpdir "/tmp"
 
+// TODO: figure out why this duplicate is needed to compile libiconv
+typedef struct FILE FILE;
+
 // A typedef doesn't suffice, because libgmp uses this definition to check if
 // STDIO was loaded.
 #define FILE FILE
