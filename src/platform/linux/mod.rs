@@ -81,10 +81,6 @@ impl Sys {
 }
 
 impl Pal for Sys {
-    fn access(path: CStr, mode: c_int) -> Result<()> {
-        Sys::faccessat(AT_FDCWD, path, mode, 0)
-    }
-
     fn faccessat(fd: c_int, path: CStr, amode: c_int, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(FACCESSAT, fd, path.as_ptr(), amode, flags) }).map(|_| ())
     }
@@ -95,14 +91,6 @@ impl Pal for Sys {
 
     fn chdir(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(CHDIR, path.as_ptr()) }).map(|_| ())
-    }
-
-    fn chmod(path: CStr, mode: mode_t) -> Result<()> {
-        e_raw(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
-    }
-
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        Sys::fchownat(AT_FDCWD, path, owner, group, 0)
     }
 
     fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()> {
@@ -487,10 +475,6 @@ impl Pal for Sys {
         .map(|_| ())
     }
 
-    fn link(path1: CStr, path2: CStr) -> Result<()> {
-        Sys::linkat(AT_FDCWD, path1, AT_FDCWD, path2, 0)
-    }
-
     fn linkat(fd1: c_int, path1: CStr, fd2: c_int, path2: CStr, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(LINKAT, fd1, path1.as_ptr(), fd2, path2.as_ptr(), flags) })
             .map(|_| ())
@@ -504,10 +488,6 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(MKDIRAT, dir_fildes, path.as_ptr(), mode) }).map(|_| ())
     }
 
-    fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
-        Sys::mkdirat(AT_FDCWD, path, mode)
-    }
-
     fn mknodat(dir_fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         // Note: dev_t is c_long (i64) and __kernel_dev_t is u32; So we need to cast it
         //       and check for overflow
@@ -517,10 +497,6 @@ impl Pal for Sys {
         }
 
         e_raw(unsafe { syscall!(MKNODAT, dir_fildes, path.as_ptr(), mode, k_dev) }).map(|_| ())
-    }
-
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
-        Sys::mknodat(AT_FDCWD, path, mode, dev)
     }
 
     fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()> {
@@ -718,18 +694,6 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
-        e_raw(unsafe {
-            syscall!(
-                READLINKAT,
-                AT_FDCWD,
-                pathname.as_ptr(),
-                out.as_mut_ptr(),
-                out.len()
-            )
-        })
-    }
-
     fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize> {
         e_raw(unsafe {
             syscall!(
@@ -740,11 +704,6 @@ impl Pal for Sys {
                 out.len()
             )
         })
-    }
-
-    fn rename(old: CStr, new: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) })
-            .map(|_| ())
     }
 
     fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
@@ -812,10 +771,6 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(SETSID) }).map(|s| s as c_int)
     }
 
-    fn symlink(path1: CStr, path2: CStr) -> Result<()> {
-        Sys::symlinkat(path1, AT_FDCWD, path2)
-    }
-
     fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), fd, path2.as_ptr()) }).map(|_| ())
     }
@@ -871,10 +826,6 @@ impl Pal for Sys {
 
     fn uname(mut utsname: Out<utsname>) -> Result<()> {
         e_raw(unsafe { syscall!(UNAME, utsname.as_mut_ptr(), 0) }).map(|_| ())
-    }
-
-    fn unlink(path: CStr) -> Result<()> {
-        Sys::unlinkat(AT_FDCWD, path, 0)
     }
 
     fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
