@@ -193,7 +193,9 @@ impl VaArg {
 
         let ap_impl = unsafe {
             // The double deconstruct is intended
-            let ptr_to_struct = *(ap as *mut core::ffi::VaList as *mut *mut VaListImpl);
+
+            use core::ptr;
+            let ptr_to_struct = *(ptr::from_mut(ap).cast::<*mut VaListImpl>());
             &mut *ptr_to_struct
         };
 
@@ -487,6 +489,7 @@ fn float_exp(mut float: c_double) -> (c_double, isize) {
     (float, exp)
 }
 
+#[expect(clippy::too_many_arguments)]
 fn fmt_float_exp<W: Write>(
     w: &mut W,
     exp_fmt: char,
@@ -524,6 +527,7 @@ fn fmt_float_exp<W: Write>(
     Ok(())
 }
 
+#[expect(clippy::too_many_arguments)]
 fn fmt_float_normal<W: Write>(
     w: &mut W,
     trim: bool,

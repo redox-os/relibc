@@ -38,17 +38,14 @@ impl Semaphore {
                 return 0;
             }
 
-            match self.count.compare_exchange_weak(
+            if self.count.compare_exchange_weak(
                 value,
                 value - 1,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
-            ) {
-                Ok(_) => {
-                    // Acquired
-                    return value;
-                }
-                Err(_) => (),
+            ).is_ok() {
+                // Acquired
+                return value;
             }
             // Try again (as long as value > 0)
         }

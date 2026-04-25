@@ -930,7 +930,7 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     let r = unsafe { open((b"/scheme/pty\0" as *const u8).cast(), O_CREAT) };
 
     #[cfg(target_os = "linux")]
-    let r = unsafe { open((b"/dev/ptmx\0" as *const u8).cast(), flags) };
+    let r = unsafe { open(c"/dev/ptmx".as_ptr(), flags) };
 
     if r < 0 && platform::ERRNO.get() == ENOSPC {
         platform::ERRNO.set(EAGAIN);
