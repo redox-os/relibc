@@ -96,11 +96,11 @@ pub struct group {
 #[derive(Debug)]
 enum Error {
     EOF,
-    SyntaxError,
+    Syntax,
     BufTooSmall,
     Misc(io::Error),
-    FromUtf8Error(FromUtf8Error),
-    ParseIntError(ParseIntError),
+    FromUtf8(FromUtf8Error),
+    ParseInt(ParseIntError),
     Other,
 }
 
@@ -171,9 +171,9 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         let gr_name = buffer.next().ok_or(Error::EOF)?.to_vec();
         let gr_passwd = buffer.next().ok_or(Error::EOF)?.to_vec();
         let gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
-            .map_err(Error::FromUtf8Error)?
+            .map_err(Error::FromUtf8)?
             .parse::<gid_t>()
-            .map_err(Error::ParseIntError)?;
+            .map_err(Error::ParseInt)?;
 
         // Place the gid at the beginning of the byte buffer to make getting it back out again later, much faster.
 
@@ -338,9 +338,9 @@ pub unsafe extern "C" fn getgrgid_r(
                 return match err {
                     Error::BufTooSmall => ERANGE,
                     Error::EOF
-                    | Error::SyntaxError
-                    | Error::FromUtf8Error(_)
-                    | Error::ParseIntError(_)
+                    | Error::Syntax
+                    | Error::FromUtf8(_)
+                    | Error::ParseInt(_)
                     | Error::Other => EINVAL,
                     Error::Misc(io_err) => match io_err.kind() {
                         io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof => EINVAL,
