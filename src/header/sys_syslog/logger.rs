@@ -92,7 +92,13 @@ impl<L: LogSink> LogParams<L> {
                 .unwrap_or(true)
         {
             // Try reopening the log file once and retrying as musl does.
-            if !(self.open_logger().is_ok() && self.writer.as_mut().and_then(|w| w.writer().write_all(&buffer).ok()).is_some()) && self.opt.contains(Config::Console)
+            if !(self.open_logger().is_ok()
+                && self
+                    .writer
+                    .as_mut()
+                    .and_then(|w| w.writer().write_all(&buffer).ok())
+                    .is_some())
+                && self.opt.contains(Config::Console)
             {
                 // TODO: Log error to /dev/console & Redox equivalent
             }

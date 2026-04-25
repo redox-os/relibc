@@ -28,8 +28,9 @@ fn find_expected_dir() -> Option<PathBuf> {
 
     if found_expected_dir.is_none()
         && let Ok(check) = env::current_dir().map(|cwd| cwd.join("expected"))
-        && check.is_dir(){
-                found_expected_dir = Some(check);
+        && check.is_dir()
+    {
+        found_expected_dir = Some(check);
     }
 
     found_expected_dir

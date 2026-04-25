@@ -245,8 +245,7 @@ pub extern "C" fn clock() -> clock_t {
     }
     let ts = unsafe { ts.assume_init() };
 
-    let clocks =
-        ts.tv_sec * CLOCKS_PER_SEC + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC));
+    let clocks = ts.tv_sec * CLOCKS_PER_SEC + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC));
     clock_t::try_from(clocks).unwrap_or(-1)
 }
 
@@ -839,8 +838,9 @@ unsafe fn set_timezone(
 
         match dst {
             Some(dst) => {
-                guard.1 =
-                    Some(CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap());
+                guard.1 = Some(
+                    CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap(),
+                );
                 tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
                 daylight = 1;
             }
