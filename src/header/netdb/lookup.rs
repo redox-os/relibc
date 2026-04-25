@@ -63,7 +63,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
         let packet_data_len = packet_data.len();
 
         let packet_data_box = packet_data.into_boxed_slice();
-        let packet_data_ptr = Box::into_raw(packet_data_box) as *mut _ as *mut c_void;
+        let packet_data_ptr = Box::into_raw(packet_data_box).cast();
 
         let dest = sockaddr_in {
             sin_family: AF_INET as u16,
@@ -164,7 +164,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         let packet_data = packet.compile();
         let packet_data_len = packet_data.len();
         let packet_data_box = packet_data.into_boxed_slice();
-        let packet_data_ptr = Box::into_raw(packet_data_box) as *mut _ as *mut c_void;
+        let packet_data_ptr = Box::into_raw(packet_data_box).cast();
 
         let dest = sockaddr_in {
             sin_family: AF_INET as u16,

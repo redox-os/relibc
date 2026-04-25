@@ -57,6 +57,7 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
     let mut offset = 0;
     let buf = unsafe { platform::alloc(size).cast::<c_char>() };
 
+    #[expect(clippy::needless_range_loop)]
     for i in 0..len {
         let dest_buf = unsafe { buf.add(offset) };
         let item = unsafe { *array.add(i) };
@@ -85,7 +86,7 @@ pub unsafe fn relibc_verify_host() {
 #[used]
 static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
 
-static mut init_complete: bool = false;
+static mut INIT_COMPLETE: bool = false;
 
 #[used]
 #[unsafe(no_mangle)]
@@ -93,7 +94,7 @@ static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
 
 fn alloc_init() {
     unsafe {
-        if init_complete {
+        if INIT_COMPLETE {
             return;
         }
     }
@@ -113,7 +114,7 @@ extern "C" fn init_array() {
     // memory allocator before doing anything else.
 
     unsafe {
-        if init_complete {
+        if INIT_COMPLETE {
             return;
         }
     }
@@ -129,7 +130,7 @@ extern "C" fn init_array() {
 
     unsafe {
         crate::pthread::init();
-        init_complete = true
+        INIT_COMPLETE = true
     }
 }
 

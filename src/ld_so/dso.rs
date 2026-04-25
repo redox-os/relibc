@@ -775,9 +775,9 @@ impl DSO {
         let strtab_size = strtab_size.expect("mandatory DT_STRSZ not present");
 
         let dynstrtab = StringTable::new(
-            &*mmap,
+            mmap,
             strtab_offset as u64,
-            strtab_offset as u64 + strtab_size as u64,
+            strtab_offset as u64 + strtab_size,
         );
 
         let get_str = |entry: &Dyn| {

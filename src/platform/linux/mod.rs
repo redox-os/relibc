@@ -23,7 +23,7 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
 };
-use core::{num::NonZeroU64, ptr};
+use core::{intrinsics, num::NonZeroU64, ptr};
 // use header::sys_times::tms;
 
 mod epoll;
@@ -164,7 +164,7 @@ impl Pal for Sys {
         unsafe {
             syscall!(EXIT, status);
         }
-        loop {}
+        intrinsics::abort();
     }
     unsafe fn exit_thread(_stack_base: *mut (), _stack_size: usize) -> ! {
         // TODO
