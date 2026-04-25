@@ -1,6 +1,7 @@
 sys_includes = ["sys/types.h", "sys/resource.h"]
-include_guard = "_SYS_WAIT_H"
-trailer = """
+include_guard = "_RELIBC_SYS_WAIT_H"
+after_includes = """
+
 #define WEXITSTATUS(s) (((s) >> 8) & 0xff)
 #define WTERMSIG(s) ((s) & 0x7f)
 #define WSTOPSIG(s) WEXITSTATUS(s)
