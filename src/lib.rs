@@ -5,6 +5,27 @@
 //! data structures in the [`header`] module.
 //!
 //! Currently, Linux and Redox syscall backends are supported.
+//!
+//! # Scope
+//! As a general rule, relibc aims to implement the most recent version of
+//! POSIX, as well as common extensions and legacy interfaces as deemed
+//! appropriate. Thus, relibc's documentation will generally defer to the
+//! POSIX standard or to Linux man pages, except to document quirks, safety
+//! requirements or internal interfaces.
+//!
+//! * See [The Open Group Base Specifications Issue 8](https://pubs.opengroup.org/onlinepubs/9799919799/) (POSIX.1-2024) for the current POSIX spec.
+//! * Linux man pages are available online at [man7.org](https://www.man7.org/linux/man-pages/index.html) and [linux.die.net](https://linux.die.net/man/).
+//!
+//! For an overview of the relevant standards, see the
+//! [`standards` man page](https://www.man7.org/linux/man-pages/man7/standards.7.html).
+//! Historical versions of the POSIX specification are available here:
+//! * [X/Open CAE Specification: System Interfaces and Headers Issue 4, Version 2](https://pubs.opengroup.org/onlinepubs/9695969499/toc.pdf) (1994)
+//! * [The Single UNIX® Specification, Version 2](https://pubs.opengroup.org/onlinepubs/7908799/index.html) (1997)
+//! * [The Open Group Base Specifications Issue 6 (2004 edition)](https://pubs.opengroup.org/onlinepubs/009695399/) (POSIX.1-2001 including Technical Corrigenda 1 and 2)
+//! * [The Open Group Base Specifications Issue 7](http://pubs.opengroup.org/onlinepubs/9699919799.2008edition/) (POSIX.1-2008)
+//!     * [Issue 7 (2013 edition)](https://pubs.opengroup.org/onlinepubs/9699919799.2013edition/) (POSIX.1-2008 including Technical Corrigendum 1)
+//!     * [Issue 7 (2016 edition)](http://pubs.opengroup.org/onlinepubs/9699919799.2016edition/) (POSIX.1-2008 including Technical Corrigenda 1 and 2)
+//!     * [Issue 7 (2018 edition)](https://pubs.opengroup.org/onlinepubs/9699919799/) (POSIX.1-2017)
 
 #![no_std]
 #![feature(alloc_error_handler)]
