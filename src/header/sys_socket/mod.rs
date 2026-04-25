@@ -91,10 +91,10 @@ const _SS_PADDING: usize = _SS_MAXSIZE - mem::size_of::<sa_family_t>() - mem::si
 /// * [`usize`] is used because it's the width of a pointer for a given platform
 /// * The order of the fields is important because the bytes in the padding will be cast to and
 ///   from protocol structs in C
-///
-/// cbindgen:ignore
+
 #[repr(C)]
 //#[derive(CheckVsLibcCrate)] FIXME: can't ignore private fields yet
+/// cbindgen:ignore
 pub struct sockaddr_storage {
     pub ss_family: sa_family_t,
     __ss_pad2: [u8; _SS_PADDING],

@@ -272,10 +272,8 @@ pub unsafe extern "C" fn gethostbyaddr(
     }
 
     //TODO actually get aliases
-    let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
-    _host_aliases.push(vec![b'\0']);
-    let mut host_aliases: Vec<*mut c_char> = Vec::new();
-    host_aliases.push(ptr::null_mut());
+    let mut _host_aliases: Vec<Vec<u8>> = vec![vec![b'\0']];
+    let mut host_aliases: Vec<*mut c_char> = vec![ptr::null_mut()];
     unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
 
     match lookup_addr(addr.clone()).map(|host_names| host_names.into_iter().next()) {
@@ -402,11 +400,8 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     unsafe { HOST_ADDR = Some(host_addr) };
 
     //TODO actually get aliases
-    let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
-    _host_aliases.push(vec![b'\0']);
-    let mut host_aliases: Vec<*mut c_char> = Vec::new();
-    host_aliases.push(ptr::null_mut());
-    host_aliases.push(ptr::null_mut());
+    let mut _host_aliases: Vec<Vec<u8>> = vec![vec![b'\0']];
+    let mut host_aliases: Vec<*mut c_char> = vec![ptr::null_mut(); 2];
     unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
 
     unsafe {
@@ -769,11 +764,8 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
          *serv_aliases.push(ptr::null_mut());
          *
          */
-        let mut _serv_aliases: Vec<Vec<u8>> = Vec::new();
-        _serv_aliases.push(vec![b'\0']);
-        let mut serv_aliases: Vec<*mut i8> = Vec::new();
-        serv_aliases.push(ptr::null_mut());
-        serv_aliases.push(ptr::null_mut());
+        let mut _serv_aliases: Vec<Vec<u8>> = vec![vec![b'\0']];
+        let mut serv_aliases: Vec<*mut i8> = vec![ptr::null_mut(); 2];
 
         unsafe { SERV_ALIASES.unsafe_set(Some(_serv_aliases)) };
         unsafe { SERV_NAME.unsafe_set(Some(serv_name)) };

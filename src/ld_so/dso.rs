@@ -777,7 +777,7 @@ impl DSO {
         let dynstrtab = StringTable::new(
             mmap,
             strtab_offset as u64,
-            strtab_offset as u64 + strtab_size as u64,
+            strtab_offset as u64 + strtab_size,
         );
 
         let get_str = |entry: &Dyn| {

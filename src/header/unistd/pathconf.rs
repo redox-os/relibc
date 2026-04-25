@@ -39,12 +39,12 @@ pub const _PC_2_SYMLINKS: c_int = 20;
 fn pc(name: c_int) -> c_long {
     // Settings from musl, some adjusted
     match name {
-        _PC_LINK_MAX => LINK_MAX.try_into().unwrap_or(-1),
-        _PC_MAX_CANON => MAX_CANON.try_into().unwrap_or(-1),
-        _PC_MAX_INPUT => MAX_INPUT.try_into().unwrap_or(-1),
+        _PC_LINK_MAX => LINK_MAX,
+        _PC_MAX_CANON => MAX_CANON,
+        _PC_MAX_INPUT => MAX_INPUT,
         _PC_NAME_MAX => NAME_MAX.try_into().unwrap_or(-1),
         _PC_PATH_MAX => PATH_MAX.try_into().unwrap_or(-1),
-        _PC_PIPE_BUF => PIPE_BUF.try_into().unwrap_or(-1),
+        _PC_PIPE_BUF => PIPE_BUF,
         _PC_CHOWN_RESTRICTED => 1,
         _PC_NO_TRUNC => 1,
         _PC_VDISABLE => _POSIX_VDISABLE.into(),
@@ -52,13 +52,13 @@ fn pc(name: c_int) -> c_long {
         _PC_ASYNC_IO => -1,
         _PC_PRIO_IO => -1,
         _PC_SOCK_MAXBUF => -1,
-        _PC_FILESIZEBITS => FILESIZEBITS.into(),
+        _PC_FILESIZEBITS => FILESIZEBITS,
         _PC_REC_INCR_XFER_SIZE => -1,
         _PC_REC_MAX_XFER_SIZE => -1,
         _PC_REC_MIN_XFER_SIZE => 4096,
         _PC_REC_XFER_ALIGN => 4096,
-        _PC_ALLOC_SIZE_MIN => POSIX_ALLOC_SIZE_MIN.try_into().unwrap_or(-1),
-        _PC_SYMLINK_MAX => SYMLINK_MAX.try_into().unwrap_or(-1),
+        _PC_ALLOC_SIZE_MIN => POSIX_ALLOC_SIZE_MIN,
+        _PC_SYMLINK_MAX => SYMLINK_MAX,
         _PC_2_SYMLINKS => 1,
         _ => {
             platform::ERRNO.set(errno::EINVAL);
