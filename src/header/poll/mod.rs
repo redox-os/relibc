@@ -76,9 +76,11 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
             continue;
         }
 
+        #[expect(clippy::needless_update)]
         let mut event = epoll_event {
             events: 0,
             data: epoll_data { u64: i as u64 },
+            ..Default::default()
         };
 
         for (p, ep) in event_map.iter() {
