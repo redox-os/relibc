@@ -27,7 +27,7 @@ use crate::{
     platform::{
         self, Pal, Sys,
         rlb::{Line, RawLineBuffer},
-        types::{c_char, c_int, c_ulong, c_void},
+        types::{c_char, c_int, c_void, uint32_t},
     },
     raw_cell::RawCell,
 };
@@ -62,7 +62,7 @@ pub struct netent {
     n_name: *mut c_char,         /* official name of net */
     n_aliases: *mut *mut c_char, /* alias list */
     n_addrtype: c_int,           /* net address type */
-    n_net: c_ulong,              /* network # */
+    n_net: uint32_t,             /* network # */
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
@@ -512,7 +512,7 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
                 .cast::<c_char>(),
             n_aliases: net_aliases.as_mut_slice().as_mut_ptr(),
             n_addrtype: AF_INET,
-            n_net: c_ulong::from(NET_ADDR.unwrap()),
+            n_net: uint32_t::from(NET_ADDR.unwrap()),
         }
     };
     (&raw mut NET_ENTRY).cast::<netent>()
