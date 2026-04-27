@@ -2,8 +2,13 @@
 sys_includes = ["netinet/in.h", "features.h"]
 include_guard = "_RELIBC_NETDB_H"
 trailer = """
+#ifndef _RELIBC_BITS_NETDB_H
+#define _RELIBC_BITS_NETDB_H
+
 #define h_errno (*__h_errno_location())
-# define        h_addr  h_addr_list[0] /* Address, for backward compatibility.*/
+#define        h_addr  h_addr_list[0] /* Address, for backward compatibility.*/
+
+#endif // _RELIBC_BITS_NETDB_H
 """
 language = "C"
 style = "Tag"
