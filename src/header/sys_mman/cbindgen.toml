@@ -1,4 +1,10 @@
-sys_includes = ["stdarg.h", "stdint.h", "sys/types.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_mman.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/mman.h> header shall define the mode_t, off_t, and size_t types as described in <sys/types.h>."
+# - "The <sys/mman.h> header shall define the following symbolic constants as described in <fcntl.h>"
+# - "Inclusion of the <sys/mman.h> header may make visible all symbols from the <fcntl.h> header."
+sys_includes = ["sys/types.h", "fcntl.h"]
 include_guard = "_RELIBC_SYS_MMAN_H"
 after_includes = """
 
@@ -8,6 +14,8 @@ language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
+# make size_t actually size_t instead of uintptr_t (which would require stdint.h)
+usize_is_size_t = true
 
 [enum]
 prefix_with_name = true
