@@ -19,8 +19,11 @@ sys_includes = ["sys/types.h", "sys/socket.h"]
 after_includes = """
 #include <bits/arpainet.h> // for htonl, htons, ntohl, ntohs
 """
-include_guard = "_NETINET_IN_H"
+include_guard = "_RELIBC_NETINET_IN_H"
 trailer = """
+#ifndef _RELIBC_BITS_NETINET_IN_H
+#define _RELIBC_BITS_NETINET_IN_H
+
 extern const struct in6_addr in6addr_any;
 extern const struct in6_addr in6addr_loopback;
 #define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
@@ -93,6 +96,8 @@ extern const struct in6_addr in6addr_loopback;
 #define IN_EXPERIMENTAL(a)  ((((in_addr_t)(a)) & 0xe0000000) == 0xe0000000)
 #define IN_BADCLASS(a) ((((in_addr_t)(a)) & 0xf0000000) == 0xf0000000)
 // } from musl
+
+#endif // _RELIBC_BITS_NETINET_IN_H
 """
 language = "C"
 style = "Tag"
