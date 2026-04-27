@@ -62,8 +62,8 @@ pub unsafe extern "C" fn memchr(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcmp.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
-    let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
+pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t) -> c_int {
+    let (div, rem) = (n / mem::size_of::<size_t>(), n % mem::size_of::<size_t>());
     let mut a = s1.cast::<usize>();
     let mut b = s2.cast::<usize>();
     for _ in 0..div {
@@ -405,6 +405,7 @@ pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, dstsize: 
     src_len + if dst_len > dstsize { dstsize } else { dst_len }
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/strsep.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strsep(str_: *mut *mut c_char, sep: *const c_char) -> *mut c_char {
     let s = unsafe { *str_ };
