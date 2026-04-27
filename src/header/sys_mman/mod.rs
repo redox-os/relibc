@@ -62,7 +62,7 @@ pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mlock.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
+pub unsafe extern "C" fn mlock(addr: *const c_void, len: size_t) -> c_int {
     unsafe { Sys::mlock(addr, len) }
         .map(|()| 0)
         .or_minus_one_errno()
@@ -107,8 +107,8 @@ pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: size_t, prot: c_int) -
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mremap(
     old_address: *mut c_void,
-    old_size: usize,
-    new_size: usize,
+    old_size: size_t,
+    new_size: size_t,
     flags: c_int,
     mut __valist: ...
 ) -> *mut c_void {
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn msync(addr: *mut c_void, len: size_t, flags: c_int) -> 
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mlock.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn munlock(addr: *const c_void, len: usize) -> c_int {
+pub unsafe extern "C" fn munlock(addr: *const c_void, len: size_t) -> c_int {
     unsafe { Sys::munlock(addr, len) }
         .map(|()| 0)
         .or_minus_one_errno()
