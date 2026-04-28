@@ -143,7 +143,7 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/libc.a
 		$(LINKFLAGS) \
 		-o $@
 
-$(BUILD)/$(PROFILE)/ld.so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/crti.o $(BUILD)/$(PROFILE)/libc.a $(BUILD)/$(PROFILE)/crtn.o
+$(BUILD)/$(PROFILE)/ld.so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/libc.a
 	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
 	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --gc-sections $^ -o $@
 
