@@ -85,7 +85,7 @@ pub unsafe fn relibc_verify_host() {
 #[used]
 static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
 
-static mut init_complete: bool = false;
+static mut INIT_COMPLETE: bool = false;
 
 #[used]
 #[unsafe(no_mangle)]
@@ -93,7 +93,7 @@ static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
 
 fn alloc_init() {
     unsafe {
-        if init_complete {
+        if INIT_COMPLETE {
             return;
         }
     }
@@ -113,7 +113,7 @@ extern "C" fn init_array() {
     // memory allocator before doing anything else.
 
     unsafe {
-        if init_complete {
+        if INIT_COMPLETE {
             return;
         }
     }
@@ -129,7 +129,7 @@ extern "C" fn init_array() {
 
     unsafe {
         crate::pthread::init();
-        init_complete = true
+        INIT_COMPLETE = true
     }
 }
 
@@ -158,8 +158,6 @@ pub unsafe extern "C" fn relibc_start_v1(
         static __preinit_array_end: extern "C" fn();
         static __init_array_start: extern "C" fn();
         static __init_array_end: extern "C" fn();
-
-        fn _init();
     }
 
     // Ensure correct host system before executing more system calls
@@ -242,12 +240,6 @@ pub unsafe extern "C" fn relibc_start_v1(
             (unsafe { *f })();
             f = unsafe { f.offset(1) };
         }
-    }
-
-    // Call init section
-    #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
-    {
-        unsafe { _init() };
     }
 
     // Run init array

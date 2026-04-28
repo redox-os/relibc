@@ -355,8 +355,6 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
     unsafe extern "C" {
         static __fini_array_start: extern "C" fn();
         static __fini_array_end: extern "C" fn();
-
-        fn _fini();
     }
 
     for i in (0..unsafe { ATEXIT_FUNCS.unsafe_ref().len() }).rev() {
@@ -371,11 +369,6 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
     while f > &raw const __fini_array_start {
         f = unsafe { f.offset(-1) };
         (unsafe { *f })();
-    }
-
-    #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
-    {
-        unsafe { _fini() };
     }
 
     unsafe { ld_so::fini() };
