@@ -13,7 +13,7 @@ use crate::{
 };
 use core::{
     mem::{MaybeUninit, size_of},
-    ptr, slice,
+    ptr,
 };
 
 pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
@@ -71,12 +71,9 @@ fn timer_next_event(timer_st: &mut timer_internal_t) -> Result<()> {
             0,
         ))?;
 
-        slice::from_raw_parts(
-            &timer_st.next_wake_time.it_value as *const _ as *const u8,
-            size_of::<timespec>(),
-        )
+        syscall::TimeSpec::from(&timer_st.next_wake_time.it_value)
     };
-    let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, buf_to_write)?;
+    let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, &*buf_to_write)?;
     if bytes_written < size_of::<timespec>() {
         return Err(Errno(EIO));
     }

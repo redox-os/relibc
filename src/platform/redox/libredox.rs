@@ -229,10 +229,7 @@ pub unsafe fn futimens(fd: usize, times: *const timespec) -> Result<()> {
 pub fn clock_gettime(clock: usize, mut tp: Out<timespec>) -> Result<()> {
     let mut redox_tp = syscall::TimeSpec::default();
     syscall::clock_gettime(clock as usize, &mut redox_tp)?;
-    tp.write(timespec {
-        tv_sec: redox_tp.tv_sec as time_t,
-        tv_nsec: redox_tp.tv_nsec as c_long,
-    });
+    tp.write((&redox_tp).into());
     Ok(())
 }
 

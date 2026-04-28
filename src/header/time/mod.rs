@@ -44,16 +44,6 @@ const SECS_PER_DAY: time_t = 24 * 60 * 60;
 pub(crate) const NANOSECONDS: c_long = 1_000_000_000;
 const UTC_STR: &core::ffi::CStr = c"UTC";
 
-#[cfg(target_os = "redox")]
-impl<'a> From<&'a timespec> for syscall::TimeSpec {
-    fn from(tp: &timespec) -> Self {
-        Self {
-            tv_sec: tp.tv_sec as _,
-            tv_nsec: tp.tv_nsec as _,
-        }
-    }
-}
-
 /// timer_t internal data, ABI unstable
 #[repr(C)]
 #[derive(Clone)]

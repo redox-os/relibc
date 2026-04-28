@@ -540,10 +540,7 @@ impl Pal for Sys {
 
     #[inline]
     unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()> {
-        let deadline = deadline.map(|d| syscall::TimeSpec {
-            tv_sec: d.tv_sec,
-            tv_nsec: d.tv_nsec as i32,
-        });
+        let deadline = deadline.map(|d| syscall::TimeSpec::from(d));
         (unsafe { redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref()) })?;
         Ok(())
     }
@@ -961,20 +958,17 @@ impl Pal for Sys {
     }
 
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
-        let redox_rqtp = unsafe { redox_timespec::from(&*rqtp) };
-        let mut redox_rmtp: redox_timespec;
-        if rmtp.is_null() {
-            redox_rmtp = redox_timespec::default();
-        } else {
-            redox_rmtp = unsafe { redox_timespec::from(&*rmtp) };
+        let redox_rqtp = unsafe { (&*rqtp).into() };
+        let mut redox_rmtp = redox_timespec::default();
+        if !rmtp.is_null() {
+            redox_rmtp = unsafe { (&*rmtp).into() };
         }
         match redox_rt::sys::posix_nanosleep(&redox_rqtp, &mut redox_rmtp) {
             Ok(_) => Ok(()),
             Err(Error { errno: EINTR }) => {
                 unsafe {
                     if !rmtp.is_null() {
-                        (*rmtp).tv_sec = redox_rmtp.tv_sec as time_t;
-                        (*rmtp).tv_nsec = redox_rmtp.tv_nsec as c_long;
+                        *rmtp = (&redox_rmtp).into();
                     }
                 };
                 Err(Errno(EINTR))
@@ -1392,13 +1386,12 @@ impl Pal for Sys {
             Self::timer_gettime(timerid, ovalue)?;
         }
 
-        let mut now = timespec::default();
-        Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
-
         //FIXME: make these atomic?
         timer_st.next_wake_time = {
             let mut val = value.clone();
             if flags & TIMER_ABSTIME == 0 {
+                let mut now = timespec::default();
+                Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
                 val.it_value = timespec::add(now, val.it_value).ok_or(Errno(EINVAL))?;
             }
             val
@@ -1408,14 +1401,9 @@ impl Pal for Sys {
             event::redox_event_queue_ctl_v1(timer_st.eventfd, timer_st.timerfd, 1, 0)
         })?;
 
-        let buf_to_write = unsafe {
-            slice::from_raw_parts(
-                &timer_st.next_wake_time.it_value as *const _ as *const u8,
-                mem::size_of::<timespec>(),
-            )
-        };
+        let buf_to_write = syscall::TimeSpec::from(&timer_st.next_wake_time.it_value);
 
-        let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, buf_to_write)?;
+        let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, &buf_to_write)?;
 
         if bytes_written < mem::size_of::<timespec>() {
             return Err(Errno(EIO));
