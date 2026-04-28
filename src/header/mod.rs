@@ -30,7 +30,7 @@ pub mod err;
 pub mod errno;
 pub mod fcntl;
 pub mod float;
-// TODO: fmtmsg.h
+pub mod fmtmsg;
 pub mod fnmatch;
 // TODO: ftw.h
 pub mod getopt;

@@ -207,7 +207,8 @@ EXPECT_NAMES=\
 	wctype/towlower \
 	wctype/towupper \
 	mknod \
-	mknodat
+	mknodat \
+	fmtmsg
 
 # Binaries that may generate varied output
 VARIED_NAMES=\
