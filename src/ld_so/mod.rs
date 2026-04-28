@@ -38,7 +38,7 @@ static mut STATIC_TCB_MASTER: Master = Master {
 };
 
 #[inline(never)]
-pub fn static_init(
+fn static_init(
     sp: &'static Stack,
     #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuardUpper,
 ) {

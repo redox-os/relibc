@@ -80,7 +80,7 @@ libs: \
 	$(BUILD)/$(PROFILE)/crt0.o \
 	$(BUILD)/$(PROFILE)/crti.o \
 	$(BUILD)/$(PROFILE)/crtn.o \
-	$(BUILD)/$(PROFILE)/ld_so
+	$(BUILD)/$(PROFILE)/ld.so
 
 install-libs: headers libs
 	mkdir -pv "$(DESTDIR)/lib"
@@ -91,7 +91,7 @@ install-libs: headers libs
 	ln -vnfs crt0.o "$(DESTDIR)/lib/crt1.o"
 	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/$(LD_SO_PATH)"
+	cp -v "$(BUILD)/$(PROFILE)/ld.so" "$(DESTDIR)/$(LD_SO_PATH)"
 ifeq ($(USE_RUST_LIBM),)
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 endif
@@ -132,21 +132,20 @@ test-once: sysroot/$(TARGET)
 	$(MAKE) -C tests run-once TESTBIN=$(TESTBIN)
 
 
-$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/libc.a
 	$(CC) -nostdlib \
 		-shared \
 		-Wl,--gc-sections \
 		-Wl,-z,pack-relative-relocs \
 		-Wl,--sort-common \
-		-Wl,--allow-multiple-definition \
 		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
 		-Wl,-soname,libc.so.6 \
 		$(LINKFLAGS) \
 		-o $@
 
-$(BUILD)/$(PROFILE)/ld_so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/crti.o $(BUILD)/$(PROFILE)/libc.a $(BUILD)/$(PROFILE)/crtn.o
+$(BUILD)/$(PROFILE)/ld.so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/libc.a
 	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
-	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
+	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --gc-sections $^ -o $@
 
 $(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
