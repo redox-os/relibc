@@ -54,8 +54,10 @@ pub const FIFOTYPE: u8 = b'6'; // FIFO special
 pub const CONTTYPE: u8 = b'7'; // Contiguous file
 
 /// tar format magic and version
+/// cbindgen:ignore
 pub const TMAGIC: &str = "ustar"; // Magic string : ustar and a null
 pub const TMAGLEN: usize = 6; // Length of the magic string
+/// cbindgen:ignore
 pub const TVERSION: &str = "00"; // Version string
 pub const TVERSLEN: usize = 2; // Length of the version string
 
