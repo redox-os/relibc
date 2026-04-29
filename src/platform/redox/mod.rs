@@ -333,11 +333,7 @@ impl Pal for Sys {
         }
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let file = openat2(fildes, path, flags, 0)?;
-        libredox::fchown(
-            *file as usize,
-            owner.try_into().map_err(|_| Errno(EINVAL))?,
-            group.try_into().map_err(|_| Errno(EINVAL))?,
-        )?;
+        libredox::fchown(*file as usize, owner as _, group as _)?;
         Ok(())
     }
 
