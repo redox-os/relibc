@@ -9,6 +9,7 @@
 sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 after_includes = """
+#include <bits/sigset-t.h> // for sigset_t
 #include <bits/timespec.h> // for timespec from time.h
 
 #define SIG_DFL ((void (*)(int))0)
@@ -17,7 +18,6 @@ after_includes = """
 #define SIG_HOLD ((void (*)(int))2)
 
 typedef struct siginfo siginfo_t;
-typedef unsigned long long sigset_t;
 typedef struct ucontext ucontext_t;
 typedef struct mcontext mcontext_t;
 typedef long sig_atomic_t;

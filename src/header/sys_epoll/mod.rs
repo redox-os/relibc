@@ -6,7 +6,7 @@ use core::ptr;
 
 use crate::{
     error::ResultExt,
-    header::signal::sigset_t,
+    header::bits_sigset_t::sigset_t,
     platform::{
         PalEpoll, Sys,
         types::{c_int, c_void},

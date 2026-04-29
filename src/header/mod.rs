@@ -11,6 +11,8 @@ pub mod bits_locale_t;
 pub mod bits_pthread;
 #[path = "bits_safamily-t/mod.rs"]
 pub mod bits_safamily_t;
+#[path = "bits_sigset-t/mod.rs"]
+pub mod bits_sigset_t;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
 pub mod bits_timespec;

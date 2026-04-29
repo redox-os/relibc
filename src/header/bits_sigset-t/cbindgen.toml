@@ -1,0 +1,18 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html
+#
+# This type is split out to prevent importing all of signal.h into other headers.
+#
+# POSIX headers that require sigset_t:
+# - poll.h
+# - signal.h (where it should be defined)
+# - sys/select.h
+sys_includes = []
+include_guard = "_RELIBC_BITS_SIGSET_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+[export]
+include = ["sigset_t"]
+[enum]
+prefix_with_name = true
