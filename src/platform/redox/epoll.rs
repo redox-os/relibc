@@ -6,7 +6,7 @@ use super::{
 use crate::{
     error::Errno,
     fs::File,
-    header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
+    header::{bits_sigset_t::sigset_t, errno::*, fcntl::*, sys_epoll::*},
     io::prelude::*,
 };
 use core::{mem, slice};

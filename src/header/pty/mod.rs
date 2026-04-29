@@ -5,7 +5,9 @@
 use core::{mem, ptr, slice};
 
 use crate::{
-    header::{fcntl, limits, pthread, signal, sys_ioctl, sys_wait, termios, unistd, utmp},
+    header::{
+        bits_sigset_t, fcntl, limits, pthread, signal, sys_ioctl, sys_wait, termios, unistd, utmp,
+    },
     platform::{
         self,
         types::{c_char, c_int, c_void},
@@ -69,8 +71,8 @@ pub unsafe extern "C" fn forkpty(
     let mut p: [c_int; 2] = [0; 2];
     let mut cs = 0;
     let mut pid = -1;
-    let mut set = signal::sigset_t::default();
-    let mut oldset = signal::sigset_t::default();
+    let mut set = bits_sigset_t::sigset_t::default();
+    let mut oldset = bits_sigset_t::sigset_t::default();
 
     if unsafe { openpty(&raw mut m, &raw mut s, name, tio, ws) } < 0 {
         return -1;

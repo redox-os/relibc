@@ -15,10 +15,11 @@ use crate::header::sys_time::itimerval;
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_sigset_t::sigset_t,
         bits_timespec::timespec,
         signal::{
-            SA_RESTORER, SI_QUEUE, SIGALRM, SIGEV_SIGNAL, sigaction, sigevent, siginfo_t, sigset_t,
-            sigval, stack_t,
+            SA_RESTORER, SI_QUEUE, SIGALRM, SIGEV_SIGNAL, sigaction, sigevent, siginfo_t, sigval,
+            stack_t,
         },
         time,
     },

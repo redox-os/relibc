@@ -8,7 +8,7 @@ use cbitset::BitSet;
 
 use crate::{
     error::{Errno, ResultExt},
-    header::{bits_timespec::timespec, errno, setjmp},
+    header::{bits_sigset_t::sigset_t, bits_timespec::timespec, errno, setjmp},
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{
@@ -102,8 +102,6 @@ pub union sigval {
     pub sival_ptr: *mut c_void,
 }
 
-/// cbindgen:ignore
-pub type sigset_t = c_ulonglong;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 /// cbindgen:ignore
 pub type siginfo_t = siginfo;

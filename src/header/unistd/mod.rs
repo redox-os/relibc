@@ -15,10 +15,12 @@ use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
     header::{
+        bits_sigset_t::sigset_t,
         bits_timespec::timespec,
         crypt::{crypt_data, crypt_r},
         errno::{self, ENAMETOOLONG},
         fcntl, limits,
+        signal::{sigprocmask, sigsuspend},
         stdlib::getenv,
         sys_ioctl, sys_resource,
         sys_select::timeval,
@@ -49,8 +51,6 @@ use super::{
     errno::{E2BIG, EINVAL, ENOMEM},
     stdio::snprintf,
 };
-
-use crate::header::signal::{sigprocmask, sigset_t, sigsuspend};
 
 mod brk;
 mod getopt;
