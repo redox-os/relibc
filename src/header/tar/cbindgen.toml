@@ -1,7 +1,13 @@
 # POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html
 #
 # There are no spec quotations relating to includes
-include_guard = "_TAR_H"
+include_guard = "_RELIBC_TAR_H"
+# cbindgen cannot export Rust &str
+after_includes = """
+
+#define TMAGIC "ustar"
+#define TVERSION "00"
+"""
 language = "C"
 style = "Tag"
 no_includes = true
