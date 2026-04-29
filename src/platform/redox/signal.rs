@@ -7,12 +7,12 @@ use crate::header::sys_time::{ITIMER_REAL, itimerval};
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_sigset_t::sigset_t,
         bits_timespec::timespec,
         errno::{EINVAL, ENOSYS},
         signal::{
             SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGALRM, SIGEV_SIGNAL,
-            SS_DISABLE, SS_ONSTACK, sigaction, sigevent, siginfo_t, sigset_t, sigval, stack_t,
-            ucontext_t,
+            SS_DISABLE, SS_ONSTACK, sigaction, sigevent, siginfo_t, sigval, stack_t, ucontext_t,
         },
         time::{itimerspec, timer_internal_t},
     },

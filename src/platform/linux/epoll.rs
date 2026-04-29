@@ -3,8 +3,11 @@ use core::mem;
 use super::{Sys, e_raw};
 use crate::{
     error::Result,
-    header::{signal::sigset_t, sys_epoll::epoll_event},
-    platform::{PalEpoll, types::*},
+    header::{bits_sigset_t::sigset_t, sys_epoll::epoll_event},
+    platform::{
+        PalEpoll,
+        types::{c_int, size_t},
+    },
 };
 
 impl PalEpoll for Sys {

@@ -1,6 +1,6 @@
 use crate::{
     error::Result,
-    header::{signal::sigset_t, sys_epoll::epoll_event},
+    header::{bits_sigset_t::sigset_t, sys_epoll::epoll_event},
     platform::{Pal, types::c_int},
 };
 

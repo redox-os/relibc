@@ -7,8 +7,9 @@ use crate::header::sys_time::itimerval;
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_sigset_t::sigset_t,
         bits_timespec::timespec,
-        signal::{sigaction, siginfo_t, sigset_t, sigval, stack_t},
+        signal::{sigaction, siginfo_t, sigval, stack_t},
     },
 };
 
