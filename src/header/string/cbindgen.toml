@@ -8,6 +8,11 @@ sys_includes = ["stddef.h"]
 include_guard = "_RELIBC_STRING_H"
 after_includes = """
 #include <bits/locale-t.h> // for locale_t from locale.h
+
+// POSIX doesn't require importing strings.h but mesa needs it
+#if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
+#include <strings.h>
+#endif
 """
 language = "C"
 style = "Tag"
