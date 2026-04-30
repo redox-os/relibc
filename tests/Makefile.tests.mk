@@ -145,6 +145,7 @@ EXPECT_NAMES=\
 	sys_stat/chmod \
 	sys_stat/lstat \
 	sys_stat/fstatat \
+	sys_stat/umask \
 	sys_syslog/syslog \
 	time/asctime \
 	time/constants \

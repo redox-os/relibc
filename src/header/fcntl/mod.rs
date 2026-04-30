@@ -80,7 +80,16 @@ pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: ...) -> c_int {
-    unsafe { openat(AT_FDCWD, path, oflag, __valist) }
+    let mode = if oflag & O_CREAT == O_CREAT
+    /* || oflag & O_TMPFILE == O_TMPFILE */
+    {
+        unsafe { __valist.arg::<mode_t>() }
+    } else {
+        0
+    };
+
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::openat(AT_FDCWD, path, oflag, mode).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/openat.html>.
