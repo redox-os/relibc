@@ -1,8 +1,36 @@
-sys_includes = ["bits/signal.h", "stdint.h", "sys/types.h", "bits/pthread.h", "features.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html
+#
+# Spec quotations relating to includes:
+# - "The <signal.h> header shall define the pthread_t, size_t, and uid_t types as described in <sys/types.h>."
+# - "The <signal.h> header shall define the timespec structure as described in <time.h>."
+# - "pid_t As described in <sys/types.h>."
+# - "The <signal.h> header shall define the pthread_attr_t type as described in <sys/types.h>."
+# - "Inclusion of the <signal.h> header may make visible all symbols from the <time.h> header."
+sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 after_includes = """
-#include <bits/timespec.h> // for timespec
-#include <bits/signal.h>
+#include <bits/sigset-t.h> // for sigset_t
+#include <bits/timespec.h> // for timespec from time.h
+
+#define SIG_DFL ((void (*)(int))0)
+#define SIG_IGN ((void (*)(int))1)
+#define SIG_ERR ((void (*)(int))-1)
+#define SIG_HOLD ((void (*)(int))2)
+
+typedef struct siginfo siginfo_t;
+typedef struct ucontext ucontext_t;
+typedef struct mcontext mcontext_t;
+typedef long sig_atomic_t;
+
+struct sigaction {
+  union {
+    void (*sa_handler)(int);
+    void (*sa_sigaction)(int, siginfo_t *, void *);
+  };
+  int sa_flags;
+  void (*sa_restorer)(void);
+  sigset_t sa_mask;
+};
 """
 language = "C"
 style = "Tag"

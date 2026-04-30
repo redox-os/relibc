@@ -1,12 +1,25 @@
-sys_includes = ["stddef.h", "stdint.h", "strings.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html
+#
+# Spec quotations relating to includes:
+# - "The <string.h> header shall define NULL and size_t as described in <stddef.h>."
+# - "The <string.h> header shall define the locale_t type as described in <locale.h>."
+# - "Inclusion of the <string.h> header may also make visible all symbols from <stddef.h>."
+sys_includes = ["stddef.h"]
 include_guard = "_RELIBC_STRING_H"
 after_includes = """
-#include <bits/locale-t.h> // for locale_t
+#include <bits/locale-t.h> // for locale_t from locale.h
+
+// POSIX doesn't require importing strings.h but mesa needs it
+#if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
+#include <strings.h>
+#endif
 """
 language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
+# make size_t actually size_t instead of uintptr_t (which would require stdint.h)
+usize_is_size_t = true
 
 [enum]
 prefix_with_name = true

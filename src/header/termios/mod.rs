@@ -9,7 +9,7 @@ use crate::{
     },
     platform::{
         self,
-        types::{c_int, c_ulong, c_void, pid_t},
+        types::{c_int, c_uchar, c_uint, c_ulong, c_void, pid_t},
     },
 };
 
@@ -23,9 +23,9 @@ pub mod sys;
 #[path = "redox.rs"]
 pub mod sys;
 
-pub type cc_t = u8;
-pub type speed_t = u32;
-pub type tcflag_t = u32;
+pub type cc_t = c_uchar;
+pub type speed_t = c_uint;
+pub type tcflag_t = c_uint;
 
 pub const TCOOFF: c_int = 0;
 pub const TCOON: c_int = 1;
@@ -39,6 +39,9 @@ pub const TCIOFLUSH: c_int = 2;
 pub const TCSANOW: c_int = 0;
 pub const TCSADRAIN: c_int = 1;
 pub const TCSAFLUSH: c_int = 2;
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_export_winsize(winsize: winsize) {}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/termios.h.html>.
 #[cfg(target_os = "linux")]

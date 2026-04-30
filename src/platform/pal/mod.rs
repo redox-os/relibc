@@ -6,6 +6,7 @@ use crate::{
     error::{Errno, Result},
     header::{
         bits_timespec::timespec,
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD},
         signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
@@ -35,7 +36,12 @@ mod socket;
 /// Platform abstraction layer, a platform-agnostic abstraction over syscalls.
 pub trait Pal {
     /// Platform implementation of [`access()`](crate::header::unistd::access) from [`unistd.h`](crate::header::unistd).
-    fn access(path: CStr, mode: c_int) -> Result<()>;
+    fn access(path: CStr, mode: c_int) -> Result<()> {
+        Self::faccessat(AT_FDCWD, path, mode, 0)
+    }
+
+    /// Platform implementation of [`faccessat()`](crate::header::unistd::faccessat) from [`unistd.h`](crate::header::unistd).
+    fn faccessat(fd: c_int, path: CStr, amode: c_int, flags: c_int) -> Result<()>;
 
     /// Platform implementation of [`brk()`](crate::header::unistd::brk) from [`unistd.h`](crate::header::unistd).
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void>;
@@ -44,10 +50,14 @@ pub trait Pal {
     fn chdir(path: CStr) -> Result<()>;
 
     /// Platform implementation of [`chmod()`](crate::header::sys_stat::chmod) from [`sys/stat.h`](crate::header::sys_stat).
-    fn chmod(path: CStr, mode: mode_t) -> Result<()>;
+    fn chmod(path: CStr, mode: mode_t) -> Result<()> {
+        Self::fchmodat(AT_FDCWD, Some(path), mode, 0)
+    }
 
     /// Platform implementation of [`chown()`](crate::header::unistd::chown) from [`unistd.h`](crate::header::unistd).
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+        Self::fchownat(AT_FDCWD, path, owner, group, 0)
+    }
 
     /// Platform implementation of [`clock_getres()`](crate::header::time::clock_getres) from [`time.h`](crate::header::time).
     fn clock_getres(clk_id: clockid_t, tp: Option<Out<timespec>>) -> Result<()>;
@@ -87,13 +97,20 @@ pub trait Pal {
     fn fchdir(fildes: c_int) -> Result<()>;
 
     /// Platform implementation of [`fchmod()`](crate::header::sys_stat::fchmod) from [`sys/stat.h`](crate::header::sys_stat).
-    fn fchmod(fildes: c_int, mode: mode_t) -> Result<()>;
+    fn fchmod(fildes: c_int, mode: mode_t) -> Result<()> {
+        Self::fchmodat(fildes, Some(c"".into()), mode, AT_EMPTY_PATH)
+    }
 
     /// Platform implementation of [`fchmodat()`](crate::header::sys_stat::fchmodat) from [`sys/stat.h`](crate::header::sys_stat).
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()>;
 
     /// Platform implementation of [`fchown()`](crate::header::unistd::fchown) from [`unistd.h`](crate::header::unistd).
-    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()>;
+    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()> {
+        Self::fchownat(fildes, c"".into(), owner, group, AT_EMPTY_PATH)
+    }
+
+    /// Platform implementation of [`fchownat()`](crate::header::unistd::fchownat) from [`unistd.h`](crate::header::unistd).
+    fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()>;
 
     /// Platform implementation of [`fdatasync()`](crate::header::unistd::fdatasync) from [`unistd.h`](crate::header::unistd).
     fn fdatasync(fildes: c_int) -> Result<()>;
@@ -102,7 +119,9 @@ pub trait Pal {
     fn flock(fd: c_int, operation: c_int) -> Result<()>;
 
     /// Platform implementation of [`fstat()`](crate::header::sys_stat::fstat) from [`sys/stat.h`](crate::header::sys_stat).
-    fn fstat(fildes: c_int, buf: Out<stat>) -> Result<()>;
+    fn fstat(fildes: c_int, buf: Out<stat>) -> Result<()> {
+        Self::fstatat(fildes, Some(c"".into()), buf, 0)
+    }
 
     /// Platform implementation of [`fstatat()`](crate::header::sys_stat::fstatat) from [`sys/stat.h`](crate::header::sys_stat).
     fn fstatat(fildes: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()>;
@@ -223,7 +242,12 @@ pub trait Pal {
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
 
     /// Platform implementation of [`link()`](crate::header::unistd::link) from [`unistd.h`](crate::header::unistd).
-    fn link(path1: CStr, path2: CStr) -> Result<()>;
+    fn link(path1: CStr, path2: CStr) -> Result<()> {
+        Self::linkat(AT_FDCWD, path1, AT_FDCWD, path2, 0)
+    }
+
+    /// Platform implementation of [`linkat()`](crate::header::unistd::linkat) from [`unistd.h`](crate::header::unistd).
+    fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()>;
 
     /// Platform implementation of [`lseek()`](crate::header::unistd::lseek) from [`unistd.h`](crate::header::unistd).
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t>;
@@ -232,19 +256,25 @@ pub trait Pal {
     fn mkdirat(fildes: c_int, path: CStr, mode: mode_t) -> Result<()>;
 
     /// Platform implementation of [`mkdir()`](crate::header::sys_stat::mkdir) from [`sys/stat.h`](crate::header::sys_stat).
-    fn mkdir(path: CStr, mode: mode_t) -> Result<()>;
+    fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
+        Self::mkdirat(AT_FDCWD, path, mode)
+    }
 
     /// Platform implementation of [`mkfifoat()`](crate::header::sys_stat::mkfifoat) from [`sys/stat.h`](crate::header::sys_stat).
     fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()>;
 
     /// Platform implementation of [`mkfifo()`](crate::header::sys_stat::mkfifo) from [`sys/stat.h`](crate::header::sys_stat).
-    fn mkfifo(path: CStr, mode: mode_t) -> Result<()>;
+    fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
+        Self::mkfifoat(AT_FDCWD, path, mode)
+    }
 
     /// Platform implementation of [`mknodat()`](crate::header::sys_stat::mknodat) from [`sys/stat.h`](crate::header::sys_stat).
     fn mknodat(fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()>;
 
     /// Platform implementation of [`mknod()`](crate::header::sys_stat::mknod) from [`sys/stat.h`](crate::header::sys_stat).
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()>;
+    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
+        Self::mknodat(AT_FDCWD, path, mode, dev)
+    }
 
     /// Platform implementation of [`mlock()`](crate::header::sys_mman::mlock) from [`sys/mman.h`](crate::header::sys_mman).
     unsafe fn mlock(addr: *const c_void, len: usize) -> Result<()>;
@@ -323,16 +353,22 @@ pub trait Pal {
     fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<usize>;
 
     /// Platform implementation of [`readlink()`](crate::header::unistd::readlink) from [`unistd.h`](crate::header::unistd).
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize>;
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
+        Self::readlinkat(AT_FDCWD, pathname, out)
+    }
 
     /// Platform implementation of [`readlinkat()`](crate::header::unistd::readlinkat) from [`unistd.h`](crate::header::unistd).
     fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize>;
 
     /// Platform implementation of [`rename()`](crate::header::stdio::rename) from [`stdio.h`](crate::header::stdio).
-    fn rename(old: CStr, new: CStr) -> Result<()>;
+    fn rename(old: CStr, new: CStr) -> Result<()> {
+        Self::renameat(AT_FDCWD, old, AT_FDCWD, new)
+    }
 
     /// Platform implementation of [`renameat()`](crate::header::stdio::renameat) from [`stdio.h`](crate::header::stdio).
-    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()>;
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
+        Self::renameat2(old_dir, old_path, new_dir, new_path, 0)
+    }
 
     /// Platform implementation of [`renameat2()`](crate::header::stdio::renameat2) from [`stdio.h`](crate::header::stdio).
     fn renameat2(
@@ -349,7 +385,7 @@ pub trait Pal {
     /// Platform implementation of [`sched_yield()`](crate::header::sched::sched_yield) from [`sched.h`](crate::header::sched).
     fn sched_yield() -> Result<()>;
 
-    /// Platform implementation of [`setgroups()`](crate::header::unistd::setgroups) from [`unistd.h`](crate::header::unistd) (TODO: should be `grp.h`?).
+    /// Platform implementation of [`setgroups()`](crate::header::grp::setgroups) from [`grp.h`](crate::header::grp).
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()>;
 
     /// Platform implementation of [`setpgid()`](crate::header::unistd::setpgid) from [`unistd.h`](crate::header::unistd).
@@ -368,7 +404,12 @@ pub trait Pal {
     fn setsid() -> Result<c_int>;
 
     /// Platform implementation of [`symlink()`](crate::header::unistd::symlink) from [`unistd.h`](crate::header::unistd).
-    fn symlink(path1: CStr, path2: CStr) -> Result<()>;
+    fn symlink(path1: CStr, path2: CStr) -> Result<()> {
+        Self::symlinkat(path1, AT_FDCWD, path2)
+    }
+
+    /// Platform implementation of [`symlinkat()`](crate::header::unistd::symlinkat) from [`unistd.h`](crate::header::unistd).
+    fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()>;
 
     /// Platform implementation of [`sync()`](crate::header::unistd::sync) from [`unistd.h`](crate::header::unistd).
     fn sync() -> Result<()>;
@@ -398,7 +439,12 @@ pub trait Pal {
     fn uname(utsname: Out<utsname>) -> Result<()>;
 
     /// Platform implementation of [`unlink()`](crate::header::unistd::unlink) from [`unistd.h`](crate::header::unistd).
-    fn unlink(path: CStr) -> Result<()>;
+    fn unlink(path: CStr) -> Result<()> {
+        Self::unlinkat(AT_FDCWD, path, 0)
+    }
+
+    /// Platform implementation of [`unlinkat()`](crate::header::unistd::unlinkat) from [`unistd.h`](crate::header::unistd).
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()>;
 
     /// Platform implementation of [`waitpid()`](crate::header::sys_wait::waitpid) from [`sys/wait.h`](crate::header::sys_wait).
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t>;

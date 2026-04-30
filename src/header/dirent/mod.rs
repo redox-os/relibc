@@ -24,6 +24,31 @@ use crate::{
     },
 };
 
+// values of below constants taken from musl
+
+/// Unknown file type.
+pub const DT_UNKNOWN: c_int = 0;
+/// FIFO special.
+pub const DT_FIFO: c_int = 1;
+/// Character special.
+pub const DT_CHR: c_int = 2;
+/// Directory.
+pub const DT_DIR: c_int = 4;
+/// Block special.
+pub const DT_BLK: c_int = 6;
+/// Regular.
+pub const DT_REG: c_int = 8;
+/// Symbolic link.
+pub const DT_LNK: c_int = 10;
+/// Socket.
+pub const DT_SOCK: c_int = 12;
+/// Non-POSIX.
+/// Whiteout inode.
+pub const DT_WHT: c_int = 14;
+
+// values of above constants taken from musl
+
+/// cbindgen:ignore
 const INITIAL_BUFSIZE: usize = 512;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html>.
@@ -163,6 +188,7 @@ pub struct posix_dent {
     pub d_name: [c_char; 256],
 }
 
+/// cbindgen:ignore
 #[cfg(target_os = "redox")]
 const _: () = {
     use core::mem::{offset_of, size_of};

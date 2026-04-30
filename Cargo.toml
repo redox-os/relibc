@@ -41,12 +41,12 @@ zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 [workspace.lints.rust]
 dangling_pointers_from_temporaries = "deny"
 dead_code = "allow" # TODO review occuurences
-deprecated = "allow" # TODO review occuurences
+deprecated = "deny"
 improper_ctypes_definitions = "deny"
 internal_features = "allow" # core_intrinsics and lang_items
 irrefutable_let_patterns = "deny"
 mismatched_lifetime_syntaxes = "deny"
-non_camel_case_types = "allow"
+non_camel_case_types = "allow" # needed for most POSIX type names
 non_snake_case = "allow" # TODO review occuurences
 non_upper_case_globals = "allow" # TODO review occuurences
 unexpected_cfgs = "deny"
@@ -67,8 +67,8 @@ bitflags = "2"
 ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.3"
-redox_protocols = { package = "libredox", version = "0.1.14", default-features = false, features = ["protocol"] }
-redox_syscall = "0.7.3"
+redox_protocols = { package = "libredox", version = "0.1.16", default-features = false, features = ["protocol"] }
+redox_syscall = "0.7.4"
 
 [build-dependencies]
 cc = "1"
@@ -133,6 +133,7 @@ redox_protocols.workspace = true
 default = ["check_against_libc_crate", "ld_so_cache", "no_trace"]
 check_against_libc_crate = ["__libc_only_for_layout_checks"]
 ld_so_cache = []
+math_libm = []
 no_trace = ["log/release_max_level_debug"]
 # for very verbose activity beyond trace level
 trace_tls = []

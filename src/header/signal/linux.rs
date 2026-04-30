@@ -1,5 +1,5 @@
 use super::{sigset_t, stack_t};
-use crate::platform::types::c_ulong;
+use crate::platform::types::{c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
 use core::arch::global_asm;
 
 // Needs to be defined in assembly because it can't have a function prologue
@@ -143,37 +143,37 @@ pub struct ucontext {
     pub uc_stack: stack_t,
     pub uc_mcontext: mcontext_t,
     pub uc_sigmask: sigset_t,
-    __private: [u8; 512],
+    __private: [c_uchar; 512],
 }
 
 #[repr(C)]
 pub struct _libc_fpstate {
-    pub cwd: u16,
-    pub swd: u16,
-    pub ftw: u16,
-    pub fop: u16,
-    pub rip: u64,
-    pub rdp: u64,
-    pub mxcsr: u32,
-    pub mxcr_mask: u32,
+    pub cwd: c_ushort,
+    pub swd: c_ushort,
+    pub ftw: c_ushort,
+    pub fop: c_ushort,
+    pub rip: c_ulonglong,
+    pub rdp: c_ulonglong,
+    pub mxcsr: c_uint,
+    pub mxcr_mask: c_uint,
     pub _st: [_libc_fpxreg; 8],
     pub _xmm: [_libc_xmmreg; 16],
-    __private: [u64; 12],
+    __private: [c_ulonglong; 12],
 }
 #[repr(C)]
 pub struct _libc_fpxreg {
-    pub significand: [u16; 4],
-    pub exponent: u16,
-    __private: [u16; 3],
+    pub significand: [c_ushort; 4],
+    pub exponent: c_ushort,
+    __private: [c_ushort; 3],
 }
 
 #[repr(C)]
 pub struct _libc_xmmreg {
-    pub element: [u32; 4],
+    pub element: [c_uint; 4],
 }
 #[repr(C)]
 pub struct mcontext {
-    pub gregs: [i64; 23], // TODO: greg_t?
+    pub gregs: [c_longlong; 23], // TODO: greg_t?
     pub fpregs: *mut _libc_fpstate,
-    __private: [u64; 8],
+    __private: [c_ulonglong; 8],
 }

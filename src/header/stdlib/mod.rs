@@ -146,9 +146,9 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
         platform::ERRNO.set(EINVAL);
         return ptr::null_mut();
     }
-    /* The size-is-multiple-of-alignment requirement is the only
-     * difference between aligned_alloc() and memalign(). */
-    unsafe { memalign(alignment, size) }
+    let mut pointer = ptr::null_mut();
+    unsafe { posix_memalign(ptr::from_mut(&mut pointer), alignment, size) };
+    pointer
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/at_quick_exit.html>.
@@ -355,8 +355,6 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
     unsafe extern "C" {
         static __fini_array_start: extern "C" fn();
         static __fini_array_end: extern "C" fn();
-
-        fn _fini();
     }
 
     for i in (0..unsafe { ATEXIT_FUNCS.unsafe_ref().len() }).rev() {
@@ -371,11 +369,6 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
     while f > &raw const __fini_array_start {
         f = unsafe { f.offset(-1) };
         (unsafe { *f })();
-    }
-
-    #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
-    {
-        unsafe { _fini() };
     }
 
     unsafe { ld_so::fini() };
@@ -1113,6 +1106,7 @@ pub unsafe extern "C" fn rand() -> c_int {
 /// # Deprecation
 /// The `rand_r()` function was marked as obsolescent in the Open Group Base
 /// Specifications Issue 7, and the function was removed in Issue 8.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
     if seed.is_null() {

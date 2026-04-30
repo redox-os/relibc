@@ -13,47 +13,47 @@ use crate::{
     platform::{
         Pal, Sys,
         types::{
-            blkcnt_t, blksize_t, c_char, c_int, dev_t, gid_t, ino_t, mode_t, nlink_t, off_t, uid_t,
-            useconds_t,
+            blkcnt_t, blksize_t, c_char, c_int, c_long, dev_t, gid_t, ino_t, mode_t, nlink_t,
+            off_t, uid_t,
         },
     },
 };
 
-pub const S_IFMT: c_int = 0o0_170_000;
+pub const S_IFMT: mode_t = 0o0_170_000;
 
-pub const S_IFDIR: c_int = 0o040_000;
-pub const S_IFCHR: c_int = 0o020_000;
-pub const S_IFBLK: c_int = 0o060_000;
-pub const S_IFREG: c_int = 0o100_000;
-pub const S_IFIFO: c_int = 0o010_000;
-pub const S_IFLNK: c_int = 0o120_000;
-pub const S_IFSOCK: c_int = 0o140_000;
+pub const S_IFDIR: mode_t = 0o040_000;
+pub const S_IFCHR: mode_t = 0o020_000;
+pub const S_IFBLK: mode_t = 0o060_000;
+pub const S_IFREG: mode_t = 0o100_000;
+pub const S_IFIFO: mode_t = 0o010_000;
+pub const S_IFLNK: mode_t = 0o120_000;
+pub const S_IFSOCK: mode_t = 0o140_000;
 
-pub const S_IRWXU: c_int = 0o0_700;
-pub const S_IRUSR: c_int = 0o0_400;
-pub const S_IWUSR: c_int = 0o0_200;
-pub const S_IXUSR: c_int = 0o0_100;
+pub const S_IRWXU: mode_t = 0o0_700;
+pub const S_IRUSR: mode_t = 0o0_400;
+pub const S_IWUSR: mode_t = 0o0_200;
+pub const S_IXUSR: mode_t = 0o0_100;
 
 // Defined for compatibility
-pub const S_IREAD: c_int = S_IRUSR;
-pub const S_IWRITE: c_int = S_IWUSR;
-pub const S_IEXEC: c_int = S_IXUSR;
+pub const S_IREAD: mode_t = S_IRUSR;
+pub const S_IWRITE: mode_t = S_IWUSR;
+pub const S_IEXEC: mode_t = S_IXUSR;
 
-pub const S_IRWXG: c_int = 0o0_070;
-pub const S_IRGRP: c_int = 0o0_040;
-pub const S_IWGRP: c_int = 0o0_020;
-pub const S_IXGRP: c_int = 0o0_010;
+pub const S_IRWXG: mode_t = 0o0_070;
+pub const S_IRGRP: mode_t = 0o0_040;
+pub const S_IWGRP: mode_t = 0o0_020;
+pub const S_IXGRP: mode_t = 0o0_010;
 
-pub const S_IRWXO: c_int = 0o0_007;
-pub const S_IROTH: c_int = 0o0_004;
-pub const S_IWOTH: c_int = 0o0_002;
-pub const S_IXOTH: c_int = 0o0_001;
-pub const S_ISUID: c_int = 0o4_000;
-pub const S_ISGID: c_int = 0o2_000;
-pub const S_ISVTX: c_int = 0o1_000;
+pub const S_IRWXO: mode_t = 0o0_007;
+pub const S_IROTH: mode_t = 0o0_004;
+pub const S_IWOTH: mode_t = 0o0_002;
+pub const S_IXOTH: mode_t = 0o0_001;
+pub const S_ISUID: mode_t = 0o4_000;
+pub const S_ISGID: mode_t = 0o2_000;
+pub const S_ISVTX: mode_t = 0o1_000;
 
-pub const UTIME_NOW: useconds_t = (1 << 30) - 1;
-pub const UTIME_OMIT: useconds_t = (1 << 30) - 2;
+pub const UTIME_NOW: c_long = (1 << 30) - 1;
+pub const UTIME_OMIT: c_long = (1 << 30) - 2;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html>.
 #[repr(C)]

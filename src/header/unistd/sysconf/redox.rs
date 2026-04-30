@@ -93,7 +93,7 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_TIMEOUTS => 202405,
         _SC_TIMERS => 202405,
         _SC_SYMLOOP_MAX => -1,
-        _SC_HOST_NAME_MAX => 64,
+        _SC_HOST_NAME_MAX => limits::HOST_NAME_MAX.try_into().unwrap_or(-1),
         _SC_NPROCESSORS_CONF => get_cpu_count().unwrap_or(None).unwrap_or(1),
         _SC_NPROCESSORS_ONLN => get_cpu_count().unwrap_or(None).unwrap_or(1),
         _SC_PHYS_PAGES => get_mem_stat().map(|s| s.f_blocks as c_long).unwrap_or(-1),

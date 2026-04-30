@@ -7,12 +7,8 @@
 use super::super::{ERRNO, PalPtrace, Sys, types::*};
 #[cfg(target_arch = "x86_64")]
 use super::super::{Pal, PalSignal};
-#[allow(unused_imports)]
-#[cfg(target_arch = "aarch64")]
-use crate::header::arch_aarch64_user::user_regs_struct; // unused
 #[cfg(target_arch = "x86_64")]
 use crate::header::arch_x64_user::user_regs_struct;
-#[allow(unused_imports)]
 use crate::{
     c_str::{CStr, CString},
     error::Errno,

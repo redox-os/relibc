@@ -5,8 +5,8 @@
 use crate::{
     header::{
         ctype::{self, isspace},
-        errno::*,
-        stdlib::*,
+        errno::{EINVAL, ERANGE},
+        stdlib::{convert_hex, convert_integer, convert_octal, detect_base, is_positive},
     },
     platform::{
         self,

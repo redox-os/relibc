@@ -32,8 +32,9 @@ use crate::{
             ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
-            self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, F_GETLK, F_OFD_GETLK, F_OFD_SETLK,
-            F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
+            self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
+            AT_SYMLINK_NOFOLLOW, F_GETLK, F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW,
+            F_UNLCK, F_WRLCK, flock,
         },
         limits,
         pthread::{pthread_cancel, pthread_create},
@@ -107,7 +108,15 @@ pub struct Sys;
 
 impl Pal for Sys {
     fn access(path: CStr, mode: c_int) -> Result<()> {
-        let fd = FdGuard::new(Sys::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
+        Sys::faccessat(AT_FDCWD, path, mode, 0)
+    }
+
+    fn faccessat(fd: c_int, path: CStr, mode: c_int, flags: c_int) -> Result<()> {
+        let fd = FdGuard::new(Sys::openat(fd, path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
+
+        if (flags & !(AT_EACCESS)) != 0 {
+            return Err(Errno(EINVAL));
+        }
 
         if mode == F_OK {
             return Ok(());
@@ -117,11 +126,22 @@ impl Pal for Sys {
 
         fd.fstat(&mut stat)?;
 
-        let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
+        let Resugid {
+            ruid,
+            rgid,
+            euid,
+            egid,
+            ..
+        } = redox_rt::sys::posix_getresugid();
+        let (uid, gid) = if (flags & AT_EACCESS) == AT_EACCESS {
+            (euid, egid)
+        } else {
+            (ruid, rgid)
+        };
 
-        let perms = (if stat.st_uid == ruid {
+        let perms = (if stat.st_uid == uid {
             stat.st_mode >> (3 * 2)
-        } else if stat.st_gid == rgid {
+        } else if stat.st_gid == gid {
             stat.st_mode >> (3 * 1)
         } else {
             stat.st_mode
@@ -277,7 +297,7 @@ impl Pal for Sys {
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            return Err(Errno(EINVAL));
         }
         let mut path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
@@ -303,6 +323,17 @@ impl Pal for Sys {
 
     fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> Result<()> {
         libredox::fchown(fd as usize, owner as u32, group as u32)?;
+        Ok(())
+    }
+
+    fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()> {
+        const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
+        if MASK & flags != 0 {
+            return Err(Errno(EINVAL));
+        }
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let file = openat2(fildes, path, flags, 0)?;
+        libredox::fchown(*file as usize, owner as _, group as _)?;
         Ok(())
     }
 
@@ -634,8 +665,13 @@ impl Pal for Sys {
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
-        todo_skip!(0, "getpriority({}, {}): not implemented", which, who);
-        Err(Errno(ENOSYS))
+        match redox_rt::sys::posix_getpriority(which, who as u32) {
+            Ok(kernel_prio) => {
+                let posix_prio = (kernel_prio as i32 * -1) + 40 as i32;
+                Ok(posix_prio)
+            }
+            Err(e) => Err(Errno(e.errno)),
+        }
     }
 
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
@@ -759,10 +795,25 @@ impl Pal for Sys {
         Self::fchown(*file, owner, group)
     }
 
-    fn link(oldpath: CStr, newpath: CStr) -> Result<()> {
+    fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()> {
+        // make sure the flags passed are valid.
+        // valid states: AT_SYMLINK_FOLLOW, or 0.
+        if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
+            return Err(Errno(EINVAL));
+        }
         let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
 
-        let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        // By default, we don't follow the symlink if there is one.
+        // We only follow it if AT_SYMLINK_FOLLOW is passed in flags.
+        // We represent this by setting O_NOFOLLOW by default, and clearing it
+        // if AT_SYMLINK_FOLLOW is present.
+        let mut oflags = fcntl::O_PATH | fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW;
+        if (flags & AT_SYMLINK_FOLLOW) == AT_SYMLINK_FOLLOW {
+            oflags &= !fcntl::O_NOFOLLOW;
+        }
+
+        let file = File::openat(fd1, oldpath, oflags)?;
+        let newpath = openat2_path(fd2, newpath, 0)?;
         syscall::flink(*file as usize, newpath)?;
         Ok(())
     }
@@ -781,15 +832,6 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
-        File::create(
-            path,
-            fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
-            0o777,
-        )?;
-        Ok(())
-    }
-
     fn mkfifoat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
         Sys::mknodat(
             dir_fd,
@@ -799,17 +841,8 @@ impl Pal for Sys {
         )
     }
 
-    fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
-        Sys::mknod(path, syscall::MODE_FIFO as mode_t | (mode & 0o777), 0)
-    }
-
     fn mknodat(dir_fd: c_int, path_name: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         File::createat(dir_fd, path_name, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode)?;
-        Ok(())
-    }
-
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<(), Errno> {
-        File::create(path, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode)?;
         Ok(())
     }
 
@@ -1110,17 +1143,14 @@ impl Pal for Sys {
         }
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
-        let file = File::open(
-            pathname,
-            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
-        )?;
-        Self::read(*file, out)
-    }
-
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
         let path = str::from_utf8(path.to_bytes()).map_err(|_| Errno(ENOENT))?;
-        let file = openat2(dirfd, path, 0, fcntl::O_RDONLY | fcntl::O_SYMLINK)?;
+        let file = openat2(
+            dirfd,
+            path,
+            0,
+            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
+        )?;
         Sys::read(*file, out)
     }
 
@@ -1197,15 +1227,13 @@ impl Pal for Sys {
     }
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
-        // TODO
-        todo_skip!(
-            0,
-            "setpriority({}, {}, {}): not implemented",
-            which,
-            who,
-            prio
-        );
-        Err(Errno(ENOSYS))
+        let clamped_prio = prio.clamp(-20, 19);
+        let kernel_prio = (20 + clamped_prio) as u32;
+
+        match redox_rt::sys::posix_setpriority(which, who as u32, kernel_prio) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Errno(e.errno)),
+        }
     }
 
     fn setsid() -> Result<c_int> {
@@ -1237,7 +1265,12 @@ impl Pal for Sys {
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {
-        let mut file = File::create(
+        Sys::symlinkat(path1, AT_FDCWD, path2)
+    }
+
+    fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
+        let mut file = File::createat(
+            fd,
             path2,
             fcntl::O_WRONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
             0o777,
@@ -1505,6 +1538,17 @@ impl Pal for Sys {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
         redox_rt::sys::unlink(&canon, 0)?;
+        Ok(())
+    }
+
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
+        if (flags & !AT_REMOVEDIR) != 0 {
+            return Err(Errno(EINVAL));
+        }
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let path = openat2_path(fd, path, 0)?;
+        let canon = canonicalize(&path)?;
+        redox_rt::sys::unlink(&canon, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
         Ok(())
     }
 

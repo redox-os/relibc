@@ -14,19 +14,20 @@ use crate::{
     header::{
         arpa_inet::inet_aton,
         bits_arpainet::{htons, ntohl},
+        bits_safamily_t::sa_family_t,
         bits_socklen_t::socklen_t,
         errno::*,
         fcntl::O_RDONLY,
         netinet_in::{in_addr, sockaddr_in, sockaddr_in6},
         stdlib::atoi,
         strings::strcasecmp,
-        sys_socket::{constants::AF_INET, sa_family_t, sockaddr},
+        sys_socket::{constants::AF_INET, sockaddr},
         unistd::SEEK_SET,
     },
     platform::{
         self, Pal, Sys,
         rlb::{Line, RawLineBuffer},
-        types::{c_char, c_int, c_ulong, c_void},
+        types::{c_char, c_int, c_void, uint32_t},
     },
     raw_cell::RawCell,
 };
@@ -61,7 +62,7 @@ pub struct netent {
     n_name: *mut c_char,         /* official name of net */
     n_aliases: *mut *mut c_char, /* alias list */
     n_addrtype: c_int,           /* net address type */
-    n_net: c_ulong,              /* network # */
+    n_net: uint32_t,             /* network # */
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
@@ -347,7 +348,10 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     // Some implementations just skip resolution and copy the address to h_name
     if let Some(s_addr) = parse_ipv4_string(name_str) {
         let addr = in_addr { s_addr };
-        return unsafe { gethostbyaddr(ptr::from_ref(&addr).cast::<c_void>(), 4, AF_INET) };
+        return unsafe {
+            #[allow(deprecated)]
+            gethostbyaddr(ptr::from_ref(&addr).cast::<c_void>(), 4, AF_INET)
+        };
     }
 
     // check the hosts file first
@@ -508,7 +512,7 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
                 .cast::<c_char>(),
             n_aliases: net_aliases.as_mut_slice().as_mut_ptr(),
             n_addrtype: AF_INET,
-            n_net: c_ulong::from(NET_ADDR.unwrap()),
+            n_net: uint32_t::from(NET_ADDR.unwrap()),
         }
     };
     (&raw mut NET_ENTRY).cast::<netent>()
@@ -1136,6 +1140,7 @@ pub extern "C" fn herror(prefix: *const c_char) {
     let code = H_ERRNO.get();
     // Safety: `hstrerror` handles every error code case and always returns a valid C string
     let error = unsafe {
+        #[allow(deprecated)]
         let msg_cstr = CStr::from_ptr(hstrerror(code));
         str::from_utf8_unchecked(msg_cstr.to_bytes())
     };

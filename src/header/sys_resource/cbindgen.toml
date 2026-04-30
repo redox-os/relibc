@@ -1,6 +1,7 @@
 sys_includes = ["sys/types.h", "stdint.h", "sys/time.h"]
-include_guard = "_SYS_RESOURCE_H"
-trailer = """
+include_guard = "_RELIBC_SYS_RESOURCE_H"
+after_includes = """
+
 #define RUSAGE_SELF 0
 #define RUSAGE_CHILDREN (-1)
 #define RUSAGE_BOTH (-2)

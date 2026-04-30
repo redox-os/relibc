@@ -5,7 +5,7 @@
 #
 # bits/iovec.h brings in sys/types.h
 sys_includes = ["bits/iovec.h"]
-include_guard = "_SYS_UIO_H"
+include_guard = "_RELIBC_SYS_UIO_H"
 language = "C"
 style = "Tag"
 no_includes = true

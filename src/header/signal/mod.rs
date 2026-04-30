@@ -8,7 +8,7 @@ use cbitset::BitSet;
 
 use crate::{
     error::{Errno, ResultExt},
-    header::{bits_timespec::timespec, errno, setjmp},
+    header::{bits_sigset_t::sigset_t, bits_timespec::timespec, errno, setjmp},
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{
@@ -102,8 +102,6 @@ pub union sigval {
     pub sival_ptr: *mut c_void,
 }
 
-/// cbindgen:ignore
-pub type sigset_t = c_ulonglong;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 /// cbindgen:ignore
 pub type siginfo_t = siginfo;
@@ -112,13 +110,13 @@ pub type siginfo_t = siginfo;
 pub type stack_t = sigaltstack;
 
 unsafe extern "C" {
-    pub fn sigsetjmp(jb: *mut u64, savemask: i32) -> i32;
+    pub fn sigsetjmp(jb: *mut c_ulonglong, savemask: c_int) -> c_int;
 }
 
 //NOTE for the following two functions, to see why they're implemented slightly differently from their intended behavior, read
 //     https://git.musl-libc.org/cgit/musl/commit/?id=583e55122e767b1586286a0d9c35e2a4027998ab
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __sigsetjmp_tail(jb: *mut u64, ret: i32) -> i32 {
+unsafe extern "C" fn __sigsetjmp_tail(jb: *mut c_ulonglong, ret: c_int) -> c_int {
     let set = jb.wrapping_add(9);
     if ret > 0 {
         unsafe { sigprocmask(SIG_SETMASK, set, ptr::null_mut()) };
@@ -129,7 +127,7 @@ unsafe extern "C" fn __sigsetjmp_tail(jb: *mut u64, ret: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn siglongjmp(jb: *mut u64, ret: i32) {
+pub unsafe extern "C" fn siglongjmp(jb: *mut c_ulonglong, ret: c_int) {
     unsafe { setjmp::longjmp(jb, ret) };
 }
 
@@ -292,6 +290,7 @@ pub extern "C" fn sigignore(sig: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/siginterrupt.html>.
 ///
 /// Marked obsolescent in issue 7. Removed in issue 8.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();

@@ -38,12 +38,12 @@ pub struct timeval {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 pub const FD_SETSIZE: usize = 1024;
-type bitset = BitSet<[u64; FD_SETSIZE / (8 * mem::size_of::<u64>())]>;
+type FdBitSet = BitSet<[u64; FD_SETSIZE / (8 * mem::size_of::<u64>())]>;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 #[repr(C)]
 pub struct fd_set {
-    pub fds_bits: bitset,
+    pub fds_bits: FdBitSet,
 }
 
 #[allow(clippy::needless_update)]
@@ -67,9 +67,9 @@ pub fn select_epoll(
         File::new(epfd)
     };
 
-    let mut read_bitset: Option<&mut bitset> = readfds.map(|fd_set| &mut fd_set.fds_bits);
-    let mut write_bitset: Option<&mut bitset> = writefds.map(|fd_set| &mut fd_set.fds_bits);
-    let mut except_bitset: Option<&mut bitset> = exceptfds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut read_bitset: Option<&mut FdBitSet> = readfds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut write_bitset: Option<&mut FdBitSet> = writefds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut except_bitset: Option<&mut FdBitSet> = exceptfds.map(|fd_set| &mut fd_set.fds_bits);
 
     // Keep track of the number of file descriptors that do not support epoll
     let mut not_epoll = 0;

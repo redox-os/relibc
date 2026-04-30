@@ -2,18 +2,21 @@ use super::super::{
     Pal,
     types::{c_int, c_uint, pid_t},
 };
+#[allow(deprecated)]
+use crate::header::sys_time::itimerval;
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_sigset_t::sigset_t,
         bits_timespec::timespec,
-        signal::{sigaction, siginfo_t, sigset_t, sigval, stack_t},
-        sys_time::itimerval,
+        signal::{sigaction, siginfo_t, sigval, stack_t},
     },
 };
 
 /// Platform abstraction of signal-related functionality.
 pub trait PalSignal: Pal {
     /// Platform implementation of [`getitimer()`](crate::header::sys_time::getitimer) from [`sys/time.h`](crate::header::sys_time).
+    #[allow(deprecated)]
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()>;
 
     /// Platform implementation of [`kill()`](crate::header::signal::kill) from [`signal.h`](crate::header::signal).
@@ -29,6 +32,7 @@ pub trait PalSignal: Pal {
     fn raise(sig: c_int) -> Result<()>;
 
     /// Platform implementation of [`setitimer()`](crate::header::sys_time::setitimer) from [`sys/time.h`](crate::header::sys_time).
+    #[allow(deprecated)]
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()>;
 
     /// Platform implementation of [`alarm()`](crate::header::unistd::alarm) from [`unistd.h`](crate::header::unistd).

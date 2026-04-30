@@ -17,7 +17,7 @@ use core::{
 };
 
 use crate::{
-    c_str::CStr,
+    c_str::{CStr, Thin},
     c_vec::CVec,
     error::{ResultExt, ResultExtPtrMut},
     fs::File,
@@ -36,6 +36,7 @@ use crate::{
         types::{c_char, c_int, c_long, c_uint, c_ulonglong, c_void, off_t, size_t},
     },
 };
+use reader::Reader;
 
 pub use self::constants::*;
 mod constants;
@@ -48,10 +49,9 @@ mod getdelim;
 
 mod ext;
 mod helpers;
-mod lookaheadreader;
 pub mod printf;
-mod scanf;
-use lookaheadreader::LookAheadReader;
+pub mod reader;
+pub mod scanf;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
@@ -315,6 +315,7 @@ pub unsafe extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
 ///
 /// Marked legacy in SUS Version 2.
 // #[unsafe(no_mangle)]
+#[deprecated]
 pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
     let mut buf: Vec<c_char> = vec![0; 256];
     let mut pwd: pwd::passwd = unsafe { mem::zeroed() };
@@ -894,6 +895,7 @@ pub unsafe extern "C" fn getchar_unlocked() -> c_int {
 /// `fgets` is recommended instead, which is what this implementation calls.
 ///
 /// Get a string from `stdin`
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gets(s: *mut c_char) -> *mut c_char {
     unsafe { fgets(s, c_int::MAX, &raw mut *stdin) }
@@ -904,6 +906,7 @@ pub unsafe extern "C" fn gets(s: *mut c_char) -> *mut c_char {
 /// Was marked legacy and removed in issue 6.
 ///
 /// Get an integer from `stream`
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getw(stream: *mut FILE) -> c_int {
     let mut ret: c_int = 0;
@@ -1125,6 +1128,7 @@ pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
 /// Marked legacy in SUS Version 2.
 ///
 /// Put an integer `w` into `stream`
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn putw(w: c_int, stream: *mut FILE) -> c_int {
     (unsafe {
@@ -1258,6 +1262,7 @@ pub unsafe extern "C" fn setvbuf(
 /// See <https://pubs.opengroup.org/onlinepubs/009604599/functions/tempnam.html>.
 ///
 /// Marked obsolescent in issue 7.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut c_char {
     unsafe fn is_appropriate(pos_dir: *const c_char) -> bool {
@@ -1294,7 +1299,12 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
         };
 
         // use the same mechanism as tmpnam to get the file name
-        if unsafe { tmpnam_inner(out_buf, dirname_len + 1 + prefix_len) }.is_null() {
+        if unsafe {
+            #[allow(deprecated)]
+            tmpnam_inner(out_buf, dirname_len + 1 + prefix_len)
+        }
+        .is_null()
+        {
             // failed to find a valid file name, so we need to free the buffer
             unsafe { platform::free(out_buf.cast()) };
             out_buf = ptr::null_mut();
@@ -1331,6 +1341,7 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tmpnam.html>.
 ///
 /// Marked obsolescent in issue 7.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
     let buf = if s.is_null() {
@@ -1340,9 +1351,13 @@ pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
     };
 
     unsafe { *buf = b'/' as _ };
-    unsafe { tmpnam_inner(buf, 1) }
+    unsafe {
+        #[allow(deprecated)]
+        tmpnam_inner(buf, 1)
+    }
 }
 
+#[deprecated]
 unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_char {
     const TEMPLATE: &[u8] = b"XXXXXX\0";
 
@@ -1352,7 +1367,10 @@ unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_cha
     };
 
     let err = platform::ERRNO.get();
-    unsafe { stdlib::mktemp(buf) };
+    unsafe {
+        #[allow(deprecated)]
+        stdlib::mktemp(buf)
+    };
     platform::ERRNO.set(err);
 
     if unsafe { *buf } == 0 {
@@ -1523,8 +1541,11 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
     }
 
     let f: &mut FILE = &mut file;
-    let reader: LookAheadReader = f.into();
-    unsafe { scanf::scanf(reader, format, ap) }
+    let reader: Reader<Thin> = f.into();
+    unsafe {
+        let format = CStr::from_ptr(format);
+        scanf::scanf(reader, format.into(), ap)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
@@ -1552,8 +1573,11 @@ pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_in
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfscanf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    let reader = (s.cast::<u8>()).into();
-    unsafe { scanf::scanf(reader, format, ap) }
+    unsafe {
+        let format = CStr::from_ptr(format);
+        let s = CStr::from_ptr(s);
+        scanf::scanf(s.into(), format.into(), ap)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
@@ -1563,8 +1587,11 @@ pub unsafe extern "C" fn sscanf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    let reader = (s.cast::<u8>()).into();
-    unsafe { scanf::scanf(reader, format, __valist.as_va_list()) }
+    unsafe {
+        let format = CStr::from_ptr(format);
+        let s = CStr::from_ptr(s);
+        scanf::scanf(s.into(), format.into(), __valist.as_va_list())
+    }
 }
 
 pub unsafe fn flush_io_streams() {

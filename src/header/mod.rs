@@ -9,11 +9,15 @@ pub mod bits_iovec;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
 pub mod bits_pthread;
+#[path = "bits_safamily-t/mod.rs"]
+pub mod bits_safamily_t;
+#[path = "bits_sigset-t/mod.rs"]
+pub mod bits_sigset_t;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
 pub mod bits_timespec;
 // complex.h implemented in C
-// cpio.h implemented in C
+pub mod cpio;
 pub mod crypt;
 pub mod ctype;
 // TODO: curses.h (deprecated)
@@ -44,8 +48,9 @@ pub mod libgen;
 pub mod limits;
 pub mod locale;
 pub mod malloc;
-// pub mod math; // TODO unfinished, uncomment when ready to export
-// math.h implemented in C // TODO replace openlibm with rust libm as above
+// TODO unfinished, unguard feature when ready
+#[cfg(feature = "math_libm")]
+pub mod math;
 pub mod monetary;
 // TODO: mqueue.h
 // TODO: ndbm.h
@@ -99,6 +104,8 @@ pub mod sys_select;
 pub mod sys_socket;
 pub mod sys_stat;
 pub mod sys_statvfs;
+#[allow(non_upper_case_globals)]
+pub mod sys_syscall;
 pub mod sys_time;
 #[deprecated]
 pub mod sys_timeb;
@@ -111,6 +118,8 @@ pub mod sys_procfs;
 pub mod sys_random;
 pub mod sys_syslog;
 pub mod sys_types;
+#[allow(non_camel_case_types)]
+pub mod sys_types_internal;
 pub mod sys_uio;
 pub mod sys_un;
 pub mod sys_utsname;

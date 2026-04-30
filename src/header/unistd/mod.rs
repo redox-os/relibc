@@ -9,14 +9,18 @@ use core::{
     ptr, slice,
 };
 
+#[allow(deprecated)]
+use crate::platform::types::useconds_t;
 use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
     header::{
+        bits_sigset_t::sigset_t,
         bits_timespec::timespec,
         crypt::{crypt_data, crypt_r},
         errno::{self, ENAMETOOLONG},
         fcntl, limits,
+        signal::{sigprocmask, sigsuspend},
         stdlib::getenv,
         sys_ioctl, sys_resource,
         sys_select::timeval,
@@ -27,33 +31,33 @@ use crate::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{
             c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
-            size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
+            size_t, ssize_t, suseconds_t, time_t, uid_t,
         },
     },
 };
 
-pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
+pub use self::{brk::*, getopt::*, pathconf::*, sysconf::*};
 pub use crate::header::pthread::fork_hooks;
 
 // Inclusion of ctermid() prototype marked as obsolescent since Issue 7, cf.
 // <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/unistd.h.html>.
 // cuserid() marked legacy in Issue 5.
-pub use crate::header::stdio::{ctermid, cuserid};
-
-// TODO: implement and reexport fcntl functions:
-//pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
+#[deprecated]
+pub use crate::header::stdio::ctermid;
+#[allow(deprecated)]
+pub use crate::header::stdio::cuserid;
 
 use super::{
     errno::{E2BIG, EINVAL, ENOMEM},
     stdio::snprintf,
 };
 
-use crate::header::signal::{sigprocmask, sigset_t, sigsuspend};
-
 mod brk;
 mod getopt;
 mod getpass;
 mod pathconf;
+#[cfg(target_os = "linux")]
+pub mod syscall;
 mod sysconf;
 
 pub const F_OK: c_int = 0;
@@ -132,6 +136,20 @@ pub extern "C" fn _exit(status: c_int) -> ! {
 pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
     Sys::access(path, mode).map(|()| 0).or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/faccessat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn faccessat(
+    fd: c_int,
+    path: *const c_char,
+    mode: c_int,
+    flags: c_int,
+) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::faccessat(fd, path, mode, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
@@ -330,7 +348,7 @@ pub unsafe extern "C" fn execve(
         .or_minus_one_errno()
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fexecve.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fexecve(
     fd: c_int,
@@ -393,6 +411,20 @@ pub extern "C" fn fchdir(fildes: c_int) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
     Sys::fchown(fildes, owner, group)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchownat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fchownat(
+    fd: c_int,
+    path: *const c_char,
+    owner: uid_t,
+    group: gid_t,
+    flags: c_int,
+) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::fchownat(fd, path, owner, group, flags)
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -575,7 +607,7 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getlogin.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getlogin() -> *mut c_char {
-    const LOGIN_LEN: usize = 256;
+    const LOGIN_LEN: usize = limits::LOGIN_NAME_MAX as usize;
     static mut LOGIN: [c_char; LOGIN_LEN] = [0; LOGIN_LEN];
     if getlogin_r((&raw mut LOGIN).cast(), LOGIN_LEN) == 0 {
         (&raw mut LOGIN).cast()
@@ -703,6 +735,22 @@ pub unsafe extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_i
     let path1 = unsafe { CStr::from_ptr(path1) };
     let path2 = unsafe { CStr::from_ptr(path2) };
     Sys::link(path1, path2).map(|()| 0).or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/linkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn linkat(
+    fd1: c_int,
+    path1: *const c_char,
+    fd2: c_int,
+    path2: *const c_char,
+    flags: c_int,
+) -> c_int {
+    let path1 = unsafe { CStr::from_ptr(path1) };
+    let path2 = unsafe { CStr::from_ptr(path2) };
+    Sys::linkat(fd1, path1, fd2, path2, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lockf.html>.
@@ -853,7 +901,7 @@ pub unsafe extern "C" fn readlink(
         .or_minus_one_errno()
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readlink.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readlinkat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn readlinkat(
     dirfd: c_int,
@@ -895,16 +943,6 @@ pub extern "C" fn seteuid(uid: uid_t) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
     Sys::setresgid(gid, gid, -1)
-        .map(|()| 0)
-        .or_minus_one_errno()
-}
-
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/setgroups.2.html>.
-///
-/// TODO: specified in `grp.h`?
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
-    unsafe { Sys::setgroups(size, list) }
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -1018,6 +1056,16 @@ pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> 
     Sys::symlink(path1, path2).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/symlinkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn symlinkat(path1: *const c_char, fd: c_int, path2: *const c_char) -> c_int {
+    let path1 = unsafe { CStr::from_ptr(path1) };
+    let path2 = unsafe { CStr::from_ptr(path2) };
+    Sys::symlinkat(path1, fd, path2)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sync.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn sync() {
@@ -1097,6 +1145,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 /// The `ualarm()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 6, and removed in Issue 7.
 #[deprecated]
+#[allow(deprecated)]
 #[unsafe(no_mangle)]
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
     // TODO setitimer is unimplemented on Redox and obsolete
@@ -1131,12 +1180,21 @@ pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
     Sys::unlink(path).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/unlinkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn unlinkat(fd: c_int, path: *const c_char, flags: c_int) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::unlinkat(fd, path, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/usleep.html>.
 ///
 /// # Deprecation
 /// The `usleep()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 6, and removed in Issue 7.
 #[deprecated]
+#[allow(deprecated)]
 #[unsafe(no_mangle)]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     #[cfg(not(target_arch = "x86"))]

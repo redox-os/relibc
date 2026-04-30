@@ -2,17 +2,18 @@ use super::{
     super::{Pal, PalSignal, types::*},
     Sys,
 };
+#[allow(deprecated)]
+use crate::header::sys_time::{ITIMER_REAL, itimerval};
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_sigset_t::sigset_t,
         bits_timespec::timespec,
         errno::{EINVAL, ENOSYS},
         signal::{
             SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGALRM, SIGEV_SIGNAL,
-            SS_DISABLE, SS_ONSTACK, sigaction, sigevent, siginfo_t, sigset_t, sigval, stack_t,
-            ucontext_t,
+            SS_DISABLE, SS_ONSTACK, sigaction, sigevent, siginfo_t, sigval, stack_t, ucontext_t,
         },
-        sys_time::{ITIMER_REAL, itimerval},
         time::{itimerspec, timer_internal_t},
     },
     out::Out,
@@ -58,6 +59,7 @@ const _: () = {
 };
 
 impl PalSignal for Sys {
+    #[allow(deprecated)]
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
         let path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
@@ -100,6 +102,7 @@ impl PalSignal for Sys {
         unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
+    #[allow(deprecated)]
     fn setitimer(which: c_int, _new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
         // TODO: setitimer is no longer part of POSIX and should not be implemented in Redox
         // Change the platform-independent implementation to use POSIX timers.
