@@ -1275,8 +1275,7 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
         [tmpdir, dir, P_tmpdir.as_ptr().cast()]
             .iter()
             .copied()
-            .skip_while(|&d| !unsafe { is_appropriate(d) })
-            .next()
+            .find(|&d| unsafe { is_appropriate(d) })
             .unwrap_or(c"/tmp".as_ptr().cast())
     };
     let dirname_len = unsafe { string::strlen(dirname) };

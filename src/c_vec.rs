@@ -200,7 +200,7 @@ impl<'a, T> IntoIterator for &'a CVec<T> {
     type Item = <&'a [T] as IntoIterator>::Item;
     type IntoIter = <&'a [T] as IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
-        <&[T]>::into_iter(&*self)
+        <&[T]>::into_iter(self)
     }
 }
 impl<'a, T> IntoIterator for &'a mut CVec<T> {

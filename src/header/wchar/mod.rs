@@ -1040,7 +1040,7 @@ pub unsafe extern "C" fn vfwscanf(
 
     unsafe {
         let format = WStr::from_ptr(format);
-        wscanf::scanf(reader, format.into(), __valist)
+        wscanf::scanf(reader, format, __valist)
     }
 }
 
