@@ -164,7 +164,7 @@ impl Pal for Sys {
         unsafe {
             syscall!(EXIT, status);
         }
-        loop {}
+        unreachable!();
     }
     unsafe fn exit_thread(_stack_base: *mut (), _stack_size: usize) -> ! {
         // TODO

@@ -59,7 +59,7 @@ impl Dns {
     }
 
     pub fn parse(data: &[u8]) -> Result<Self, String> {
-        let name_ind = 0b1100_0000;
+        let name_ind = 0b1100_0000u8;
         let mut i = 0;
 
         macro_rules! pop_u8 {
@@ -106,7 +106,7 @@ impl Dns {
                     let name_len = pop_u8!();
                     if name_len & name_ind == name_ind {
                         i -= 1;
-                        i = (pop_n16!() - ((name_ind as u16) << 8)) as usize;
+                        i = (pop_n16!() - ((u16::from(name_ind)) << 8)) as usize;
                         continue;
                     }
                     if name_len == 0 {
