@@ -203,7 +203,7 @@ pub unsafe extern "C" fn ppoll(
         -1
     } else {
         let tmo = unsafe { &*tmo_p };
-        if tmo.tv_sec > (c_int::MAX / 1000) as _ {
+        if tmo.tv_sec > (c_int::MAX / 1000).into() {
             c_int::MAX
         } else {
             ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)

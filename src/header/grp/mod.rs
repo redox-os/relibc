@@ -449,7 +449,7 @@ pub unsafe extern "C" fn getgrent() -> *mut group {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endgrent() {
     unsafe {
-        *(&mut *LINE_READER.get()) = None;
+        *LINE_READER.get() = None;
     }
 }
 

@@ -1261,7 +1261,7 @@ unsafe fn with_argv(
     // NULL
     unsafe { va.arg::<*const c_char>() };
 
-    f(unsafe { (&*out).assume_init_ref() }, va);
+    f(unsafe { out.assume_init_ref() }, va);
 
     // f only returns if it fails
     if argc >= 32 {
