@@ -1,5 +1,12 @@
 sys_includes = []
 include_guard = "_RELIBC_FMTMSG_H"
+after_includes = """
+
+#define MM_NULLLBL ((char*)0)
+#define MM_NULLTXT ((char*)0)
+#define MM_NULLACT ((char*)0)
+#define MM_NULLTAG ((char*)0)
+"""
 language = "C"
 style = "Tag"
 no_includes = true
