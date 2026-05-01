@@ -485,6 +485,14 @@ pub(super) fn openat2_path(dirfd: c_int, path: &str, at_flags: c_int) -> Result<
     }
 }
 
+fn at_flags_to_open_flags(at_flags: c_int) -> c_int {
+    let mut out: c_int = 0;
+    if at_flags & fcntl::AT_SYMLINK_NOFOLLOW == fcntl::AT_SYMLINK_NOFOLLOW {
+        out |= fcntl::O_NOFOLLOW;
+    }
+    out
+}
+
 /// Canonicalize and open `path` with respect to `dirfd`.
 ///
 /// This unexported openat2 is similar to the Linux syscall but with a different interface. The
@@ -512,11 +520,7 @@ pub(super) fn openat2(
     oflags: c_int,
 ) -> Result<File, Errno> {
     // Translate at flags into open flags; openat will do this on its own most likely.
-    let oflags = if at_flags & fcntl::AT_SYMLINK_NOFOLLOW == fcntl::AT_SYMLINK_NOFOLLOW {
-        fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW | fcntl::O_PATH | fcntl::O_SYMLINK | oflags
-    } else {
-        fcntl::O_CLOEXEC | oflags
-    };
+    let oflags = at_flags_to_open_flags(at_flags) | fcntl::O_CLOEXEC | oflags;
     let c_path = CString::new(path).map_err(|_| Errno(EINVAL))?;
     File::openat(dirfd, c_path.as_c_str().into(), oflags)
 }
