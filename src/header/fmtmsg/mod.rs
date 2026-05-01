@@ -7,7 +7,7 @@
 
 use crate::{
     header::{
-        fcntl::open,
+        fcntl::{O_WRONLY, open},
         pthread::{PTHREAD_CANCEL_DISABLE, pthread_setcancelstate},
         stdio::dprintf,
         stdlib::getenv,
@@ -16,28 +16,60 @@ use crate::{
     },
     platform::types::{c_char, c_int, c_long},
 };
-pub const MM_NULLSEV: c_int = 0;
-pub const MM_HALT: c_int = 1;
-pub const MM_ERROR: c_int = 2;
-pub const MM_WARNING: c_int = 3;
-pub const MM_INFO: c_int = 4;
-pub const MM_NOMSG: c_int = 1;
-pub const MM_NOTOK: c_int = -1;
-// c_long because classification is a c_long
-pub const MM_PRINT: c_long = 256;
-// c_long because classification is a c_long
-pub const MM_CONSOLE: c_long = 512;
-pub const MM_NOCON: c_int = 4;
-#[cfg(target_os = "linux")]
-pub const O_WRONLY: c_int = 0x0001;
-#[cfg(target_os = "redox")]
-//Take from `src/header/fcntl/redox.rs`
-pub const O_WRONLY: c_int = 0x0002_0000;
 
-/*
- * If lstr is the first part of bstr, check that the next char in bstr
- * is either \0 or ':'
- */
+// constant values below taken from musl
+
+/// Source of the condition is hardware.
+pub const MM_HARD: c_int = 1;
+/// Source of the condition is software.
+pub const MM_SOFT: c_int = 2;
+/// Source of the condition is firmware.
+pub const MM_FIRM: c_int = 4;
+
+/// Condition detected by application.
+pub const MM_APPL: c_int = 8;
+/// Condition detected by utility.
+pub const MM_UTIL: c_int = 16;
+/// Condition detected by operating system.
+pub const MM_OPSYS: c_int = 32;
+
+/// Recoverable error.
+pub const MM_RECOVER: c_int = 64;
+/// Non-recoverable error.
+pub const MM_NRECOV: c_int = 128;
+
+/// Display message on standard error.
+pub const MM_PRINT: c_long = 256;
+/// Display message on system console.
+pub const MM_CONSOLE: c_long = 512;
+
+/// Class argument.
+pub const MM_NULLMC: c_long = 0;
+
+/// Error causing application to halt.
+pub const MM_HALT: c_int = 1;
+/// Application has encountered a non-fatal fault.
+pub const MM_ERROR: c_int = 2;
+/// Application has detected unusual non-error condition.
+pub const MM_WARNING: c_int = 3;
+/// Informative message.
+pub const MM_INFO: c_int = 4;
+/// No severity level provided for the message.
+pub const MM_NOSEV: c_int = 0;
+
+/// The function succeeded.
+pub const MM_OK: c_int = 0;
+/// The function failed completely.
+pub const MM_NOTOK: c_int = -1;
+/// The function was unable to generate a message on standard error, but otherwise succeeded.
+pub const MM_NOMSG: c_int = 1;
+/// The function was unable to generate a console message, but otherwise succeeded.
+pub const MM_NOCON: c_int = 4;
+
+/// Severity argument.
+pub const MM_NULLSEV: c_int = 0;
+
+/// If lstr is the first part of bstr, check that the next char in bstr is either \0 or ':'
 unsafe fn strcolcmp(mut lstr: *const c_char, mut bstr: *const c_char) -> c_int {
     unsafe {
         // We already know lstr and bstr are non-null
@@ -52,6 +84,7 @@ unsafe fn strcolcmp(mut lstr: *const c_char, mut bstr: *const c_char) -> c_int {
         }
     }
 }
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fmtmsg.h.html>
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fmtmsg(
