@@ -9,7 +9,7 @@ use crate::{
     header::bits_sigset_t::sigset_t,
     platform::{
         PalEpoll, Sys,
-        types::{c_int, c_void},
+        types::{c_int, c_uint, c_ulonglong, c_void},
     },
 };
 
@@ -33,8 +33,8 @@ pub const EPOLL_CTL_MOD: c_int = 3;
 pub union epoll_data {
     pub ptr: *mut c_void,
     pub fd: c_int,
-    pub u32: u32,
-    pub u64: u64,
+    pub u32: c_uint,
+    pub u64: c_ulonglong,
 }
 impl Default for epoll_data {
     fn default() -> Self {
@@ -50,11 +50,11 @@ impl Default for epoll_data {
 // systems) on redox. The `Default` trait is here so we don't need to
 // worry about the padding when using this type.
 pub struct epoll_event {
-    pub events: u32, // 4 bytes
+    pub events: c_uint, // 4 bytes
     // 4 automatic alignment bytes
     pub data: epoll_data, // 8 bytes
 
-    pub _pad: u64, // 8 bytes
+    pub _pad: c_ulonglong, // 8 bytes
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
@@ -62,7 +62,7 @@ pub struct epoll_event {
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct epoll_event {
-    pub events: u32,
+    pub events: c_uint,
     pub data: epoll_data,
 }
 
