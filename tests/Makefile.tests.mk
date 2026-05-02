@@ -75,6 +75,7 @@ EXPECT_NAMES=\
 	sigaction \
 	sigaltstack \
 	signal \
+	sigsetjmp \
 	stdio/all \
 	stdio/buffer \
 	stdio/dprintf \
@@ -161,6 +162,7 @@ EXPECT_NAMES=\
 	time/tzset \
 	unistd/access \
 	unistd/alarm \
+	unistd/alarm_fn \
 	unistd/constants \
 	unistd/confstr \
 	unistd/dup \
