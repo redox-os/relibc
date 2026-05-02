@@ -1392,6 +1392,11 @@ impl Pal for Sys {
             Self::timer_gettime(timerid, ovalue)?;
         }
 
+        if value.it_value.is_zero() {
+            timer_st.next_wake_version += 1;
+            return Ok(());
+        }
+
         timer_st.next_wake_time = {
             let mut val = value.clone();
             if flags & TIMER_ABSTIME == 0 {

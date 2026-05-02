@@ -64,6 +64,7 @@ pub(crate) struct timer_internal_t {
     pub process_pid: platform::types::pid_t,
 }
 
+#[cfg(target_os = "redox")]
 impl timer_internal_t {
     pub unsafe fn from_raw(timerid: timer_t) -> &'static Mutex<Self> {
         unsafe { &*(timerid as *const Mutex<Self>) }
