@@ -55,11 +55,19 @@ pub(crate) struct timer_internal_t {
     pub evp: sigevent,
     pub thread: platform::types::pthread_t,
     pub caller_thread: crate::pthread::OsTid,
-    // relibc handles it_interval, not the kernel
+    /// relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
+    /// kernel does not support unregistering timer
+    pub next_wake_version: usize,
     // When non-zero, timer_routine delivers SIGALRM via kill(process_pid, sig)
     // instead of rlct_kill (thread-specific). Used by alarm().
     pub process_pid: platform::types::pid_t,
+}
+
+impl timer_internal_t {
+    pub unsafe fn from_raw(timerid: timer_t) -> &'static Mutex<Self> {
+        unsafe { &*(timerid as *const Mutex<Self>) }
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.

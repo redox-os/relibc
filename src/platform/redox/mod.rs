@@ -2,6 +2,7 @@ use core::{
     convert::TryFrom,
     mem::{self, size_of},
     num::NonZeroU64,
+    ops::DerefMut,
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
@@ -56,7 +57,7 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
     platform::sys::timer::{timer_routine, timer_update_wake_time},
-    sync::rwlock::RwLock,
+    sync::{Mutex, rwlock::RwLock},
 };
 
 pub use redox_rt::proc::FdGuard;
@@ -1308,15 +1309,15 @@ impl Pal for Sys {
         let timer_buf = unsafe {
             let timer_buf = Self::mmap(
                 ptr::null_mut(),
-                size_of::<timer_internal_t>(),
+                size_of::<Mutex<timer_internal_t>>(),
                 PROT_READ | PROT_WRITE,
                 MAP_ANONYMOUS,
                 0,
                 0,
             )?;
 
-            let timer_ptr = timer_buf as *mut timer_internal_t;
-            let timer_st = &mut *timer_ptr;
+            let timer_ptr = timer_internal_t::from_raw(timer_buf);
+            let mut timer_st = timer_ptr.lock();
 
             timer_st.clockid = clock_id;
             timer_st.timerfd = timerfd.take();
@@ -1326,6 +1327,9 @@ impl Pal for Sys {
             timer_st.thread = ptr::null_mut();
             timer_st.caller_thread = caller_thread;
             timer_st.process_pid = 0;
+            timer_st.next_wake_version = 0;
+            drop(timer_st);
+
             timer_buf
         };
 
@@ -1336,38 +1340,39 @@ impl Pal for Sys {
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
         unsafe {
-            let timer_st = &mut *(timerid as *mut timer_internal_t);
+            let timer_ptr = timer_internal_t::from_raw(timerid);
+            let timer_st = timer_ptr.lock();
             let _ = syscall::close(timer_st.timerfd);
             let _ = syscall::close(timer_st.eventfd);
             if !timer_st.thread.is_null() {
                 let _ = pthread_cancel(timer_st.thread);
             }
-            Self::munmap(timerid, size_of::<timer_internal_t>())?;
+            drop(timer_st);
+            Self::munmap(timerid, size_of::<Mutex<timer_internal_t>>())?;
         }
 
         Ok(())
     }
 
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
-        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+        let timer_ptr = unsafe { timer_internal_t::from_raw(timerid) };
+        let mut timer_st = timer_ptr.lock();
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
-
         if timer_st.evp.sigev_notify == SIGEV_NONE {
             if timespec::subtract(&timer_st.next_wake_time.it_value, &now).is_none() {
                 // error here means the timer is disarmed
-                let _ = timer_update_wake_time(timer_st);
+                let _ = timer_update_wake_time(timer_st.deref_mut());
             }
         }
-
-        value.write(if timer_st.next_wake_time.it_value.is_default() {
+        let remaining = &timer_st.next_wake_time.it_value;
+        value.write(if remaining.is_zero() {
             // disarmed
             itimerspec::default()
         } else {
             itimerspec {
                 it_interval: timer_st.next_wake_time.it_interval.clone(),
-                it_value: timespec::subtract(&timer_st.next_wake_time.it_value, &now)
-                    .unwrap_or_default(),
+                it_value: timespec::subtract(remaining, &now).unwrap_or_default(),
             }
         });
 
@@ -1380,13 +1385,13 @@ impl Pal for Sys {
         value: &itimerspec,
         ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
-        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+        let timer_ptr = unsafe { timer_internal_t::from_raw(timerid) };
+        let mut timer_st = timer_ptr.lock();
 
         if let Some(ovalue) = ovalue {
             Self::timer_gettime(timerid, ovalue)?;
         }
 
-        //FIXME: make these atomic?
         timer_st.next_wake_time = {
             let mut val = value.clone();
             if flags & TIMER_ABSTIME == 0 {

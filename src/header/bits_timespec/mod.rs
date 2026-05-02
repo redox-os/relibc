@@ -55,7 +55,7 @@ impl timespec {
 
         Some(time)
     }
-    pub fn is_default(&self) -> bool {
+    pub fn is_zero(&self) -> bool {
         self.tv_nsec == 0 && self.tv_sec == 0
     }
 }

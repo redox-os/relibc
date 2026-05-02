@@ -13,17 +13,22 @@ use crate::{
 };
 use core::{
     mem::{MaybeUninit, size_of},
+    ops::DerefMut,
     ptr,
 };
 
 pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
-    let timer_st = unsafe { &mut *(arg as *mut timer_internal_t) };
-
+    let timer_ptr = unsafe { timer_internal_t::from_raw(arg) };
+    let (mut timer_version, eventfd) = {
+        let timer_st = timer_ptr.lock();
+        (timer_st.next_wake_version, timer_st.eventfd)
+    };
     loop {
         let mut buf = MaybeUninit::uninit();
         let res = Error::demux(unsafe {
+            // this blocks the thread
             event::redox_event_queue_get_events_v1(
-                timer_st.eventfd,
+                eventfd,
                 buf.as_mut_ptr(),
                 1,
                 0,
@@ -37,32 +42,38 @@ pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
             break;
         }
 
-        if timer_st.evp.sigev_notify == SIGEV_THREAD {
-            if let Some(fun) = timer_st.evp.sigev_notify_function {
-                fun(timer_st.evp.sigev_value);
-            }
-        } else if timer_st.evp.sigev_notify == SIGEV_SIGNAL {
-            // TODO: This will deliver signal to process, which is required for alarm()
-            //       Until it can bypass the exec() boundary, do not uncomment this code
-            // if timer_st.process_pid != 0 && Sys::kill(timer_st.process_pid, timer_st.evp.sigev_signo).is_err() { break; } else
-            if unsafe { Sys::rlct_kill(timer_st.caller_thread, timer_st.evp.sigev_signo as _) }
-                .is_err()
-            {
-                break;
+        let mut timer_st = timer_ptr.lock();
+        if timer_version == timer_st.next_wake_version {
+            if timer_st.evp.sigev_notify == SIGEV_THREAD {
+                if let Some(fun) = timer_st.evp.sigev_notify_function {
+                    fun(timer_st.evp.sigev_value);
+                }
+            } else if timer_st.evp.sigev_notify == SIGEV_SIGNAL {
+                // TODO: This will deliver signal to process, which is required for alarm()
+                //       Until it can bypass the exec() boundary, do not uncomment this code
+                // if timer_st.process_pid != 0 && Sys::kill(timer_st.process_pid, timer_st.evp.sigev_signo).is_err() { break; } else
+                if unsafe { Sys::rlct_kill(timer_st.caller_thread, timer_st.evp.sigev_signo as _) }
+                    .is_err()
+                {
+                    break;
+                }
             }
         }
 
-        if timer_next_event(timer_st).is_err() {
+        if timer_next_event(timer_st.deref_mut()).is_err() {
             break;
         }
+        timer_version = timer_st.next_wake_version;
     }
-
-    timer_st.thread = ptr::null_mut();
     ptr::null_mut()
 }
 
+// Internal function only valid for inside timer_routine
 fn timer_next_event(timer_st: &mut timer_internal_t) -> Result<()> {
-    timer_update_wake_time(timer_st)?;
+    if let Err(e) = timer_update_wake_time(timer_st) {
+        timer_st.thread = ptr::null_mut();
+        return Err(e);
+    }
     let buf_to_write = unsafe {
         Error::demux(event::redox_event_queue_ctl_v1(
             timer_st.eventfd,
@@ -80,21 +91,19 @@ fn timer_next_event(timer_st: &mut timer_internal_t) -> Result<()> {
     Ok(())
 }
 
+/// Update next_wake_time.it_value from next_wake_time.it_interval
 pub(crate) fn timer_update_wake_time(timer_st: &mut timer_internal_t) -> Result<()> {
-    timer_st.next_wake_time.it_value = if timer_st.next_wake_time.it_interval.is_default() {
+    let interval = &timer_st.next_wake_time.it_interval;
+    timer_st.next_wake_time.it_value = if interval.is_zero() {
         timespec::default()
     } else {
         let mut now = timespec::default();
         Sys::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
-        let next_time = match timespec::add(&now, &timer_st.next_wake_time.it_interval) {
-            Some(a) => a,
-            None => timespec::default(),
-        };
-
-        next_time
+        timespec::add(&now, interval).unwrap_or_default()
     };
-    if timer_st.next_wake_time.it_value.is_default() {
+    if timer_st.next_wake_time.it_value.is_zero() {
         return Err(Errno(0));
     }
+    timer_st.next_wake_version += 1;
     Ok(())
 }
