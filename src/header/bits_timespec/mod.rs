@@ -16,7 +16,7 @@ impl timespec {
 
     /// similar logic with timeradd
     #[allow(clippy::should_implement_trait)] // not to confuse std::ops::Add
-    pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
+    pub fn add(base: &timespec, interval: &timespec) -> Option<timespec> {
         let delta_sec = base.tv_sec.checked_add(interval.tv_sec)?;
         let delta_nsec = base.tv_nsec.checked_add(interval.tv_nsec)?;
 
@@ -30,7 +30,7 @@ impl timespec {
         })
     }
     /// similar logic with timersub
-    pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
+    pub fn subtract(later: &timespec, earlier: &timespec) -> Option<timespec> {
         let delta_sec = later.tv_sec.checked_sub(earlier.tv_sec)?;
         let delta_nsec = later.tv_nsec.checked_sub(earlier.tv_nsec)?;
 

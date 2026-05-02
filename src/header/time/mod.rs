@@ -882,15 +882,15 @@ const fn blank_tm() -> tm {
     }
 }
 
-pub(crate) fn timespec_realtime_to_monotonic(abstime: timespec) -> Result<timespec, Errno> {
+pub(crate) fn timespec_realtime_to_monotonic(abstime: &timespec) -> Result<timespec, Errno> {
     let mut realtime = timespec::default();
     unsafe { clock_gettime(CLOCK_REALTIME, &raw mut realtime) };
     let mut monotonic = timespec::default();
     unsafe { clock_gettime(CLOCK_MONOTONIC, &raw mut monotonic) };
-    let Some(delta) = timespec::subtract(abstime, realtime) else {
+    let Some(delta) = timespec::subtract(abstime, &realtime) else {
         return Err(Errno(ETIMEDOUT));
     };
-    let Some(relative) = timespec::add(monotonic, delta) else {
+    let Some(relative) = timespec::add(&monotonic, &delta) else {
         return Err(Errno(ENOMEM));
     };
     Ok(relative)

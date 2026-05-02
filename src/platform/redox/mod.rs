@@ -1354,7 +1354,7 @@ impl Pal for Sys {
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
 
         if timer_st.evp.sigev_notify == SIGEV_NONE {
-            if timespec::subtract(timer_st.next_wake_time.it_value.clone(), now.clone()).is_none() {
+            if timespec::subtract(&timer_st.next_wake_time.it_value, &now).is_none() {
                 // error here means the timer is disarmed
                 let _ = timer_update_wake_time(timer_st);
             }
@@ -1366,7 +1366,7 @@ impl Pal for Sys {
         } else {
             itimerspec {
                 it_interval: timer_st.next_wake_time.it_interval.clone(),
-                it_value: timespec::subtract(timer_st.next_wake_time.it_value.clone(), now)
+                it_value: timespec::subtract(&timer_st.next_wake_time.it_value, &now)
                     .unwrap_or_default(),
             }
         });
@@ -1392,7 +1392,7 @@ impl Pal for Sys {
             if flags & TIMER_ABSTIME == 0 {
                 let mut now = timespec::default();
                 Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
-                val.it_value = timespec::add(now, val.it_value).ok_or(Errno(EINVAL))?;
+                val.it_value = timespec::add(&now, &val.it_value).ok_or(Errno(EINVAL))?;
             }
             val
         };

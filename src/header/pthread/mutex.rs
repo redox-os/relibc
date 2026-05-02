@@ -76,7 +76,7 @@ pub unsafe extern "C" fn pthread_mutex_timedlock(
     mutex: *mut pthread_mutex_t,
     abstime: &timespec,
 ) -> c_int {
-    let relative = match timespec_realtime_to_monotonic(abstime.clone()) {
+    let relative = match timespec_realtime_to_monotonic(abstime) {
         Ok(relative) => relative,
         Err(err) => return e(Err(err)),
     };
