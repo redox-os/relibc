@@ -1,10 +1,7 @@
 use super::{Sys, e_raw};
 use crate::{
     error::Result,
-    header::{
-        bits_socklen_t::socklen_t,
-        sys_socket::{msghdr, sockaddr},
-    },
+    header::sys_socket::{msghdr, sockaddr, socklen_t},
     platform::{
         PalSocket,
         types::{c_int, c_void, size_t},
