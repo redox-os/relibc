@@ -16,12 +16,11 @@ use crate::{
     error::{Errno, Result},
     header::{
         bits_sigset_t::sigset_t,
-        bits_timespec::timespec,
         signal::{
             SA_RESTORER, SI_QUEUE, SIGALRM, SIGEV_SIGNAL, sigaction, sigevent, siginfo_t, sigval,
             stack_t,
         },
-        time,
+        time::{self, timespec},
     },
     out::Out,
     platform::{self, Pal, types::timer_t},

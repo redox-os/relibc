@@ -3,10 +3,9 @@ use syscall::Error;
 use crate::{
     error::{Errno, Result},
     header::{
-        bits_timespec::timespec,
         errno::EIO,
         signal::{SIGEV_SIGNAL, SIGEV_THREAD},
-        time::timer_internal_t,
+        time::{timer_internal_t, timespec},
     },
     out::Out,
     platform::{Pal, Sys, sys::event, types::c_void},

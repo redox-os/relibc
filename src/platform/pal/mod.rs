@@ -5,7 +5,6 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
-        bits_timespec::timespec,
         fcntl::{AT_EMPTY_PATH, AT_FDCWD},
         signal::sigevent,
         sys_resource::{rlimit, rusage},
@@ -14,7 +13,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::utsname,
-        time::itimerspec,
+        time::{itimerspec, timespec},
     },
     ld_so::tcb::OsSpecific,
     out::Out,

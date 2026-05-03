@@ -6,7 +6,6 @@ use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
     header::{
-        bits_timespec::timespec,
         errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
         signal::sigevent,
         stdlib::getenv,
@@ -29,6 +28,8 @@ use chrono::{
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{cell::OnceCell, convert::TryFrom, mem, ptr};
+
+pub use crate::header::bits_timespec::timespec;
 
 pub use self::constants::*;
 
