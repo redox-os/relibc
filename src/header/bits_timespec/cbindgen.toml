@@ -14,7 +14,7 @@
 # - sys/time.h
 # - time.h (where it should be defined)
 after_includes = """
-#include <bits/time_t.h>
+#include <bits/time-t.h>
 """
 include_guard = "_RELIBC_BITS_TIMESPEC_H"
 language = "C"
