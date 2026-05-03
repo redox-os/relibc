@@ -340,8 +340,10 @@ fn alarm_timespec(duration: timespec) -> c_uint {
         }
 
         // Enable process-wide signal delivery instead of thread-specific
-        let timer_st = unsafe { &mut *(timer_id as *mut timer_internal_t) };
+        let timer_ptr = unsafe { timer_internal_t::from_raw(timer_id) };
+        let mut timer_st = timer_ptr.lock();
         timer_st.process_pid = Sys::getpid();
+        drop(timer_st);
 
         *guard = Some(AlarmTimer(timer_id));
     }

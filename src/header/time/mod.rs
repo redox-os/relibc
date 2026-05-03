@@ -44,16 +44,6 @@ const SECS_PER_DAY: time_t = 24 * 60 * 60;
 pub(crate) const NANOSECONDS: c_long = 1_000_000_000;
 const UTC_STR: &core::ffi::CStr = c"UTC";
 
-#[cfg(target_os = "redox")]
-impl<'a> From<&'a timespec> for syscall::TimeSpec {
-    fn from(tp: &timespec) -> Self {
-        Self {
-            tv_sec: tp.tv_sec as _,
-            tv_nsec: tp.tv_nsec as _,
-        }
-    }
-}
-
 /// timer_t internal data, ABI unstable
 #[repr(C)]
 #[derive(Clone)]
@@ -65,11 +55,20 @@ pub(crate) struct timer_internal_t {
     pub evp: sigevent,
     pub thread: platform::types::pthread_t,
     pub caller_thread: crate::pthread::OsTid,
-    // relibc handles it_interval, not the kernel
+    /// relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
+    /// kernel does not support unregistering timer
+    pub next_wake_version: usize,
     // When non-zero, timer_routine delivers SIGALRM via kill(process_pid, sig)
     // instead of rlct_kill (thread-specific). Used by alarm().
     pub process_pid: platform::types::pid_t,
+}
+
+#[cfg(target_os = "redox")]
+impl timer_internal_t {
+    pub unsafe fn from_raw(timerid: timer_t) -> &'static Mutex<Self> {
+        unsafe { &*(timerid as *const Mutex<Self>) }
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
@@ -892,15 +891,15 @@ const fn blank_tm() -> tm {
     }
 }
 
-pub(crate) fn timespec_realtime_to_monotonic(abstime: timespec) -> Result<timespec, Errno> {
+pub(crate) fn timespec_realtime_to_monotonic(abstime: &timespec) -> Result<timespec, Errno> {
     let mut realtime = timespec::default();
     unsafe { clock_gettime(CLOCK_REALTIME, &raw mut realtime) };
     let mut monotonic = timespec::default();
     unsafe { clock_gettime(CLOCK_MONOTONIC, &raw mut monotonic) };
-    let Some(delta) = timespec::subtract(abstime, realtime) else {
+    let Some(delta) = timespec::subtract(abstime, &realtime) else {
         return Err(Errno(ETIMEDOUT));
     };
-    let Some(relative) = timespec::add(monotonic, delta) else {
+    let Some(relative) = timespec::add(&monotonic, &delta) else {
         return Err(Errno(ENOMEM));
     };
     Ok(relative)

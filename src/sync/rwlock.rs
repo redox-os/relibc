@@ -38,9 +38,7 @@ impl InnerRwLock {
         let relative = match deadline {
             // FUTEX expect monotonic clock
             Some((abstime, CLOCK_MONOTONIC)) => Some(abstime.clone()),
-            Some((abstime, CLOCK_REALTIME)) => {
-                Some(timespec_realtime_to_monotonic(abstime.clone())?)
-            }
+            Some((abstime, CLOCK_REALTIME)) => Some(timespec_realtime_to_monotonic(abstime)?),
             None => None,
             _ => {
                 return Err(Errno(EINVAL));
