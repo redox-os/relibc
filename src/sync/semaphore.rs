@@ -66,7 +66,7 @@ impl Semaphore {
                 let relative = match clock_id {
                     // FUTEX expect monotonic clock
                     CLOCK_MONOTONIC => timeout.clone(),
-                    CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout.clone()) {
+                    CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout) {
                         Ok(relative) => relative,
                         Err(_) => return Err(()),
                     },

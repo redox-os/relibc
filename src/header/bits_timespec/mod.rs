@@ -16,7 +16,7 @@ impl timespec {
 
     /// similar logic with timeradd
     #[allow(clippy::should_implement_trait)] // not to confuse std::ops::Add
-    pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
+    pub fn add(base: &timespec, interval: &timespec) -> Option<timespec> {
         let delta_sec = base.tv_sec.checked_add(interval.tv_sec)?;
         let delta_nsec = base.tv_nsec.checked_add(interval.tv_nsec)?;
 
@@ -30,7 +30,7 @@ impl timespec {
         })
     }
     /// similar logic with timersub
-    pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
+    pub fn subtract(later: &timespec, earlier: &timespec) -> Option<timespec> {
         let delta_sec = later.tv_sec.checked_sub(earlier.tv_sec)?;
         let delta_nsec = later.tv_nsec.checked_sub(earlier.tv_nsec)?;
 
@@ -55,8 +55,28 @@ impl timespec {
 
         Some(time)
     }
-    pub fn is_default(&self) -> bool {
+    pub fn is_zero(&self) -> bool {
         self.tv_nsec == 0 && self.tv_sec == 0
+    }
+}
+
+#[cfg(target_os = "redox")]
+impl<'a> From<&'a syscall::TimeSpec> for timespec {
+    fn from(value: &'a syscall::TimeSpec) -> Self {
+        Self {
+            tv_sec: value.tv_sec as _,
+            tv_nsec: value.tv_nsec as _,
+        }
+    }
+}
+
+#[cfg(target_os = "redox")]
+impl<'a> From<&'a timespec> for syscall::TimeSpec {
+    fn from(tp: &timespec) -> Self {
+        Self {
+            tv_sec: tp.tv_sec as _,
+            tv_nsec: tp.tv_nsec as _,
+        }
     }
 }
 
