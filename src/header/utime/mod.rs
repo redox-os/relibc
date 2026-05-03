@@ -8,7 +8,7 @@
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    header::bits_timespec::timespec,
+    header::time::timespec,
     platform::{
         Pal, Sys,
         types::{c_char, c_int, time_t},

@@ -3,10 +3,9 @@
 use crate::{
     error::Errno,
     header::{
-        bits_timespec::timespec,
         errno::{EINVAL, ETIMEDOUT},
         pthread::*,
-        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     },
     platform::types::clockid_t,
 };

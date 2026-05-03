@@ -3,7 +3,7 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/aio.h.html>.
 
 use crate::{
-    header::{bits_timespec::timespec, signal::sigevent},
+    header::{signal::sigevent, time::timespec},
     platform::types::{c_int, c_void},
 };
 
