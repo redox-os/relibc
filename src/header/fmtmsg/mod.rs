@@ -101,7 +101,7 @@ pub unsafe extern "C" fn fmtmsg(
     let consolefd: c_int;
     let mut cs: c_int = 0;
     unsafe {
-        pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &mut cs as *mut c_int);
+        pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &raw mut cs);
     }
     let mut cmsg = unsafe { getenv(c"MSGVERB".as_ptr()) };
     let errstring: *const c_char = match severity {
@@ -165,7 +165,7 @@ pub unsafe extern "C" fn fmtmsg(
                     break;
                 } else {
                     verb |= 1 << i;
-                    cmsg = strchr(cmsg, b':' as _);
+                    cmsg = strchr(cmsg, b':'.into());
                     if !cmsg.is_null() {
                         cmsg = cmsg.add(1);
                     }
