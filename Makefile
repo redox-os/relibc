@@ -94,6 +94,8 @@ install-libs: headers libs
 	cp -v "$(BUILD)/$(PROFILE)/ld.so" "$(DESTDIR)/$(LD_SO_PATH)"
 ifeq ($(USE_RUST_LIBM),)
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
+else
+	$(AR) -rcs "$(DESTDIR)/lib/libm.a"
 endif
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"

@@ -12,6 +12,17 @@ ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	LD_SO_PATH=lib/ld.so.1
 endif
 
+ifeq ($(TARGET),aarch64-unknown-linux-relibc)
+	export CC=aarch64-linux-relibc-gcc
+	export LD=aarch64-linux-relibc-ld
+	export AR=aarch64-linux-relibc-ar
+	export NM=aarch64-linux-relibc-nm
+	export OBJCOPY=aarch64-linux-relibc-objcopy
+	export CPPFLAGS=
+	LD_SO_PATH=lib/ld.so.1
+endif
+
+
 ifeq ($(TARGET),aarch64-unknown-redox)
 	export CC=aarch64-unknown-redox-gcc
 	export LD=aarch64-unknown-redox-ld
@@ -48,6 +59,16 @@ ifeq ($(TARGET),x86_64-unknown-linux-gnu)
 	export AR=x86_64-linux-gnu-ar
 	export NM=x86_64-linux-gnu-nm
 	export OBJCOPY=objcopy
+	export CPPFLAGS=
+	LD_SO_PATH=lib/ld64.so.1
+endif
+
+ifeq ($(TARGET),x86_64-unknown-linux-relibc)
+	export CC=x86_64-linux-relibc-gcc
+	export LD=x86_64-linux-relibc-ld
+	export AR=x86_64-linux-relibc-ar
+	export NM=x86_64-linux-relibc-nm
+	export OBJCOPY=x86_64-linux-relibc-objcopy
 	export CPPFLAGS=
 	LD_SO_PATH=lib/ld64.so.1
 endif
