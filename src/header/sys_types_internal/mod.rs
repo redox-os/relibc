@@ -10,6 +10,7 @@
 use crate::platform::types::{
     c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
+pub use crate::header::bits_time_t::time_t;
 
 /// Used for block sizes.
 pub type blksize_t = c_long;
@@ -39,8 +40,6 @@ pub type pid_t = c_int;
 pub type id_t = c_uint;
 /// Used for a count of bytes or an error indication.
 pub type ssize_t = c_long;
-/// Used for time in seconds.
-pub type time_t = c_longlong;
 pub type useconds_t = c_uint;
 
 #[cfg(target_os = "linux")]
