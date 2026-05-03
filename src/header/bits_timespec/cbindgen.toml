@@ -12,10 +12,11 @@
 # - sys/select.h (not currently imported, needed for pselect, no TODO)
 # - sys/stat.h
 # - sys/time.h
-#
-# include sys/types.h to get time_t for timespec
-sys_includes = ["sys/types.h"]
-include_guard = "_RELIBC_BITS_TIME_H"
+# - time.h (where it should be defined)
+after_includes = """
+#include <bits/time_t.h>
+"""
+include_guard = "_RELIBC_BITS_TIMESPEC_H"
 language = "C"
 style = "Tag"
 no_includes = true

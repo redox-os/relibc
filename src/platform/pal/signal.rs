@@ -8,8 +8,8 @@ use crate::{
     error::{Errno, Result},
     header::{
         bits_sigset_t::sigset_t,
-        bits_timespec::timespec,
         signal::{sigaction, siginfo_t, sigval, stack_t},
+        time::timespec,
     },
 };
 

@@ -9,7 +9,7 @@
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    header::{bits_timespec::timespec, sys_select::timeval},
+    header::{sys_select::timeval, time::timespec},
     out::Out,
     platform::{
         Pal, PalSignal, Sys,

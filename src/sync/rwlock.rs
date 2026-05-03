@@ -7,9 +7,8 @@ use core::{
 use crate::{
     error::{Errno, Result},
     header::{
-        bits_timespec::timespec,
         errno::{EINVAL, ETIMEDOUT},
-        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     },
     platform::types::clockid_t,
     pthread::Pshared,

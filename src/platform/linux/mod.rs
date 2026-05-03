@@ -6,7 +6,6 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
-        bits_timespec::timespec,
         dirent::dirent,
         errno::{EINVAL, EIO},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
@@ -17,7 +16,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::utsname,
-        time::itimerspec,
+        time::{itimerspec, timespec},
         unistd::{SEEK_CUR, SEEK_SET},
     },
     ld_so::tcb::OsSpecific,

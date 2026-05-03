@@ -8,13 +8,13 @@ use crate::{
     fs::File,
     header::{
         bits_sigset_t::sigset_t,
-        bits_timespec::timespec,
         errno::EBADF,
         sys_epoll::{
             EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT,
             EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl,
             epoll_data, epoll_event, epoll_pwait,
         },
+        time::timespec,
     },
     platform::{
         self,

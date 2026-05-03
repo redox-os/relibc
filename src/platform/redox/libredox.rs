@@ -12,8 +12,7 @@ use syscall::{
 
 use crate::{
     header::{
-        bits_iovec::iovec, bits_timespec::timespec, errno::EINVAL, signal::sigaction,
-        sys_stat::UTIME_NOW,
+        bits_iovec::iovec, errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, time::timespec,
     },
     out::Out,
     platform::{PalSignal, pal::Pal, types::*},
