@@ -13,3 +13,6 @@ pub struct timeval {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_export_timeval(_: timeval) {}
