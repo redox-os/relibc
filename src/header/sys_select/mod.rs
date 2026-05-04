@@ -15,32 +15,21 @@ use crate::{
             epoll_data, epoll_event, epoll_wait,
         },
     },
-    platform::{
-        self,
-        types::{c_int, suseconds_t, time_t},
-    },
+    platform::{self, types::c_int},
 };
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
-///
-/// Note that the `timeval` struct was specified for
-/// [`sys/time.h`](crate::header::sys_time) in the Open Group Base
-/// Specifications Issue 7 and prior, see
-/// <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
-#[repr(C)]
-#[derive(Default)]
-pub struct timeval {
-    pub tv_sec: time_t,
-    pub tv_usec: suseconds_t,
-}
+pub use crate::header::bits_timeval::timeval;
 
-// fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
+// FD_SETSIZE and fd_set is also defined in C because cbindgen is incompatible with mem::size_of
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
+/// cbindgen:ignore
 pub const FD_SETSIZE: usize = 1024;
 type FdBitSet = BitSet<[u64; FD_SETSIZE / (8 * mem::size_of::<u64>())]>;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
+/// cbindgen:ignore
+#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct fd_set {
     pub fds_bits: FdBitSet,
