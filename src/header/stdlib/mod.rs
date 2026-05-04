@@ -20,6 +20,7 @@ use crate::{
         fcntl::*,
         limits,
         stdio::flush_io_streams,
+        stdlib::sort::{QsortContext, QsortRContext},
         string::*,
         sys_ioctl::*,
         time::constants::CLOCK_MONOTONIC,
@@ -1056,13 +1057,14 @@ pub unsafe extern "C" fn qsort(
         if nel > 0 {
             // XXX: maybe try to do mergesort/timsort first and fallback to introsort if memory
             //      allocation fails?  not sure what is ideal
-            unsafe { sort::introsort(base.cast::<c_char>(), nel, width, comp) };
+            let mut ctx = QsortContext { comp };
+            unsafe { sort::introsort(base.cast::<c_char>(), nel, width, &mut ctx) };
         }
     }
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/qsort.html>.
-// #[unsafe(no_mangle)]
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/qsort_r.html>.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn qsort_r(
     base: *mut c_void,
     nel: size_t,
@@ -1070,7 +1072,10 @@ pub unsafe extern "C" fn qsort_r(
     compar: Option<extern "C" fn(*const c_void, *const c_void, *mut c_void) -> c_int>,
     arg: *mut c_void,
 ) {
-    unimplemented!();
+    if let (Some(comp), true) = (compar, nel > 0) {
+        let mut ctx = QsortRContext { comp, arg };
+        unsafe { sort::introsort(base.cast::<c_char>(), nel, width, &mut ctx) };
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/quick_exit.html>.

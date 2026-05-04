@@ -1,10 +1,35 @@
 use crate::platform::types::{c_char, c_int, c_void, size_t};
 
-pub unsafe fn introsort(
+pub trait SortContext {
+    fn compare(&mut self, a: *const c_void, b: *const c_void) -> c_int;
+}
+
+pub struct QsortContext {
+    pub comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+}
+impl SortContext for QsortContext {
+    #[inline]
+    fn compare(&mut self, a: *const c_void, b: *const c_void) -> c_int {
+        (self.comp)(a, b)
+    }
+}
+
+pub struct QsortRContext {
+    pub comp: extern "C" fn(*const c_void, *const c_void, *mut c_void) -> c_int,
+    pub arg: *mut c_void,
+}
+impl SortContext for QsortRContext {
+    #[inline]
+    fn compare(&mut self, a: *const c_void, b: *const c_void) -> c_int {
+        (self.comp)(a, b, self.arg)
+    }
+}
+
+pub unsafe fn introsort<C: SortContext>(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    comp: &mut C,
 ) {
     /*TODO: introsort is much faster than insertion sort, but is currently broken
     let maxdepth = 2 * log2(nel);
@@ -27,12 +52,12 @@ fn log2(num: size_t) -> size_t {
     max_bits - num.to_le().leading_zeros() as size_t
 }
 
-unsafe fn introsort_helper(
+unsafe fn introsort_helper<C: SortContext>(
     mut base: *mut c_char,
     mut nel: size_t,
     width: size_t,
     mut maxdepth: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    comp: &mut C,
 ) {
     const THRESHOLD: size_t = 8;
 
@@ -65,17 +90,17 @@ unsafe fn introsort_helper(
     }
 }
 
-unsafe fn insertion_sort(
+unsafe fn insertion_sort<C: SortContext>(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    comp: &mut C,
 ) {
     for i in 0..nel {
         for j in (0..i).rev() {
             let current = unsafe { base.add(j * width) };
             let prev = unsafe { base.add((j + 1) * width) };
-            if comp(current as *const c_void, prev as *const c_void) > 0 {
+            if comp.compare(current as *const c_void, prev as *const c_void) > 0 {
                 unsafe { swap(current, prev, width) };
             } else {
                 break;
@@ -84,12 +109,7 @@ unsafe fn insertion_sort(
     }
 }
 
-unsafe fn heapsort(
-    base: *mut c_char,
-    nel: size_t,
-    width: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
-) {
+unsafe fn heapsort<C: SortContext>(base: *mut c_char, nel: size_t, width: size_t, comp: &mut C) {
     unsafe { heapify(base, nel, width, comp) };
 
     let mut end = nel - 1;
@@ -101,12 +121,7 @@ unsafe fn heapsort(
     }
 }
 
-unsafe fn heapify(
-    base: *mut c_char,
-    nel: size_t,
-    width: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
-) {
+unsafe fn heapify<C: SortContext>(base: *mut c_char, nel: size_t, width: size_t, comp: &mut C) {
     // we start at the last parent in the heap (the parent of the last child)
     let last_parent = (nel - 2) / 2;
 
@@ -115,12 +130,12 @@ unsafe fn heapify(
     }
 }
 
-unsafe fn heap_sift_down(
+unsafe fn heap_sift_down<C: SortContext>(
     base: *mut c_char,
     start: size_t,
     end: size_t,
     width: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    comp: &mut C,
 ) {
     // get the left child of the node at the given index
     let left_child = |idx| 2 * idx + 1;
@@ -136,11 +151,13 @@ unsafe fn heap_sift_down(
         let first_child_ptr = unsafe { base.add(child * width) };
         let second_child_ptr = unsafe { base.add((child + 1) * width) };
 
-        if comp(swap_ptr as *const c_void, first_child_ptr as *const c_void) < 0 {
+        if comp.compare(swap_ptr as *const c_void, first_child_ptr as *const c_void) < 0 {
             swap_idx = child;
             swap_ptr = first_child_ptr;
         }
-        if child < end && comp(swap_ptr as *const c_void, second_child_ptr as *const c_void) < 0 {
+        if child < end
+            && comp.compare(swap_ptr as *const c_void, second_child_ptr as *const c_void) < 0
+        {
             swap_idx = child + 1;
             swap_ptr = second_child_ptr;
         }
@@ -155,11 +172,11 @@ unsafe fn heap_sift_down(
 }
 
 #[inline]
-unsafe fn partition(
+unsafe fn partition<C: SortContext>(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    comp: &mut C,
 ) -> (size_t, size_t) {
     // calculate the median of the first, middle, and last elements and use it as the pivot
     // to do fewer comparisons, also swap the elements into their correct positions
@@ -176,7 +193,7 @@ unsafe fn partition(
         let n_ptr = unsafe { base.add(n * width) };
         let pivot_ptr = unsafe { base.add(pivot * width) };
 
-        let comparison = comp(j_ptr as *const c_void, pivot_ptr as *const c_void);
+        let comparison = comp.compare(j_ptr as *const c_void, pivot_ptr as *const c_void);
         if comparison < 0 {
             unsafe { swap(i_ptr, j_ptr, width) };
             if i == pivot {
@@ -198,22 +215,22 @@ unsafe fn partition(
     (i, n)
 }
 
-unsafe fn median_of_three(
+unsafe fn median_of_three<C: SortContext>(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
-    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    comp: &mut C,
 ) -> size_t {
     let pivot = nel / 2;
 
     let mid = unsafe { base.add(pivot * width) };
     let last = unsafe { base.add((nel - 1) * width) };
-    if comp(mid as *const c_void, base as *const c_void) < 0 {
+    if comp.compare(mid as *const c_void, base as *const c_void) < 0 {
         unsafe { swap(mid, base, width) };
     }
-    if comp(last as *const c_void, mid as *const c_void) < 0 {
+    if comp.compare(last as *const c_void, mid as *const c_void) < 0 {
         unsafe { swap(mid, last, width) };
-        if comp(mid as *const c_void, base as *const c_void) < 0 {
+        if comp.compare(mid as *const c_void, base as *const c_void) < 0 {
             unsafe { swap(mid, base, width) };
         }
     }
