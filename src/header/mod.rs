@@ -20,6 +20,7 @@ pub mod bits_suseconds_t;
 #[path = "bits_time-t/mod.rs"]
 pub mod bits_time_t;
 pub mod bits_timespec;
+pub mod bits_timeval;
 // complex.h implemented in C
 pub mod cpio;
 pub mod crypt;

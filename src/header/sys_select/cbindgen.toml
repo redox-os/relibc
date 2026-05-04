@@ -5,11 +5,15 @@
 # - "The <sys/select.h> header shall define the sigset_t type as described in <signal.h>."
 # - "The <sys/select.h> header shall define the timespec structure as described in <time.h>."
 # - "Inclusion of the <sys/select.h> header may make visible all symbols from the headers <signal.h> and <time.h>."
-sys_includes = ["sys/types.h"]
+#
+# bits/timeval.h brings in time_t and suseconds_t so no need to include all of sys/types.h.
+sys_includes = []
 include_guard = "_RELIBC_SYS_SELECT_H"
+# FD_SETSIZE and fd_set is also defined in C (below) because cbindgen is incompatible with mem::size_of
 after_includes = """
 #include <bits/sigset-t.h> // for sigset_t from signal.h
 #include <bits/timespec.h> // for timespec from time.h
+#include <bits/timeval.h> // for timeval
 
 // from musl license MIT {
 #define FD_SETSIZE 1024
@@ -38,9 +42,6 @@ cpp_compat = true
 [enum]
 prefix_with_name = true
 
-[export]
-# fd_set is also defined in C (above) because cbindgen is incompatible with mem::size_of
-exclude = ["FD_SETSIZE", "fd_set"]
-
 [export.rename]
 "timespec" = "struct timespec"
+"timeval" = "struct timeval"
