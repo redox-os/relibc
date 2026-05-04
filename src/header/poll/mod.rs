@@ -61,6 +61,7 @@ pub struct pollfd {
     pub revents: c_short,
 }
 
+#[allow(clippy::needless_update)] // epoll_event _pad field on redox
 pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
     let event_map = [
         (POLLIN, EPOLLIN),
@@ -97,7 +98,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         let mut event = epoll_event {
             events: 0,
             data: epoll_data { u64: i as u64 },
-            ..Default::default()
+            ..Default::default() // needed only on redox for _pad field
         };
 
         for (p, ep) in event_map.iter() {
