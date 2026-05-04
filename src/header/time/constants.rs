@@ -10,9 +10,12 @@ pub mod sys;
 
 pub use self::sys::*;
 
+/// cbindgen:ignore
 pub(crate) const UTC: *const c_char = c"UTC".as_ptr().cast();
 
+/// cbindgen:ignore
 pub(crate) const DAY_NAMES: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/// cbindgen:ignore
 pub(crate) const MON_NAMES: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
