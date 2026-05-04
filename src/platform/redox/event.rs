@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 use crate::header::{
     bits_sigset_t::sigset_t,
-    fcntl::{O_CLOEXEC, O_CREAT, O_RDWR},
+    fcntl::{AT_FDCWD, O_CLOEXEC, O_CREAT, O_RDWR},
     time::timespec,
 };
 
@@ -16,7 +16,12 @@ pub unsafe extern "C" fn redox_event_queue_create_v1(flags: u32) -> RawResult {
         if flags != 0 {
             return Err(Error::new(EINVAL));
         }
-        Ok(super::libredox::open("/scheme/event", O_CLOEXEC | O_CREAT | O_RDWR, 0o700)? as usize)
+        Ok(super::libredox::openat(
+            AT_FDCWD,
+            "/scheme/event",
+            O_CLOEXEC | O_CREAT | O_RDWR,
+            0o700,
+        )? as usize)
     })())
 }
 #[unsafe(no_mangle)]
