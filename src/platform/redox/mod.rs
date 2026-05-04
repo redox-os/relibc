@@ -107,10 +107,6 @@ static CLONE_LOCK: RwLock<()> = RwLock::new(());
 pub struct Sys;
 
 impl Pal for Sys {
-    fn access(path: CStr, mode: c_int) -> Result<()> {
-        Sys::faccessat(AT_FDCWD, path, mode, 0)
-    }
-
     fn faccessat(fd: c_int, path: CStr, mode: c_int, flags: c_int) -> Result<()> {
         let fd = FdGuard::new(Sys::openat(fd, path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
 
@@ -247,10 +243,6 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn dup(fd: c_int) -> Result<c_int> {
-        Ok(syscall::dup(fd as usize, &[])? as c_int)
-    }
-
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
         Ok(syscall::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
     }
@@ -289,11 +281,6 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn fchmod(fd: c_int, mode: mode_t) -> Result<()> {
-        libredox::fchmod(fd as usize, mode as u16)?;
-        Ok(())
-    }
-
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
@@ -308,7 +295,7 @@ impl Pal for Sys {
                 if dirfd == AT_FDCWD {
                     path = ".";
                 } else {
-                    return Sys::fchmod(dirfd, mode);
+                    return Ok(libredox::fchmod(dirfd as usize, mode as u16)?);
                 }
             } else {
                 // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
@@ -321,17 +308,24 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> Result<()> {
-        libredox::fchown(fd as usize, owner as u32, group as u32)?;
-        Ok(())
-    }
-
     fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()> {
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
             return Err(Errno(EINVAL));
         }
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let mut path = path.to_str().map_err(|_| Errno(ENOENT))?;
+        if path.is_empty() {
+            if flags & AT_EMPTY_PATH == AT_EMPTY_PATH {
+                if fildes == AT_FDCWD {
+                    path = ".";
+                } else {
+                    return Ok(libredox::fchown(fildes as usize, owner as _, group as _)?);
+                }
+            } else {
+                // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
+                return Err(Errno(ENOENT));
+            }
+        }
         let file = openat2(fildes, path, flags, 0)?;
         libredox::fchown(*file as usize, owner as _, group as _)?;
         Ok(())
@@ -486,7 +480,7 @@ impl Pal for Sys {
                 if dirfd == AT_FDCWD {
                     path = ".";
                 } else {
-                    return Sys::fstat(dirfd, buf);
+                    return Ok(Sys::fstat(dirfd, buf)?);
                 }
             } else {
                 // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
@@ -513,7 +507,7 @@ impl Pal for Sys {
         let file = openat2(dirfd, path, 0, open_flags)?;
         // Close the file descriptor after fstat(2) regardless of success or failure.
         let fstat_res = Sys::fstat(*file, buf);
-        let close_res = syscall::close(file.fd as usize);
+        let close_res = syscall::close(*file as usize);
         if let Err(err) = fstat_res {
             return Err(err);
         }
@@ -975,21 +969,6 @@ impl Pal for Sys {
             }
             Err(Error { errno: e }) => Err(Errno(e)),
         }
-    }
-
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
-
-        // POSIX states that umask should affect the following:
-        //
-        // open, openat, creat, mkdir, mkdirat,
-        // mkfifo, mkfifoat, mknod, mknodat,
-        // mq_open, and sem_open,
-        //
-        // all of which (the ones that exist thus far) currently call this function.
-        let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
-
-        Ok(libredox::open(path, oflag, effective_mode)? as c_int)
     }
 
     fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {

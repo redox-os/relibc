@@ -5,7 +5,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, F_DUPFD},
         signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
@@ -72,7 +72,9 @@ pub trait Pal {
     fn close(fildes: c_int) -> Result<()>;
 
     /// Platform implementation of [`dup()`](crate::header::unistd::dup) from [`unistd.h`](crate::header::unistd).
-    fn dup(fildes: c_int) -> Result<c_int>;
+    fn dup(fildes: c_int) -> Result<c_int> {
+        Self::fcntl(fildes, F_DUPFD, 0)
+    }
 
     /// Platform implementation of [`dup2()`](crate::header::unistd::dup2) from [`unistd.h`](crate::header::unistd).
     fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int>;
@@ -322,7 +324,9 @@ pub trait Pal {
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()>;
 
     /// Platform implementation of [`open()`](crate::header::fcntl::open) from [`fcntl.h`](crate::header::fcntl).
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        Self::openat(AT_FDCWD, path, oflag, mode)
+    }
 
     /// Platform implementation of `openat()` (TODO) from [`fcntl.h`](crate::header::fcntl).
     fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;

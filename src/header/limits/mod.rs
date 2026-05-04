@@ -129,3 +129,4 @@ pub const PTHREAD_DESTRUCTOR_ITERATIONS: c_long = _POSIX_THREAD_DESTRUCTOR_ITERA
 // TODO: What should this limit be? Both glibc and musl have it as 1024
 pub const PTHREAD_KEYS_MAX: c_long = 4096 * 32;
 pub const PTHREAD_STACK_MIN: c_long = 65536;
+pub const SYMLOOP_MAX: c_long = 64;

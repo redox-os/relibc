@@ -12,7 +12,8 @@ use syscall::{
 
 use crate::{
     header::{
-        bits_iovec::iovec, errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, time::timespec,
+        bits_iovec::iovec, errno::EINVAL, fcntl::AT_FDCWD, signal::sigaction, sys_stat::UTIME_NOW,
+        time::timespec,
     },
     out::Out,
     platform::{PalSignal, pal::Pal, types::*},
@@ -21,20 +22,6 @@ use crate::{
 use super::Sys;
 
 pub type RawResult = usize;
-
-pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
-    let usize_fd = super::path::open(
-        path,
-        ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
-    )?;
-
-    c_int::try_from(usize_fd)
-        .map_err(|_| {
-            let _ = syscall::close(usize_fd);
-            Error::new(EMFILE)
-        })
-        .map(|f| f as usize)
-}
 
 pub fn openat(dirfd: c_int, path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
     let usize_fd = super::path::openat(
@@ -239,7 +226,8 @@ pub unsafe extern "C" fn redox_open_v1(
     flags: u32,
     mode: u16,
 ) -> RawResult {
-    Error::mux(open(
+    Error::mux(openat(
+        AT_FDCWD,
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) },
         flags as c_int,
         mode as mode_t,
