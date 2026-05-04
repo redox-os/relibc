@@ -89,6 +89,7 @@ install-libs: headers libs
 	ln -vnfs libc.so "$(DESTDIR)/lib/libc.so.6"
 	cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/lib"
 	ln -vnfs crt0.o "$(DESTDIR)/lib/crt1.o"
+	ln -vnfs crt0.o "$(DESTDIR)/lib/Scrt1.o"
 	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/ld.so" "$(DESTDIR)/$(LD_SO_PATH)"
