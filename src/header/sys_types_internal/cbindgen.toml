@@ -1,6 +1,7 @@
 sys_includes = ["stddef.h"]
 # TODO: figure out how to export void* type
 after_includes = """
+#include <bits/suseconds-t.h>
 #include <bits/time-t.h>
 
 typedef void* timer_t;
@@ -25,7 +26,6 @@ include = [
   "id_t",
   "ssize_t",
   "useconds_t",
-  "suseconds_t",
   "clock_t",
   "clockid_t",
   "blkcnt_t",
