@@ -7,7 +7,7 @@
 //! <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/types.h.html>
 //! for the old specification.
 
-pub use crate::header::bits_time_t::time_t;
+pub use crate::header::{bits_suseconds_t::suseconds_t, bits_time_t::time_t};
 use crate::platform::types::{
     c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
@@ -41,13 +41,6 @@ pub type id_t = c_uint;
 /// Used for a count of bytes or an error indication.
 pub type ssize_t = c_long;
 pub type useconds_t = c_uint;
-
-#[cfg(target_os = "linux")]
-/// Used for time in microseconds.
-pub type suseconds_t = c_long;
-#[cfg(not(target_os = "linux"))]
-/// Used for time in microseconds.
-pub type suseconds_t = c_int;
 
 /// Used for system times in clock ticks or CLOCKS_PER_SEC.
 pub type clock_t = c_long;
