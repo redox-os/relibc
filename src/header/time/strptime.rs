@@ -11,8 +11,10 @@ use core::{
     str,
 };
 
+/// cbindgen:ignore
 /// For convenience, we define some helper constants for the C-locale.
 const SHORT_DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/// cbindgen:ignore
 const LONG_DAYS: [&str; 7] = [
     "Sunday",
     "Monday",
@@ -22,9 +24,11 @@ const LONG_DAYS: [&str; 7] = [
     "Friday",
     "Saturday",
 ];
+/// cbindgen:ignore
 const SHORT_MONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
+/// cbindgen:ignore
 const LONG_MONTHS: [&str; 12] = [
     "January",
     "February",

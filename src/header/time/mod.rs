@@ -39,10 +39,15 @@ mod strftime;
 mod strptime;
 pub use strptime::strptime;
 
+/// cbindgen:ignore
 const YEARS_PER_ERA: time_t = 400;
+/// cbindgen:ignore
 const DAYS_PER_ERA: time_t = 146097;
+/// cbindgen:ignore
 const SECS_PER_DAY: time_t = 24 * 60 * 60;
+/// cbindgen:ignore
 pub(crate) const NANOSECONDS: c_long = 1_000_000_000;
+/// cbindgen:ignore
 const UTC_STR: &core::ffi::CStr = c"UTC";
 
 /// timer_t internal data, ABI unstable
@@ -73,6 +78,7 @@ impl timer_internal_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
+#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct tm {
     pub tm_sec: c_int,          // 0 - 60
@@ -90,9 +96,11 @@ pub struct tm {
 
 unsafe impl Sync for tm {}
 
+/// cbindgen:ignore
 // The C Standard says that localtime and gmtime return the same pointer.
 static GMTIME_LOCALTIME_RETURN_TM: RawCell<tm> = RawCell::new(blank_tm());
 
+/// cbindgen:ignore
 // The C Standard says that ctime and asctime return the same pointer.
 static mut ASCTIME: [c_char; 26] = [0; 26];
 
@@ -101,9 +109,11 @@ pub struct TzName([*mut c_char; 2]);
 
 unsafe impl Sync for TzName {}
 
+/// cbindgen:ignore
 // Name storage for the `tm_zone` field.
 static TIMEZONE_NAMES: Mutex<OnceCell<BTreeSet<CString>>> = Mutex::new(OnceCell::new());
 
+/// cbindgen:ignore
 // relibc functions should hold `TIMEZONE_LOCK` when accessing `daylight`,
 // `timezone`, and `tzname`. However, it cannot guard those variables against
 // user access (see `tzset()` specs for details).
@@ -132,6 +142,7 @@ pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
 pub static mut getdate_err: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
+#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Default)]
 pub struct itimerspec {
