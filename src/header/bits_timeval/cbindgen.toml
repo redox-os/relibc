@@ -1,0 +1,20 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html
+#
+# This type is split out to prevent including all of sys/select.h in other headers.
+#
+# POSIX headers that require timeval:
+# - sys/resource.h
+# - sys/select.h (where it should be defined)
+# - sys/time.h
+after_includes = """
+#include <bits/time-t.h>
+#include <bits/suseconds-t.h>
+"""
+include_guard = "_RELIBC_BITS_TIMEVAL_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
