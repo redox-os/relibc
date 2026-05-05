@@ -5,10 +5,7 @@
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    header::{
-        fcntl::{AT_SYMLINK_NOFOLLOW, O_NOFOLLOW, O_PATH},
-        time::timespec,
-    },
+    header::{fcntl::AT_SYMLINK_NOFOLLOW, time::timespec},
     out::Out,
     platform::{
         Pal, Sys,
@@ -147,19 +144,7 @@ pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
     let buf = unsafe { Out::nonnull(buf) };
-
-    // TODO: Rustify
-    let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0).or_minus_one_errno();
-    if fd < 0 {
-        return -1;
-    }
-
-    // TODO: Rustify
-    let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
-
-    if let Ok(()) = Sys::close(fd) {}; // TODO handle error
-
-    res
+    Sys::lstat(path, buf).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdirat.html>.
@@ -220,19 +205,7 @@ pub unsafe extern "C" fn mknodat(
 pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = unsafe { CStr::from_ptr(file) };
     let buf = unsafe { Out::nonnull(buf) };
-
-    // TODO: Rustify
-    let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
-    if fd < 0 {
-        return -1;
-    }
-
-    // TODO: Rustify
-    let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
-
-    if let Ok(()) = Sys::close(fd) {}; // TODO handle error
-
-    res
+    Sys::stat(file, buf).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/umask.html>.

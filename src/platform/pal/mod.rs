@@ -5,7 +5,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, F_DUPFD},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, F_DUPFD},
         signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
@@ -121,7 +121,17 @@ pub trait Pal {
 
     /// Platform implementation of [`fstat()`](crate::header::sys_stat::fstat) from [`sys/stat.h`](crate::header::sys_stat).
     fn fstat(fildes: c_int, buf: Out<stat>) -> Result<()> {
-        Self::fstatat(fildes, Some(c"".into()), buf, 0)
+        Self::fstatat(fildes, Some(c"".into()), buf, AT_EMPTY_PATH)
+    }
+
+    /// Platform implementation of [`lstat()`](crate::header::sys_stat::lstat) from [`sys/stat.h`](crate::header::sys_stat).
+    fn lstat(path: CStr, buf: Out<stat>) -> Result<()> {
+        Self::fstatat(AT_FDCWD, Some(path), buf, AT_SYMLINK_NOFOLLOW)
+    }
+
+    /// Platform implementation of [`stat()`](crate::header::sys_stat::stat) from [`sys/stat.h`](crate::header::sys_stat).
+    fn stat(path: CStr, buf: Out<stat>) -> Result<()> {
+        Self::fstatat(AT_FDCWD, Some(path), buf, 0)
     }
 
     /// Platform implementation of [`fstatat()`](crate::header::sys_stat::fstatat) from [`sys/stat.h`](crate::header::sys_stat).
@@ -253,7 +263,9 @@ pub trait Pal {
     fn getuid() -> uid_t;
 
     /// Platform implementation of [`lchown()`](crate::header::unistd::lchown) from [`unistd.h`](crate::header::unistd).
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+        Self::fchownat(AT_FDCWD, path, owner, group, AT_SYMLINK_NOFOLLOW)
+    }
 
     /// Platform implementation of [`link()`](crate::header::unistd::link) from [`unistd.h`](crate::header::unistd).
     fn link(path1: CStr, path2: CStr) -> Result<()> {
@@ -396,7 +408,9 @@ pub trait Pal {
     ) -> Result<()>;
 
     /// Platform implementation of [`rmdir()`](crate::header::unistd::rmdir) from [`unistd.h`](crate::header::unistd).
-    fn rmdir(path: CStr) -> Result<()>;
+    fn rmdir(path: CStr) -> Result<()> {
+        Self::unlinkat(AT_FDCWD, path, AT_REMOVEDIR)
+    }
 
     /// Platform implementation of [`sched_yield()`](crate::header::sched::sched_yield) from [`sched.h`](crate::header::sched).
     fn sched_yield() -> Result<()>;

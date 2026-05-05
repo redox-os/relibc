@@ -8,7 +8,7 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{EINVAL, EIO},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
+        fcntl::AT_EMPTY_PATH,
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
@@ -174,6 +174,8 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(FCHDIR, fildes) }).map(|_| ())
     }
 
+    // Override the default impl in Sys because `fchmodat(fildes, "", mode, AT_EMPTY_PATH)` doesn't
+    // seem to be equivalent to `fchmod(fildes, mode)` on Linux.
     fn fchmod(fildes: c_int, mode: mode_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHMOD, fildes, mode) }).map(|_| ())
     }
@@ -191,31 +193,12 @@ impl Pal for Sys {
         .map(|_| ())
     }
 
-    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(FCHOWN, fildes, owner, group) }).map(|_| ())
-    }
-
     fn fdatasync(fildes: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(FDATASYNC, fildes) }).map(|_| ())
     }
 
     fn flock(fd: c_int, operation: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(FLOCK, fd, operation) }).map(|_| ())
-    }
-
-    fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
-        let empty = b"\0";
-        let empty_ptr = empty.as_ptr().cast::<c_char>();
-        e_raw(unsafe {
-            syscall!(
-                NEWFSTATAT,
-                fildes,
-                empty_ptr,
-                buf.as_mut_ptr(),
-                AT_EMPTY_PATH
-            )
-        })
-        .map(|_| ())
     }
 
     fn fstatat(fildes: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
@@ -455,26 +438,6 @@ impl Pal for Sys {
         unsafe { syscall!(GETUID) as uid_t }
     }
 
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }).map(|_| ())
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                FCHOWNAT,
-                AT_FDCWD,
-                path.as_ptr(),
-                owner as u32,
-                group as u32,
-                crate::header::fcntl::AT_SYMLINK_NOFOLLOW
-            )
-        })
-        .map(|_| ())
-    }
-
     fn linkat(fd1: c_int, path1: CStr, fd2: c_int, path2: CStr, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(LINKAT, fd1, path1.as_ptr(), fd2, path2.as_ptr(), flags) })
             .map(|_| ())
@@ -501,10 +464,6 @@ impl Pal for Sys {
 
     fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()> {
         Sys::mknodat(dir_fd, path, mode | S_IFIFO, 0)
-    }
-
-    fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
-        Sys::mknod(path, mode | S_IFIFO, 0)
     }
 
     unsafe fn mlock(addr: *const c_void, len: usize) -> Result<()> {
@@ -562,11 +521,6 @@ impl Pal for Sys {
 
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
         e_raw(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }).map(|_| ())
-    }
-
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
-        e_raw(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) })
-            .map(|fd| fd as c_int)
     }
 
     fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
@@ -706,19 +660,6 @@ impl Pal for Sys {
         })
     }
 
-    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                RENAMEAT,
-                old_dir,
-                old_path.as_ptr(),
-                new_dir,
-                new_path.as_ptr()
-            )
-        })
-        .map(|_| ())
-    }
-
     fn renameat2(
         old_dir: c_int,
         old_path: CStr,
@@ -737,10 +678,6 @@ impl Pal for Sys {
             )
         })
         .map(|_| ())
-    }
-
-    fn rmdir(path: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }).map(|_| ())
     }
 
     fn sched_yield() -> Result<()> {
