@@ -147,6 +147,7 @@ EXPECT_NAMES=\
 	sys_stat/lstat \
 	sys_stat/fstatat \
 	sys_stat/umask \
+	sys_stat/utimensat \
 	sys_syslog/syslog \
 	time/asctime \
 	time/constants \

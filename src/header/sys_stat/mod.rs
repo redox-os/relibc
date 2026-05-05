@@ -6,7 +6,7 @@ use crate::{
     c_str::CStr,
     error::ResultExt,
     header::{
-        fcntl::{O_NOFOLLOW, O_PATH},
+        fcntl::{AT_SYMLINK_NOFOLLOW, O_NOFOLLOW, O_PATH},
         time::timespec,
     },
     out::Out,
@@ -239,4 +239,23 @@ pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn umask(mask: mode_t) -> mode_t {
     Sys::umask(mask)
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/utimensat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn utimensat(
+    fd: c_int,
+    path: *const c_char,
+    times: *const timespec,
+    flag: c_int,
+) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    match Sys::openat(fd, path, flag & AT_SYMLINK_NOFOLLOW, 0) {
+        Ok(fd) => unsafe {
+            let r = Sys::futimens(fd, times).map(|()| 0).or_minus_one_errno();
+            let _ = Sys::close(fd);
+            r
+        },
+        r => r.or_minus_one_errno(),
+    }
 }
