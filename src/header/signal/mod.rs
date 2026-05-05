@@ -357,7 +357,6 @@ pub extern "C" fn signal(
     };
     let mut old_sa = mem::MaybeUninit::uninit();
     if unsafe { sigaction(sig, &raw const sa, old_sa.as_mut_ptr()) } < 0 {
-        mem::forget(old_sa);
         return unsafe { mem::transmute(SIG_ERR) };
     }
     unsafe { old_sa.assume_init() }.sa_handler
@@ -467,7 +466,6 @@ pub unsafe extern "C" fn sigset(
             if unsafe { sigaction(sig, ptr::null_mut(), old_sa.as_mut_ptr()) } < 0
                 || unsafe { sigprocmask(SIG_BLOCK, &raw const set, &raw mut set) } < 0
             {
-                mem::forget(old_sa);
                 return sig_err;
             }
         } else {
@@ -481,7 +479,6 @@ pub unsafe extern "C" fn sigset(
             if unsafe { sigaction(sig, &raw const sa, old_sa.as_mut_ptr()) } < 0
                 || unsafe { sigprocmask(SIG_UNBLOCK, &raw const set, &raw mut set) } < 0
             {
-                mem::forget(old_sa);
                 return sig_err;
             }
         }

@@ -26,13 +26,11 @@ fn find_expected_dir() -> Option<PathBuf> {
         }
     }
 
-    if found_expected_dir.is_none() {
-        if let Ok(cwd) = env::current_dir() {
-            let check = cwd.join("expected");
-            if check.is_dir() {
-                found_expected_dir = Some(check);
-            }
-        }
+    if found_expected_dir.is_none()
+        && let Ok(check) = env::current_dir().map(|cwd| cwd.join("expected"))
+        && check.is_dir()
+    {
+        found_expected_dir = Some(check);
     }
 
     found_expected_dir
@@ -85,10 +83,10 @@ fn expected(
 
     if expected != generated {
         println!("# {}: {}: expected #", bin, kind);
-        io::stdout().write(&expected).unwrap();
+        io::stdout().write_all(&expected).unwrap();
 
         println!("# {}: {}: generated #", bin, kind);
-        io::stdout().write(generated).unwrap();
+        io::stdout().write_all(generated).unwrap();
 
         return Err(format!(
             "{} failed - retcode {}, {} mismatch",

@@ -256,8 +256,8 @@ pub extern "C" fn clock() -> clock_t {
     }
     let ts = unsafe { ts.assume_init() };
 
-    let clocks =
-        ts.tv_sec * CLOCKS_PER_SEC as i64 + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)) as i64;
+    #[expect(clippy::unnecessary_cast, reason="needed on i586")]
+    let clocks = ts.tv_sec * CLOCKS_PER_SEC as i64 + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)) as i64;
     clock_t::try_from(clocks).unwrap_or(-1)
 }
 
@@ -712,18 +712,12 @@ unsafe fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CSt
 
     // SAFETY: the caller is required to ensure access exclusively for the
     // holder of `TIMEZONE_LOCK`.
-    let daylight_mut = unsafe { &mut *(&raw mut daylight) };
-    // SAFETY: the caller is required to ensure access exclusively for the
-    // holder of `TIMEZONE_LOCK`.
-    let timezone_mut = unsafe { &mut *(&raw mut timezone) };
-    // SAFETY: the caller is required to ensure access exclusively for the
-    // holder of `TIMEZONE_LOCK`.
-    let tzname_mut = unsafe { &mut *(&raw mut tzname) };
-
-    (*tzname_mut).0[0] = ptr::null_mut();
-    (*tzname_mut).0[1] = ptr::null_mut();
-    *timezone_mut = 0;
-    *daylight_mut = 0;
+    unsafe {
+        tzname.0[0] = ptr::null_mut();
+        tzname.0[1] = ptr::null_mut();
+        timezone = 0;
+        daylight = 0;
+    }
 }
 
 #[inline(always)]
@@ -848,34 +842,29 @@ unsafe fn set_timezone(
 ) {
     // SAFETY: the caller is required to ensure access exclusively for the
     // holder of `TIMEZONE_LOCK`.
-    let daylight_mut = unsafe { &mut *(&raw mut daylight) };
-    // SAFETY: the caller is required to ensure access exclusively for the
-    // holder of `TIMEZONE_LOCK`.
-    let timezone_mut = unsafe { &mut *(&raw mut timezone) };
-    // SAFETY: the caller is required to ensure access exclusively for the
-    // holder of `TIMEZONE_LOCK`.
-    let tzname_mut = unsafe { &mut *(&raw mut tzname) };
+    unsafe {
+        let ut_offset = std.offset();
 
-    let ut_offset = std.offset();
+        guard.0 = Some(CString::new(ut_offset.abbreviation().expect("Wrong timezone")).unwrap());
+        tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
 
-    guard.0 = Some(CString::new(ut_offset.abbreviation().expect("Wrong timezone")).unwrap());
-    tzname_mut.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
-
-    match dst {
-        Some(dst) => {
-            guard.1 =
-                Some(CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap());
-            tzname_mut.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
-            *daylight_mut = 1;
+        match dst {
+            Some(dst) => {
+                guard.1 = Some(
+                    CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap(),
+                );
+                tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
+                daylight = 1;
+            }
+            None => {
+                guard.1 = None;
+                tzname.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+                daylight = 0;
+            }
         }
-        None => {
-            guard.1 = None;
-            tzname_mut.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
-            *daylight_mut = 0;
-        }
+
+        timezone = -c_long::from(ut_offset.fix().local_minus_utc());
     }
-
-    *timezone_mut = -c_long::from(ut_offset.fix().local_minus_utc());
 }
 
 #[inline(always)]

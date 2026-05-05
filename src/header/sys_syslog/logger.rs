@@ -92,16 +92,12 @@ impl<L: LogSink> LogParams<L> {
                 .unwrap_or(true)
         {
             // Try reopening the log file once and retrying as musl does.
-            if !self
-                .open_logger()
-                .is_ok()
-                .then(|| {
-                    self.writer
-                        .as_mut()
-                        .map(|w| w.writer().write_all(&buffer).is_ok())
-                        .unwrap_or_default()
-                })
-                .unwrap_or_default()
+            if !(self.open_logger().is_ok()
+                && self
+                    .writer
+                    .as_mut()
+                    .and_then(|w| w.writer().write_all(&buffer).ok())
+                    .is_some())
                 && self.opt.contains(Config::Console)
             {
                 // TODO: Log error to /dev/console & Redox equivalent
@@ -139,10 +135,10 @@ impl<L: LogSink> LogParams<L> {
     /// default.
     pub fn set_identity(&mut self, ident: Option<&str>) {
         self.ident = ident
-            .and_then(|ident| {
+            .map(|ident| {
                 let ident = ident.bytes().chain([0]).collect();
                 // SAFETY: Already validated
-                Some(unsafe { String::from_utf8_unchecked(ident) })
+                unsafe { String::from_utf8_unchecked(ident) }
             })
             .unwrap_or_else(|| {
                 unsafe { CStr::from_nullable_ptr(platform::program_invocation_short_name) }

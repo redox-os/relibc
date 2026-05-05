@@ -774,6 +774,8 @@ impl DSO {
         let strtab_offset = strtab_offset.expect("mandatory DT_STRTAB not present");
         let strtab_size = strtab_size.expect("mandatory DT_STRSZ not present");
 
+
+        #[expect(clippy::unnecessary_cast, reason="needed on i586")]
         let dynstrtab = StringTable::new(
             mmap,
             strtab_offset as u64,
