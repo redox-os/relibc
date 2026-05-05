@@ -10,30 +10,17 @@ use crate::{
         bits_sigset_t::sigset_t,
         errno::{EINVAL, ENOSYS},
         signal::{
-            SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGALRM, SIGEV_SIGNAL,
-            SS_DISABLE, SS_ONSTACK, sigaction, sigevent, siginfo_t, sigval, stack_t, ucontext_t,
+            SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
+            sigaction, siginfo_t, sigval, stack_t, ucontext_t,
         },
-        time::{itimerspec, timer_internal_t, timespec},
+        time::timespec,
     },
-    out::Out,
-    sync::Mutex,
 };
 use core::mem::offset_of;
 use redox_protocols::protocol::ProcKillTarget;
 use redox_rt::signal::{
     PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
 };
-
-/// Wrapper for timer_t that implements Send (the timer_t pointer is a process-
-/// wide mmap'd allocation that outlives any single thread).
-struct AlarmTimer(timer_t);
-// SAFETY: The timer_t pointer refers to an mmap'd timer_internal_t that is
-// only accessed under the ALARM_TIMER mutex lock.
-unsafe impl Send for AlarmTimer {}
-
-/// Process-global singleton timer used by alarm(). Protected by a mutex to
-/// ensure only one alarm is active at a time (POSIX requirement).
-static ALARM_TIMER: Mutex<Option<AlarmTimer>> = Mutex::new(None);
 
 const _: () = {
     #[track_caller]
@@ -262,102 +249,4 @@ impl PalSignal for Sys {
         }
         Ok(info.si_signo)
     }
-
-    /// Thread-based alarm() that Recycles the existing POSIX timer machinery
-    /// (timerfd + eventfd + pthread) with process-level signal delivery.
-    ///
-    /// Internally works with a timespec to allow sub-second timers in the
-    /// future (e.g. ualarm) as i've been asked, though the public API only exposes whole seconds.
-    fn alarm(seconds: c_uint) -> c_uint {
-        alarm_timespec(timespec {
-            tv_sec: seconds as time_t,
-            tv_nsec: 0,
-        })
-    }
-}
-
-/// Internal helper that arms/disarms the process-global alarm timer.
-/// Accepts a full timespec so sub-second timers (ualarm) can reuse this later.
-/// Returns the number of seconds remaining on the previous alarm (rounded up),
-/// or 0 if there was no previous alarm.
-///
-/// TODO: This implementation does not survive `exec()`. POSIX requires that a
-/// pending alarm be preserved across exec (the timer continues counting down
-/// in the new process image as i understand).
-fn alarm_timespec(duration: timespec) -> c_uint {
-    let mut guard = ALARM_TIMER.lock();
-
-    // Determine remaining time on any existing alarm
-    let remaining = if let Some(ref alarm) = *guard {
-        let mut cur = itimerspec::default();
-        if Sys::timer_gettime(alarm.0, Out::from_mut(&mut cur)).is_ok() {
-            let secs = cur.it_value.tv_sec as c_uint;
-            if cur.it_value.tv_nsec > 0 {
-                secs + 1 // POSIX: round up
-            } else {
-                secs
-            }
-        } else {
-            0
-        }
-    } else {
-        0
-    };
-
-    let disarm = duration.tv_sec == 0 && duration.tv_nsec == 0;
-
-    if disarm {
-        // alarm(0): cancel any pending alarm
-        if let Some(ref alarm) = *guard {
-            let zero = itimerspec::default();
-            let _ = Sys::timer_settime(alarm.0, 0, &zero, None);
-        }
-        return remaining;
-    }
-
-    // Lazily create the singleton timer if it doesn't exist yet
-    if guard.is_none() {
-        let evp = sigevent {
-            sigev_value: sigval {
-                sival_ptr: core::ptr::null_mut(),
-            },
-            sigev_signo: SIGALRM as c_int,
-            sigev_notify: SIGEV_SIGNAL,
-            sigev_notify_function: None,
-            sigev_notify_attributes: core::ptr::null_mut(),
-        };
-
-        let mut timer_id: timer_t = core::ptr::null_mut();
-        if Sys::timer_create(
-            crate::header::time::CLOCK_REALTIME,
-            &evp,
-            Out::from_mut(&mut timer_id),
-        )
-        .is_err()
-        {
-            return remaining;
-        }
-
-        // Enable process-wide signal delivery instead of thread-specific
-        let timer_ptr = unsafe { timer_internal_t::from_raw(timer_id) };
-        let mut timer_st = timer_ptr.lock();
-        timer_st.process_pid = Sys::getpid();
-        drop(timer_st);
-
-        *guard = Some(AlarmTimer(timer_id));
-    }
-
-    let timer_id = guard
-        .as_ref()
-        .expect("alarm timer must exist after lazy init")
-        .0;
-
-    // Arm the timer as a one-shot (no interval)
-    let spec = itimerspec {
-        it_value: duration,
-        it_interval: timespec::default(),
-    };
-    let _ = Sys::timer_settime(timer_id, 0, &spec, None);
-
-    remaining
 }

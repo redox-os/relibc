@@ -1,6 +1,6 @@
 use super::super::{
     Pal,
-    types::{c_int, c_uint, pid_t},
+    types::{c_int, pid_t},
 };
 #[allow(deprecated)]
 use crate::header::sys_time::itimerval;
@@ -34,9 +34,6 @@ pub trait PalSignal: Pal {
     /// Platform implementation of [`setitimer()`](crate::header::sys_time::setitimer) from [`sys/time.h`](crate::header::sys_time).
     #[allow(deprecated)]
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()>;
-
-    /// Platform implementation of [`alarm()`](crate::header::unistd::alarm) from [`unistd.h`](crate::header::unistd).
-    fn alarm(seconds: c_uint) -> c_uint;
 
     /// Platform implementation of [`sigaction()`](crate::header::signal::sigaction()) from [`signal.h`](crate::header::signal).
     fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> Result<()>;
