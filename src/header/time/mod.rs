@@ -584,9 +584,6 @@ pub unsafe extern "C" fn timer_create(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_delete.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timer_delete(timerid: timer_t) -> c_int {
-    if timerid.is_null() {
-        return Err(Errno(EFAULT)).or_minus_one_errno();
-    }
     Sys::timer_delete(timerid).map(|()| 0).or_minus_one_errno()
 }
 
@@ -599,7 +596,7 @@ pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
-    if timerid.is_null() || value.is_null() {
+    if value.is_null() {
         return Err(Errno(EFAULT)).or_minus_one_errno();
     }
     let value = unsafe { Out::nonnull(value) };
@@ -616,7 +613,7 @@ pub unsafe extern "C" fn timer_settime(
     value: *const itimerspec,
     ovalue: *mut itimerspec,
 ) -> c_int {
-    if timerid.is_null() || value.is_null() {
+    if value.is_null() {
         return Err(Errno(EFAULT)).or_minus_one_errno();
     }
     let (value, ovalue) = unsafe { (&*value, Out::nullable(ovalue)) };
