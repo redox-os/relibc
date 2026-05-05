@@ -783,7 +783,7 @@ impl Pal for Sys {
             syscall!(
                 TIMER_CREATE,
                 clock_id,
-                ptr::addr_of!(evp),
+                evp as *const _,
                 timerid.as_mut_ptr()
             )
         })
@@ -809,7 +809,7 @@ impl Pal for Sys {
                 TIMER_SETTIME,
                 timerid,
                 flags,
-                ptr::addr_of!(value),
+                value as *const _,
                 match ovalue {
                     None => ptr::null_mut(),
                     Some(mut o) => o.as_mut_ptr(),

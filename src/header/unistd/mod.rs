@@ -25,10 +25,11 @@ use crate::{
         sys_select::timeval,
         sys_time, sys_utsname, termios,
         time::timespec,
+        unistd::alarm::alarm_timespec,
     },
     out::Out,
     platform::{
-        self, ERRNO, Pal, PalSignal, Sys,
+        self, ERRNO, Pal, Sys,
         types::{
             c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
             size_t, ssize_t, suseconds_t, time_t, uid_t,
@@ -52,6 +53,7 @@ use super::{
     stdio::snprintf,
 };
 
+mod alarm;
 mod brk;
 mod getopt;
 mod getpass;
@@ -155,7 +157,10 @@ pub unsafe extern "C" fn faccessat(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
-    Sys::alarm(seconds)
+    alarm_timespec(timespec {
+        tv_sec: seconds.into(),
+        tv_nsec: 0,
+    })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chdir.html>.
