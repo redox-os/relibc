@@ -32,9 +32,8 @@ use crate::{
             ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
-            self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
-            AT_SYMLINK_NOFOLLOW, F_GETLK, F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW,
-            F_UNLCK, F_WRLCK, flock,
+            self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
+            F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
         limits,
         pthread::{pthread_cancel, pthread_create},
@@ -463,14 +462,7 @@ impl Pal for Sys {
         Ok(redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
     }
 
-    fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
-        unsafe {
-            libredox::fstat(fildes as usize, buf.as_mut_ptr())?;
-        }
-        Ok(())
-    }
-
-    fn fstatat(dirfd: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
+    fn fstatat(dirfd: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
         // `path` should be non-null.
         let path = path.ok_or(Errno(EFAULT))?;
         let mut path = str::from_utf8(path.to_bytes()).ok().ok_or(Errno(EILSEQ))?;
@@ -480,7 +472,7 @@ impl Pal for Sys {
                 if dirfd == AT_FDCWD {
                     path = ".";
                 } else {
-                    return Ok(Sys::fstat(dirfd, buf)?);
+                    return Ok(unsafe { libredox::fstat(dirfd as usize, buf.as_mut_ptr()) }?);
                 }
             } else {
                 // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
@@ -488,31 +480,15 @@ impl Pal for Sys {
             }
         }
 
-        // Use `O_PATH` to obtain a file descriptor without actually *opening* the file. This
-        // bypasses permission checks and avoids cases where opening a file is blocking operation
-        // (e.g., FIFOs). This gives a file descriptor where fstat(2) can be performed (and some
-        // other meta operations) but nothing else (e.g. read/write).
-        //
-        // `O_CLOEXEC` is used to avoid leaking file descriptors to child processes on exec(2).
-        //
-        // FIXME: Ideally we would want the file descriptor to not leak on fork(2) too because
-        // fstatat(2) should not have side effects. However, Redox does not currently support that,
-        // so we use `CLOEXEC` as a compromise.
-        // FIXME: Should we handle AT_* flags here or in openat2?
-        let mut open_flags = fcntl::O_PATH | fcntl::O_CLOEXEC;
-        if flags & AT_SYMLINK_NOFOLLOW == AT_SYMLINK_NOFOLLOW {
-            open_flags |= fcntl::O_SYMLINK | fcntl::O_NOFOLLOW;
-        }
-
-        let file = openat2(dirfd, path, 0, open_flags)?;
+        let file = openat2(dirfd, path, flags, 0)?;
         // Close the file descriptor after fstat(2) regardless of success or failure.
-        let fstat_res = Sys::fstat(*file, buf);
+        let fstat_res = unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr()) };
         let close_res = syscall::close(*file as usize);
         if let Err(err) = fstat_res {
-            return Err(err);
+            return Err(err.into());
         }
         close_res?;
-        fstat_res
+        Ok(fstat_res?)
     }
 
     fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {
@@ -789,15 +765,6 @@ impl Pal for Sys {
 
     fn getuid() -> uid_t {
         redox_rt::sys::posix_getresugid().ruid as uid_t
-    }
-
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        // TODO: Is it correct for regular chown to use O_PATH? On Linux the meaning of that flag
-        // is to forbid file operations, including fchown.
-
-        // unlike chown, never follow symbolic links
-        let file = File::open(path, fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW)?;
-        Self::fchown(*file, owner, group)
     }
 
     fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()> {
@@ -1141,22 +1108,6 @@ impl Pal for Sys {
         Sys::read(*file, out)
     }
 
-    fn rename(oldpath: CStr, newpath: CStr) -> Result<()> {
-        let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
-        let newpath = canonicalize(newpath).map_err(|_| Errno(EINVAL))?;
-
-        let file = File::open(
-            oldpath,
-            fcntl::O_NOFOLLOW | fcntl::O_PATH | fcntl::O_CLOEXEC,
-        )?;
-        syscall::frename(*file as usize, newpath)?;
-        Ok(())
-    }
-
-    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
-        Sys::renameat2(old_dir, old_path, new_dir, new_path, 0)
-    }
-
     fn renameat2(
         old_dir: c_int,
         old_path: CStr,
@@ -1188,13 +1139,6 @@ impl Pal for Sys {
         syscall::frename(*source as usize, target)
             .map(|_| ())
             .map_err(Into::into)
-    }
-
-    fn rmdir(path: CStr) -> Result<()> {
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
-        let canon = canonicalize(path)?;
-        redox_rt::sys::unlink(&canon, fcntl::AT_REMOVEDIR as usize)?;
-        Ok(())
     }
 
     fn sched_yield() -> Result<()> {
@@ -1249,10 +1193,6 @@ impl Pal for Sys {
             sgid: None,
         })?;
         Ok(())
-    }
-
-    fn symlink(path1: CStr, path2: CStr) -> Result<()> {
-        Sys::symlinkat(path1, AT_FDCWD, path2)
     }
 
     fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
@@ -1521,13 +1461,6 @@ impl Pal for Sys {
         //read_line(domainname.as_slice_mut().cast_slice_to::<u8>())?;
         domainname.as_slice_mut().zero();
 
-        Ok(())
-    }
-
-    fn unlink(path: CStr) -> Result<()> {
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
-        let canon = canonicalize(path)?;
-        redox_rt::sys::unlink(&canon, 0)?;
         Ok(())
     }
 
