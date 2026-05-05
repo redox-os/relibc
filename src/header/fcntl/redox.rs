@@ -30,7 +30,9 @@ pub const O_NDELAY: c_int = O_NONBLOCK;
 
 // Flags for capability based "at" functions
 pub const AT_FDCWD: c_int = -100;
+// fchmodat, fchownat, fstatat, utimensat
 pub const AT_SYMLINK_NOFOLLOW: c_int = 0x200;
+// unlinkat
 pub const AT_REMOVEDIR: c_int = 0x200;
 // Used by linkat()
 pub const AT_SYMLINK_FOLLOW: c_int = 0x2000;
