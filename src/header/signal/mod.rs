@@ -6,14 +6,14 @@ use core::{mem, ptr};
 
 use cbitset::BitSet;
 
+#[cfg(target_os = "redox")]
+use crate::platform::types::pthread_attr_t;
 use crate::{
     error::{Errno, ResultExt},
     header::{bits_sigset_t::sigset_t, errno, setjmp, time::timespec},
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
-        types::{
-            c_char, c_int, c_ulonglong, c_void, pid_t, pthread_attr_t, pthread_t, size_t, uid_t,
-        },
+        types::{c_char, c_int, c_ulonglong, c_void, pid_t, pthread_t, size_t, uid_t},
     },
 };
 
@@ -69,12 +69,31 @@ pub struct sigaltstack {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 #[repr(C)]
 #[derive(Clone)]
+#[cfg(not(target_os = "linux"))]
 pub struct sigevent {
     pub sigev_value: sigval,
     pub sigev_signo: c_int,
     pub sigev_notify: c_int,
     pub sigev_notify_function: Option<extern "C" fn(sigval)>,
     pub sigev_notify_attributes: *mut pthread_attr_t,
+}
+
+// must match with signature from libc
+// https://docs.rs/libc/0.2.186/src/libc/unix/linux_like/mod.rs.html#300-322
+#[repr(C)]
+#[derive(Clone)]
+#[cfg(target_os = "linux")]
+pub struct sigevent {
+    pub sigev_value: sigval,
+    pub sigev_signo: c_int,
+    pub sigev_notify: c_int,
+    // Actually a union.  We only expose sigev_notify_thread_id because it's
+    // the most useful member
+    pub sigev_notify_thread_id: c_int,
+    #[cfg(target_pointer_width = "64")]
+    __unused1: [c_int; 11],
+    #[cfg(target_pointer_width = "32")]
+    __unused1: [c_int; 12],
 }
 
 // FIXME: This struct is wrong on Linux
