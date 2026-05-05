@@ -12,7 +12,6 @@
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
 #![feature(macro_derive)]
-#![feature(maybe_uninit_slice)]
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(pointer_is_aligned_to)]
@@ -21,7 +20,6 @@
 #![feature(stmt_expr_attributes)]
 #![feature(sync_unsafe_cell)]
 #![feature(thread_local)]
-#![feature(vec_into_raw_parts)]
 #![feature(negative_impls)]
 
 #[macro_use]
