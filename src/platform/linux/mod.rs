@@ -304,12 +304,13 @@ impl Pal for Sys {
         .map(|n| n as u32)
     }
 
-    unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
-        e_raw(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }).map(|_| ())
-    }
-
-    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
-        e_raw(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }).map(|_| ())
+    unsafe fn utimensat(
+        dirfd: c_int,
+        path: CStr,
+        times: *const timespec,
+        flag: c_int,
+    ) -> Result<()> {
+        e_raw(unsafe { syscall!(UTIMENSAT, dirfd, path.as_ptr(), times, flag) }).map(|_| ())
     }
 
     fn getcwd(mut buf: Out<[u8]>) -> Result<()> {

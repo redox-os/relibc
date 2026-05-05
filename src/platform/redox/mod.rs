@@ -543,14 +543,28 @@ impl Pal for Sys {
         Ok(unsafe { redox_rt::sys::sys_futex_wake(addr, num) }?)
     }
 
-    unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
-        (unsafe { libredox::futimens(fd as usize, times) })?;
-        Ok(())
-    }
+    unsafe fn utimensat(
+        dirfd: c_int,
+        path: CStr,
+        times: *const timespec,
+        flag: c_int,
+    ) -> Result<()> {
+        let mut path = path.to_str().map_err(|_| Errno(ENOENT))?;
+        if path.is_empty() {
+            if flag & AT_EMPTY_PATH == AT_EMPTY_PATH {
+                if dirfd == AT_FDCWD {
+                    path = ".";
+                } else {
+                    return Ok(unsafe { libredox::futimens(dirfd as usize, times) }?);
+                }
+            } else {
+                // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
+                return Err(Errno(ENOENT));
+            }
+        }
 
-    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
-        let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
-        unsafe { Self::futimens(*file, times) }
+        let file = openat2(dirfd, path, flag, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        Ok(unsafe { libredox::futimens(*file as usize, times) }?)
     }
 
     fn getcwd(buf: Out<[u8]>) -> Result<()> {
@@ -1491,7 +1505,7 @@ impl Pal for Sys {
         // <sysname>\n e.g. "Redox"
         // <release>\n e.g. "0.9.0"
         // <machine>\n e.g. "x86_64"
-        // <version>\n e.g. "yyyy-mm-ddThh:mm:ssZ"
+        // <version>\n e.g. "<commit hash of kernel>
 
         // A future file format might add the domainname.
 

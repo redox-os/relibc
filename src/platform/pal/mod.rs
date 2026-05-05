@@ -149,10 +149,23 @@ pub trait Pal {
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32>;
 
     /// Platform implementation of [`futimens()`](crate::header::sys_stat::futimens) from [`sys/stat.h`](crate::header::sys_stat).
-    unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()>;
+    unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
+        unsafe { Self::utimensat(fd, c"".into(), times, AT_EMPTY_PATH) }
+    }
 
-    /// Platform implementation of `utimens()` (TODO) from [`sys/stat.h`](crate::header::sys_stat).
-    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()>;
+    /// Platform implementation of [`utimens()`](crate::header::unistd::utimens) (from [`sys/stat.h`](crate::header::sys_stat).
+    /// This is an extension of POSIX.
+    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
+        unsafe { Self::utimensat(AT_FDCWD, path, times, 0) }
+    }
+
+    /// Platform implementation of [`utimensat()`](crate::header::unistd::utimensat) (from [`sys/stat.h`](crate::header::sys_stat).
+    unsafe fn utimensat(
+        dirfd: c_int,
+        path: CStr,
+        times: *const timespec,
+        flag: c_int,
+    ) -> Result<()>;
 
     /// Platform implementation of [`getcwd()`](crate::header::unistd::getcwd) from [`unistd.h`](crate::header::unistd).
     fn getcwd(buf: Out<[u8]>) -> Result<()>;
