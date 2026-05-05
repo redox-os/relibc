@@ -163,6 +163,7 @@ EXPECT_NAMES=\
 	time/strptime \
 	time/time \
 	time/timegm \
+	time/timer \
 	time/tzset \
 	unistd/access \
 	unistd/alarm \
