@@ -12,16 +12,23 @@ use posix_regex::{
     tree::{Tree, TreeBuilder},
 };
 
+/// cbindgen:ignore
 const ONCE: Range = Range(1, Some(1));
 
+/// The input string does not match the specified pattern.
 pub const FNM_NOMATCH: c_int = 1;
 
+/// Disable backslash escaping.
 pub const FNM_NOESCAPE: c_int = 1;
+/// Backslash in the input string only matches backlash in pattern.
 pub const FNM_PATHNAME: c_int = 2;
+/// Leading period in input string only matches period in pattern.
 pub const FNM_PERIOD: c_int = 4;
+/// Compare input string and pattern in a case-insensitive manner.
 pub const FNM_CASEFOLD: c_int = 8;
+/// Equivalent to `FNM_CASEFOLD`.
 pub const FNM_IGNORECASE: c_int = FNM_CASEFOLD;
-// TODO: FNM_EXTMATCH
+// TODO: FNM_EXTMATCH (Non-POSIX)
 
 unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
     fn any(leading: bool, flags: c_int) -> Token {
@@ -132,6 +139,12 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fnmatch.html>.
+///
+/// Checks the `input` string to see if it matches `pattern`.
+///
+/// # Safety
+///
+/// The `input` and `pattern` parameters must be non-null and properly aligned.
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // often redefined in GNU programs
 pub unsafe extern "C" fn fnmatch(
