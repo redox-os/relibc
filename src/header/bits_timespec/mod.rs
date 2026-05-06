@@ -4,6 +4,7 @@ use crate::{
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
+#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Default, Debug)]
 pub struct timespec {
@@ -79,6 +80,3 @@ impl<'a> From<&'a timespec> for syscall::TimeSpec {
         }
     }
 }
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_alias_timespec(_: timespec) {}
