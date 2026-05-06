@@ -57,6 +57,7 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
     let mut offset = 0;
     let buf = unsafe { platform::alloc(size).cast::<c_char>() };
 
+    #[expect(clippy::needless_range_loop)]
     for i in 0..len {
         let dest_buf = unsafe { buf.add(offset) };
         let item = unsafe { *array.add(i) };

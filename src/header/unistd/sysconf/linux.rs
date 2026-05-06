@@ -326,7 +326,7 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
             }
         }
         _SC_V6_LPBIG_OFFBIG => -1,
-        _SC_HOST_NAME_MAX => HOST_NAME_MAX.try_into().unwrap_or(-1),
+        _SC_HOST_NAME_MAX => HOST_NAME_MAX,
         _SC_TRACE => -1,
         _SC_TRACE_EVENT_FILTER => -1,
         _SC_TRACE_INHERIT => -1,
