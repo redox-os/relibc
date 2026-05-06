@@ -5,15 +5,14 @@
 use core::slice;
 
 use crate::{
-    header::{
-        bits_iovec::{gather, iovec, scatter},
-        errno, unistd,
-    },
+    header::{errno, unistd},
     platform::{
         self,
         types::{c_int, c_void, off_t, ssize_t},
     },
 };
+
+pub use crate::header::bits_iovec::{gather, iovec, scatter};
 
 pub const IOV_MAX: c_int = 1024;
 
