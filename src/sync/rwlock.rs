@@ -74,8 +74,10 @@ impl InnerRwLock {
                     waiting_wr = expected & WAITING_WR;
 
                     if actual & COUNT_MASK > 0 {
-                        if crate::sync::futex_wait(&self.state, expected, relative.as_ref()) == super::FutexWaitResult::TimedOut {
-                            return Err(Errno(ETIMEDOUT))
+                        if crate::sync::futex_wait(&self.state, expected, relative.as_ref())
+                            == super::FutexWaitResult::TimedOut
+                        {
+                            return Err(Errno(ETIMEDOUT));
                         }
                     } else {
                         // We must avoid blocking indefinitely in our `futex_wait()`, in this case
@@ -93,8 +95,10 @@ impl InnerRwLock {
     pub fn acquire_read_lock(&self, deadline: Option<(&timespec, clockid_t)>) -> Result<(), Errno> {
         let relative = Self::translate_timeout(deadline)?;
         while let Err(old) = self.try_acquire_read_lock() {
-            if crate::sync::futex_wait(&self.state, old, relative.as_ref()) == super::FutexWaitResult::TimedOut {
-                return Err(Errno(ETIMEDOUT))
+            if crate::sync::futex_wait(&self.state, old, relative.as_ref())
+                == super::FutexWaitResult::TimedOut
+            {
+                return Err(Errno(ETIMEDOUT));
             }
         }
 

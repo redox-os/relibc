@@ -835,10 +835,7 @@ mod tests {
 
         let mut reader = BufReader::with_capacity(5, PositionReader { pos: 0 });
         assert_eq!(reader.fill_buf().ok(), Some(&[0, 1, 2, 3, 4][..]));
-        assert_eq!(
-            reader.seek(SeekFrom::End(-5)).ok(),
-            Some(u64::MAX - 5)
-        );
+        assert_eq!(reader.seek(SeekFrom::End(-5)).ok(), Some(u64::MAX - 5));
         assert_eq!(reader.fill_buf().ok().map(|s| s.len()), Some(5));
         // the following seek will require two underlying seeks
         let expected = 9223372036854775802;
