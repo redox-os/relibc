@@ -1,4 +1,10 @@
-sys_includes = ["sys/types.h", "sys/resource.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_wait.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/wait.h> header shall define the id_t and pid_t types as described in <sys/types.h>."
+# - "The <sys/wait.h> header shall define the siginfo_t type and the sigval union as described in <signal.h>."
+# - "Inclusion of the <sys/wait.h> header may also make visible all symbols from <signal.h>."
+sys_includes = ["sys/types.h", "signal.h"]
 include_guard = "_RELIBC_SYS_WAIT_H"
 after_includes = """
 
