@@ -574,6 +574,7 @@ macro_rules! CheckVsLibcCrate {
             const _: () = {
                 fn ensure_ty<A, B>(a: A, b: B) where (): $crate::macros::LibcTypeEquals::<A, B> {}
                 fn for_libc(a: $name, b: __libc_only_for_layout_checks::$name) {
+                    #[allow(clippy::diverging_sub_expression)]
                     let a: $type = panic!("never called");
                     ensure_ty(a, b.$field);
                 }
