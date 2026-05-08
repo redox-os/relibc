@@ -1,6 +1,7 @@
 sys_includes = ["stddef.h"]
 # TODO: figure out how to export void* type
 after_includes = """
+#include <bits/ssize-t.h>
 #include <bits/suseconds-t.h>
 #include <bits/time-t.h>
 
