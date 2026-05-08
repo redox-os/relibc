@@ -24,7 +24,6 @@ include = [
   "off_t",
   "pid_t",
   "id_t",
-  "ssize_t",
   "useconds_t",
   "clock_t",
   "clockid_t",

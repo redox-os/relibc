@@ -1,0 +1,25 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html
+#
+# This type is split out to prevent importing all of sys/types.h into other headers.
+#
+# POSIX headers that require ssize_t:
+# - aio.h
+# - dirent.h
+# - monetary.h
+# - mqueue.h
+# - stdio.h
+# - sys/msg.h
+# - sys/socket.h
+# - sys/types.h (where it should be defined)
+# - sys/uio.h
+# - unistd.h
+sys_includes = []
+include_guard = "_RELIBC_BITS_SSIZE_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+[export]
+include = ["ssize_t"]
+[enum]
+prefix_with_name = true
