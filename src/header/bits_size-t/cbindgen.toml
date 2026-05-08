@@ -1,0 +1,44 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stddef.h.html
+#
+# This type is split out to prevent importing all of stddef.h into other headers.
+#
+# POSIX headers that require size_t:
+# - aio.h
+# - devctl.h (TODO not present in relibc)
+# - dirent.h
+# - glob.h
+# - grp.h
+# - iconv.h (external libiconv (gettext dependency))
+# - monetary.h
+# - mqueue.h (TODO not present in relibc)
+# - nbdm.h (TODO not present in relibc)
+# - pwd.h
+# - regex.h
+# - search.h (TODO not present in relibc)
+# - signal.h
+# - stdio.h
+# - stdlib.h
+# - string.h
+# - strings.h
+# - sys/mman.h
+# - sys/msg.h (TODO not present in relibc)
+# - sys/sem.h (TODO not present in relibc)
+# - sys/shm.h (TODO not present in relibc)
+# - sys/socket.h
+# - sys/types.h (should be re-exported)
+# - sys/uio.h
+# - time.h
+# - uchar.h (TODO not present in relibc)
+# - unistd.h
+# - wchar.h
+# - wordexp.h (TODO not present in relibc)
+sys_includes = []
+include_guard = "_RELIBC_BITS_SIZE_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+[export]
+include = ["size_t"]
+[enum]
+prefix_with_name = true
