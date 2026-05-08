@@ -5,7 +5,8 @@
 # POSIX headers that require timeval:
 # - sys/resource.h
 # - sys/select.h (where it should be defined)
-# - sys/time.h
+# - sys/time.h (previous POSIX versions defined it here)
+# - utmpx.h (TODO: not currently present in relibc)
 after_includes = """
 #include <bits/time-t.h>
 #include <bits/suseconds-t.h>
@@ -18,3 +19,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export]
+include = ["timeval"]
