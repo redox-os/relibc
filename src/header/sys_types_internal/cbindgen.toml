@@ -1,3 +1,4 @@
+# stddef.h brings in size_t
 sys_includes = ["stddef.h"]
 # TODO: figure out how to export void* type
 after_includes = """
