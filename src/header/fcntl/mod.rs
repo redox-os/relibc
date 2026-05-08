@@ -113,9 +113,6 @@ pub unsafe extern "C" fn openat(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(_: flock) {}
-
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, length: off_t) -> c_int {
     // Length can't be zero and offset must be positive.
     let Ok(offset) = offset.try_into() else {
