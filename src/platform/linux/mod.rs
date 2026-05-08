@@ -244,6 +244,7 @@ impl Pal for Sys {
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int> {
+        Sys::write(2,b"testing2").expect("test");
         Ok(e_raw(unsafe { syscall!(FCNTL, fildes, cmd, arg) })? as c_int)
     }
 

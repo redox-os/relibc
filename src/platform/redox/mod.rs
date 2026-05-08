@@ -331,6 +331,7 @@ impl Pal for Sys {
     }
 
     fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> Result<c_int> {
+        Self::write(2,b"testing2").expect("test");
         match cmd {
             F_SETLK | F_OFD_SETLK => {
                 let is_ofd = cmd == F_OFD_SETLK;

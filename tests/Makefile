@@ -33,7 +33,8 @@ support_build: $(BUILD)/expected \
 	$(BUILD)/sys_stat/stat.c \
 	$(BUILD)/unistd/link.c \
 	$(BUILD)/wchar/fgetwc.in \
-	$(BUILD)/wchar/ungetwc.in
+	$(BUILD)/wchar/ungetwc.in \
+	$(BUILD)/ppoll.c
 
 run: build
 	$(MAKE) run -C $(BUILD)
