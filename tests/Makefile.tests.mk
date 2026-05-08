@@ -174,6 +174,7 @@ EXPECT_NAMES=\
 	unistd/ftruncate \
 	unistd/getopt \
 	unistd/getopt_long \
+	unistd/nice \
 	unistd/pipe \
 	unistd/readlinkat \
 	unistd/rmdir \
