@@ -234,7 +234,7 @@ unsafe extern "C" fn new_thread_shim(
 
     unsafe { tcb.copy_masters() }.unwrap();
 
-    unsafe { (*tcb).pthread.os_tid.get().write(Sys::current_os_tid()) };
+    unsafe { tcb.pthread.os_tid.get().write(Sys::current_os_tid()) };
 
     unsafe { (&*synchronization_mutex).manual_unlock() };
 

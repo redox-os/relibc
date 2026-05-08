@@ -7,7 +7,9 @@
 //! <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/types.h.html>
 //! for the old specification.
 
-pub use crate::header::{bits_suseconds_t::suseconds_t, bits_time_t::time_t};
+pub use crate::header::{
+    bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t, bits_time_t::time_t,
+};
 use crate::platform::types::{
     c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
@@ -38,8 +40,6 @@ pub type off_t = c_longlong;
 pub type pid_t = c_int;
 /// Used as a general identifier; can be used to contain at least a pid_t, uid_t, or gid_t.
 pub type id_t = c_uint;
-/// Used for a count of bytes or an error indication.
-pub type ssize_t = c_long;
 pub type useconds_t = c_uint;
 
 /// Used for system times in clock ticks or CLOCKS_PER_SEC.

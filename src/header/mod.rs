@@ -13,15 +13,19 @@ pub mod bits_pthread;
 pub mod bits_safamily_t;
 #[path = "bits_sigset-t/mod.rs"]
 pub mod bits_sigset_t;
+#[path = "bits_size-t/mod.rs"]
+pub mod bits_size_t;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
+#[path = "bits_ssize-t/mod.rs"]
+pub mod bits_ssize_t;
 #[path = "bits_suseconds-t/mod.rs"]
 pub mod bits_suseconds_t;
 #[path = "bits_time-t/mod.rs"]
 pub mod bits_time_t;
 pub mod bits_timespec;
 pub mod bits_timeval;
-// complex.h implemented in C
+// complex.h implemented in C (currently through openlibm)
 pub mod cpio;
 pub mod crypt;
 pub mod ctype;
@@ -132,7 +136,7 @@ pub mod sys_wait;
 pub mod tar;
 // TODO: term.h (deprecated)
 pub mod termios;
-// TODO: tgmath.h (likely C implementation)
+// TODO: tgmath.h (likely C implementation currenly through openlibm)
 // TODO: threads.h
 pub mod time;
 // TODO: uchar.h
