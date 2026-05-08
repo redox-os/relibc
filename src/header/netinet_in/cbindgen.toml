@@ -13,9 +13,8 @@
 # - including netinet/in.h in arpa/inet.h
 # - splitting out functions (htonl, htons, ntohl, ntohs) into bits/arpainet.h
 #
-# sys/types.h needed for c_int and c_char
 # bits/arpainet.h brings in inttypes.h
-sys_includes = ["sys/types.h", "sys/socket.h"]
+sys_includes = ["sys/socket.h"]
 after_includes = """
 #include <bits/arpainet.h> // for htonl, htons, ntohl, ntohs
 """
