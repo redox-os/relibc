@@ -15,6 +15,8 @@ pub mod bits_safamily_t;
 pub mod bits_sigset_t;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
+#[path = "bits_ssize-t/mod.rs"]
+pub mod bits_ssize_t;
 #[path = "bits_suseconds-t/mod.rs"]
 pub mod bits_suseconds_t;
 #[path = "bits_time-t/mod.rs"]
