@@ -1,6 +1,6 @@
-# sys/types.h brings in features.h (needed for #[deprecated] annotations)
-sys_includes = ["sys/types.h", "sys/select.h"]
-include_guard = "_SYS_TIME_H"
+# features.h needed for #[deprecated] annotations
+sys_includes = ["features.h", "sys/types.h", "sys/select.h"]
+include_guard = "_RELIBC_SYS_TIME_H"
 language = "C"
 after_includes = """
 #include <bits/timespec.h> // for timespec
