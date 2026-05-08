@@ -1,4 +1,0 @@
-This is printed to STDOUT.
-Or, at least, that's what I thought.
-But all write(...) syscalls are actually redirected to STDERR by the tracer.
-Big surprise, right!

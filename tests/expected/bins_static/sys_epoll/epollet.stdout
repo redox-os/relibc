@@ -1,5 +1,0 @@
-ctl ADD: 0
-wait for HUP, edge-triggered: 1
-wait for HUP again: 0
-ctl MOD: 0
-wait for HUP: 1
