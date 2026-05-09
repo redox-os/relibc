@@ -805,9 +805,25 @@ pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nice.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn nice(incr: c_int) -> c_int {
-    unimplemented!();
+    let prio = Sys::getpriority(sys_resource::PRIO_PROCESS, 0).or_minus_one_errno();
+    if prio < 0 {
+        return prio;
+    }
+
+    let current_nice = 20 - prio;
+    let new_nice = current_nice.saturating_add(incr).clamp(-20, 19);
+
+    if Sys::setpriority(sys_resource::PRIO_PROCESS, 0, new_nice)
+        .map(|()| 0)
+        .or_minus_one_errno()
+        < 0
+    {
+        return -1;
+    }
+
+    return new_nice;
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pause.html>.
