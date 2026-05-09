@@ -5,9 +5,10 @@
 # POSIX headers that require iovec:
 # - sys/socket.h
 # - sys/uio.h (where it should be defined)
-#
-# sys/types.h included for c_void and size_t
-sys_includes = ["sys/types.h"]
+sys_includes = []
+after_includes = """
+#include <bits/size-t.h> // for size_t from sys/types.h
+"""
 include_guard = "_RELIBC_BITS_IOVEC_H"
 language = "C"
 style = "Tag"
