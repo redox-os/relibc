@@ -10,6 +10,8 @@ pub mod bits_iovec;
 pub mod bits_locale_t;
 #[path = "bits_off-t/mod.rs"]
 pub mod bits_off_t;
+#[path = "bits_pid-t/mod.rs"]
+pub mod bits_pid_t;
 pub mod bits_pthread;
 #[path = "bits_safamily-t/mod.rs"]
 pub mod bits_safamily_t;
