@@ -394,6 +394,3 @@ pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
 pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
     dir.opaque_offset as c_long
 }
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_posix_dent(_: posix_dent) {}
