@@ -1,7 +1,5 @@
 use core::convert::TryInto;
 
-use alloc::string::String;
-
 use crate::{
     error::Errno,
     fs::File,
@@ -108,12 +106,17 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
 }
 
 pub fn get_cpu_count() -> Result<Option<c_long>, Errno> {
-    let mut string = String::new();
+    // As long as CPUs: entry is in the first line, this is safe
+    let mut buffer = [0u8; 128];
     let mut file = File::open(c"/scheme/sys/cpu".into(), fcntl::O_RDONLY)?;
-    file.read_to_string(&mut string)
+
+    let bytes_read = file
+        .read(&mut buffer)
         .map_err(|_| Errno(errno::EIO).sync())?;
 
-    Ok(string
+    let contents =
+        str::from_utf8(&buffer[..bytes_read]).map_err(|_| Errno(errno::EINVAL).sync())?;
+    Ok(contents
         .lines()
         .find(|line| line.starts_with("CPUs:"))
         .and_then(|line| line.split(':').nth(1))
