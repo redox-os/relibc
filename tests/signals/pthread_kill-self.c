@@ -11,11 +11,8 @@
 
 # define INTHREAD 0
 # define INMAIN 1
-# define SIGTOTEST SIGABRT
-
 int sem1;		/* Manual semaphore */
 volatile sig_atomic_t handler_called = 0;
-int count = 1;
 
 struct signal {
 	int signum;
@@ -74,9 +71,10 @@ int pthread_kill_test1(int signum)
 
 	ERROR_IF(pthread_kill, handler_called, == -1);
 	ERROR_IF(pthread_kill, handler_called, == 0);
-	
+	pthread_join(new_th, NULL);
+
 	handler_called = 0;
-	return EXIT_SUCCESS;	
+	return EXIT_SUCCESS;
 }
 
 int main(){
@@ -91,4 +89,3 @@ int main(){
 	}
 	return EXIT_SUCCESS;
 }
-

@@ -11,7 +11,7 @@ void prepare() {
 void parent() {
     // Make sure we print in the right order and also don't exit
     // before the fork does.
-    int us_status = usleep(1000);
+    int us_status = usleep(100000);
     ERROR_IF(usleep, us_status, == -1);
     UNEXP_IF(usleep, us_status, != 0);
 
