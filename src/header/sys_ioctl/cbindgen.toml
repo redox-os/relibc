@@ -1,7 +1,5 @@
-include_guard = "_SYS_IOCTL_H"
-language = "C"
-style = "Tag"
-trailer = """
+include_guard = "_RELIBC_SYS_IOCTL_H"
+after_includes = """
 // Shamelessly copy-pasted from musl
 
 #define _IOC(a,b,c,d) ( ((a)<<30) | ((b)<<8) | (c) | ((d)<<16) )
@@ -14,6 +12,8 @@ trailer = """
 #define _IOR(a,b,c) _IOC(_IOC_READ,(a),(b),sizeof(c))
 #define _IOWR(a,b,c) _IOC(_IOC_READ|_IOC_WRITE,(a),(b),sizeof(c))
 """
+language = "C"
+style = "Tag"
 no_includes = true
 cpp_compat = true
 

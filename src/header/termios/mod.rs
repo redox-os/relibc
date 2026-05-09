@@ -3,15 +3,14 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/termios.h.html>.
 
 use crate::{
-    header::{
-        errno,
-        sys_ioctl::{self, winsize},
-    },
+    header::{errno, sys_ioctl},
     platform::{
         self,
         types::{c_int, c_uchar, c_uint, c_ulong, c_void, pid_t},
     },
 };
+
+pub use crate::header::sys_ioctl::winsize;
 
 pub use self::sys::*;
 
