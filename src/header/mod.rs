@@ -5,6 +5,8 @@ pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
 pub mod bits_arpainet;
+#[path = "bits_gid-t/mod.rs"]
+pub mod bits_gid_t;
 pub mod bits_iovec;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;

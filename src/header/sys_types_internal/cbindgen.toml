@@ -2,6 +2,7 @@
 sys_includes = ["stddef.h"]
 # TODO: figure out how to export void* type
 after_includes = """
+#include <bits/gid-t.h>
 #include <bits/off-t.h>
 #include <bits/pid-t.h>
 #include <bits/ssize-t.h>
@@ -21,7 +22,6 @@ include = [
   "dev_t",
   "ino_t",
   "reclen_t",
-  "gid_t",
   "uid_t",
   "mode_t",
   "nlink_t",
