@@ -186,7 +186,7 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 # Release targets
 
 $(BUILD)/release/librelibc.a: $(SRC)
-	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+	$(CARGO) rustc --release $(CARGOFLAGS) $(FEATURE_MATH) -- --emit link=$@ $(RUSTCFLAGS)
 	@# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	@# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
