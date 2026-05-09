@@ -8,7 +8,7 @@
 //! for the old specification.
 
 pub use crate::header::{
-    bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t, bits_time_t::time_t,
+    bits_off_t::off_t, bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t, bits_time_t::time_t,
 };
 use crate::platform::types::{
     c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
@@ -34,8 +34,6 @@ pub type mode_t = c_uint;
 pub type mode_t = c_int;
 /// Used for link counts.
 pub type nlink_t = c_ulong;
-/// Used for file sizes.
-pub type off_t = c_longlong;
 /// Used for process IDs and process group IDs.
 pub type pid_t = c_int;
 /// Used as a general identifier; can be used to contain at least a pid_t, uid_t, or gid_t.
