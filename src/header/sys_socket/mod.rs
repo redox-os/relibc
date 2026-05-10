@@ -27,9 +27,6 @@ pub struct linger {
     pub l_linger: c_int,
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn _cbindgen_export_linger(linger: linger) {}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
@@ -52,6 +49,8 @@ pub struct cmsghdr {
     pub cmsg_type: c_int,
 }
 
+// TODO: `ucred` should be behind _GNU_SOURCE include guard
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/unix.7.html>.
 #[repr(C)]
 #[derive(Clone, Debug)]
 // FIXME: CheckVsLibcCrate
@@ -60,12 +59,6 @@ pub struct ucred {
     pub uid: uid_t,
     pub gid: gid_t,
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _cbindgen_export_cmsghdr(cmsghdr: cmsghdr) {}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _cbindgen_export_ucred(ucred: ucred) {}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]

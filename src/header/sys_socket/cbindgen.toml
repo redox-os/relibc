@@ -41,5 +41,12 @@ cpp_compat = true
 [enum]
 prefix_with_name = true
 
+[export]
+include = [
+    "linger",
+    "cmsghdr",
+    "ucred"
+]
+
 [export.rename]
 "iovec" = "struct iovec"
