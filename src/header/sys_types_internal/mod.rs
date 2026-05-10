@@ -9,7 +9,7 @@
 
 pub use crate::header::{
     bits_gid_t::gid_t, bits_off_t::off_t, bits_pid_t::pid_t, bits_ssize_t::ssize_t,
-    bits_suseconds_t::suseconds_t, bits_time_t::time_t,
+    bits_suseconds_t::suseconds_t, bits_time_t::time_t, bits_uid_t::uid_t,
 };
 use crate::platform::types::{
     c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
@@ -23,8 +23,6 @@ pub type dev_t = c_ulonglong;
 pub type ino_t = c_ulonglong;
 /// Used for directory entry lengths.
 pub type reclen_t = c_ushort;
-/// Used for user IDs.
-pub type uid_t = c_int;
 /// Used for some file attributes.
 #[cfg(target_os = "linux")]
 pub type mode_t = c_uint;

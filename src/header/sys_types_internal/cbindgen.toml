@@ -8,6 +8,7 @@ after_includes = """
 #include <bits/ssize-t.h>
 #include <bits/suseconds-t.h>
 #include <bits/time-t.h>
+#include <bits/uid-t.h>
 
 typedef void* timer_t;
 """
@@ -22,7 +23,6 @@ include = [
   "dev_t",
   "ino_t",
   "reclen_t",
-  "uid_t",
   "mode_t",
   "nlink_t",
   "id_t",
