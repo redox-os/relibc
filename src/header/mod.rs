@@ -31,6 +31,8 @@ pub mod bits_suseconds_t;
 pub mod bits_time_t;
 pub mod bits_timespec;
 pub mod bits_timeval;
+#[path = "bits_uid-t/mod.rs"]
+pub mod bits_uid_t;
 // complex.h implemented in C (currently through openlibm)
 pub mod cpio;
 pub mod crypt;
