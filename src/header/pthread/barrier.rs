@@ -22,6 +22,7 @@ impl Default for RlctBarrierAttr {
 }
 
 // Not async-signal-safe.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrier_destroy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_barrier_destroy(barrier: *mut pthread_barrier_t) -> c_int {
     // Behavior is undefined if any thread is currently waiting when this is called.
@@ -33,6 +34,7 @@ pub unsafe extern "C" fn pthread_barrier_destroy(barrier: *mut pthread_barrier_t
 }
 
 // Not async-signal-safe.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrier_init.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_barrier_init(
     barrier: *mut pthread_barrier_t,
@@ -56,6 +58,7 @@ fn unlikely(condition: bool) -> bool {
 }
 
 // Not async-signal-safe.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrier_wait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_barrier_wait(barrier: *mut pthread_barrier_t) -> c_int {
     let barrier = unsafe { &*barrier.cast::<RlctBarrier>() };
@@ -67,6 +70,7 @@ pub unsafe extern "C" fn pthread_barrier_wait(barrier: *mut pthread_barrier_t) -
 }
 
 // Not async-signal-safe.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrierattr_init.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_barrierattr_init(attr: *mut pthread_barrierattr_t) -> c_int {
     unsafe { core::ptr::write(attr.cast::<RlctBarrierAttr>(), RlctBarrierAttr::default()) };
@@ -75,6 +79,7 @@ pub unsafe extern "C" fn pthread_barrierattr_init(attr: *mut pthread_barrierattr
 }
 
 // Not async-signal-safe.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrierattr_setpshared.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_barrierattr_setpshared(
     attr: *mut pthread_barrierattr_t,
@@ -87,6 +92,7 @@ pub unsafe extern "C" fn pthread_barrierattr_setpshared(
 }
 
 // Not async-signal-safe.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrierattr_getpshared.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_barrierattr_getpshared(
     attr: *const pthread_barrierattr_t,
@@ -97,6 +103,7 @@ pub unsafe extern "C" fn pthread_barrierattr_getpshared(
 }
 
 // Not async-signal-safe.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrierattr_destroy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_barrierattr_destroy(attr: *mut pthread_barrierattr_t) -> c_int {
     unsafe { core::ptr::drop_in_place(attr) };

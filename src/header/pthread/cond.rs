@@ -6,11 +6,13 @@ use super::*;
 
 // PTHREAD_COND_INITIALIZER is defined manually in bits_pthread/cbindgen.toml
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_broadcast.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> c_int {
     e((unsafe { &*cond.cast::<RlctCond>() }).broadcast())
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_destroy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_int {
     // No-op
@@ -18,6 +20,7 @@ pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_in
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_init.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_init(
     cond: *mut pthread_cond_t,
@@ -37,11 +40,13 @@ pub unsafe extern "C" fn pthread_cond_init(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_signal.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_signal(cond: *mut pthread_cond_t) -> c_int {
     e((unsafe { &*cond.cast::<RlctCond>() }).signal())
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_timedwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_timedwait(
     cond: *mut pthread_cond_t,
@@ -52,6 +57,7 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
         .timedwait(unsafe { &*mutex.cast::<RlctMutex>() }, unsafe { &*timeout }))
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_clockwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_clockwait(
     cond: *mut pthread_cond_t,
@@ -66,6 +72,7 @@ pub unsafe extern "C" fn pthread_cond_clockwait(
     ))
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_wait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_wait(
     cond: *mut pthread_cond_t,
@@ -74,6 +81,7 @@ pub unsafe extern "C" fn pthread_cond_wait(
     e((unsafe { &*cond.cast::<RlctCond>() }).wait(unsafe { &*mutex.cast::<RlctMutex>() }))
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_condattr_destroy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_destroy(condattr: *mut pthread_condattr_t) -> c_int {
     unsafe { core::ptr::drop_in_place(condattr.cast::<RlctCondAttr>()) };
@@ -81,6 +89,7 @@ pub unsafe extern "C" fn pthread_condattr_destroy(condattr: *mut pthread_condatt
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_condattr_getclock.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_getclock(
     condattr: *const pthread_condattr_t,
@@ -90,6 +99,7 @@ pub unsafe extern "C" fn pthread_condattr_getclock(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_condattr_getpshared.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_getpshared(
     condattr: *const pthread_condattr_t,
@@ -99,6 +109,7 @@ pub unsafe extern "C" fn pthread_condattr_getpshared(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_condattr_init.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_init(condattr: *mut pthread_condattr_t) -> c_int {
     unsafe {
@@ -109,6 +120,7 @@ pub unsafe extern "C" fn pthread_condattr_init(condattr: *mut pthread_condattr_t
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_condattr_setclock.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_setclock(
     condattr: *mut pthread_condattr_t,
@@ -118,6 +130,7 @@ pub unsafe extern "C" fn pthread_condattr_setclock(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_condattr_setpshared.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_setpshared(
     condattr: *mut pthread_condattr_t,

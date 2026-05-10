@@ -34,12 +34,14 @@ impl Default for RlctAttr {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_destroy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_destroy(attr: *mut pthread_attr_t) -> c_int {
     unsafe { ptr::drop_in_place(attr) };
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getdetachstate.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getdetachstate(
     attr: *const pthread_attr_t,
@@ -49,6 +51,7 @@ pub unsafe extern "C" fn pthread_attr_getdetachstate(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getguardsize.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getguardsize(
     attr: *const pthread_attr_t,
@@ -58,6 +61,7 @@ pub unsafe extern "C" fn pthread_attr_getguardsize(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getinheritsched.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getinheritsched(
     attr: *const pthread_attr_t,
@@ -67,6 +71,7 @@ pub unsafe extern "C" fn pthread_attr_getinheritsched(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getschedparam.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getschedparam(
     attr: *const pthread_attr_t,
@@ -76,6 +81,7 @@ pub unsafe extern "C" fn pthread_attr_getschedparam(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getschedpolicy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getschedpolicy(
     attr: *const pthread_attr_t,
@@ -85,6 +91,7 @@ pub unsafe extern "C" fn pthread_attr_getschedpolicy(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getscope.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getscope(
     attr: *const pthread_attr_t,
@@ -94,6 +101,7 @@ pub unsafe extern "C" fn pthread_attr_getscope(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getstack.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getstack(
     attr: *const pthread_attr_t,
@@ -105,6 +113,7 @@ pub unsafe extern "C" fn pthread_attr_getstack(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_getstacksize.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getstacksize(
     attr: *const pthread_attr_t,
@@ -114,12 +123,14 @@ pub unsafe extern "C" fn pthread_attr_getstacksize(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_init.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_init(attr: *mut pthread_attr_t) -> c_int {
     unsafe { ptr::write(attr.cast::<RlctAttr>(), RlctAttr::default()) };
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setdetachstate.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setdetachstate(
     attr: *mut pthread_attr_t,
@@ -131,6 +142,7 @@ pub unsafe extern "C" fn pthread_attr_setdetachstate(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setguardsize.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setguardsize(
     attr: *mut pthread_attr_t,
@@ -142,6 +154,7 @@ pub unsafe extern "C" fn pthread_attr_setguardsize(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setinheritsched.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setinheritsched(
     attr: *mut pthread_attr_t,
@@ -153,6 +166,7 @@ pub unsafe extern "C" fn pthread_attr_setinheritsched(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setschedparam.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setschedparam(
     attr: *mut pthread_attr_t,
@@ -164,6 +178,7 @@ pub unsafe extern "C" fn pthread_attr_setschedparam(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setschedpolicy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setschedpolicy(
     attr: *mut pthread_attr_t,
@@ -175,6 +190,7 @@ pub unsafe extern "C" fn pthread_attr_setschedpolicy(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setscope.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setscope(attr: *mut pthread_attr_t, scope: c_int) -> c_int {
     unsafe {
@@ -183,6 +199,7 @@ pub unsafe extern "C" fn pthread_attr_setscope(attr: *mut pthread_attr_t, scope:
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setstack.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setstack(
     attr: *mut pthread_attr_t,
@@ -198,6 +215,7 @@ pub unsafe extern "C" fn pthread_attr_setstack(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setstacksize.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setstacksize(
     attr: *mut pthread_attr_t,
