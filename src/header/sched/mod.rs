@@ -13,17 +13,27 @@ use crate::{
 
 // TODO: There are extensions, but adding more member is breaking ABI for pthread_attr_t
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
+///
+/// Scheduling parameters required for each supported scheduling policy.
+#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct sched_param {
+    /// Process or thread execution scheduling priority.
     pub sched_priority: c_int,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
+///
+/// First in first out (FIFO) scheduling policy.
 pub const SCHED_FIFO: c_int = 0;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
+///
+/// Round robin scheduling policy.
 pub const SCHED_RR: c_int = 1;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
+///
+/// Another scheduling policy.
 pub const SCHED_OTHER: c_int = 2;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sched_get_priority_max.html>.
@@ -67,10 +77,10 @@ pub extern "C" fn sched_setscheduler(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sched_yield.html>.
+///
+/// Force the running thread to relinquish the processor until it again
+/// becomes the head of its thread list.
 #[unsafe(no_mangle)]
 pub extern "C" fn sched_yield() -> c_int {
     Sys::sched_yield().map(|()| 0).or_minus_one_errno()
 }
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_sched_param(_: sched_param) {}
