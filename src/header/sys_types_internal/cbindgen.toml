@@ -4,6 +4,7 @@ sys_includes = ["stddef.h"]
 after_includes = """
 #include <bits/clock-t.h>
 #include <bits/gid-t.h>
+#include <bits/id-t.h>
 #include <bits/off-t.h>
 #include <bits/pid-t.h>
 #include <bits/ssize-t.h>
@@ -26,7 +27,6 @@ include = [
   "reclen_t",
   "mode_t",
   "nlink_t",
-  "id_t",
   "useconds_t",
   "clockid_t",
   "blkcnt_t",
