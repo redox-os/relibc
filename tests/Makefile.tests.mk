@@ -292,6 +292,7 @@ VARIED_NAMES=\
 	sys_socket/getpeername \
 	sys_stat/stat \
 	sys_statvfs/statvfs \
+	sys_time/utimes \
 	sys_utsname/uname \
 	time/gettimeofday \
 	unistd/chdir \
