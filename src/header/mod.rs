@@ -5,6 +5,8 @@ pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
 pub mod bits_arpainet;
+#[path = "bits_clock-t/mod.rs"]
+pub mod bits_clock_t;
 #[path = "bits_gid-t/mod.rs"]
 pub mod bits_gid_t;
 pub mod bits_iovec;
