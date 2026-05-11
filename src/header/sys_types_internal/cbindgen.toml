@@ -2,6 +2,7 @@
 sys_includes = ["stddef.h"]
 # TODO: figure out how to export void* type
 after_includes = """
+#include <bits/clock-t.h>
 #include <bits/gid-t.h>
 #include <bits/off-t.h>
 #include <bits/pid-t.h>
@@ -27,7 +28,6 @@ include = [
   "nlink_t",
   "id_t",
   "useconds_t",
-  "clock_t",
   "clockid_t",
   "blkcnt_t",
   "fsblkcnt_t",
