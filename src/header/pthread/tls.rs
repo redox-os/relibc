@@ -82,10 +82,14 @@ pub unsafe extern "C" fn pthread_key_create(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_key_delete(key: pthread_key_t) -> c_int {
-    if KEYS.lock().remove(&key).is_none() || VALUES.borrow_mut().remove(&key).is_none() {
+    if KEYS.lock().remove(&key).is_none() {
         // We don't have to return anything, but it's not less expensive to ignore it.
         return EINVAL;
     }
+
+    // POSIX recommends to return EINVAL if the value does not "refers"
+    // to this key, but we do not map VALUES back to KEYS
+    VALUES.borrow_mut().remove(&key);
 
     0
 }
