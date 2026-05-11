@@ -1,0 +1,29 @@
+# "Inclusion of the <mqueue.h> header may make visible symbols defined in the headers
+# <fcntl.h>, <signal.h>, and <time.h>."
+sys_includes = ["fcntl.h", "signal.h", "time.h"]
+include_guard = "_RELIBC_MQUEUE_H"
+language = "C"
+style = "tag"
+no_includes = true
+cpp_compat = true
+after_includes = """
+// "The <mqueue.h> header shall define the size_t and
+// ssize_t types as described in <sys/types.h>."
+#include <bits/size-t.h>
+#include <bits/ssize-t.h>
+
+// "The <mqueue.h> header shall define the struct timespec structure as described in <time.h>."
+#include <bits/timespec.h>
+
+// "The tag sigevent shall be declared as naming an incomplete
+// structure type, the contents of which
+// are described in the <signal.h> header."
+// Realistically, an opaque forward declaration would be sufficient.
+#include <bits/sigevent-t.h>
+"""
+
+[export.rename]
+"timespec" = "struct timespec"
+
+[enum]
+prefix_with_name = true
