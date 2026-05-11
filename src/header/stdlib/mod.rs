@@ -924,7 +924,7 @@ pub unsafe extern "C" fn posix_memalign(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "redox")]
-    let r = unsafe { open(c"/scheme/pty".as_ptr(), O_CREAT) };
+    let r = unsafe { open(c"/scheme/pty".as_ptr(), flags) };
 
     #[cfg(target_os = "linux")]
     let r = unsafe { open(c"/dev/ptmx".as_ptr(), flags) };

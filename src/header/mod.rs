@@ -145,7 +145,7 @@ pub mod tar;
 // TODO: term.h (deprecated)
 pub mod termios;
 // TODO: tgmath.h (likely C implementation currenly through openlibm)
-// TODO: threads.h
+pub mod threads;
 pub mod time;
 // TODO: uchar.h
 // TODO: ucontext.h (deprecated)
