@@ -29,6 +29,7 @@ static VALUES: RefCell<BTreeMap<pthread_key_t, Record>> = RefCell::new(BTreeMap:
 static KEYS: Mutex<BTreeMap<pthread_key_t, Dtor>> = Mutex::new(BTreeMap::new());
 static NEXTKEY: AtomicUsize = AtomicUsize::new(1);
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_getspecific.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut c_void {
     // According to POSIX (issue 8): Calling [`pthread_getspecific`] with a key
@@ -44,6 +45,7 @@ pub unsafe extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut c_void 
         .unwrap_or(ptr::null_mut())
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_setspecific.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c_void) -> c_int {
     if !KEYS.lock().contains_key(&key) {
@@ -63,6 +65,7 @@ pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_key_create.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_key_create(
     key_ptr: *mut pthread_key_t,
@@ -80,6 +83,7 @@ pub unsafe extern "C" fn pthread_key_create(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_key_delete.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_key_delete(key: pthread_key_t) -> c_int {
     if KEYS.lock().remove(&key).is_none() {
