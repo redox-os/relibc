@@ -1,9 +1,12 @@
+# sys/select brings in bits/timespec.h
+# bits/timespec.h brings in time_t
+# sys/select brings in bits/timeval.h
+# bits/timeval.h brings in time_t and suseconds_t
 # features.h needed for #[deprecated] annotations
-sys_includes = ["features.h", "sys/types.h", "sys/select.h"]
+sys_includes = ["sys/select.h", "features.h"]
 include_guard = "_RELIBC_SYS_TIME_H"
 language = "C"
 after_includes = """
-#include <bits/timespec.h> // for timespec
 
 #define timeradd(x,y,res) (void) (\
         (res)->tv_sec = (x)->tv_sec + (y)->tv_sec + (((x)->tv_usec + (y)->tv_usec) / 1000000), \
