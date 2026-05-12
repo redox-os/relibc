@@ -8,9 +8,18 @@
 //! for the old specification.
 
 pub use crate::header::{
-    bits_clock_t::clock_t, bits_clockid_t::clockid_t, bits_gid_t::gid_t, bits_id_t::id_t,
-    bits_mode_t::mode_t, bits_off_t::off_t, bits_pid_t::pid_t, bits_ssize_t::ssize_t,
-    bits_suseconds_t::suseconds_t, bits_time_t::time_t, bits_uid_t::uid_t,
+    bits_clock_t::clock_t,
+    bits_clockid_t::clockid_t,
+    bits_gid_t::gid_t,
+    bits_id_t::id_t,
+    bits_mode_t::mode_t,
+    bits_off_t::off_t,
+    bits_pid_t::pid_t,
+    bits_ssize_t::ssize_t,
+    bits_suseconds_t::suseconds_t,
+    bits_sys_statvfs::{fsblkcnt_t, fsfilcnt_t},
+    bits_time_t::time_t,
+    bits_uid_t::uid_t,
 };
 use crate::platform::types::{
     c_char, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
@@ -32,11 +41,6 @@ pub type useconds_t = c_uint;
 
 /// Used for file block counts.
 pub type blkcnt_t = c_longlong;
-
-/// Used for file system block counts.
-pub type fsblkcnt_t = c_ulong;
-/// Used for file system file counts.
-pub type fsfilcnt_t = c_ulong;
 
 pub type u_char = c_uchar;
 pub type uchar = c_uchar;
