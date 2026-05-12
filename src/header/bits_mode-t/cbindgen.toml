@@ -1,0 +1,22 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html
+#
+# This type is split out to prevent importing all of sys/types.h into other headers.
+#
+# POSIX headers that require mode_t:
+# - fcntl.h
+# - ndbm.h (TODO not present in relibc)
+# - spawn.h (TODO not present in relibc)
+# - sys/ipc.h (TODO not present in relibc)
+# - sys/mman.h
+# - sys/stat.h
+# - sys/types.h (where it should be defined)
+sys_includes = []
+include_guard = "_RELIBC_BITS_MODE_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+[export]
+include = ["mode_t"]
+[enum]
+prefix_with_name = true
