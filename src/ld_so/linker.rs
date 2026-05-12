@@ -989,7 +989,7 @@ impl Linker {
             {
                 let mut shm_stat = Stat::default();
                 if shm_fd.fstat(&mut shm_stat).is_ok() {
-                    shm_exists = true;
+                    shm_exists = (shm_stat.st_mode & syscall::MODE_TYPE) == syscall::MODE_FILE;
                     if shm_stat.st_size == source_size as u64 {
                         if let Ok(mmap_file) =
                             MmapFile::from_fd(shm_fd.as_c_fd().unwrap(), source_size)
