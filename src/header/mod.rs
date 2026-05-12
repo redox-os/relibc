@@ -75,7 +75,7 @@ pub mod malloc;
 #[cfg(feature = "math_libm")]
 pub mod math;
 pub mod monetary;
-// TODO: mqueue.h
+pub mod mqueue;
 // TODO: ndbm.h
 pub mod net_if;
 pub mod netdb;
