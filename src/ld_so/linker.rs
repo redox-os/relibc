@@ -19,7 +19,7 @@ use core::{
 
 use crate::{
     ALLOCATOR,
-    c_str::{CStr, CString},
+    c_str::CStr,
     error::Errno,
     header::{
         dl_tls::{__tls_get_addr, dl_tls_index},
@@ -34,9 +34,6 @@ use crate::{
     },
     sync::rwlock::RwLock,
 };
-
-#[cfg(feature = "ld_so_cache")]
-use crate::header::sys_stat::stat;
 
 #[cfg(not(target_arch = "x86"))]
 use crate::{ld_so::dso::resolve_sym, platform::types::c_uint};
@@ -825,10 +822,9 @@ impl Linker {
 
         let path = self.search_object(name, parent_runpath)?;
         let file = self.read_file(&path)?;
-        let data = file.data();
         let (obj, tcb_master, elf) = DSO::new(
             &path,
-            data,
+            file.data(),
             base_addr,
             dlopened,
             self.next_object_id,
@@ -843,6 +839,7 @@ impl Linker {
 
             DlError::Malformed
         })?;
+        drop(file);
 
         if debug {
             eprintln!(
@@ -952,35 +949,30 @@ impl Linker {
     fn read_file(&self, path: &str) -> Result<MmapFile> {
         let debug = self.config.debug_flags.contains(DebugFlags::SEARCH);
 
-        let path_c = CString::new(path).map_err(|err| {
-            if debug {
-                eprintln!("[ld.so]: invalid path '{}': {}", path, err)
-            }
-
-            DlError::NotFound
-        })?;
-
         // TODO: Caches may silently fail within multiple users (try to leverage capabilities?)
         // TODO: No way to specify weak cache or pruning the cache manually
 
-        #[cfg(feature = "ld_so_cache")]
+        #[cfg(all(feature = "ld_so_cache", target_os = "redox"))]
         let file = {
+            use redox_rt::proc::FdGuard;
+            use syscall::Stat;
+
             let mut mtime_sec = 0;
             let mut mtime_nsec = 0;
             let mut source_size = 0;
 
-            let src_fd = Sys::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC, 0)
-                .map_err(|err| {
+            let src_fd =
+                FdGuard::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC).map_err(|err| {
                     if debug {
                         eprintln!("[ld.so]: failed to open '{}': {}", path, err)
                     }
                     DlError::NotFound
                 })?;
-            let mut st = stat::default();
-            if Sys::fstat(src_fd, Out::from_mut(&mut st)).is_ok() {
-                mtime_sec = st.st_mtim.tv_sec;
-                mtime_nsec = st.st_mtim.tv_nsec;
-                source_size = st.st_size as usize;
+            let mut st = Stat::default();
+            if src_fd.fstat(&mut st).is_ok() {
+                mtime_sec = st.st_mtime;
+                mtime_nsec = st.st_atime_nsec;
+                source_size = usize::try_from(st.st_size).unwrap();
             }
 
             let shm_path_str = format!(
@@ -989,39 +981,36 @@ impl Linker {
                 mtime_sec,
                 mtime_nsec
             );
-            let shm_path = unsafe { CStr::from_bytes_with_nul_unchecked(shm_path_str.as_bytes()) };
 
             let mut shm_exists = false;
 
-            if let Ok(shm_fd) = Sys::open(shm_path, fcntl::O_RDONLY, 0) {
-                let mut shm_stat = stat::default();
-                if Sys::fstat(shm_fd, Out::from_mut(&mut shm_stat)).is_ok() {
-                    shm_exists = true;
-                    if shm_stat.st_size > 0 {
-                        if let Ok(mmap_file) = MmapFile::anonymous(source_size) {
-                            let mut offset = 0;
-                            let buf = mmap_file.as_mut_slice();
-                            while offset < source_size {
-                                match Sys::read(shm_fd, &mut buf[offset..]) {
-                                    Ok(0) | Err(_) => break,
-                                    Ok(n) => offset += n,
-                                }
-                            }
-                            let _ = Sys::close(shm_fd);
+            if let Ok(shm_fd) =
+                FdGuard::open(&shm_path_str[..&shm_path_str.len() - 1], syscall::O_STAT)
+            {
+                let mut shm_stat = Stat::default();
+                if shm_fd.fstat(&mut shm_stat).is_ok() {
+                    shm_exists = (shm_stat.st_mode & syscall::MODE_TYPE) == syscall::MODE_FILE;
+                    if shm_stat.st_size == source_size as u64 {
+                        if let Ok(mmap_file) =
+                            MmapFile::from_fd(shm_fd.as_c_fd().unwrap(), source_size)
+                        {
+                            shm_fd.take();
                             return Ok(mmap_file);
                         }
-                        let _ = Sys::close(shm_fd);
                     }
                 }
-                let _ = Sys::close(shm_fd);
             }
 
-            let file = MmapFile::from_fd(src_fd, source_size).map_err(|err| {
-                if debug {
-                    eprintln!("[ld.so]: failed to map '{}': {}", path, err)
-                }
-                DlError::NotFound
-            })?;
+            let shm_path = unsafe { CStr::from_bytes_with_nul_unchecked(shm_path_str.as_bytes()) };
+
+            let file =
+                MmapFile::from_fd(src_fd.as_c_fd().unwrap(), source_size).map_err(|err| {
+                    if debug {
+                        eprintln!("[ld.so]: failed to map '{}': {}", path, err)
+                    }
+                    DlError::NotFound
+                })?;
+            src_fd.take();
 
             if !shm_exists {
                 let _ = Sys::open(shm_path, fcntl::O_CREAT | fcntl::O_RDWR, 0o600).map(Sys::close);
@@ -1033,8 +1022,18 @@ impl Linker {
 
             file
         };
-        #[cfg(not(feature = "ld_so_cache"))]
+        #[cfg(not(all(feature = "ld_so_cache", target_os = "redox")))]
         let file = {
+            use alloc::ffi::CString;
+
+            let path_c = CString::new(path).map_err(|err| {
+                if debug {
+                    eprintln!("[ld.so]: invalid path '{}': {}", path, err)
+                }
+
+                DlError::NotFound
+            })?;
+
             let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
             MmapFile::open(CStr::borrow(&path_c), flags).map_err(|err| {
                 if debug {
