@@ -1,0 +1,10 @@
+sys_includes = ["sched.h", "bits/sigset-t.h"]
+include_guard = "_RELIBC_SPAWN_H"
+language = "C"
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
+
+[export.rename]
+"sched_param" = "struct sched_param"
