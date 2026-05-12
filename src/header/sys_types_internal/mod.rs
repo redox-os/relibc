@@ -15,6 +15,8 @@ pub use crate::header::{
 use crate::platform::types::{
     c_char, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
+#[cfg(not(target_os = "linux"))]
+use crate::platform::types::c_int;
 
 /// Used for block sizes.
 pub type blksize_t = c_long;
