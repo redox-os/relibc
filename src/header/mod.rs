@@ -16,6 +16,8 @@ pub mod bits_id_t;
 pub mod bits_iovec;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
+#[path = "bits_mode-t/mod.rs"]
+pub mod bits_mode_t;
 #[path = "bits_off-t/mod.rs"]
 pub mod bits_off_t;
 #[path = "bits_pid-t/mod.rs"]
