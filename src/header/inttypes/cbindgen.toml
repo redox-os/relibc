@@ -4,8 +4,9 @@
 # - "The <inttypes.h> header shall include the <stdint.h> header."
 # - "wchar_t As described in <stddef.h>."
 #
-# wchar.h brings in both stdint.h and stddef.h
-sys_includes = ["wchar.h"]
+# TODO possibly split out wchar_t to avoid including all of stddef.h
+# stddef.h also currently includes stdint.h but shouldn't according to the spec
+sys_includes = ["stdint.h", "stddef.h"]
 include_guard = "_RELIBC_INTTYPES_H"
 trailer = """
 #ifndef _RELIBC_BITS_INTTYPES_H
