@@ -12,11 +12,11 @@ pub use crate::header::{
     bits_off_t::off_t, bits_pid_t::pid_t, bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t,
     bits_time_t::time_t, bits_uid_t::uid_t,
 };
+#[cfg(not(target_os = "linux"))]
+use crate::platform::types::c_int;
 use crate::platform::types::{
     c_char, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
-#[cfg(not(target_os = "linux"))]
-use crate::platform::types::c_int;
 
 /// Used for block sizes.
 pub type blksize_t = c_long;
