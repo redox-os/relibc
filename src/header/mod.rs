@@ -7,6 +7,8 @@ pub mod assert;
 pub mod bits_arpainet;
 #[path = "bits_clock-t/mod.rs"]
 pub mod bits_clock_t;
+#[path = "bits_clockid-t/mod.rs"]
+pub mod bits_clockid_t;
 #[path = "bits_gid-t/mod.rs"]
 pub mod bits_gid_t;
 #[path = "bits_id-t/mod.rs"]
