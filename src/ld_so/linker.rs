@@ -952,7 +952,7 @@ impl Linker {
         // TODO: Caches may silently fail within multiple users (try to leverage capabilities?)
         // TODO: No way to specify weak cache or pruning the cache manually
 
-        #[cfg(feature = "ld_so_cache")]
+        #[cfg(all(feature = "ld_so_cache", target_os = "redox"))]
         let file = {
             use redox_rt::proc::FdGuard;
             use syscall::Stat;
@@ -1022,7 +1022,7 @@ impl Linker {
 
             file
         };
-        #[cfg(not(feature = "ld_so_cache"))]
+        #[cfg(not(all(feature = "ld_so_cache", target_os = "redox")))]
         let file = {
             use alloc::ffi::CString;
 
