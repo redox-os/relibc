@@ -9,11 +9,9 @@
 
 pub use crate::header::{
     bits_clock_t::clock_t, bits_clockid_t::clockid_t, bits_gid_t::gid_t, bits_id_t::id_t,
-    bits_off_t::off_t, bits_pid_t::pid_t, bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t,
-    bits_time_t::time_t, bits_uid_t::uid_t,
+    bits_mode_t::mode_t, bits_off_t::off_t, bits_pid_t::pid_t, bits_ssize_t::ssize_t,
+    bits_suseconds_t::suseconds_t, bits_time_t::time_t, bits_uid_t::uid_t,
 };
-#[cfg(not(target_os = "linux"))]
-use crate::platform::types::c_int;
 use crate::platform::types::{
     c_char, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
@@ -26,12 +24,6 @@ pub type dev_t = c_ulonglong;
 pub type ino_t = c_ulonglong;
 /// Used for directory entry lengths.
 pub type reclen_t = c_ushort;
-/// Used for some file attributes.
-#[cfg(target_os = "linux")]
-pub type mode_t = c_uint;
-/// Used for some file attributes.
-#[cfg(not(target_os = "linux"))]
-pub type mode_t = c_int;
 /// Used for link counts.
 pub type nlink_t = c_ulong;
 pub type useconds_t = c_uint;
