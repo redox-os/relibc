@@ -8,12 +8,14 @@
 //! for the old specification.
 
 pub use crate::header::{
-    bits_clock_t::clock_t, bits_gid_t::gid_t, bits_id_t::id_t, bits_off_t::off_t,
-    bits_pid_t::pid_t, bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t, bits_time_t::time_t,
-    bits_uid_t::uid_t,
+    bits_clock_t::clock_t, bits_clockid_t::clockid_t, bits_gid_t::gid_t, bits_id_t::id_t,
+    bits_off_t::off_t, bits_pid_t::pid_t, bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t,
+    bits_time_t::time_t, bits_uid_t::uid_t,
 };
+#[cfg(not(target_os = "linux"))]
+use crate::platform::types::c_int;
 use crate::platform::types::{
-    c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
+    c_char, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
 
 /// Used for block sizes.
@@ -33,9 +35,6 @@ pub type mode_t = c_int;
 /// Used for link counts.
 pub type nlink_t = c_ulong;
 pub type useconds_t = c_uint;
-
-/// Used for clock ID type in the clock and timer functions.
-pub type clockid_t = c_int;
 
 // timer_t in cbindgen after_includes (how to export void* type?)
 
