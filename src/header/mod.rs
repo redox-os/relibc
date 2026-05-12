@@ -35,6 +35,7 @@ pub mod bits_socklen_t;
 pub mod bits_ssize_t;
 #[path = "bits_suseconds-t/mod.rs"]
 pub mod bits_suseconds_t;
+pub mod bits_sys_statvfs;
 #[path = "bits_time-t/mod.rs"]
 pub mod bits_time_t;
 pub mod bits_timespec;
