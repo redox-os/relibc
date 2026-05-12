@@ -110,9 +110,6 @@ pub struct siginfo {
     pub si_value: sigval,
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn _cbindgen_export_siginfo(a: siginfo) {}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -595,6 +592,3 @@ pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char)
         psignal((*info).si_signo, prefix);
     }
 }
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_struct_sigevent_for_timer(_: sigevent) {}
