@@ -40,6 +40,14 @@ cpp_compat = true
 [enum]
 prefix_with_name = true
 
+[export]
+include = [
+  "mcontext",
+  "sigevent",
+  "siginfo",
+  "ucontext"
+]
+
 [export.rename]
 "sigaction" = "struct sigaction"
 "timespec" = "struct timespec"

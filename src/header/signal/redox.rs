@@ -183,13 +183,6 @@ pub struct mcontext {
     _opaque: [c_uchar; 520],
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn __completely_unused_cbindgen_workaround_fn_ucontext_mcontext(
-    a: *const ucontext_t,
-    b: *const mcontext_t,
-) {
-}
-
 impl From<SiginfoAbi> for siginfo_t {
     fn from(value: SiginfoAbi) -> Self {
         unsafe { core::mem::transmute(value) }
