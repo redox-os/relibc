@@ -11,7 +11,7 @@ after_includes = """
 #include <bits/pid-t.h>
 #include <bits/ssize-t.h>
 #include <bits/suseconds-t.h>
-#include <bits/sys/statfvs.h> // for fsblkcnt_t and fsfilcnt_t
+#include <bits/sys/statvfs.h> // for fsblkcnt_t and fsfilcnt_t
 #include <bits/time-t.h>
 #include <bits/uid-t.h>
 
