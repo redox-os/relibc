@@ -12,6 +12,7 @@ pub use crate::header::{
     bits_clockid_t::clockid_t,
     bits_gid_t::gid_t,
     bits_id_t::id_t,
+    bits_ino_t::ino_t,
     bits_mode_t::mode_t,
     bits_off_t::off_t,
     bits_pid_t::pid_t,
@@ -29,8 +30,6 @@ use crate::platform::types::{
 pub type blksize_t = c_long;
 /// Used for device IDs.
 pub type dev_t = c_ulonglong;
-/// Used for serial numbers.
-pub type ino_t = c_ulonglong;
 /// Used for directory entry lengths.
 pub type reclen_t = c_ushort;
 /// Used for link counts.

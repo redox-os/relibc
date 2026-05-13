@@ -91,6 +91,8 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
     let dev = Dev::new(fd)?;
     match func {
         0x00 => unsafe { dev.read_write_ioctl::<drm_version>(buf, VERSION) },
+        0x01 => unsafe { dev.read_write_ioctl::<drm_unique>(buf, GET_UNIQUE) },
+        0x07 => unsafe { dev.read_write_ioctl::<drm_set_version>(buf, SET_VERSION) },
         0x0C => unsafe { dev.read_write_ioctl::<drm_get_cap>(buf, GET_CAP) },
         0x0D => unsafe { dev.write_ioctl::<drm_set_client_cap>(buf, SET_CLIENT_CAP) },
         0xA0 => unsafe { dev.read_write_ioctl::<drm_mode_card_res>(buf, MODE_CARD_RES) },
