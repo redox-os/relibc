@@ -6,6 +6,7 @@ after_includes = """
 #include <bits/clockid-t.h>
 #include <bits/gid-t.h>
 #include <bits/id-t.h>
+#include <bits/ino-t.h>
 #include <bits/mode-t.h>
 #include <bits/off-t.h>
 #include <bits/pid-t.h>
@@ -26,7 +27,6 @@ no_includes = true
 include = [
   "blksize_t",
   "dev_t",
-  "ino_t",
   "reclen_t",
   "nlink_t",
   "useconds_t",
