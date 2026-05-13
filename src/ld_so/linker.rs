@@ -35,9 +35,6 @@ use crate::{
     sync::rwlock::RwLock,
 };
 
-#[cfg(feature = "ld_so_cache")]
-use crate::header::sys_stat::stat;
-
 #[cfg(not(target_arch = "x86"))]
 use crate::{ld_so::dso::resolve_sym, platform::types::c_uint};
 
@@ -960,80 +957,6 @@ impl Linker {
             DlError::NotFound
         })?;
 
-        // TODO: Caches may silently fail within multiple users (try to leverage capabilities?)
-        // TODO: No way to specify weak cache or pruning the cache manually
-
-        #[cfg(feature = "ld_so_cache")]
-        let file = {
-            let mut mtime_sec = 0;
-            let mut mtime_nsec = 0;
-            let mut source_size = 0;
-
-            let src_fd = Sys::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC, 0)
-                .map_err(|err| {
-                    if debug {
-                        eprintln!("[ld.so]: failed to open '{}': {}", path, err)
-                    }
-                    DlError::NotFound
-                })?;
-            let mut st = stat::default();
-            if Sys::fstat(src_fd, Out::from_mut(&mut st)).is_ok() {
-                mtime_sec = st.st_mtim.tv_sec;
-                mtime_nsec = st.st_mtim.tv_nsec;
-                source_size = st.st_size as usize;
-            }
-
-            let shm_path_str = format!(
-                "/scheme/shm/ld.so.cache.{}.{}.{}\0",
-                path.replace('/', "_"),
-                mtime_sec,
-                mtime_nsec
-            );
-            let shm_path = unsafe { CStr::from_bytes_with_nul_unchecked(shm_path_str.as_bytes()) };
-
-            let mut shm_exists = false;
-
-            if let Ok(shm_fd) = Sys::open(shm_path, fcntl::O_RDONLY, 0) {
-                let mut shm_stat = stat::default();
-                if Sys::fstat(shm_fd, Out::from_mut(&mut shm_stat)).is_ok() {
-                    shm_exists = true;
-                    if shm_stat.st_size > 0 {
-                        if let Ok(mmap_file) = MmapFile::anonymous(source_size) {
-                            let mut offset = 0;
-                            let buf = mmap_file.as_mut_slice();
-                            while offset < source_size {
-                                match Sys::read(shm_fd, &mut buf[offset..]) {
-                                    Ok(0) | Err(_) => break,
-                                    Ok(n) => offset += n,
-                                }
-                            }
-                            let _ = Sys::close(shm_fd);
-                            return Ok(mmap_file);
-                        }
-                        let _ = Sys::close(shm_fd);
-                    }
-                }
-                let _ = Sys::close(shm_fd);
-            }
-
-            let file = MmapFile::from_fd(src_fd, source_size).map_err(|err| {
-                if debug {
-                    eprintln!("[ld.so]: failed to map '{}': {}", path, err)
-                }
-                DlError::NotFound
-            })?;
-
-            if !shm_exists {
-                let _ = Sys::open(shm_path, fcntl::O_CREAT | fcntl::O_RDWR, 0o600).map(Sys::close);
-            } else if let Ok(shm_fd) = Sys::open(shm_path, fcntl::O_RDWR, 0o600) {
-                let _ = Sys::ftruncate(shm_fd, source_size as i64);
-                let _ = Sys::write(shm_fd, file.data());
-                let _ = Sys::close(shm_fd);
-            }
-
-            file
-        };
-        #[cfg(not(feature = "ld_so_cache"))]
         let file = {
             let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
             MmapFile::open(CStr::borrow(&path_c), flags).map_err(|err| {
