@@ -1,4 +1,5 @@
-sys_includes = []
+# features.h required for Rust never type (no return)
+sys_includes = ["features.h"]
 include_guard = "_RELIBC_THREADS_H"
 language = "C"
 style = "tag"
