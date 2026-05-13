@@ -1,4 +1,6 @@
-sys_includes = []
+# time.h brings in features.h
+# features.h required for Rust never type (no return)
+sys_includes = ["time.h"]
 include_guard = "_RELIBC_THREADS_H"
 language = "C"
 style = "tag"
