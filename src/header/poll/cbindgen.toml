@@ -4,8 +4,6 @@
 # - "The <poll.h> header shall define the sigset_t type as described in <signal.h>."
 # - "The <poll.h> header shall define the timespec structure as described in <time.h>."
 # - "Inclusion of the <poll.h> header may make visible all symbols from the headers <signal.h> and <time.h>."
-#
-# bits/timespec.h brings in sys/types.h (TODO: refactor bits/timespec.h and sys/types.h)
 sys_includes = []
 include_guard = "_RELIBC_POLL_H"
 after_includes = """

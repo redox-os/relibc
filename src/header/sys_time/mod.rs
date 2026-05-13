@@ -16,7 +16,6 @@ use crate::{
         types::{c_char, c_int, c_long},
     },
 };
-use core::ptr::null;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
 ///
@@ -123,11 +122,10 @@ pub unsafe extern "C" fn setitimer(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
-    // Nullptr is valid here, it means "use current time"
     let times_spec = if times.is_null() {
-        null()
+        None
     } else {
-        [
+        Some([
             timespec {
                 tv_sec: unsafe { (*times.offset(0)).tv_sec },
                 tv_nsec: c_long::from(unsafe { (*times.offset(0)).tv_usec }) * 1000,
@@ -136,10 +134,14 @@ pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c
                 tv_sec: unsafe { (*times.offset(1)).tv_sec },
                 tv_nsec: c_long::from(unsafe { (*times.offset(1)).tv_usec }) * 1000,
             },
-        ]
-        .as_ptr()
+        ])
     };
-    unsafe { Sys::utimens(path, times_spec) }
+    let times_ptr = match &times_spec {
+        Some(times_spec) => times_spec.as_ptr(),
+        // Nullptr is valid here, it means "use current time"
+        None => core::ptr::null(),
+    };
+    unsafe { Sys::utimens(path, times_ptr) }
         .map(|()| 0)
         .or_minus_one_errno()
 }

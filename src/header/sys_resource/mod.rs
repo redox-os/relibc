@@ -12,11 +12,10 @@ use crate::{
     },
 };
 
-// Exported from cbindgen
-// const RUSAGE_SELF: c_int = 0;
-// const RUSAGE_CHILDREN: c_int = -1;
-// const RUSAGE_BOTH: c_int = -2;
-// const RUSAGE_THREAD: c_int = 1;
+pub const RUSAGE_SELF: c_int = 0;
+pub const RUSAGE_CHILDREN: c_int = -1;
+pub const RUSAGE_BOTH: c_int = -2;
+pub const RUSAGE_THREAD: c_int = 1;
 
 pub const RLIM_INFINITY: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 pub const RLIM_SAVED_CUR: u64 = RLIM_INFINITY;

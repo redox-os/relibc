@@ -1,9 +1,16 @@
-sys_includes = ["stddef.h", "stdint.h", "sys/types.h"]
+# bits/iovec.h brings in size_t
+sys_includes = ["stddef.h", "stdint.h"]
 include_guard = "_RELIBC_SYS_SOCKET_H"
 after_includes = """
-#include <bits/iovec.h> // for iovec from sys/uio.h
+#include <bits/iovec.h>      // for iovec from sys/uio.h
 #include <bits/safamily-t.h> // for sa_family_t
-#include <bits/socklen-t.h> // for socklen_t
+#include <bits/socklen-t.h>  // for socklen_t
+#include <bits/ssize-t.h>    // for ssize_t from sys/types.h
+
+// Below required for Non-POSIX ucred struct
+#include <bits/gid-t.h> // for gid_t from sys/types.h
+#include <bits/pid-t.h> // for pid_t from sys/types.h
+#include <bits/uid-t.h> // for uid_t from sys/types.h
 """
 trailer = """
 #ifndef _RELIBC_BITS_SYS_SOCKET_H
@@ -40,6 +47,13 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export]
+include = [
+    "linger",
+    "cmsghdr",
+    "ucred"
+]
 
 [export.rename]
 "iovec" = "struct iovec"

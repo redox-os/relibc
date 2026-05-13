@@ -84,6 +84,7 @@ static mut GROUP: group = group {
 static LINE_READER: SyncUnsafeCell<Option<Lines<BufReader<File>>>> = SyncUnsafeCell::new(None);
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/grp.h.html>.
+#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug)]
 pub struct group {
@@ -312,7 +313,7 @@ pub unsafe extern "C" fn getgrgid_r(
     gid: gid_t,
     result_buf: *mut group,
     buffer: *mut c_char,
-    buflen: usize,
+    buflen: size_t,
     result: *mut *mut group,
 ) -> c_int {
     // In case of error or the requested entry is not found.
@@ -373,7 +374,7 @@ pub unsafe extern "C" fn getgrnam_r(
     name: *const c_char,
     result_buf: *mut group,
     buffer: *mut c_char,
-    buflen: usize,
+    buflen: size_t,
     result: *mut *mut group,
 ) -> c_int {
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {

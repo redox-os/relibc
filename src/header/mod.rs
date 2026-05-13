@@ -5,9 +5,23 @@ pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
 pub mod bits_arpainet;
+#[path = "bits_clock-t/mod.rs"]
+pub mod bits_clock_t;
+#[path = "bits_clockid-t/mod.rs"]
+pub mod bits_clockid_t;
+#[path = "bits_gid-t/mod.rs"]
+pub mod bits_gid_t;
+#[path = "bits_id-t/mod.rs"]
+pub mod bits_id_t;
 pub mod bits_iovec;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
+#[path = "bits_mode-t/mod.rs"]
+pub mod bits_mode_t;
+#[path = "bits_off-t/mod.rs"]
+pub mod bits_off_t;
+#[path = "bits_pid-t/mod.rs"]
+pub mod bits_pid_t;
 pub mod bits_pthread;
 #[path = "bits_safamily-t/mod.rs"]
 pub mod bits_safamily_t;
@@ -21,10 +35,13 @@ pub mod bits_socklen_t;
 pub mod bits_ssize_t;
 #[path = "bits_suseconds-t/mod.rs"]
 pub mod bits_suseconds_t;
+pub mod bits_sys_statvfs;
 #[path = "bits_time-t/mod.rs"]
 pub mod bits_time_t;
 pub mod bits_timespec;
 pub mod bits_timeval;
+#[path = "bits_uid-t/mod.rs"]
+pub mod bits_uid_t;
 // complex.h implemented in C (currently through openlibm)
 pub mod cpio;
 pub mod crypt;
@@ -137,7 +154,7 @@ pub mod tar;
 // TODO: term.h (deprecated)
 pub mod termios;
 // TODO: tgmath.h (likely C implementation currenly through openlibm)
-// TODO: threads.h
+pub mod threads;
 pub mod time;
 // TODO: uchar.h
 // TODO: ucontext.h (deprecated)

@@ -1,12 +1,9 @@
-sys_includes = ["sys/types.h", "stdint.h", "sys/time.h"]
-include_guard = "_RELIBC_SYS_RESOURCE_H"
+# sys/time.h brings in sys/select.h which brings in bits/timeval.h
+sys_includes = ["sys/time.h"]
 after_includes = """
-
-#define RUSAGE_SELF 0
-#define RUSAGE_CHILDREN (-1)
-#define RUSAGE_BOTH (-2)
-#define RUSAGE_THREAD 1
+#include <bits/id-t.h> // for id_t from sys/types.h
 """
+include_guard = "_RELIBC_SYS_RESOURCE_H"
 language = "C"
 style = "Tag"
 no_includes = true

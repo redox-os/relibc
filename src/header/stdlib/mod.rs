@@ -147,9 +147,12 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
         platform::ERRNO.set(EINVAL);
         return ptr::null_mut();
     }
-    let mut pointer = ptr::null_mut();
-    unsafe { posix_memalign(ptr::from_mut(&mut pointer), alignment, size) };
-    pointer
+    /* The size-is-multiple-of-alignment requirement is the only
+     * difference between aligned_alloc() and memalign(). */
+    #[allow(deprecated)]
+    unsafe {
+        memalign(alignment, size)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/at_quick_exit.html>.
@@ -921,7 +924,7 @@ pub unsafe extern "C" fn posix_memalign(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "redox")]
-    let r = unsafe { open(c"/scheme/pty".as_ptr(), O_CREAT) };
+    let r = unsafe { open(c"/scheme/pty".as_ptr(), flags) };
 
     #[cfg(target_os = "linux")]
     let r = unsafe { open(c"/dev/ptmx".as_ptr(), flags) };

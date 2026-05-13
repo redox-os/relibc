@@ -212,6 +212,10 @@ pub unsafe fn inner_scanf<T: Kind>(
                             }
                             width = width.map(|w| w - 1);
                             if !read!() {
+                                if character == '0' {
+                                    // Parse last 0 as number instead of radix
+                                    break;
+                                }
                                 return Ok(matched);
                             }
                             if width.map(|w| w > 0).unwrap_or(true)

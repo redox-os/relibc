@@ -1,0 +1,18 @@
+sys_includes = []
+include_guard = "_RELIBC_THREADS_H"
+language = "C"
+style = "tag"
+no_includes = true
+cpp_compat = true
+after_includes = """
+#include <bits/timespec.h> // for timespec
+#include <bits/pthread.h> // for pthread-related types
+#define thread_local _Thread_local
+#define ONCE_FLAG_INIT PTHREAD_ONCE_INIT // once_flag == pthread_once_t
+"""
+
+[export.rename]
+"timespec" = "struct timespec"
+
+[enum]
+prefix_with_name = true

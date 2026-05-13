@@ -30,9 +30,11 @@ use self::linux as sys;
 #[cfg(target_os = "redox")]
 use self::redox as sys;
 
+/// cbindgen:ignore
 #[cfg(target_os = "linux")]
 const SEPARATOR: u8 = b':';
 
+/// cbindgen:ignore
 #[cfg(target_os = "redox")]
 const SEPARATOR: u8 = b';';
 
@@ -40,6 +42,7 @@ const SEPARATOR: u8 = b';';
 /// for POSIX minimum requirements, and
 /// <https://www.man7.org/linux/man-pages/man3/getpwnam.3.html> for further
 /// details.
+#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug)]
 pub struct passwd {
@@ -52,7 +55,9 @@ pub struct passwd {
     pub pw_shell: *mut c_char,
 }
 
+/// cbindgen:ignore
 static mut PASSWD_BUF: Option<MaybeAllocated> = None;
+/// cbindgen:ignore
 static PASSWD: RawCell<passwd> = RawCell::new(passwd {
     pw_name: ptr::null_mut(),
     pw_passwd: ptr::null_mut(),
@@ -119,6 +124,7 @@ enum Cause {
     Other,
 }
 
+/// cbindgen:ignore
 static READER: RawCell<Option<BufReader<File>>> = RawCell::new(None);
 
 fn parsed<I, O>(buf: Option<I>) -> Option<O>

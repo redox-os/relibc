@@ -8,10 +8,21 @@
 //! for the old specification.
 
 pub use crate::header::{
-    bits_ssize_t::ssize_t, bits_suseconds_t::suseconds_t, bits_time_t::time_t,
+    bits_clock_t::clock_t,
+    bits_clockid_t::clockid_t,
+    bits_gid_t::gid_t,
+    bits_id_t::id_t,
+    bits_mode_t::mode_t,
+    bits_off_t::off_t,
+    bits_pid_t::pid_t,
+    bits_ssize_t::ssize_t,
+    bits_suseconds_t::suseconds_t,
+    bits_sys_statvfs::{fsblkcnt_t, fsfilcnt_t},
+    bits_time_t::time_t,
+    bits_uid_t::uid_t,
 };
 use crate::platform::types::{
-    c_char, c_int, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
+    c_char, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
 };
 
 /// Used for block sizes.
@@ -22,40 +33,14 @@ pub type dev_t = c_ulonglong;
 pub type ino_t = c_ulonglong;
 /// Used for directory entry lengths.
 pub type reclen_t = c_ushort;
-/// Used for group IDs.
-pub type gid_t = c_int;
-/// Used for user IDs.
-pub type uid_t = c_int;
-/// Used for some file attributes.
-#[cfg(target_os = "linux")]
-pub type mode_t = c_uint;
-/// Used for some file attributes.
-#[cfg(not(target_os = "linux"))]
-pub type mode_t = c_int;
 /// Used for link counts.
 pub type nlink_t = c_ulong;
-/// Used for file sizes.
-pub type off_t = c_longlong;
-/// Used for process IDs and process group IDs.
-pub type pid_t = c_int;
-/// Used as a general identifier; can be used to contain at least a pid_t, uid_t, or gid_t.
-pub type id_t = c_uint;
 pub type useconds_t = c_uint;
-
-/// Used for system times in clock ticks or CLOCKS_PER_SEC.
-pub type clock_t = c_long;
-/// Used for clock ID type in the clock and timer functions.
-pub type clockid_t = c_int;
 
 // timer_t in cbindgen after_includes (how to export void* type?)
 
 /// Used for file block counts.
 pub type blkcnt_t = c_longlong;
-
-/// Used for file system block counts.
-pub type fsblkcnt_t = c_ulong;
-/// Used for file system file counts.
-pub type fsfilcnt_t = c_ulong;
 
 pub type u_char = c_uchar;
 pub type uchar = c_uchar;
