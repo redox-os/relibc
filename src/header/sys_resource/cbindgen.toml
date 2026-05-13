@@ -1,5 +1,7 @@
+# stdint.h needed for uint64_t due to rlim_t and constants u64
+# TODO POSIX says rlim_t can be unsigned int but including stdint.h is considered namespace pollution
 # sys/time.h brings in sys/select.h which brings in bits/timeval.h
-sys_includes = ["sys/time.h"]
+sys_includes = ["stdint.h", "sys/time.h"]
 after_includes = """
 #include <bits/id-t.h> // for id_t from sys/types.h
 """
