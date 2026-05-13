@@ -2,7 +2,6 @@ use core::{
     convert::TryFrom,
     mem::{self, size_of},
     num::NonZeroU64,
-    ops::DerefMut,
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
@@ -39,6 +38,7 @@ use crate::{
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
+        stdlib::posix_memalign,
         sys_file,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
@@ -56,8 +56,11 @@ use crate::{
     io::{self, BufReader, prelude::*},
     ld_so::tcb::OsSpecific,
     out::Out,
-    platform::sys::timer::{timer_routine, timer_update_wake_time},
-    sync::{Mutex, rwlock::RwLock},
+    platform::{
+        free,
+        sys::timer::{TIMERS, timer_routine, timer_update_wake_time},
+    },
+    sync::rwlock::RwLock,
 };
 
 pub use redox_rt::proc::FdGuard;
@@ -1247,65 +1250,77 @@ impl Pal for Sys {
             event::redox_event_queue_create_v1(0)
         })?)
         .to_upper()?;
-        let caller_thread = Self::current_os_tid();
 
-        let timer_buf = unsafe {
-            let timer_buf = Self::mmap(
-                ptr::null_mut(),
-                size_of::<Mutex<timer_internal_t>>(),
-                PROT_READ | PROT_WRITE,
-                MAP_ANONYMOUS,
-                0,
-                0,
-            )?;
-
-            let timer_ptr = timer_internal_t::from_raw(timer_buf);
-            let mut timer_st = timer_ptr.lock();
-
-            timer_st.clockid = clock_id;
-            timer_st.timerfd = timerfd.take();
-            timer_st.eventfd = eventfd.take();
-            timer_st.evp = (*evp).clone();
-            timer_st.next_wake_time = itimerspec::default();
-            timer_st.thread = ptr::null_mut();
-            timer_st.caller_thread = caller_thread;
-            timer_st.process_pid = 0;
-            timer_st.next_wake_version = 0;
-            drop(timer_st);
-
-            timer_buf
+        let timer_st = timer_internal_t {
+            clockid: clock_id,
+            timerfd: timerfd.take(),
+            eventfd: eventfd.take(),
+            evp: (*evp).clone(),
+            thread: ptr::null_mut(),
+            next_wake_time: itimerspec::default(),
+            next_wake_version: 0,
+            process_pid: Sys::getpid(),
+        };
+        let timers = &mut TIMERS.lock().0;
+        // allocate enough memory on the heap to store one timer_internal_t
+        let mut memory_pointer: *mut timer_internal_t = ptr::null_mut();
+        unsafe {
+            let result = posix_memalign(
+                (&mut memory_pointer as *mut *mut timer_internal_t).cast(),
+                align_of::<timer_internal_t>(),
+                size_of::<timer_internal_t>(),
+            );
+            assert_eq!(result, 0, "Failed to allocate or invalid alignment");
         };
 
-        timerid.write(timer_buf);
+        let pointer = {
+            ptr::NonNull::new(memory_pointer)
+                .expect("Pointer is guaranteed to not be null if posix_memalign returns 0")
+        };
+
+        // move value from the stack to the location we allocated on the heap
+        unsafe {
+            // Safety: If non-null, posix_memalign gives us a pointer that is valid
+            // for writes and properly aligned.
+            pointer.as_ptr().write(timer_st);
+        }
+        let timer_ptr = pointer.as_ptr() as timer_t;
+        timers.insert(timer_ptr);
+
+        timerid.write(timer_ptr);
 
         Ok(())
     }
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
-        unsafe {
-            let timer_ptr = timer_internal_t::from_raw(timerid);
-            let timer_st = timer_ptr.lock();
-            let _ = syscall::close(timer_st.timerfd);
-            let _ = syscall::close(timer_st.eventfd);
-            if !timer_st.thread.is_null() {
-                let _ = pthread_cancel(timer_st.thread);
-            }
-            drop(timer_st);
-            Self::munmap(timerid, size_of::<Mutex<timer_internal_t>>())?;
+        let timers = &mut TIMERS.lock().0;
+        let removed = timers.remove(&timerid);
+        if !removed {
+            return Err(Errno(EINVAL));
         }
+        let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
+        let _ = syscall::close(timer_st.timerfd);
+        let _ = syscall::close(timer_st.eventfd);
+        if !timer_st.thread.is_null() {
+            let _ = unsafe { pthread_cancel(timer_st.thread) };
+        }
+        unsafe { free(timerid) };
 
         Ok(())
     }
 
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
-        let timer_ptr = unsafe { timer_internal_t::from_raw(timerid) };
-        let mut timer_st = timer_ptr.lock();
+        let timers = &mut TIMERS.lock().0;
+        if !timers.contains(&timerid) {
+            return Err(Errno(EINVAL));
+        }
+        let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
         if timer_st.evp.sigev_notify == SIGEV_NONE {
             if timespec::subtract(&timer_st.next_wake_time.it_value, &now).is_none() {
                 // error here means the timer is disarmed
-                let _ = timer_update_wake_time(timer_st.deref_mut());
+                let _ = timer_update_wake_time(timer_st);
             }
         }
         let remaining = &timer_st.next_wake_time.it_value;
@@ -1328,12 +1343,15 @@ impl Pal for Sys {
         value: &itimerspec,
         ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
-        let timer_ptr = unsafe { timer_internal_t::from_raw(timerid) };
-        let mut timer_st = timer_ptr.lock();
-
         if let Some(ovalue) = ovalue {
             Self::timer_gettime(timerid, ovalue)?;
         }
+
+        let timers = &mut TIMERS.lock().0;
+        if !timers.contains(&timerid) {
+            return Err(Errno(EINVAL));
+        }
+        let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
 
         if value.it_value.is_zero() {
             timer_st.next_wake_version += 1;

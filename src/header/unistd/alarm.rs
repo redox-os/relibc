@@ -1,5 +1,3 @@
-#[cfg(target_os = "redox")]
-use crate::header::time::timer_internal_t;
 use crate::{
     header::{
         bits_timespec::timespec,
@@ -78,15 +76,6 @@ pub fn alarm_timespec(duration: timespec) -> c_uint {
         .is_err()
         {
             return remaining;
-        }
-
-        // Enable process-wide signal delivery instead of thread-specific
-        #[cfg(target_os = "redox")]
-        {
-            let timer_ptr = unsafe { timer_internal_t::from_raw(timer_id) };
-            let mut timer_st = timer_ptr.lock();
-            timer_st.process_pid = Sys::getpid();
-            drop(timer_st);
         }
 
         *guard = Some(AlarmTimer(timer_id));
