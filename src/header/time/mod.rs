@@ -60,7 +60,6 @@ pub(crate) struct timer_internal_t {
     pub eventfd: usize,
     pub evp: sigevent,
     pub thread: platform::types::pthread_t,
-    pub caller_thread: crate::pthread::OsTid,
     /// relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
     /// kernel does not support unregistering timer
@@ -72,8 +71,8 @@ pub(crate) struct timer_internal_t {
 
 #[cfg(target_os = "redox")]
 impl timer_internal_t {
-    pub unsafe fn from_raw(timerid: timer_t) -> &'static Mutex<Self> {
-        unsafe { &*(timerid as *const Mutex<Self>) }
+    pub unsafe fn from_raw(timerid: timer_t) -> &'static mut Self {
+        unsafe { &mut *(timerid as *mut Self) }
     }
 }
 
