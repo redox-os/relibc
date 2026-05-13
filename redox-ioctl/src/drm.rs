@@ -4,16 +4,16 @@ use core::{
     ffi::{c_char, c_int, c_uint},
     iter, mem, slice,
 };
-use drm_sys::drm_clip_rect;
 
 pub use drm_sys::{
-    __kernel_size_t, DRM_PROP_NAME_LEN, drm_get_cap, drm_mode_card_res,
+    __kernel_size_t, DRM_PROP_NAME_LEN, drm_clip_rect, drm_get_cap, drm_mode_card_res,
     drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc,
     drm_mode_crtc_page_flip_target, drm_mode_cursor, drm_mode_cursor2, drm_mode_destroy_dumb,
     drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_fb_dirty_cmd, drm_mode_get_blob,
     drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res,
     drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties,
-    drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap, drm_version,
+    drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap, drm_set_version, drm_unique,
+    drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -28,6 +28,24 @@ define_ioctl_data! {
         date: *mut c_char [array<c_char, date_len>],
         desc_len: __kernel_size_t,
         desc: *mut c_char [array<c_char, desc_len>],
+    }
+}
+
+pub const GET_UNIQUE: u64 = 0x01;
+define_ioctl_data! {
+    struct drm_unique, DrmUnique {
+        unique_len: __kernel_size_t,
+        unique: *mut c_char [array<c_char, unique_len>],
+    }
+}
+
+pub const SET_VERSION: u64 = 0x07;
+define_ioctl_data! {
+    struct drm_set_version, DrmSetVersion {
+        drm_di_major: c_int,
+        drm_di_minor: c_int,
+        drm_dd_major: c_int,
+        drm_dd_minor: c_int,
     }
 }
 
