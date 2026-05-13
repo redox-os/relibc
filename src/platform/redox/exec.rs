@@ -83,30 +83,6 @@ pub fn execve(
             let mut src_stat = Stat::default();
             redox_rt::sys::fstat(*src_fd as usize, &mut src_stat)?;
 
-            #[cfg(feature = "ld_so_cache")]
-            let src_fd = {
-                let mtime_sec = src_stat.st_mtime;
-                let mtime_nsec = src_stat.st_mtime_nsec;
-
-                let safe_path = path.to_str().unwrap_or("").replace('/', "_");
-                let shm_path_owned = format!(
-                    "/scheme/shm/ld.so.cache.{}.{}.{}\0",
-                    safe_path, mtime_sec, mtime_nsec
-                );
-                let shm_path =
-                    unsafe { CStr::from_bytes_with_nul_unchecked(shm_path_owned.as_bytes()) };
-
-                let mut file_opt = None;
-                if let Ok(shm_fd) = File::open(shm_path, O_RDONLY as c_int) {
-                    if let Ok(shm_stat) = shm_fd.fstat()
-                        && shm_stat.st_size > 0
-                    {
-                        file_opt = Some(shm_fd);
-                    }
-                }
-                file_opt.unwrap_or(src_fd)
-            };
-
             (src_fd, src_stat, path.to_bytes())
         }
         Executable::InFd { file, arg0 } => {
