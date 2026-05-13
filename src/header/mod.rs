@@ -13,6 +13,8 @@ pub mod bits_clockid_t;
 pub mod bits_gid_t;
 #[path = "bits_id-t/mod.rs"]
 pub mod bits_id_t;
+#[path = "bits_ino-t/mod.rs"]
+pub mod bits_ino_t;
 pub mod bits_iovec;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
