@@ -295,6 +295,8 @@ define_ioctl_data! {
     }
 }
 
+pub const MODE_ADD_FB2: u64 = 0xB8;
+
 pub const MODE_OBJ_GET_PROPERTIES: u64 = 0xB9;
 define_ioctl_data! {
     struct drm_mode_obj_get_properties, DrmModeObjGetProperties {
