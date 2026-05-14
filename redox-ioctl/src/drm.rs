@@ -7,7 +7,7 @@ use core::{
 
 pub use drm_sys::{
     __kernel_size_t, DRM_PROP_NAME_LEN, drm_clip_rect, drm_get_cap, drm_mode_card_res,
-    drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc,
+    drm_mode_closefb, drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc,
     drm_mode_crtc_page_flip_target, drm_mode_cursor, drm_mode_cursor2, drm_mode_destroy_dumb,
     drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_fb_dirty_cmd, drm_mode_get_blob,
     drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res,
@@ -335,5 +335,13 @@ define_ioctl_data! {
         pitches: [u32; 4],
         offsets: [u32; 4],
         modifier: [u64; 4],
+    }
+}
+
+pub const MODE_CLOSE_FB: u64 = 0xD0;
+define_ioctl_data! {
+    struct drm_mode_closefb, DrmModeClosefb {
+        fb_id: u32,
+        pad: u32,
     }
 }
