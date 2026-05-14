@@ -39,6 +39,7 @@ use crate::{
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
+        string::strlen,
         sys_file,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
@@ -62,7 +63,7 @@ pub use redox_rt::proc::FdGuard;
 
 mod epoll;
 mod event;
-mod exec;
+pub(crate) mod exec;
 mod extra;
 mod libcscheme;
 mod libredox;
@@ -1193,6 +1194,72 @@ impl Pal for Sys {
             sgid: None,
         })?;
         Ok(())
+    }
+
+    unsafe fn spawn(
+        program: CStr,
+        fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
+        fat: Option<&crate::header::spawn::posix_spawnattr_t>,
+        mut argv: *const *mut c_char,
+        mut envp: *const *mut c_char,
+        use_path: bool,
+    ) -> Result<pid_t> {
+        let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
+        let executable = File::open(program, fcntl::O_RDONLY)?;
+        let cwd = path::clone_cwd().unwrap();
+        let proc_fd = child.proc_fd.unwrap();
+
+        let extra_info = redox_rt::proc::ExtraInfo {
+            cwd: Some(cwd.as_bytes()),
+            sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
+            sigprocmask: if let Some(fat) = fat
+                && crate::header::spawn::Flags::from_bits(fat.flags)
+                    .unwrap()
+                    .contains(crate::header::spawn::Flags::POSIX_SPAWN_SETSIGMASK)
+            {
+                fat.sigmask
+            } else {
+                redox_rt::signal::get_sigmask().unwrap()
+            },
+            umask: redox_rt::sys::get_umask(),
+            thr_fd: child.thr_fd.as_raw_fd(),
+            proc_fd: proc_fd.as_raw_fd(),
+            ns_fd: redox_rt::current_namespace_fd().ok(),
+            cwd_fd: path::current_dir()
+                .ok()
+                .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
+        };
+
+        let mut args = Vec::new();
+        let mut envs = Vec::new();
+
+        while unsafe { !(*argv).is_null() } {
+            let arg = unsafe { *argv };
+            let len = unsafe { strlen(arg) };
+            args.push(unsafe { slice::from_raw_parts(arg as *const u8, len) });
+            argv = unsafe { argv.add(1) };
+        }
+
+        while unsafe { !(*envp).is_null() } {
+            let env = unsafe { *envp };
+            let len = unsafe { strlen(env) };
+            envs.push(unsafe { slice::from_raw_parts(env as *const u8, len) });
+            envp = unsafe { envp.add(1) };
+        }
+
+        redox_rt::proc::fexec_impl(
+            FdGuard::new(executable.fd as usize).to_upper().unwrap(),
+            &child.thr_fd,
+            &proc_fd,
+            program.to_bytes(),
+            args.as_slice(),
+            envs.as_slice(),
+            &extra_info,
+            None,
+        )
+        .map_err(|_| syscall::error::Error::new(syscall::error::ENOEXEC))?;
+
+        Ok(i32::try_from(child.pid).unwrap())
     }
 
     fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
