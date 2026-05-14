@@ -14,6 +14,9 @@ static void handler(int sig) {
 }
 
 int main(void) {
+    long COUNTDOWN_MILLISECONDS = 100;
+    unsigned int SLEEP_MILLISECONDS = 110;
+
     struct sigaction sa;
     sa.sa_handler = handler;
     sa.sa_flags = 0;
@@ -30,7 +33,7 @@ int main(void) {
     struct itimerspec current_timer_spec = {0};
     struct itimerspec new_timer_spec = {0};
     new_timer_spec.it_value.tv_sec = 0;
-    new_timer_spec.it_value.tv_nsec = 5000000; // 5 ms
+    new_timer_spec.it_value.tv_nsec = COUNTDOWN_MILLISECONDS * 1000000;
 
 
     // use an invalid timer
@@ -65,10 +68,10 @@ int main(void) {
     status = timer_gettime(timerid, &current_timer_spec);
     assert(current_timer_spec.it_value.tv_sec == 0);
     assert(current_timer_spec.it_value.tv_nsec > 0);
-    assert(current_timer_spec.it_value.tv_nsec <= 5000000);
+    assert(current_timer_spec.it_value.tv_nsec <= COUNTDOWN_MILLISECONDS * 1000000);
 
     // timer fires
-    usleep(10000); // 10 ms
+    usleep(SLEEP_MILLISECONDS * 1000);
     assert(alarm_count == 1);
 
     // timer_gettime reports no timer any more
