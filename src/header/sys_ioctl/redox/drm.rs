@@ -117,13 +117,15 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xB3 => unsafe { dev.read_write_ioctl::<drm_mode_map_dumb>(buf, MODE_MAP_DUMB) },
         0xB4 => unsafe { dev.read_write_ioctl::<drm_mode_destroy_dumb>(buf, MODE_DESTROY_DUMB) },
         0xB5 => unsafe { dev.read_write_ioctl::<drm_mode_get_plane_res>(buf, MODE_GET_PLANE_RES) },
-        0xB8 => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_ADD_FB2) },
         0xB6 => unsafe { dev.read_write_ioctl::<drm_mode_get_plane>(buf, MODE_GET_PLANE) },
+        0xB7 => unsafe { dev.read_write_ioctl::<drm_mode_set_plane>(buf, MODE_SET_PLANE) },
+        0xB8 => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_ADD_FB2) },
         0xB9 => unsafe {
             dev.read_write_ioctl::<drm_mode_obj_get_properties>(buf, MODE_OBJ_GET_PROPERTIES)
         },
         0xBB => unsafe { dev.write_ioctl::<drm_mode_cursor2>(buf, MODE_CURSOR2) },
         0xCE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_GET_FB2) },
+        0xD0 => unsafe { dev.read_write_ioctl::<drm_mode_closefb>(buf, MODE_CLOSE_FB) },
         _ => {
             todo_skip!(
                 0,
