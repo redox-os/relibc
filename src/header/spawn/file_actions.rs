@@ -20,7 +20,7 @@ const FCHDIR: c_char = 4;
 const DUP2: c_char = 5;
 
 #[repr(C)]
-enum Operation {
+pub enum Operation {
     Open {
         fd: c_int,
         path: *const c_char,
@@ -76,14 +76,13 @@ fn copy_op(file_actions: *mut posix_spawn_file_actions_t, op: Operation) -> Resu
 pub unsafe extern "C" fn posix_spawn_file_actions_init(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
-    if file_actions.is_null() {
-        return EINVAL;
-    }
+    let file_actions = match unsafe { file_actions.as_mut().ok_or(Errno(EINVAL)) } {
+        Ok(v) => v,
+        Err(_) => return EINVAL,
+    };
 
-    unsafe {
-        (*file_actions).operation = null();
-        (*file_actions).size = 0;
-    }
+    (*file_actions).operation = null();
+    (*file_actions).size = 0;
 
     0
 }
@@ -92,15 +91,13 @@ pub unsafe extern "C" fn posix_spawn_file_actions_init(
 pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
-    if file_actions.is_null() {
-        return EINVAL;
-    }
+    let file_actions = match unsafe { file_actions.as_mut().ok_or(Errno(EINVAL)) } {
+        Ok(v) => v,
+        Err(_) => return EINVAL,
+    };
 
-    unsafe {
-        free((*file_actions).operation as *mut c_void);
-        (*file_actions).operation = null();
-        (*file_actions).size = 0;
-    }
+    (*file_actions).operation = null();
+    (*file_actions).size = 0;
 
     0
 }

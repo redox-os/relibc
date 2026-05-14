@@ -1086,10 +1086,10 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
 }
 
 pub struct NewChildProc {
-    proc_fd: Option<FdGuardUpper>,
+    pub proc_fd: Option<FdGuardUpper>,
 
-    thr_fd: FdGuardUpper,
-    pid: usize,
+    pub thr_fd: FdGuardUpper,
+    pub pid: usize,
 }
 
 pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {

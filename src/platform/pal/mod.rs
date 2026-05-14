@@ -433,6 +433,15 @@ pub trait Pal {
     /// Platform implementation of [`setsid()`](crate::header::unistd::setsid) from [`unistd.h`](crate::header::unistd).
     fn setsid() -> Result<c_int>;
 
+    unsafe fn spawn(
+        program: CStr,
+        fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
+        fat: Option<&crate::header::spawn::posix_spawnattr_t>,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+        use_path: bool,
+    ) -> Result<pid_t>;
+
     /// Platform implementation of [`symlink()`](crate::header::unistd::symlink) from [`unistd.h`](crate::header::unistd).
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {
         Self::symlinkat(path1, AT_FDCWD, path2)

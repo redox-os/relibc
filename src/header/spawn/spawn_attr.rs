@@ -13,7 +13,7 @@ use crate::header::{
 };
 
 bitflags::bitflags! {
-    struct Flags: c_short
+    pub struct Flags: c_short
     {
         const POSIX_SPAWN_RESETIDS = 1;
         const POSIX_SPAWN_SETPGROUP = 2;
@@ -34,11 +34,11 @@ pub const POSIX_SPAWN_SETSCHEDULER: c_short = 6;
 #[repr(C)]
 pub struct posix_spawnattr_t {
     pub(crate) param: sched_param,
-    flags: c_short,
-    pgroup: c_int,
+    pub(crate) flags: c_short,
+    pub(crate) pgroup: c_int,
     policy: c_int,
     sigdefault: sigset_t,
-    sigmask: sigset_t,
+    pub(crate) sigmask: sigset_t,
 }
 
 #[unsafe(no_mangle)]
@@ -217,9 +217,7 @@ pub unsafe extern "C" fn posix_spawnattr_getflags(
         return EINVAL;
     }
 
-    unsafe {
-        *flags = (*attr).flags;
-    }
+    unsafe { *flags = (*attr).flags }
     0
 }
 
