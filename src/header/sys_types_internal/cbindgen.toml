@@ -1,6 +1,5 @@
 # stddef.h brings in size_t
 sys_includes = ["stddef.h"]
-# TODO: figure out how to export void* type
 after_includes = """
 #include <bits/clock-t.h>
 #include <bits/clockid-t.h>
@@ -14,9 +13,8 @@ after_includes = """
 #include <bits/suseconds-t.h>
 #include <bits/sys/statvfs.h> // for fsblkcnt_t and fsfilcnt_t
 #include <bits/time-t.h>
+#include <bits/timer-t.h>
 #include <bits/uid-t.h>
-
-typedef void* timer_t;
 """
 include_guard = "_RELIBC_SYS_TYPES_INTERNAL_H"
 language = "C"
