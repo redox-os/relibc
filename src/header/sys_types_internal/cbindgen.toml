@@ -3,6 +3,7 @@ sys_includes = ["stddef.h"]
 after_includes = """
 #include <bits/clock-t.h>
 #include <bits/clockid-t.h>
+#include <bits/dev-t.h>
 #include <bits/gid-t.h>
 #include <bits/id-t.h>
 #include <bits/ino-t.h>
@@ -24,7 +25,6 @@ no_includes = true
 
 [export]
 include = [
-  "dev_t",
   "reclen_t",
   "nlink_t",
   "useconds_t",

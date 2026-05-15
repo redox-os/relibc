@@ -10,12 +10,14 @@
 pub use crate::header::{
     bits_clock_t::clock_t,
     bits_clockid_t::clockid_t,
+    bits_dev_t::dev_t,
     bits_gid_t::gid_t,
     bits_id_t::id_t,
     bits_ino_t::ino_t,
     bits_mode_t::mode_t,
     bits_off_t::off_t,
     bits_pid_t::pid_t,
+    bits_size_t::size_t,
     bits_ssize_t::ssize_t,
     bits_suseconds_t::suseconds_t,
     bits_sys_stat::{blkcnt_t, blksize_t},
@@ -26,8 +28,6 @@ pub use crate::header::{
 };
 use crate::platform::types::{c_char, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
 
-/// Used for device IDs.
-pub type dev_t = c_ulonglong;
 /// Used for directory entry lengths.
 pub type reclen_t = c_ushort;
 /// Used for link counts.

@@ -9,6 +9,8 @@ pub mod bits_arpainet;
 pub mod bits_clock_t;
 #[path = "bits_clockid-t/mod.rs"]
 pub mod bits_clockid_t;
+#[path = "bits_dev-t/mod.rs"]
+pub mod bits_dev_t;
 #[path = "bits_gid-t/mod.rs"]
 pub mod bits_gid_t;
 #[path = "bits_id-t/mod.rs"]
