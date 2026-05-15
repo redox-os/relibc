@@ -40,6 +40,8 @@ pub mod bits_suseconds_t;
 pub mod bits_sys_statvfs;
 #[path = "bits_time-t/mod.rs"]
 pub mod bits_time_t;
+#[path = "bits_timer-t/mod.rs"]
+pub mod bits_timer_t;
 pub mod bits_timespec;
 pub mod bits_timeval;
 #[path = "bits_uid-t/mod.rs"]
