@@ -10,7 +10,9 @@
 # Cycle warning:
 # POSIX states signal.h may include time.h and time.h may include signal.h.
 # To prevent a cycle between both headers we only import the needed types through bits.
-sys_includes = []
+#
+# features.h required for deprecated annotations
+sys_includes = ["features.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 after_includes = """
 #include <bits/size-t.h>   // for size_t from sys/types.h
