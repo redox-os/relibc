@@ -34,9 +34,13 @@ pub mod sys;
 
 type SigSet = BitSet<[u64; 1]>;
 
+/// cbindgen:ignore
 pub(crate) const SIG_DFL: usize = 0;
+/// cbindgen:ignore
 pub(crate) const SIG_IGN: usize = 1;
+/// cbindgen:ignore
 pub(crate) const SIG_ERR: isize = -1;
+/// cbindgen:ignore
 pub(crate) const SIG_HOLD: isize = 2;
 
 pub const SIG_BLOCK: c_int = 0;
