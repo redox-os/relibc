@@ -13,6 +13,3 @@ prefix_with_name = true
 
 [export]
 include = ["tms"]
-
-[export.rename]
-"tms" = "struct tms"
