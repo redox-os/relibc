@@ -20,6 +20,7 @@ pub use crate::header::{
     bits_suseconds_t::suseconds_t,
     bits_sys_statvfs::{fsblkcnt_t, fsfilcnt_t},
     bits_time_t::time_t,
+    bits_timer_t::timer_t,
     bits_uid_t::uid_t,
 };
 use crate::platform::types::{
@@ -35,8 +36,6 @@ pub type reclen_t = c_ushort;
 /// Used for link counts.
 pub type nlink_t = c_ulong;
 pub type useconds_t = c_uint;
-
-// timer_t in cbindgen after_includes (how to export void* type?)
 
 /// Used for file block counts.
 pub type blkcnt_t = c_longlong;
