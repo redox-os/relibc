@@ -962,35 +962,3 @@ pub const R_X86_64_TLSDESC: usize = 36;
 pub const R_X86_64_IRELATIVE: usize = 37;
 pub const R_X86_64_RELATIVE64: usize = 38;
 pub const R_X86_64_NUM: usize = 39;
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _cbindgen_export_elf(
-    a: Elf32_Ehdr,
-    b: Elf64_Ehdr,
-    c: Elf32_Shdr,
-    d: Elf64_Shdr,
-    e: Elf32_Sym,
-    f: Elf64_Sym,
-    g: Elf32_Syminfo,
-    h: Elf64_Syminfo,
-    i: Elf32_Rel,
-    j: Elf64_Rel,
-    k: Elf32_Rela,
-    l: Elf64_Rela,
-    m: Elf32_Phdr,
-    n: Elf64_Phdr,
-    o: Elf32_Dyn,
-    p: Elf64_Dyn,
-    q: Elf32_Verdef,
-    r: Elf64_Verdef,
-    s: Elf32_Verdaux,
-    t: Elf64_Verdaux,
-    u: Elf32_Verneed,
-    v: Elf64_Verneed,
-    w: Elf64_Vernaux,
-    x: Elf64_auxv_t,
-    y: Elf32_Nhdr,
-    z: Elf64_Nhdr,
-    aa: Elf64_Move,
-) {
-}
