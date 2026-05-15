@@ -63,6 +63,8 @@ pub struct ExtraInfo<'a> {
     pub ns_fd: Option<usize>,
     /// CWD handle
     pub cwd_fd: Option<usize>,
+    /// If the process for which the image is to be loaded the same as the currently running process
+    pub same_process: bool,
 }
 
 pub fn fexec_impl(
@@ -74,7 +76,7 @@ pub fn fexec_impl(
     envs: &[&[u8]],
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
-) -> Result<FexecResult> {
+) -> Result<Option<FexecResult>> {
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
     // some misalignments, and then switch address space.
@@ -235,7 +237,7 @@ pub fn fexec_impl(
     }
 
     if let Some(interpreter_path) = interpreter {
-        return Ok(FexecResult::Interp {
+        return Ok(Some(FexecResult::Interp {
             path: interpreter_path,
             interp_override: InterpOverride {
                 at_entry: base_addr + header.e_entry as usize,
@@ -246,7 +248,7 @@ pub fn fexec_impl(
                 min_mmap_addr,
                 grants_fd: grants_fd.take(),
             },
-        });
+        }));
     }
 
     mmap_anon_remote(
@@ -495,7 +497,11 @@ pub fn fexec_impl(
     // Dropping this FD will cause the address space switch.
     drop(addrspace_selection_fd);
 
-    unreachable!();
+    if extrainfo.same_process {
+        unreachable!();
+    } else {
+        Ok(None)
+    }
 }
 fn write_usizes<const N: usize>(fd: &FdGuardUpper, usizes: [usize; N]) -> Result<usize> {
     fd.write(unsafe { plain::as_bytes(&usizes) })

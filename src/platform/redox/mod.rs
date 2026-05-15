@@ -55,7 +55,10 @@ use crate::{
     io::{self, BufReader, prelude::*},
     ld_so::tcb::OsSpecific,
     out::Out,
-    platform::sys::timer::{timer_routine, timer_update_wake_time},
+    platform::{
+        self,
+        sys::timer::{timer_routine, timer_update_wake_time},
+    },
     sync::{Mutex, rwlock::RwLock},
 };
 
@@ -1228,6 +1231,7 @@ impl Pal for Sys {
             cwd_fd: path::current_dir()
                 .ok()
                 .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
+            same_process: false,
         };
 
         let mut args = Vec::new();
@@ -1247,7 +1251,10 @@ impl Pal for Sys {
             envp = unsafe { envp.add(1) };
         }
 
-        redox_rt::proc::fexec_impl(
+        if let Some(redox_rt::proc::FexecResult::Interp {
+            path: interp_path,
+            interp_override,
+        }) = redox_rt::proc::fexec_impl(
             FdGuard::new(executable.fd as usize).to_upper().unwrap(),
             &child.thr_fd,
             &proc_fd,
@@ -1256,8 +1263,24 @@ impl Pal for Sys {
             envs.as_slice(),
             &extra_info,
             None,
-        )
-        .map_err(|_| syscall::error::Error::new(syscall::error::ENOEXEC))?;
+        )? {
+            let interp_path = CStr::from_bytes_with_nul(&interp_path)
+                .map_err(|_| platform::Errno(syscall::error::ENOEXEC))?;
+
+            let interpreter = File::open(interp_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC)
+                .map_err(|_| platform::Errno(syscall::error::ENOEXEC))?;
+
+            redox_rt::proc::fexec_impl(
+                FdGuard::new(interpreter.fd as usize).to_upper().unwrap(),
+                &child.thr_fd,
+                &proc_fd,
+                program.to_bytes(),
+                args.as_slice(),
+                envs.as_slice(),
+                &extra_info,
+                Some(interp_override),
+            )?;
+        }
 
         Ok(i32::try_from(child.pid).unwrap())
     }

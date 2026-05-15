@@ -19,13 +19,14 @@ use crate::{
 };
 
 fn spawn(
+    pid: Option<&mut pid_t>,
     mut program: &str,
     file_actions: Option<&posix_spawn_file_actions_t>,
     spawn_attr: Option<&posix_spawnattr_t>,
     argv: *const *mut c_char,
     envp: *const *mut c_char,
     use_path: bool,
-) -> Result<pid_t> {
+) -> Result<()> {
     if use_path {
         let path_env = unsafe {
             CStr::from_ptr(getenv("PATH".as_ptr() as *const c_char))
@@ -57,12 +58,17 @@ fn spawn(
             envp,
             use_path,
         )
+        .map(|v| {
+            if let Some(pid) = pid {
+                *pid = v;
+            }
+        })
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn posix_spawn(
-    pid: *const pid_t,
+    pid: *mut pid_t,
     program: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
     spawn_attr: *const posix_spawnattr_t,
@@ -71,7 +77,8 @@ pub extern "C" fn posix_spawn(
 ) -> c_int {
     let program = unsafe { CStr::from_ptr(program).to_str().unwrap() };
 
-    match spawn(
+    if let Err(e) = spawn(
+        unsafe { pid.as_mut() },
         program,
         unsafe { file_actions.as_ref() },
         unsafe { spawn_attr.as_ref() },
@@ -79,14 +86,14 @@ pub extern "C" fn posix_spawn(
         envp,
         false,
     ) {
-        Ok(v) => v,
-        Err(e) => e.0,
+        return e.0;
     }
+    0
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn posix_spawnp(
-    pid: *const pid_t,
+    pid: *mut pid_t,
     program: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
     spawn_attr: *const posix_spawnattr_t,
@@ -95,7 +102,8 @@ pub extern "C" fn posix_spawnp(
 ) -> c_int {
     let program = unsafe { CStr::from_ptr(program).to_str().unwrap() };
 
-    match spawn(
+    if let Err(e) = spawn(
+        unsafe { pid.as_mut() },
         program,
         unsafe { file_actions.as_ref() },
         unsafe { spawn_attr.as_ref() },
@@ -103,7 +111,7 @@ pub extern "C" fn posix_spawnp(
         envp,
         true,
     ) {
-        Ok(v) => v,
-        Err(e) => e.0,
+        return e.0;
     }
+    0
 }
