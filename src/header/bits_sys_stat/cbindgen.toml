@@ -1,0 +1,20 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html
+#
+# These types are split out to prevent importing all of sys/types.h into sys/statvfs.h.
+#
+# POSIX headers that require blkcnt_t and blksize_t:
+# - sys/stat.h
+# - sys/types.h (where they should be defined)
+sys_includes = []
+include_guard = "_RELIBC_BITS_SYS_STAT_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+[export]
+include = [
+  "blkcnt_t",
+  "blksize_t"
+]
+[enum]
+prefix_with_name = true
