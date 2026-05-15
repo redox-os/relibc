@@ -1,5 +1,8 @@
-sys_includes = ["sys/types.h"]
-include_guard = "_SYS_TIMES_H"
+sys_includes = []
+after_includes = """
+#include <bits/clock-t.h> // for clock_t from sys/types.h
+"""
+include_guard = "_RELIBC_SYS_TIMES_H"
 language = "C"
 style = "Tag"
 no_includes = true
@@ -7,3 +10,9 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export]
+include = ["tms"]
+
+[export.rename]
+"tms" = "struct tms"
