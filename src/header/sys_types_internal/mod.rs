@@ -18,17 +18,14 @@ pub use crate::header::{
     bits_pid_t::pid_t,
     bits_ssize_t::ssize_t,
     bits_suseconds_t::suseconds_t,
+    bits_sys_stat::{blkcnt_t, blksize_t},
     bits_sys_statvfs::{fsblkcnt_t, fsfilcnt_t},
     bits_time_t::time_t,
     bits_timer_t::timer_t,
     bits_uid_t::uid_t,
 };
-use crate::platform::types::{
-    c_char, c_long, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
-};
+use crate::platform::types::{c_char, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
 
-/// Used for block sizes.
-pub type blksize_t = c_long;
 /// Used for device IDs.
 pub type dev_t = c_ulonglong;
 /// Used for directory entry lengths.
@@ -36,9 +33,6 @@ pub type reclen_t = c_ushort;
 /// Used for link counts.
 pub type nlink_t = c_ulong;
 pub type useconds_t = c_uint;
-
-/// Used for file block counts.
-pub type blkcnt_t = c_longlong;
 
 pub type u_char = c_uchar;
 pub type uchar = c_uchar;
