@@ -4,9 +4,19 @@
 # - "The <sys/stat.h> header shall define the blkcnt_t, blksize_t, dev_t, ino_t, mode_t, nlink_t, uid_t, gid_t, off_t, and time_t types as described in <sys/types.h>."
 # - "The <sys/stat.h> header shall define the timespec structure as described in <time.h>. Times shall be given in seconds since the Epoch."
 # - "Inclusion of the <sys/stat.h> header may make visible all symbols from the <time.h> header."
-sys_includes = ["sys/types.h"]
+#
+# bits/timespec.h brings in time_t
+sys_includes = []
 include_guard = "_RELIBC_SYS_STAT_H"
 after_includes = """
+#include <bits/sys/stat.h> // for blkcnt_t and blksize_t from sys/types.h
+#include <bits/dev-t.h>    // for dev_t from sys/types.h
+#include <bits/gid-t.h>    // for gid_t from sys/types.h
+#include <bits/ino-t.h>    // for ino_t from sys/types.h
+#include <bits/mode-t.h>   // for mode_t from sys/types.h
+#include <bits/nlink-t.h>  // for nlink_t from sys/types.h
+#include <bits/off-t.h>    // for off_t from sys/types.h
+#include <bits/uid-t.h>    // for uid_t from sys/types.h
 #include <bits/timespec.h> // for timespec from time.h
 
 #define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
