@@ -33,7 +33,7 @@ pub enum Operation {
 }
 
 pub struct OperationNode {
-    operation: Operation,
+    pub operation: Operation,
     next: *const OperationNode,
 }
 
@@ -42,6 +42,32 @@ pub struct posix_spawn_file_actions_t {
     len: usize,
     head: *const OperationNode,
     tail: *mut OperationNode,
+}
+
+pub struct FileActionsIter<'a> {
+    curr: Option<&'a OperationNode>,
+}
+
+impl<'a> Iterator for FileActionsIter<'a> {
+    type Item = &'a OperationNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let curr = self.curr?;
+        self.curr = unsafe { curr.next.as_ref() };
+        Some(curr)
+    }
+}
+
+impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
+    type Item = &'a OperationNode;
+
+    type IntoIter = FileActionsIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FileActionsIter {
+            curr: unsafe { self.head.as_ref() },
+        }
+    }
 }
 
 fn copy_op(file_actions: &mut posix_spawn_file_actions_t, op: Operation) -> Result<()> {
