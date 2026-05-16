@@ -18,6 +18,7 @@ pub use crate::header::{
     bits_nlink_t::nlink_t,
     bits_off_t::off_t,
     bits_pid_t::pid_t,
+    bits_reclen_t::reclen_t,
     bits_size_t::size_t,
     bits_ssize_t::ssize_t,
     bits_suseconds_t::suseconds_t,
@@ -29,8 +30,6 @@ pub use crate::header::{
 };
 use crate::platform::types::{c_char, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
 
-/// Used for directory entry lengths.
-pub type reclen_t = c_ushort;
 pub type useconds_t = c_uint;
 
 pub type u_char = c_uchar;
