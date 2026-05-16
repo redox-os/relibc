@@ -1,6 +1,6 @@
 use core::{
     ffi::{c_char, c_int},
-    ptr::null,
+    ptr::{null, null_mut},
 };
 
 use crate::{
@@ -8,7 +8,6 @@ use crate::{
     header::{
         errno::{EBADF, EINVAL, ENOMEM},
         stdlib::{free, malloc},
-        string::memcpy,
     },
     platform::types::{c_void, mode_t},
 };
@@ -33,40 +32,35 @@ pub enum Operation {
     Dup2(c_int, c_int),
 }
 
-#[repr(C)]
-pub struct posix_spawn_file_actions_t {
-    size: usize,
-    operation: *const Operation,
+pub struct OperationNode {
+    operation: Operation,
+    next: *const OperationNode,
 }
 
-fn copy_op(file_actions: *mut posix_spawn_file_actions_t, op: Operation) -> Result<()> {
-    if file_actions.is_null() {
-        return Err(Errno(EINVAL));
-    }
+#[repr(C)]
+pub struct posix_spawn_file_actions_t {
+    len: usize,
+    head: *const OperationNode,
+    tail: *mut OperationNode,
+}
 
-    let new = unsafe { malloc((*file_actions).size + size_of::<Operation>()) };
+fn copy_op(file_actions: &mut posix_spawn_file_actions_t, op: Operation) -> Result<()> {
+    let new = unsafe { malloc(size_of::<OperationNode>()) };
+    let new_ref = unsafe {
+        (new as *const OperationNode)
+            .as_ref()
+            .ok_or(Errno(ENOMEM))?
+    };
 
-    if new == -1isize as *mut c_void {
-        return Err(Errno(ENOMEM));
-    }
-
-    unsafe {
-        if (*file_actions).size >= size_of::<Operation>() {
-            memcpy(
-                new,
-                (*file_actions).operation as *const c_void,
-                (*file_actions).size / size_of::<Operation>(),
-            );
-
-            free((*file_actions).operation as *mut c_void);
-        }
-
-        (*file_actions).operation = new as *const Operation;
-
-        let new = new as *mut Operation;
-
-        (*new.add((*file_actions).size)) = op;
-        (*file_actions).size += size_of::<Operation>()
+    if (*file_actions).head.is_null() && (*file_actions).tail.is_null() {
+        (*file_actions).head = new as *const OperationNode;
+        (*file_actions).tail = new as *mut OperationNode;
+        (*file_actions).len += 1;
+    } else {
+        let tail = unsafe { (*file_actions).tail.as_mut().unwrap() };
+        (*tail).next = new as *mut OperationNode;
+        (*file_actions).tail = new as *mut OperationNode;
+        (*file_actions).len += 1;
     }
 
     Ok(())
@@ -81,8 +75,9 @@ pub unsafe extern "C" fn posix_spawn_file_actions_init(
         Err(_) => return EINVAL,
     };
 
-    (*file_actions).operation = null();
-    (*file_actions).size = 0;
+    (*file_actions).head = null();
+    (*file_actions).tail = null_mut();
+    (*file_actions).len = 0;
 
     0
 }
@@ -96,15 +91,32 @@ pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
         Err(_) => return EINVAL,
     };
 
-    (*file_actions).operation = null();
-    (*file_actions).size = 0;
+    if (*file_actions).head.is_null() {
+        assert!((*file_actions).tail.is_null() && (*file_actions).len == 0);
+        return 0;
+    }
+
+    let node = unsafe { (*file_actions).head.as_ref().unwrap() };
+
+    while !(*file_actions).head.is_null() {
+        let head = (*file_actions).head;
+        let next = unsafe { (*head).next };
+        (*file_actions).head = next;
+
+        unsafe {
+            free(head as *mut c_void);
+        }
+    }
+
+    (*file_actions).tail = null_mut();
+    (*file_actions).len = 0;
 
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
-    file_actions: *mut posix_spawn_file_actions_t,
+    file_actions: &mut posix_spawn_file_actions_t,
     fd: c_int,
     path: *const c_char,
     oflag: c_int,
@@ -130,7 +142,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
-    file_actions: *mut posix_spawn_file_actions_t,
+    file_actions: &mut posix_spawn_file_actions_t,
     fd: c_int,
 ) -> c_int {
     if fd < 0 {
@@ -147,7 +159,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
-    file_actions: *mut posix_spawn_file_actions_t,
+    file_actions: &mut posix_spawn_file_actions_t,
     path: *const c_char,
 ) -> c_int {
     let chdir_op = Operation::Chdir(path);
@@ -161,7 +173,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
-    file_actions: *mut posix_spawn_file_actions_t,
+    file_actions: &mut posix_spawn_file_actions_t,
     fd: c_int,
 ) -> c_int {
     if fd < 0 {
@@ -179,7 +191,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_adddup2(
-    file_actions: *mut posix_spawn_file_actions_t,
+    file_actions: &mut posix_spawn_file_actions_t,
     fd: c_int,
     new: c_int,
 ) -> c_int {
