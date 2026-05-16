@@ -1209,6 +1209,15 @@ impl Pal for Sys {
         let executable = File::open(program, fcntl::O_RDONLY)?;
         let cwd = path::clone_cwd().unwrap();
         let proc_fd = child.proc_fd.unwrap();
+        let curr_proc_fd = redox_rt::current_proc_fd();
+        let file_table = RtTcb::current()
+            .thread_fd()
+            .dup(b"filetable")?
+            .dup(b"copy")?;
+
+        let new_file_table = child.thr_fd.dup(b"current-filetable")?;
+
+        new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
 
         let extra_info = redox_rt::proc::ExtraInfo {
             cwd: Some(cwd.as_bytes()),
@@ -1280,7 +1289,10 @@ impl Pal for Sys {
             )?;
         }
 
-        Ok(i32::try_from(child.pid).unwrap())
+        let start_fd = child.thr_fd.dup(b"start")?;
+        start_fd.write(&[0])?;
+
+        Ok(pid_t::try_from(child.pid).unwrap())
     }
 
     fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {

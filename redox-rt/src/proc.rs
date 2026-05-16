@@ -495,9 +495,9 @@ pub fn fexec_impl(
     }
 
     // Dropping this FD will cause the address space switch.
-    drop(addrspace_selection_fd);
 
     if extrainfo.same_process {
+        drop(addrspace_selection_fd);
         unreachable!();
     } else {
         Ok(None)
