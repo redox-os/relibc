@@ -79,8 +79,10 @@ fn spawn(
             if let Some(pid) = pid {
                 *pid = v;
             }
-        })
+        })?;
     }
+
+    Ok(())
 }
 
 #[unsafe(no_mangle)]
