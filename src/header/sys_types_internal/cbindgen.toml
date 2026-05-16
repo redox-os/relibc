@@ -8,6 +8,7 @@ after_includes = """
 #include <bits/id-t.h>
 #include <bits/ino-t.h>
 #include <bits/mode-t.h>
+#include <bits/nlink-t.h>
 #include <bits/off-t.h>
 #include <bits/pid-t.h>
 #include <bits/ssize-t.h>
@@ -26,7 +27,6 @@ no_includes = true
 [export]
 include = [
   "reclen_t",
-  "nlink_t",
   "useconds_t",
   "u_char",
   "uchar",

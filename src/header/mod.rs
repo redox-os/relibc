@@ -22,6 +22,8 @@ pub mod bits_iovec;
 pub mod bits_locale_t;
 #[path = "bits_mode-t/mod.rs"]
 pub mod bits_mode_t;
+#[path = "bits_nlink-t/mod.rs"]
+pub mod bits_nlink_t;
 #[path = "bits_off-t/mod.rs"]
 pub mod bits_off_t;
 #[path = "bits_pid-t/mod.rs"]

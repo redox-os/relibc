@@ -1,0 +1,17 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html
+#
+# This type is split out to prevent importing all of sys/types.h into other headers.
+#
+# POSIX headers that require nlink_t:
+# - sys/stat.h
+# - sys/types.h (where it should be defined)
+sys_includes = []
+include_guard = "_RELIBC_BITS_NLINK_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+[export]
+include = ["nlink_t"]
+[enum]
+prefix_with_name = true
