@@ -11,6 +11,7 @@ after_includes = """
 #include <bits/nlink-t.h>
 #include <bits/off-t.h>
 #include <bits/pid-t.h>
+#include <bits/reclen-t.h>
 #include <bits/ssize-t.h>
 #include <bits/suseconds-t.h>
 #include <bits/sys/stat.h>    // for blkcnt_t and blksize_t
@@ -26,7 +27,6 @@ no_includes = true
 
 [export]
 include = [
-  "reclen_t",
   "useconds_t",
   "u_char",
   "uchar",
