@@ -5,13 +5,18 @@
 mod file_actions;
 mod spawn_attr;
 
+use alloc::string::{String, ToString};
 pub use file_actions::{Operation, posix_spawn_file_actions_t};
 pub use spawn_attr::{Flags, posix_spawnattr_t};
 
 use crate::{
     c_str::CStr,
     error::{Errno, Result},
-    header::{errno::ENOENT, stdlib::getenv},
+    header::{
+        dirent::{opendir, readdir},
+        errno::ENOENT,
+        stdlib::getenv,
+    },
     platform::{
         self, Pal,
         types::{c_char, c_int, pid_t},
@@ -20,7 +25,7 @@ use crate::{
 
 fn spawn(
     pid: Option<&mut pid_t>,
-    mut program: &str,
+    mut program: String,
     file_actions: Option<&posix_spawn_file_actions_t>,
     spawn_attr: Option<&posix_spawnattr_t>,
     argv: *const *mut c_char,
@@ -28,24 +33,36 @@ fn spawn(
     use_path: bool,
 ) -> Result<()> {
     if use_path {
-        let path_env = unsafe {
-            CStr::from_ptr(getenv("PATH".as_ptr() as *const c_char))
-                .to_str()
-                .unwrap()
-        };
+        let path = unsafe { getenv(c"PATH".as_ptr()) };
+        let path_env = unsafe { CStr::from_nullable_ptr(path).unwrap().to_str().unwrap() };
         let path_elements = path_env.split(':');
-        let program_name = program.split("/").last().unwrap();
         let mut flag = false;
 
-        for element in path_elements {
-            if element.split("/").last().unwrap() == program_name {
-                flag = true;
-                program = element;
-                break;
+        for path_element in path_elements {
+            let dir = if let Some(dir) =
+                unsafe { opendir(path_element.as_bytes().as_ptr() as *const c_char).as_mut() }
+            {
+                dir
+            } else {
+                continue;
+            };
+
+            while let Some(dir_ent) = unsafe { readdir(dir).as_ref() } {
+                let dir_ent_name = unsafe {
+                    CStr::from_ptr(dir_ent.d_name.as_ptr() as *const c_char)
+                        .to_str()
+                        .unwrap()
+                };
+                if dir_ent_name == program {
+                    flag = true;
+                    program = format!("{}/{}", path_element, program);
+                    break;
+                }
             }
-            if !flag {
-                return Err(Errno(ENOENT));
-            }
+        }
+
+        if !flag {
+            return Err(Errno(ENOENT));
         }
     }
 
@@ -75,7 +92,7 @@ pub extern "C" fn posix_spawn(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    let program = unsafe { CStr::from_ptr(program).to_str().unwrap() };
+    let program = unsafe { CStr::from_ptr(program).to_str().unwrap().to_string() };
 
     if let Err(e) = spawn(
         unsafe { pid.as_mut() },
@@ -100,7 +117,7 @@ pub extern "C" fn posix_spawnp(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    let program = unsafe { CStr::from_ptr(program).to_str().unwrap() };
+    let program = unsafe { CStr::from_ptr(program).to_str().unwrap().to_string() };
 
     if let Err(e) = spawn(
         unsafe { pid.as_mut() },
