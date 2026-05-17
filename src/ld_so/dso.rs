@@ -722,7 +722,7 @@ impl DSO {
 
                 elf::DT_NEEDED => needed.push(entry),
                 elf::DT_JMPREL => jmprel = Some(ptr as usize),
-                elf::DT_RUNPATH => runpath = Some(entry), // FIXME(andypython): rpath
+                elf::DT_RPATH | elf::DT_RUNPATH => runpath = Some(entry),
                 elf::DT_STRTAB => strtab_offset = Some(relative_idx),
                 elf::DT_STRSZ => strtab_size = Some(val),
                 elf::DT_SONAME => soname = Some(entry),
