@@ -4,9 +4,12 @@
 # - "The <sys/mman.h> header shall define the mode_t, off_t, and size_t types as described in <sys/types.h>."
 # - "The <sys/mman.h> header shall define the following symbolic constants as described in <fcntl.h>"
 # - "Inclusion of the <sys/mman.h> header may make visible all symbols from the <fcntl.h> header."
-sys_includes = ["sys/types.h", "fcntl.h"]
+#
+# fcntl.h brings in mode_t and off_t
+sys_includes = ["fcntl.h"]
 include_guard = "_RELIBC_SYS_MMAN_H"
 after_includes = """
+#include <bits/size-t.h> // for size_t from sys/types.h
 
 #define MAP_FAILED ((void *) -1)
 """
