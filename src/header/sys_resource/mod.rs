@@ -8,7 +8,7 @@ use crate::{
     out::Out,
     platform::{
         Pal, Sys,
-        types::{c_int, c_long, id_t},
+        types::{c_int, c_long, c_ulonglong, id_t},
     },
 };
 
@@ -38,7 +38,7 @@ pub const RLIMIT_NICE: c_int = 13;
 pub const RLIMIT_RTPRIO: c_int = 14;
 pub const RLIMIT_NLIMITS: c_int = 15;
 
-pub type rlim_t = u64;
+pub type rlim_t = c_ulonglong;
 
 #[repr(C)]
 pub struct rlimit {
