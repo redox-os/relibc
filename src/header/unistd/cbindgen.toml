@@ -1,6 +1,13 @@
-sys_includes = ["stddef.h", "stdint.h", "sys/types.h", "features.h", "fcntl.h"]
+# stddef.h brings in size_t and NULL
+# fcntl.h brings in sys/stat.h bringing in off_t, gid_t and uid_t
+# fcntl.h brings in pid_t
+# bits/useconds-t.h brings in features.h (for deprecated annotations)
+sys_includes = ["stddef.h", "stdint.h", "fcntl.h"]
 include_guard = "_RELIBC_UNISTD_H"
 after_includes = """
+#include <bits/ssize-t.h>    // for ssize_t from sys/types.h
+// for deprecated ualarm and usleep
+#include <bits/useconds-t.h> // for useconds_t from sys/types.h
 
 #define _POSIX_VERSION 200809L
 #define _POSIX_BARRIERS 202405L
