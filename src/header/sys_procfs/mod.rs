@@ -64,14 +64,3 @@ pub type prfpregset_t = elf_fpregset_t;
 pub type lwpid_t = pid_t;
 pub type prstatus_t = elf_prstatus;
 pub type prpsinfo_t = elf_prpsinfo;
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _cbindgen_export_procfs(
-    a: psaddr_t,
-    b: prgregset_t,
-    c: prfpregset_t,
-    d: lwpid_t,
-    e: prstatus_t,
-    f: prpsinfo_t,
-) {
-}
