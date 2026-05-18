@@ -2,7 +2,7 @@
 #
 # There are no spec quotations relating to includes
 sys_includes = []
-include_guard = "_NETINET_TCP_H"
+include_guard = "_RELIBC_NETINET_TCP_H"
 language = "C"
 style = "Tag"
 no_includes = true
