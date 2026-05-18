@@ -10,7 +10,7 @@ use cbitset::BitSet;
 use crate::platform::types::pthread_attr_t;
 use crate::{
     error::{Errno, ResultExt},
-    header::{bits_sigset_t::sigset_t, errno, setjmp, time::timespec},
+    header::{bits_sigset_t::sigset_t, errno, time::timespec},
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{c_char, c_int, c_ulonglong, c_void, pid_t, pthread_t, size_t, uid_t},
@@ -129,10 +129,6 @@ pub type siginfo_t = siginfo;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>
 pub type stack_t = sigaltstack;
 
-unsafe extern "C" {
-    pub fn sigsetjmp(jb: *mut c_ulonglong, savemask: c_int) -> c_int;
-}
-
 //NOTE for the following two functions, to see why they're implemented slightly differently from their intended behavior, read
 //     https://git.musl-libc.org/cgit/musl/commit/?id=583e55122e767b1586286a0d9c35e2a4027998ab
 #[unsafe(no_mangle)]
@@ -144,11 +140,6 @@ unsafe extern "C" fn __sigsetjmp_tail(jb: *mut c_ulonglong, ret: c_int) -> c_int
         unsafe { sigprocmask(SIG_SETMASK, ptr::null_mut(), set) };
     }
     ret
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn siglongjmp(jb: *mut c_ulonglong, ret: c_int) {
-    unsafe { setjmp::longjmp(jb, ret) };
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/kill.html>.

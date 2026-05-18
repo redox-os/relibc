@@ -25,6 +25,8 @@ extern "C" {
 
 int setjmp(jmp_buf buf);
 void longjmp(jmp_buf buf, int value);
+int sigsetjmp(jmp_buf buf, int savemask);
+int siglongjmp(jmp_buf buf, int savemask);
 
 #ifdef __cplusplus
 } // extern "C"

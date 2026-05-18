@@ -4,6 +4,8 @@
 
 use core::arch::global_asm;
 
+use crate::platform::types::{c_int, c_ulonglong};
+
 macro_rules! platform_specific {
     ($($rust_arch:expr,$c_arch:expr,$ext:expr;)+) => {
         $(
@@ -27,7 +29,15 @@ platform_specific! {
 //Each platform has different sizes for sigjmp_buf, currently only x86_64 is supported
 unsafe extern "C" {
     /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setjmp.html>.
-    pub fn setjmp(jb: *mut u64) -> i32;
+    pub unsafe fn setjmp(env: *mut c_ulonglong) -> c_int;
+    /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigsetjmp.html>.
+    pub unsafe fn sigsetjmp(env: *mut c_ulonglong, savemask: c_int) -> c_int;
     /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/longjmp.html>.
-    pub fn longjmp(jb: *mut u64, ret: i32);
+    pub unsafe fn longjmp(env: *mut c_ulonglong, val: c_int);
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/siglongjmp.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn siglongjmp(env: *mut c_ulonglong, val: c_int) {
+    unsafe { longjmp(env, val) };
 }
