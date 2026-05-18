@@ -1,0 +1,18 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/types.h.html
+#
+# This type is split out to prevent importing all of sys/types.h into other headers.
+#
+# useconds_t was defined in sys/types.h in an older POSIX standard.
+# relibc currently only uses it in unistd.h for ualarm and usleep.
+#
+# features.h required for deprecated annotation.
+sys_includes = ["features.h"]
+include_guard = "_RELIBC_BITS_USECONDS_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+[export]
+include = ["useconds_t"]
+[enum]
+prefix_with_name = true
