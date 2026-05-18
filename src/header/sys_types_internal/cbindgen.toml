@@ -1,4 +1,5 @@
 # stddef.h brings in size_t
+# bits/useconds-t.h brings in features.h for deprecated annotation
 sys_includes = ["stddef.h"]
 after_includes = """
 #include <bits/clock-t.h>
@@ -19,6 +20,7 @@ after_includes = """
 #include <bits/time-t.h>
 #include <bits/timer-t.h>
 #include <bits/uid-t.h>
+#include <bits/useconds-t.h>  // from older POSIX
 """
 include_guard = "_RELIBC_SYS_TYPES_INTERNAL_H"
 language = "C"
@@ -27,7 +29,6 @@ no_includes = true
 
 [export]
 include = [
-  "useconds_t",
   "u_char",
   "uchar",
   "u_short",
