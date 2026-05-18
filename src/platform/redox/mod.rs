@@ -1232,10 +1232,11 @@ impl Pal for Sys {
         }
 
         let path = format!("/scheme/time/{clock_id}");
-        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?;
+        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?.to_upper()?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)
-        })?);
+        })?)
+        .to_upper()?;
         let caller_thread = Self::current_os_tid();
 
         let timer_buf = unsafe {
