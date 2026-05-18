@@ -1,5 +1,21 @@
-sys_includes = ["stdarg.h", "sys/stat.h", "unistd.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fcntl.h.html
+#
+# Spec quotations relating to includes:
+# - "The <fcntl.h> header shall define the mode_t, off_t, and pid_t types as described in <sys/types.h>."
+# - "The <fcntl.h> header shall define the values used for l_whence, SEEK_SET, SEEK_CUR, and SEEK_END as described in <stdio.h>."
+# - "The <fcntl.h> header shall define the symbolic constants for file modes for use as values of mode_t as described in <sys/stat.h>."
+# - "Inclusion of the <fcntl.h> header may also make visible all symbols from <sys/stat.h> and <unistd.h>."
+#
+# To prevent a cycle between fcntl.h and unistd.h relibc only includes fcntl.h in unistd.h.
+# This approach was chosen because unistd.h requires parts of fcntl.h but not the other way around.
+#
+# stdarg.h brings in va_list for ...
+# sys/stat.h brings in mode_t, off_t and file mode constants
+sys_includes = ["stdarg.h", "sys/stat.h"]
 include_guard = "_RELIBC_FCNTL_H"
+after_includes = """
+#include <bits/pid-t.h> // for pid_t from sys/types.h
+"""
 language = "C"
 style = "Tag"
 no_includes = true
