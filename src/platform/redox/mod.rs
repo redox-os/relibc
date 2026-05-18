@@ -1072,6 +1072,9 @@ impl Pal for Sys {
     fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize> {
         // Since this is used by realpath, it converts from the old format to the new one for
         // compatibility reasons
+
+        //syscall::write(2,b"???").expect("test");
+        //syscall::write(2,&fildes.to_be_bytes()).expect("test");
         let mut buf = [0; limits::PATH_MAX];
         let count = syscall::fpath(fildes as usize, &mut buf)?;
 
@@ -1080,8 +1083,15 @@ impl Pal for Sys {
             .and_then(|x| redox_path::RedoxPath::from_absolute(x))
             .ok_or(Errno(EINVAL))?;
 
+        syscall::write(2,&buf[..count]).expect("test");
+
+        //syscall::write(2,&buf[]).expect("test");
+        //syscall::write(2,b"\n").expect("test");
         let (scheme, reference) = redox_path.as_parts().ok_or(Errno(EINVAL))?;
 
+        syscall::write(2,reference.as_ref().as_bytes()).expect("test");
+
+        syscall::write(2,scheme.as_ref().as_bytes()).expect("test");
         let mut cursor = io::Cursor::new(out);
         let res = match scheme.as_ref() {
             "file" => write!(cursor, "/{}", reference.as_ref().trim_start_matches('/')),
@@ -1233,10 +1243,10 @@ impl Pal for Sys {
         }
 
         let path = format!("/scheme/time/{clock_id}");
-        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?;
+        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?.to_upper()?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)
-        })?);
+        })?).to_upper()?;
         let caller_thread = Self::current_os_tid();
 
         let timer_buf = unsafe {

@@ -9,6 +9,18 @@
 #include <stdio.h>
 #include <err.h>
 #include <fcntl.h>
+#include "signal.h"
+#include <assert.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <limits.h>
+#include <errno.h>
+#include <sys/utsname.h>
+
+#include "test_helpers.h"
 static void handler(int signum)
 {
     (void) signum;
@@ -37,7 +49,7 @@ int main(void)
     //printf("fcn_ret is %d\n, errno is %d\n",fcn_ret, errno);
     errno = 0;
 
-    alarm(2);
+    alarm(1);
     struct pollfd pfd = { .fd = fds[0], .events = POLLIN };
     // POSIX requires EINTR or returning the pending events.
     int ret = ppoll(&pfd, 1, NULL, &empty);

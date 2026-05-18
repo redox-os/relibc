@@ -34,6 +34,9 @@ static ALARM_TIMER: Mutex<Option<AlarmTimer>> = Mutex::new(None);
 /// pending alarm be preserved across exec (the timer continues counting down
 /// in the new process image as i understand).
 pub fn alarm_timespec(duration: timespec) -> c_uint {
+    
+
+
     let mut guard = ALARM_TIMER.lock();
 
     // Determine remaining time on any existing alarm

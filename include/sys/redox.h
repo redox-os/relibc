@@ -10,6 +10,7 @@ extern "C" {
 #ifdef __redox__
 
 ssize_t redox_fpath(int fd, void * buf, size_t count);
+ssize_t rfpath(int fd, void * buf, size_t count);
 void * redox_physalloc(size_t size);
 int redox_physfree(void * physical_address, size_t size);
 
