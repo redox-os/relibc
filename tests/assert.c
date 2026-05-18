@@ -7,6 +7,7 @@
 int main(void) {
     assert(1 == 1);
     assert(1 + 1 == 2);
+    static_assert(3 == 3);
     puts("yay!");
 
     if (assert(0 == 0), 1) {

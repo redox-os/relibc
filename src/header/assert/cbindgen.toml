@@ -12,6 +12,10 @@ trailer = """
 #undef assert
 #endif
 
+#if __STDC_VERSION__ >= 201112L && !defined(__cplusplus)
+#define static_assert _Static_assert
+#endif
+
 #ifdef NDEBUG
 # define assert(cond) (void) 0
 #else
