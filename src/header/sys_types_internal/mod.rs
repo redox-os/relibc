@@ -28,9 +28,9 @@ pub use crate::header::{
     bits_timer_t::timer_t,
     bits_uid_t::uid_t,
 };
+#[expect(deprecated)]
+pub use crate::header::bits_useconds_t::useconds_t;
 use crate::platform::types::{c_char, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
-
-pub type useconds_t = c_uint;
 
 pub type u_char = c_uchar;
 pub type uchar = c_uchar;
