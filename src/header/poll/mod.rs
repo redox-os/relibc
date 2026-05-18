@@ -107,6 +107,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
                 event.events |= ep;
             }
         }
+
         if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } < 0 {
             if platform::ERRNO.get() == EBADF {
                 pfd.revents |= POLLNVAL;

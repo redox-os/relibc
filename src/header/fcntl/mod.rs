@@ -73,6 +73,7 @@ pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> 
         | F_OFD_SETLKW | F_DUPFD_CLOEXEC => unsafe { __valist.arg::<c_ulonglong>() },
         _ => 0,
     };
+
     Sys::fcntl(fildes, cmd, arg).or_minus_one_errno()
 }
 
