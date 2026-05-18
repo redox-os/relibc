@@ -7,12 +7,14 @@ use core::{mem, ptr, slice};
 use crate::{
     fs::File,
     header::{
-        bits_sigset_t::sigset_t, errno::EBADF, fcntl::fcntl, fcntl::F_GETFD, sys_epoll::{
+        bits_sigset_t::sigset_t,
+        errno::EBADF,
+        sys_epoll::{
             EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT,
             EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl,
             epoll_data, epoll_event, epoll_pwait,
-        }, time::timespec
-        //fcntl::{fcntl,F_GETFD}
+        },
+        time::timespec,
     },
     platform::{
         self,
@@ -105,42 +107,18 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
                 event.events |= ep;
             }
         }
-
-        println!("Pre fcntl fd is {}",pfd.fd);
-
-        println!("what's my error code?{}",platform::ERRNO.get());
-        platform::ERRNO.replace(0);
-        println!("CHECKING FCNTL on {} IS {}",pfd.fd, unsafe{fcntl(pfd.fd, F_GETFD, 0)});
-        // if unsafe { fcntl(pfd.fd, F_GETFD, 0)<0 } { 
-        //     print!("hiiiii");
-        //     if platform::ERRNO.get() == EBADF {
-        //         pfd.revents |= POLLNVAL;
-        //         closed += 1;
-        //         print!("hey, we issue");
-        //         continue;
-        //     } 
-        // }
-        println!("what's my error code?{}",platform::ERRNO.get());
-
-        println!("validating ebafd{}",EBADF);
-        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } < 0  {
-                print!("HEY WE DIE IN EPOLL?");
-                if platform::ERRNO.get() == EBADF {
-                    pfd.revents |= POLLNVAL;
-                    closed += 1;
-                    //print!("hey, we issue");
-                    //continue;
-                } else{
-                 return -1;
-                }
-            
+        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } < 0 {
+            if platform::ERRNO.get() == EBADF {
+                pfd.revents |= POLLNVAL;
+                closed += 1;
+            } else {
+                return -1;
+            }
         }
     }
 
-    print!("are we closed, closed={}", closed);
     // Early exit if there are fds, and all are closed (revents = POLLNVAL)
     if closed > 0 && closed == fds.len() {
-        print!("early exit, closed={}", closed);
         return closed as i32;
     }
 

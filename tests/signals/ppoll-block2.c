@@ -26,8 +26,8 @@ int main(void)
 
     char path[64];
     //struct redox_file_desc *fd_info = (struct redox_file_desc *)buf;
-
-    rfpath(fds[1], path, 64);
+    redox_fpath(fds[1], path, 64);
+    //rfpath(
     printf("%s \n",path);
    
     //snprintf(path, sizeof(path), "/scheme/logging", getpid());
@@ -68,7 +68,7 @@ int main(void)
     printf("fcn_ret is %d, errno is %d\n",fcn_ret, errno);
 
 
-    rfpath(fds[0], path, 64);
+    redox_fpath(fds[0], path, 64);
     printf(path);
  /*    //struct pollfd pfd = { .fd = fds[0], .events = POLLIN };
     // POSIX requires EINTR or returning the pending events.

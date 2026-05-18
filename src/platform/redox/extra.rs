@@ -1,32 +1,19 @@
 use core::slice;
 
 use crate::{
-    error::{Errno, ResultExt}, platform::{Pal, sys, types::*}
+    error::{Errno, ResultExt},
+    platform::types::*,
 };
 
-use alloc::string::ToString;
-use syscall::{F_SETFD, F_SETFL, O_RDONLY, O_WRONLY, error::*};
 pub use redox_rt::proc::FdGuard;
+use syscall::{F_SETFD, F_SETFL, O_RDONLY, O_WRONLY, error::*};
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
-
-    syscall::write(2,b"fpath\n").expect("test");
-
-    syscall::write(2,&fd.to_string().as_bytes()).expect("test");
-
-    syscall::write(2,b"<--FD\n").expect("test");
     syscall::fpath(fd as usize, unsafe {
         slice::from_raw_parts_mut(buf as *mut u8, count)
     })
     .map_err(Errno::from)
-    .map(|l| l as ssize_t)
-    .or_minus_one_errno()
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rfpath(fd: c_int, out: *mut c_void, count: size_t) -> ssize_t{
-    sys::Sys::fpath(fd,unsafe { slice::from_raw_parts_mut(out as *mut u8, count) })
     .map(|l| l as ssize_t)
     .or_minus_one_errno()
 }
