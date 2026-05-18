@@ -9,7 +9,7 @@ use core::{
     ptr, slice,
 };
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 use crate::platform::types::useconds_t;
 use crate::{
     c_str::CStr,
