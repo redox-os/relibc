@@ -7,6 +7,8 @@
 //! <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/types.h.html>
 //! for the old specification.
 
+#[expect(deprecated)]
+pub use crate::header::bits_useconds_t::useconds_t;
 pub use crate::header::{
     bits_clock_t::clock_t,
     bits_clockid_t::clockid_t,
@@ -28,8 +30,6 @@ pub use crate::header::{
     bits_timer_t::timer_t,
     bits_uid_t::uid_t,
 };
-#[expect(deprecated)]
-pub use crate::header::bits_useconds_t::useconds_t;
 use crate::platform::types::{c_char, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
 
 pub type u_char = c_uchar;
