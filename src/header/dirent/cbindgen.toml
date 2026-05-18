@@ -2,11 +2,17 @@
 #
 # Spec quotations relating to includes:
 # - "The <dirent.h> header shall define the ino_t, reclen_t, size_t, and ssize_t types as described in <sys/types.h>."
-sys_includes = ["sys/types.h"]
+sys_includes = []
 include_guard = "_RELIBC_DIRENT_H"
 language = "C"
 style = "Both"
 after_includes = """
+#include <bits/size-t.h>   // for size_t from sys/types.h
+#include <bits/ssize-t.h>  // for ssize_t from sys/types.h
+#include <bits/ino-t.h>    // for ino_t from sys/types.h
+#include <bits/reclen-t.h> // for reclen_t from sys/types.h
+// for extra Non-POSIX field for dirent and posix_dent
+#include <bits/off-t.h>    // for off_t from sys/types.h
 
 // Shamelessly stolen from musl
 // Macros to convert between struct dirent and struct stat types.
