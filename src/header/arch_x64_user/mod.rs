@@ -70,14 +70,3 @@ pub struct user {
     pub u_comm: [c_char; 32],
     pub u_debugreg: [c_ulong; 8],
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _cbindgen_export_x86_user(
-    a: user_fpregs_struct,
-    b: user_regs_struct,
-    c: user,
-    d: elf_gregset_t,
-    e: elf_greg_t,
-    f: elf_fpregset_t,
-) {
-}
