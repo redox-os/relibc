@@ -1,11 +1,9 @@
-# TODO clean up namespace pollution from fcntl later
-#
 # fcntl.h brings in O_CREAT and O_EXCL
-# fcntl.h brings in sys/stat.h which brings in sys/types.h which brings in clockid_t (needed for sem_clockwait)
 sys_includes = ["fcntl.h"]
 include_guard = "_RELIBC_SEMAPHORE_H"
 after_includes = """
-#include <bits/timespec.h> // for timespec
+#include <bits/clockid-t.h> // for clockid_t from sys/types.h
+#include <bits/timespec.h>  // for timespec from time.h
 """
 language = "C"
 style = "Type"
