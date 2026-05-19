@@ -287,6 +287,7 @@ VARIED_NAMES=\
 	stdlib/mktemp \
 	stdlib/realpath \
 	sys_epoll/epoll \
+	sys_epoll/epoll_del \
 	sys_mman/mmap \
 	sys_resource/constants \
 	sys_socket/getpeername \
