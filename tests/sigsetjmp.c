@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <setjmp.h>
-#include <signal.h>
 
 int main() {
 sigjmp_buf jb;
