@@ -2,6 +2,9 @@
 #
 # There are no spec quotations relating to includes
 sys_includes = []
+after_includes = """
+#include <bits/ssize-t.h> // for ssize_t from sys/types.h
+"""
 include_guard = "_RELIBC_LIMITS_H"
 language = "C"
 style = "Tag"
