@@ -1,0 +1,9 @@
+sys_includes = []
+include_guard = "_RELIBC_SYSEXITS_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
