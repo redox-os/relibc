@@ -163,6 +163,7 @@ pub mod sys_uio;
 pub mod sys_un;
 pub mod sys_utsname;
 pub mod sys_wait;
+pub mod sysexits;
 pub mod tar;
 // TODO: term.h (deprecated)
 pub mod termios;
