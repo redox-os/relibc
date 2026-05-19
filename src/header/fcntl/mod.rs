@@ -112,6 +112,7 @@ pub unsafe extern "C" fn openat(
     Sys::openat(fd, path, oflag, mode).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_fallocate.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, length: off_t) -> c_int {
     // Length can't be zero and offset must be positive.
