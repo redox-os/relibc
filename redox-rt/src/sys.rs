@@ -240,6 +240,86 @@ pub fn sys_call(
 ) -> Result<usize> {
     unsafe { raw_sys_call(fd, payload.as_mut_ptr(), payload.len(), flags, metadata) }
 }
+
+/// SYS_CALL interface for multiple fds, read-only variant
+pub fn call_ro_multiple_fds(
+    fds: &[usize],
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    let combined_flags = flags | CallFlags::MULTIPLE_FDS | CallFlags::READ;
+    unsafe {
+        syscall::syscall6(
+            syscall::SYS_CALL,
+            fds.as_ptr() as usize,
+            payload.as_mut_ptr() as usize,
+            payload.len(),
+            metadata.len() | combined_flags.bits(),
+            metadata.as_ptr() as usize,
+            core::mem::size_of_val(fds),
+        )
+    }
+}
+
+pub fn call_wo_multiple_fds(
+    fds: &[usize],
+    payload: &[u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    let combined_flags = flags | CallFlags::MULTIPLE_FDS | CallFlags::WRITE;
+    unsafe {
+        syscall::syscall6(
+            syscall::SYS_CALL,
+            fds.as_ptr() as usize,
+            payload.as_ptr() as usize,
+            payload.len(),
+            metadata.len() | combined_flags.bits(),
+            metadata.as_ptr() as usize,
+            core::mem::size_of_val(fds),
+        )
+    }
+}
+
+pub fn call_rw_multiple_fds(
+    fds: &[usize],
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    let combined_flags = flags | CallFlags::MULTIPLE_FDS | CallFlags::READ | CallFlags::WRITE;
+    unsafe {
+        syscall::syscall6(
+            syscall::SYS_CALL,
+            fds.as_ptr() as usize,
+            payload.as_mut_ptr() as usize,
+            payload.len(),
+            metadata.len() | combined_flags.bits(),
+            metadata.as_ptr() as usize,
+            core::mem::size_of_val(fds),
+        )
+    }
+}
+
+pub fn call_multiple_fds(
+    fds: &[usize],
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    unsafe {
+        syscall::syscall6(
+            syscall::SYS_CALL,
+            fds.as_ptr() as usize,
+            payload.as_mut_ptr() as usize,
+            payload.len(),
+            metadata.len() | flags.bits(),
+            metadata.as_ptr() as usize,
+            core::mem::size_of_val(fds),
+        )
+    }
+}
 pub fn this_proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
     proc_call(
         crate::current_proc_fd().as_raw_fd(),
@@ -558,6 +638,31 @@ pub fn std_fs_call_wo(fd: usize, payload: &[u8], metadata: &StdFsCallMeta) -> Re
 pub fn std_fs_call_rw(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
     sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
 }
+pub fn std_fs_call_ro_multiple_fds(
+    fds: &[usize],
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &StdFsCallMeta,
+) -> Result<usize> {
+    call_ro_multiple_fds(fds, payload, flags | CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_wo_multiple_fds(
+    fds: &[usize],
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &StdFsCallMeta,
+) -> Result<usize> {
+    call_wo_multiple_fds(fds, payload, flags | CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_rw_multiple_fds(
+    fds: &[usize],
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &StdFsCallMeta,
+) -> Result<usize> {
+    call_rw_multiple_fds(fds, payload, flags | CallFlags::STD_FS, metadata)
+}
+
 pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
     std_fs_call_ro(fd, stat, &StdFsCallMeta::new(StdFsCallKind::Fstat, 0, 0))
 }
