@@ -76,6 +76,7 @@ EXPECT_NAMES=\
 	sigaltstack \
 	signal \
 	sigsetjmp \
+	spawn \
 	stdio/all \
 	stdio/buffer \
 	stdio/dprintf \

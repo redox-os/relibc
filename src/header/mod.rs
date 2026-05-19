@@ -115,7 +115,7 @@ pub mod setjmp;
 pub mod sgtty;
 pub mod shadow;
 pub mod signal;
-// TODO: spawn.h
+pub mod spawn;
 // TODO: stdalign.h (likely C implementation)
 // stdarg.h implemented in C
 // stdatomic.h implemented in C
