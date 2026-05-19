@@ -616,3 +616,18 @@ pub unsafe extern "C" fn redox_register_scheme_to_ns_v0(
         .map(|()| 0),
     )
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_relpathat_v0(
+    dirfd: usize,
+    fd: usize,
+    dst_base: *mut u8,
+    dst_len: usize,
+) -> RawResult {
+    Error::mux(redox_rt::sys::std_fs_call_ro_multiple_fds(
+        &[dirfd, fd],
+        unsafe { slice::from_raw_parts_mut(dst_base, dst_len) },
+        syscall::CallFlags::SCHEME_IDS,
+        &StdFsCallMeta::new(StdFsCallKind::Relpathat, 0, 0),
+    ))
+}
