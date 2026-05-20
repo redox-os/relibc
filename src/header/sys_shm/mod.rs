@@ -12,7 +12,7 @@ use crate::{
     },
     platform::{
         ERRNO, Pal, Sys,
-        types::{c_char, c_int, c_void, mode_t, pid_t, size_t, time_t},
+        types::{c_char, c_int, c_void, key_t, mode_t, pid_t, size_t, time_t},
     },
 };
 
@@ -46,7 +46,7 @@ struct ShmHeader {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/shmget.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn shmget(key: i32, size: size_t, shmflg: c_int) -> c_int {
+pub unsafe extern "C" fn shmget(key: key_t, size: size_t, shmflg: c_int) -> c_int {
     let path_str = if key == IPC_PRIVATE {
         format!("/sysv_priv_{}\0", Sys::getpid())
     } else {
