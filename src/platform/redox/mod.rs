@@ -48,7 +48,9 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
-        time::{TIMER_ABSTIME, itimerspec, timer_internal_t, timespec},
+        time::{
+            CLOCK_MONOTONIC, CLOCK_REALTIME, TIMER_ABSTIME, itimerspec, timer_internal_t, timespec,
+        },
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
@@ -204,7 +206,11 @@ impl Pal for Sys {
     }
 
     fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
-        let path = format!("/scheme/time/{clk_id}/getres");
+        let path = match clk_id {
+            CLOCK_REALTIME => "/scheme/time/1/getres",
+            CLOCK_MONOTONIC => "/scheme/time/4/getres",
+            _ => return Err(Errno(EINVAL)),
+        };
         let timerfd = FdGuard::open(&path, syscall::O_RDONLY)?;
         let mut redox_res = timespec::default();
         let buffer = unsafe {
@@ -1231,7 +1237,11 @@ impl Pal for Sys {
             }
         }
 
-        let path = format!("/scheme/time/{clock_id}");
+        let path = match clock_id {
+            CLOCK_REALTIME => "/scheme/time/1",
+            CLOCK_MONOTONIC => "/scheme/time/4",
+            _ => return Err(Errno(EINVAL)),
+        };
         let timerfd = FdGuard::open(&path, syscall::O_RDWR)?.to_upper()?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)

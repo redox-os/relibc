@@ -15,6 +15,7 @@ use crate::{
         netinet_in::{INADDR_NONE, in_addr, in_addr_t},
         sys_socket::{constants::AF_INET, socklen_t},
     },
+    io::Write,
     platform::{
         self,
         types::{c_char, c_int, c_void},
@@ -193,10 +194,12 @@ pub unsafe extern "C" fn inet_ntop(
                 4,
             )
         };
-        let addr = format!("{}.{}.{}.{}\0", s_addr[0], s_addr[1], s_addr[2], s_addr[3]);
-        unsafe {
-            ptr::copy(addr.as_ptr().cast::<c_char>(), dst, addr.len());
-        }
+        let mut w = platform::StringWriter(dst, size as usize);
+        let _ = write!(
+            w,
+            "{}.{}.{}.{}\0",
+            s_addr[0], s_addr[1], s_addr[2], s_addr[3]
+        );
         dst
     }
 }

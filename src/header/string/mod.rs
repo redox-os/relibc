@@ -359,17 +359,16 @@ pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
 pub unsafe extern "C" fn strerror_l(errnum: c_int, _loc: locale_t) -> *mut c_char {
     use core::fmt::Write;
 
-    static strerror_buf: RawCell<[u8; STRERROR_MAX]> = RawCell::new([0; STRERROR_MAX]);
-    let mut w = platform::StringWriter(unsafe { strerror_buf.unsafe_mut().as_mut_ptr() }, unsafe {
-        strerror_buf.unsafe_ref().len()
-    });
+    static STRERROR_BUF: RawCell<[c_char; STRERROR_MAX]> = RawCell::new([0; STRERROR_MAX]);
+    let strerror_ptr = unsafe { STRERROR_BUF.unsafe_mut().as_mut_ptr() };
+    let mut w = platform::StringWriter(strerror_ptr, STRERROR_MAX);
 
     let _ = match STR_ERROR.get(errnum as usize) {
         Some(e) => w.write_str(e),
         None => w.write_fmt(format_args!("Unknown error {}", errnum)),
     };
 
-    (unsafe { strerror_buf.unsafe_mut().as_mut_ptr() }).cast::<c_char>()
+    strerror_ptr
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror.html>.

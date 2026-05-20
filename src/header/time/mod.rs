@@ -499,13 +499,8 @@ pub unsafe extern "C" fn strftime(
     format: *const c_char,
     timeptr: *const tm,
 ) -> size_t {
-    let ret = unsafe {
-        strftime::strftime(
-            &mut platform::StringWriter(s.cast::<u8>(), maxsize),
-            format,
-            timeptr,
-        )
-    };
+    let mut w = platform::StringWriter(s, maxsize);
+    let ret = unsafe { strftime::strftime(&mut w, format, timeptr) };
     if ret < maxsize { ret } else { 0 }
 }
 
