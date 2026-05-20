@@ -480,7 +480,7 @@ impl Pal for Sys {
             }
         }
 
-        let file = openat2(dirfd, path, flags, 0)?;
+        let file = openat2(dirfd, path, flags, fcntl::O_PATH)?;
         // Close the file descriptor after fstat(2) regardless of success or failure.
         let fstat_res = unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr()) };
         let close_res = syscall::close(*file as usize);
