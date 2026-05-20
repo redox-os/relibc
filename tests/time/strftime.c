@@ -105,6 +105,12 @@ void strftime_mix(void) {
 
     strftime(buf, BUFS, "%T", &t);
     assert(strcmp(buf, "23:59:59") == 0);
+
+    strftime(buf, BUFS, "%x", &t);
+    assert(strcmp(buf, "12/31/20") == 0);
+
+    strftime(buf, BUFS, "%X", &t);
+    assert(strcmp(buf, "23:59:59") == 0);
 }
 
 void test_v(void) {
