@@ -138,6 +138,7 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
+	sys_shm/shm \
 	sys_socket/recv \
 	sys_socket/recvfrom \
 	sys_socket/unixrecv \

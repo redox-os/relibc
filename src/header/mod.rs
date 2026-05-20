@@ -18,6 +18,8 @@ pub mod bits_id_t;
 #[path = "bits_ino-t/mod.rs"]
 pub mod bits_ino_t;
 pub mod bits_iovec;
+#[path = "bits_key-t/mod.rs"]
+pub mod bits_key_t;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
 #[path = "bits_mode-t/mod.rs"]
@@ -132,14 +134,14 @@ pub mod sys_auxv;
 pub mod sys_epoll;
 pub mod sys_file;
 pub mod sys_ioctl;
-// TODO: sys/ipc.h
+pub mod sys_ipc;
 pub mod sys_mman;
 // TODO: sys/msg.h
 pub mod sys_ptrace;
 pub mod sys_resource;
 pub mod sys_select;
 // TODO: sys/sem.h
-// TODO: sys/shm.h
+pub mod sys_shm;
 pub mod sys_socket;
 pub mod sys_stat;
 pub mod sys_statvfs;
