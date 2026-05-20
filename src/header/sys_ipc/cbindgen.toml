@@ -3,7 +3,7 @@
 # Spec quotations relating to includes:
 # - The <sys/ipc.h> header shall define the uid_t, gid_t, mode_t, and key_t types as described in <sys/types.h>
 sys_includes = []
-include_guard = "_SYS_IPC_H"
+include_guard = "_RELIBC_SYS_IPC_H"
 after_includes = """
 #include <bits/gid-t.h>  // for gid_t from sys/types.h
 #include <bits/uid-t.h>  // for uid_t from sys/types.h
