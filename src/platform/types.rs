@@ -118,6 +118,8 @@ pub type nlink_t = c_ulong;
 pub type blksize_t = c_long;
 /// The `blkcnt_t` type provided in [`sys/types.h`](crate::header::sys_types).
 pub type blkcnt_t = c_longlong;
+/// The `key_t` type provided in [`sys/types.h`](crate::header::sys_types).
+pub type key_t = c_int;
 
 /// The `fsblkcnt_t` type provided in [`sys/types.h`](crate::header::sys_types).
 pub type fsblkcnt_t = c_ulong;
