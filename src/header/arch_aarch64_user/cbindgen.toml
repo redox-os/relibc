@@ -5,3 +5,12 @@ style = "Tag"
 
 [enum]
 prefix_with_name = true
+
+[export]
+include = [
+  "user_regs_struct",
+  "user_fpsimd_struct",
+  "elf_gregset_t",
+  "elf_greg_t",
+  "elf_fpregset_t"
+]
