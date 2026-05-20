@@ -1479,7 +1479,7 @@ pub unsafe extern "C" fn vsnprintf(
 ) -> c_int {
     unsafe {
         printf::printf(
-            &mut platform::StringWriter(s.cast::<u8>(), n),
+            &mut platform::StringWriter(s, n),
             CStr::from_ptr(format),
             ap,
         )
@@ -1496,7 +1496,7 @@ pub unsafe extern "C" fn snprintf(
 ) -> c_int {
     unsafe {
         printf::printf(
-            &mut platform::StringWriter(s.cast::<u8>(), n),
+            &mut platform::StringWriter(s, n),
             CStr::from_ptr(format),
             __valist.as_va_list(),
         )

@@ -2,7 +2,7 @@ use crate::platform::types::{c_char, size_t, ssize_t};
 
 use super::{DEFAULT_MONETARY, FormatFlags, LocaleMonetaryInfo, apply_grouping};
 use alloc::string::{String, ToString};
-use core::{ffi::CStr, slice};
+use core::{ffi::CStr, fmt::Write, slice};
 use libm::{fabs, pow, round, trunc};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strfmon.html>.
@@ -284,7 +284,7 @@ fn format_monetary(
     if frac_digits > 0 {
         result.push_str(monetary.mon_decimal_point);
         // Zero-pad fractional part to the specified width
-        result.push_str(&format!("{:0>width$}", frac_part, width = frac_digits));
+        let _ = write!(result, "{:0>width$}", frac_part, width = frac_digits);
     }
 
     // 12) if the currency symbol follows the amount, add it now

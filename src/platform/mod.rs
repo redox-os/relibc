@@ -147,13 +147,13 @@ impl Read for FileReader {
 }
 
 /// An implementation of [`Write`]/[`core::fmt::Write`] for a byte array.
-pub struct StringWriter(pub *mut u8, pub usize);
+pub struct StringWriter(pub *mut c_char, pub usize);
 impl Write for StringWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
             unsafe {
-                ptr::copy_nonoverlapping(buf.as_ptr(), self.0, copy_size);
+                ptr::copy_nonoverlapping(buf.as_ptr() as _, self.0, copy_size);
                 self.1 -= copy_size;
 
                 self.0 = self.0.add(copy_size);
