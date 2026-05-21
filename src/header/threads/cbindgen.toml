@@ -1,3 +1,8 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/threads.h.html
+#
+# Spec quotations relating to includes:
+# - "Inclusion of the <threads.h> header shall make symbols defined in the header <time.h> visible."
+#
 # time.h brings in features.h
 # features.h required for Rust never type (no return)
 sys_includes = ["time.h"]
@@ -9,6 +14,7 @@ cpp_compat = true
 after_includes = """
 #include <bits/timespec.h> // for timespec
 #include <bits/pthread.h> // for pthread-related types
+
 #define thread_local _Thread_local
 #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT // once_flag == pthread_once_t
 """
