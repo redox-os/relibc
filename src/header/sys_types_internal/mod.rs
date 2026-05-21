@@ -16,6 +16,7 @@ pub use crate::header::{
     bits_gid_t::gid_t,
     bits_id_t::id_t,
     bits_ino_t::ino_t,
+    bits_key_t::key_t,
     bits_mode_t::mode_t,
     bits_nlink_t::nlink_t,
     bits_off_t::off_t,

@@ -1,15 +1,15 @@
 # POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_shm.h.html
 #
 # Spec quotations relating to includes:
-# - The <sys/shm.h> header shall define the type intptr_t as described in <stdint.h>
-# - The <sys/shm.h> header shall define the pid_t, size_t, and time_t types as described in <sys/types.h>
-# - In addition, the <sys/shm.h> header shall include the <sys/ipc.h> header.
+# - "The <sys/shm.h> header shall define the type intptr_t as described in <stdint.h>."
+# - "The <sys/shm.h> header shall define the pid_t, size_t, and time_t types as described in <sys/types.h>."
+# - "In addition, the <sys/shm.h> header shall include the <sys/ipc.h> header."
 sys_includes = ["sys/ipc.h", "stdint.h"]
 include_guard = "_RELIBC_SYS_SHM_H"
 after_includes = """
 #include <bits/pid-t.h>  // for pid_t from sys/types.h
-#include <bits/size-t.h>  // for size_t from sys/types.h
-#include <bits/time-t.h>  // for time_t from sys/types.h
+#include <bits/size-t.h> // for size_t from sys/types.h
+#include <bits/time-t.h> // for time_t from sys/types.h
 """
 language = "C"
 style = "Tag"
