@@ -1,5 +1,14 @@
-sys_includes = ["sys/types.h"]
-include_guard = "_SYS_TIMEB_H"
+# POSIX header spec (obsolete): https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/timeb.h.html
+#
+# Spec quotations regarding includes:
+# - "The time_t type shall be defined as described in <sys/types.h>."
+#
+# features.h included for deprecated annotations
+sys_includes = ["features.h"]
+include_guard = "_RELIBC_SYS_TIMEB_H"
+after_includes = """
+#include <bits/time-t.h> // for time_t from sys/types.h
+"""
 language = "C"
 style = "Tag"
 no_includes = true
