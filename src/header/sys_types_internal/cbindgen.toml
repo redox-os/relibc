@@ -8,6 +8,7 @@ after_includes = """
 #include <bits/gid-t.h>
 #include <bits/id-t.h>
 #include <bits/ino-t.h>
+#include <bits/key-t.h>
 #include <bits/mode-t.h>
 #include <bits/nlink-t.h>
 #include <bits/off-t.h>
@@ -24,7 +25,6 @@ after_includes = """
 """
 include_guard = "_RELIBC_SYS_TYPES_INTERNAL_H"
 language = "C"
-style = "Type"
 no_includes = true
 
 [export]

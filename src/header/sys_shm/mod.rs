@@ -19,10 +19,14 @@ use crate::{
 #[allow(non_camel_case_types)]
 pub type shmatt_t = core::ffi::c_ushort;
 
+/// Attach read-only (else read-write).
 pub const SHM_RDONLY: c_int = 0o10000;
+/// Round attach address to SHMLBA.
 pub const SHM_RND: c_int = 0o20000;
+/// Segment low boundary address multiple.
 pub const SHMLBA: size_t = 4096;
 
+/// Return value of `shmat()` indicating shared memory has not been attached.
 pub const SHM_FAILED: *mut c_void = -1isize as *mut c_void;
 
 #[repr(C)]
@@ -53,7 +57,7 @@ pub unsafe extern "C" fn shmget(key: key_t, size: size_t, shmflg: c_int) -> c_in
         format!("/sysv_key_{}\0", key)
     };
 
-    let path_ptr = path_str.as_ptr() as *const c_char;
+    let path_ptr = path_str.as_ptr().cast::<c_char>();
 
     let mut oflag = O_RDWR;
     if (shmflg & IPC_CREAT) != 0 {
@@ -90,7 +94,7 @@ pub unsafe extern "C" fn shmat(
     shmflg: c_int,
 ) -> *mut c_void {
     let mut stat = stat::default();
-    if unsafe { fstat(shmid, &mut stat) } < 0 {
+    if unsafe { fstat(shmid, &raw mut stat) } < 0 {
         return SHM_FAILED;
     }
     let size = stat.st_size as usize;
@@ -105,7 +109,7 @@ pub unsafe extern "C" fn shmat(
         Err(_) => return SHM_FAILED,
     };
 
-    let header = ptr as *mut ShmHeader;
+    let header = ptr.cast::<ShmHeader>();
     unsafe {
         (*header).total_size = size;
     }
@@ -121,10 +125,10 @@ pub unsafe extern "C" fn shmdt(shmaddr: *const c_void) -> c_int {
     }
 
     let base_ptr = unsafe { (shmaddr as *mut u8).sub(mem::size_of::<ShmHeader>()) };
-    let header = base_ptr as *mut ShmHeader;
+    let header = base_ptr.cast::<ShmHeader>();
     let total_size = unsafe { (*header).total_size };
 
-    unsafe { Sys::munmap(base_ptr as *mut c_void, total_size) }
+    unsafe { Sys::munmap(base_ptr.cast::<c_void>(), total_size) }
         .map(|_| 0)
         .or_minus_one_errno()
 }
@@ -141,7 +145,7 @@ pub unsafe extern "C" fn shmctl(shmid: c_int, cmd: c_int, buf: *mut shmid_ds) ->
             }
 
             let mut stat = stat::default();
-            if unsafe { fstat(shmid, &mut stat) } < 0 {
+            if unsafe { fstat(shmid, &raw mut stat) } < 0 {
                 return -1;
             }
 
