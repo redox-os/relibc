@@ -1,8 +1,9 @@
-# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_statvfs.h.html
-#
-# Spec quotations relating to includes:
-# - "The <sys/statvfs.h> header shall define the fsblkcnt_t and fsfilcnt_t types as described in <sys/types.h>."
-sys_includes = ["sys/types.h"]
-include_guard = "_SYS_SYSCALL_H"
+# Non-POSIX header spec: https://www.man7.org/linux/man-pages/man2/syscall.2.html
+sys_includes = []
+include_guard = "_RELIBC_SYS_SYSCALL_H"
+after_includes = """
+#include <bits/size-t.h>
+"""
 language = "C"
 no_includes = true
+usize_is_size_t = true
