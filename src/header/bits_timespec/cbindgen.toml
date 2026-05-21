@@ -8,7 +8,7 @@
 # - sched.h
 # - semaphore.h
 # - signal.h
-# - sys/select.h (not currently imported, needed for pselect, no TODO)
+# - sys/select.h
 # - sys/stat.h
 # - sys/time.h
 # - time.h (where it should be defined)

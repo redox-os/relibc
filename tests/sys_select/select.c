@@ -6,7 +6,7 @@
 #include "test_helpers.h"
 
 int file_test(void) {
-    int fd = open("select.c", 0, 0);
+    int fd = open("sys_select/select.c", 0, 0);
     if (fd < 0) {
         perror("open");
         return -1;
