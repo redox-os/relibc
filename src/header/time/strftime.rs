@@ -230,6 +230,12 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                     (unsafe { (*t).tm_yday } + 7 - (unsafe { (*t).tm_wday } + 6) % 7) / 7
                 ),
 
+                // US format date: %m/%d/%y.
+                b'x' => w!(recurse "%m/%d/%y"),
+
+                // US format time: %H:%M:%S
+                b'X' => w!(recurse "%T"),
+
                 // Last two digits of year: %y
                 b'y' => w!("{:02}", unsafe { (*t).tm_year } % 100),
 
