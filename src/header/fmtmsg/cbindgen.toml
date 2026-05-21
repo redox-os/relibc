@@ -1,4 +1,6 @@
-sys_includes = []
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fmtmsg.h.html
+#
+# There are no spec quotations relating to includes
 include_guard = "_RELIBC_FMTMSG_H"
 after_includes = """
 
@@ -8,7 +10,6 @@ after_includes = """
 #define MM_NULLTAG ((char*)0)
 """
 language = "C"
-style = "Tag"
 no_includes = true
 cpp_compat = true
 
