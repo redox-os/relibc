@@ -5,19 +5,19 @@
 use core::{mem, ptr, slice};
 
 use crate::{
+    error::Errno,
     fs::File,
     header::{
         bits_sigset_t::sigset_t,
-        errno::EBADF,
+        errno::{EBADF, EINTR},
         sys_epoll::{
             EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT,
-            EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl,
-            epoll_data, epoll_event, epoll_pwait,
+            EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_data, epoll_event,
         },
         time::timespec,
     },
     platform::{
-        self,
+        ERRNO, PalEpoll, Sys,
         types::{c_int, c_short, c_ulong},
     },
 };
@@ -77,10 +77,13 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
     ];
 
     let ep = {
-        let epfd = epoll_create1(EPOLL_CLOEXEC);
-        if epfd < 0 {
-            return -1;
-        }
+        let epfd = match Sys::epoll_create1(EPOLL_CLOEXEC) {
+            Ok(epfd) => epfd,
+            Err(Errno(err)) => {
+                ERRNO.set(err);
+                return -1;
+            }
+        };
         File::new(epfd)
     };
 
@@ -108,11 +111,14 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
             }
         }
 
-        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } < 0 {
-            if platform::ERRNO.get() == EBADF {
+        match unsafe { Sys::epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } {
+            Ok(_) => {}
+            Err(Errno(EBADF)) => {
                 pfd.revents |= POLLNVAL;
                 closed += 1;
-            } else {
+            }
+            Err(Errno(err)) => {
+                ERRNO.set(err);
                 return -1;
             }
         }
@@ -124,27 +130,34 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let res = unsafe {
-        epoll_pwait(
+    match unsafe {
+        Sys::epoll_pwait(
             *ep,
             events.as_mut_ptr(),
             events.len() as c_int,
             timeout,
             sigmask,
         )
-    };
-    if res < 0 {
-        return -1;
-    }
-
-    for event in events.iter().take(res as usize) {
-        let pi = unsafe { event.data.u64 as usize };
-        // TODO: Error status when fd does not match?
-        if let Some(pfd) = fds.get_mut(pi) {
-            for (p, ep) in event_map.iter() {
-                if event.events & ep > 0 {
-                    pfd.revents |= p;
+    } {
+        Ok(res) => {
+            for event in events.iter().take(res) {
+                let pi = unsafe { event.data.u64 as usize };
+                // TODO: Error status when fd does not match?
+                if let Some(pfd) = fds.get_mut(pi) {
+                    for (p, ep) in event_map.iter() {
+                        if event.events & ep > 0 {
+                            pfd.revents |= p;
+                        }
+                    }
                 }
+            }
+        }
+        Err(Errno(err)) => {
+            if err == EINTR && closed > 0 {
+                // some fds are closed by signal
+            } else {
+                ERRNO.set(err);
+                return -1;
             }
         }
     }

@@ -10,6 +10,7 @@ use crate::{
     io::prelude::*,
 };
 use core::{mem, slice};
+use log::warn;
 use syscall::{
     data::{Event, TimeSpec},
     flag::EVENT_READ,
@@ -103,27 +104,21 @@ impl PalEpoll for Sys {
         }
 
         let timer_opt = if timeout != -1 {
-            let mut timer = File::open(c"/scheme/time/4".into(), O_RDWR)?;
-            Sys::write(
-                epfd,
-                &Event {
-                    id: timer.fd as usize,
-                    flags: EVENT_READ,
-                    data: 0,
-                },
-            )?;
-
-            let mut time = TimeSpec::default();
-            let _ = timer
-                .read(&mut time)
-                .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
-            time.tv_sec += (timeout as i64) / 1000;
-            time.tv_nsec += (timeout % 1000) * 1000000;
-            let _ = timer
-                .write(&time)
-                .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
-
-            Some(timer)
+            // TODO: Any of syscall inside this can fail, there's a race condition on kernel reusing fd numbers
+            let mut i = 10;
+            loop {
+                match register_timeout(epfd, timeout) {
+                    Ok(timer) => break Some(timer),
+                    Err(_) if i > 0 => {
+                        i += 1;
+                        continue;
+                    }
+                    Err(_) => {
+                        warn!("Gave up writing timeout for epoll");
+                        break None;
+                    }
+                }
+            }
         } else {
             None
         };
@@ -173,4 +168,28 @@ impl PalEpoll for Sys {
 
         Ok(count)
     }
+}
+
+fn register_timeout(epfd: i32, timeout: i32) -> Result<File, Errno> {
+    let mut timer = File::open(c"/scheme/time/4".into(), O_RDWR)?;
+    if let Err(e) = Sys::write(
+        epfd,
+        &Event {
+            id: timer.fd as usize,
+            flags: EVENT_READ,
+            data: 0,
+        },
+    ) {
+        return Err(e);
+    }
+    let mut time = TimeSpec::default();
+    let _ = timer
+        .read(&mut time)
+        .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
+    time.tv_sec += (timeout as i64) / 1000;
+    time.tv_nsec += (timeout % 1000) * 1000000;
+    let _ = timer
+        .write(&time)
+        .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
+    Ok(timer)
 }
