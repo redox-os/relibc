@@ -1,4 +1,6 @@
-sys_includes = ["sys/types.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/float.h.html
+#
+# There are no spec quotations relating to includes
 include_guard = "_RELIBC_FLOAT_H"
 after_includes = """
 #ifndef _RELIBC_BITS_FLOAT_H
