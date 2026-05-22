@@ -70,7 +70,6 @@ EXPECT_NAMES=\
 	locale/setlocale \
 	math \
 	regex \
-	select \
 	setjmp \
 	sigaction \
 	sigaltstack \
@@ -138,6 +137,9 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
+	sys_select/select \
+	sys_select/select_timed \
+	sys_select/pselect \
 	sys_shm/shm \
 	sys_socket/recv \
 	sys_socket/recvfrom \

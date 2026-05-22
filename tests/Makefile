@@ -22,7 +22,7 @@ support_build: $(BUILD)/expected \
 	$(BUILD)/Makefile \
 	$(BUILD)/Makefile.tests.mk \
 	$(BUILD)/example_dir \
-	$(BUILD)/select.c \
+	$(BUILD)/sys_select/select.c \
 	$(BUILD)/stdlib/realpath.c \
 	$(BUILD)/stdio/fread.in \
 	$(BUILD)/stdio/fscanf_offby1.c \
