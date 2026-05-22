@@ -25,7 +25,10 @@ use goblin::elf64::{
 };
 
 use syscall::{
-    CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, ProcSchemeVerb, SetSighandlerData, error::*, flag::{MapFlags, SEEK_SET}
+    AddrSpaceVerb, CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map,
+    O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, ProcSchemeVerb, SetSighandlerData,
+    error::*,
+    flag::{MapFlags, SEEK_SET},
 };
 
 pub enum FexecResult {
@@ -446,8 +449,11 @@ pub fn fexec_impl(
     );
 
     if interp_override.is_some() {
-        let mmap_min_fd = grants_fd.dup(b"mmap-min-addr")?;
-        let _ = mmap_min_fd.write(&usize::to_ne_bytes(min_mmap_addr));
+        grants_fd.call_wo(
+            &usize::to_ne_bytes(min_mmap_addr),
+            CallFlags::WRITE,
+            &[AddrSpaceVerb::MmapMin as u64],
+        )?;
     }
 
     let addrspace_selection_fd = thread_fd.dup(b"current-addrspace")?.to_upper()?;
