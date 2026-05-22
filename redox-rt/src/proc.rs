@@ -25,10 +25,7 @@ use goblin::elf64::{
 };
 
 use syscall::{
-    CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, O_CLOEXEC,
-    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, SetSighandlerData,
-    error::*,
-    flag::{MapFlags, SEEK_SET},
+    CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, ProcSchemeVerb, SetSighandlerData, error::*, flag::{MapFlags, SEEK_SET}
 };
 
 pub enum FexecResult {
@@ -1080,8 +1077,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         let new_filetable_sel_fd = new_thr_fd.dup(b"current-filetable")?;
         new_filetable_sel_fd.write(&usize::to_ne_bytes(new_filetable_fd.as_raw_fd()))?;
     }
-    let start_fd = new_thr_fd.dup(b"start")?;
-    start_fd.write(&[0])?;
+    let start_fd = new_thr_fd.call_wo(&[], CallFlags::empty(), &[ProcSchemeVerb::Start as u64])?;
     Ok(new_pid)
 }
 
