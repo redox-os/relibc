@@ -6,7 +6,7 @@ use core::{
 use crate::{
     error::{Errno, Result},
     header::{
-        errno::{EBADF, EINVAL, ENOMEM},
+        errno::{EBADF, ENOMEM},
         stdlib::{free, malloc},
     },
     platform::types::{c_void, mode_t},
@@ -19,6 +19,7 @@ const FCHDIR: c_char = 4;
 const DUP2: c_char = 5;
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub enum Operation {
     Open {
         fd: c_int,
@@ -32,16 +33,18 @@ pub enum Operation {
     Dup2(c_int, c_int),
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct OperationNode {
     pub operation: Operation,
     next: *const OperationNode,
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct posix_spawn_file_actions_t {
     len: usize,
-    head: *const OperationNode,
-    tail: *mut OperationNode,
+    pub head: *const OperationNode,
+    pub tail: *mut OperationNode,
 }
 
 pub struct FileActionsIter<'a> {
@@ -72,11 +75,11 @@ impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
 
 fn copy_op(file_actions: &mut posix_spawn_file_actions_t, op: Operation) -> Result<()> {
     let new = unsafe { malloc(size_of::<OperationNode>()) };
-    let new_ref = unsafe {
-        (new as *const OperationNode)
-            .as_ref()
-            .ok_or(Errno(ENOMEM))?
-    };
+
+    let new_ref = unsafe { (new as *mut OperationNode).as_mut().ok_or(Errno(ENOMEM))? };
+
+    (*new_ref).next = null();
+    (*new_ref).operation = op;
 
     if (*file_actions).head.is_null() && (*file_actions).tail.is_null() {
         (*file_actions).head = new as *const OperationNode;
@@ -94,13 +97,8 @@ fn copy_op(file_actions: &mut posix_spawn_file_actions_t, op: Operation) -> Resu
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_init(
-    file_actions: *mut posix_spawn_file_actions_t,
+    file_actions: &mut posix_spawn_file_actions_t,
 ) -> c_int {
-    let file_actions = match unsafe { file_actions.as_mut().ok_or(Errno(EINVAL)) } {
-        Ok(v) => v,
-        Err(_) => return EINVAL,
-    };
-
     (*file_actions).head = null();
     (*file_actions).tail = null_mut();
     (*file_actions).len = 0;
@@ -110,13 +108,8 @@ pub unsafe extern "C" fn posix_spawn_file_actions_init(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
-    file_actions: *mut posix_spawn_file_actions_t,
+    file_actions: &mut posix_spawn_file_actions_t,
 ) -> c_int {
-    let file_actions = match unsafe { file_actions.as_mut().ok_or(Errno(EINVAL)) } {
-        Ok(v) => v,
-        Err(_) => return EINVAL,
-    };
-
     if (*file_actions).head.is_null() {
         assert!((*file_actions).tail.is_null() && (*file_actions).len == 0);
         return 0;

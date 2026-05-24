@@ -1215,9 +1215,10 @@ impl Pal for Sys {
             .dup(b"filetable")?
             .dup(b"copy")?;
 
-        let new_file_table = child.thr_fd.dup(b"current-filetable")?;
-
-        new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
+        {
+            let new_file_table = child.thr_fd.dup(b"current-filetable")?;
+            new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
+        }
 
         let extra_info = redox_rt::proc::ExtraInfo {
             cwd: Some(cwd.as_bytes()),
@@ -1256,6 +1257,31 @@ impl Pal for Sys {
             let len = unsafe { strlen(env) };
             envs.push(unsafe { slice::from_raw_parts(env as *const u8, len) });
             envp = unsafe { envp.add(1) };
+        }
+
+        let new_file_table = child.thr_fd.dup(b"filetable")?;
+
+        if let Some(fac) = fac {
+            for action in fac {
+                match action.operation {
+                    crate::header::spawn::Operation::Open {
+                        fd,
+                        path,
+                        flag,
+                        mode,
+                    } => todo!(),
+                    crate::header::spawn::Operation::Close(fd) => {
+                        new_file_table.call_wo(
+                            &(fd as usize).to_ne_bytes(),
+                            syscall::CallFlags::empty(),
+                            &[syscall::flag::FileTableVerb::Close as u64],
+                        )?;
+                    }
+                    crate::header::spawn::Operation::Chdir(_) => todo!(),
+                    crate::header::spawn::Operation::FChdir(_) => todo!(),
+                    crate::header::spawn::Operation::Dup2(_, _) => todo!(),
+                }
+            }
         }
 
         if let Some(redox_rt::proc::FexecResult::Interp {

@@ -10,4 +10,7 @@ description = "Ioctl definitions and (de)serialization for Redox"
 drm-sys = "0.8.0"
 redox_syscall = "0.8"
 
+[patch.crates-io]
+redox_syscall = {git = "https://gitlab.redox-os.org/EuclidDivisionLemma/syscall/", branch = "spawn"}
+
 [features]
