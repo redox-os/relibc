@@ -13,18 +13,51 @@ use crate::{
     },
 };
 
-pub use self::sys::*;
-
+/// Set the close-on-exec (`FD_CLOEXEC`) flag on the new file descriptor.
 #[cfg(target_os = "linux")]
-#[path = "linux.rs"]
-pub mod sys;
+pub const EPOLL_CLOEXEC: c_int = 0x8_0000;
 
+/// Set the close-on-exec (`FD_CLOEXEC`) flag on the new file descriptor.
 #[cfg(target_os = "redox")]
-#[path = "redox.rs"]
-pub mod sys;
+pub const EPOLL_CLOEXEC: c_int = 0x0100_0000;
 
+/// The associated file is available for read operations.
+pub const EPOLLIN: c_uint = 0x001;
+/// There is an exceptional condition on the file descriptor.
+pub const EPOLLPRI: c_uint = 0x002;
+/// The associated file is available for write operations.
+pub const EPOLLOUT: c_uint = 0x004;
+/// Error condition happened on the associated file descriptor.
+pub const EPOLLERR: c_uint = 0x008;
+/// Hang up happened onthe associated file descriptor.
+pub const EPOLLHUP: c_uint = 0x010;
+pub const EPOLLNVAL: c_uint = 0x020;
+pub const EPOLLRDNORM: c_uint = 0x040;
+pub const EPOLLRDBAND: c_uint = 0x080;
+pub const EPOLLWRNORM: c_uint = 0x100;
+pub const EPOLLWRBAND: c_uint = 0x200;
+pub const EPOLLMSG: c_uint = 0x400;
+/// Stream socket peer closed connection, or shut down writing half of
+/// connection.
+pub const EPOLLRDHUP: c_uint = 0x2000;
+/// Sets an exclusive wakeup mode for the epoll file descriptor that is being
+/// attached to the target file descriptor, `fd`.
+pub const EPOLLEXCLUSIVE: c_uint = 1 << 28;
+/// If `EPOLLONESHOT` and `EPOLLET` are clear and the process has the
+/// `CAP_BLOCK_SUSPEND` capability, ensure that the system does not enter
+/// "suspend" or "hibernate" while this event is pending or being processed.
+pub const EPOLLWAKEUP: c_uint = 1 << 29;
+/// Requests one-shot notification for the associated file descriptor.
+pub const EPOLLONESHOT: c_uint = 1 << 30;
+/// Requests edge-triggered notification for the associated file descriptor.
+pub const EPOLLET: c_uint = 1 << 31;
+
+/// Add an entry to the interest list of the epoll file descriptor, `epfd`.
 pub const EPOLL_CTL_ADD: c_int = 1;
+/// Remove (deregister) the target file descriptor `fd` from the interest list.
 pub const EPOLL_CTL_DEL: c_int = 2;
+/// Change the settings associated with `fd` in the interest list to the new
+/// settings specified in `event`.
 pub const EPOLL_CTL_MOD: c_int = 3;
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
