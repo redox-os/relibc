@@ -1,8 +1,7 @@
 # POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/net_if.h.html
 #
 # There are no spec quotations relating to includes
-sys_includes = []
-include_guard = "_NET_IF_H"
+include_guard = "_RELIBC_NET_IF_H"
 language = "C"
 style = "Tag"
 no_includes = true
