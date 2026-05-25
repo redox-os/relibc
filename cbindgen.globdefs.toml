@@ -14,6 +14,7 @@
 
 # XXX: silences a warning
 "feature = no_std" = "__relibc__"
+"feature = ip6" = "__ip6__"
 
 # Ensure attributes are passed down from Rust
 # <features.h> must be included where attributes are used in relibc

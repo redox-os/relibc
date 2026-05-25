@@ -168,6 +168,7 @@ pub const MCAST_LEAVE_SOURCE_GROUP: c_int = 47;
 /// Internet domain sockets for use with IPv4 sockets.
 pub const AF_INET: c_int = 2;
 /// Internet domain sockets for use with IPv6 sockets.
+#[cfg(feature = "ip6")]
 pub const AF_INET6: c_int = 10;
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/unix.7.html>.
 ///

@@ -222,7 +222,7 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
         for part in s_addr.iter_mut().take(4) {
             if let Some(n) = octets
                 .next()
-                .filter(|x| !x.len() > 3)
+                .filter(|x| x.len() <= 3)
                 .and_then(|x| u8::from_str(x).ok())
             {
                 *part = n;
