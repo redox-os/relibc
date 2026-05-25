@@ -1,4 +1,8 @@
-sys_includes = []
+# signal brings in sigevent, size_t and timespec
+sys_includes = ["signal.h"]
+after_includes = """
+#include <bits/ssize-t.h> // for ssize_t from sys/types.h
+"""
 include_guard = "_RELIBC_AIO_H"
 language = "C"
 style = "Tag"
