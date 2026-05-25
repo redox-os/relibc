@@ -1,4 +1,8 @@
-sys_includes = ["sys/types.h", "features.h"]
+# features included for deprecated annotations
+sys_includes = ["features.h"]
+after_includes = """
+#include <bits/time-t.h> // for time_t from sys/types.h
+"""
 include_guard = "_RELIBC_UTIME_H"
 language = "C"
 style = "Tag"
