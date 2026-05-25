@@ -1,5 +1,5 @@
 sys_includes = []
-include_guard = "_DL_TLS_H"
+include_guard = "_RELIBC_DL_TLS_H"
 language = "C"
 style = "Tag"
 no_includes = true
