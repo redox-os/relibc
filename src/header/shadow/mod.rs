@@ -23,12 +23,15 @@ use crate::{
 
 use super::errno::*;
 
+/// cbindgen:ignore
 #[cfg(target_os = "linux")]
 const SEPARATOR: char = ':';
 
+/// cbindgen:ignore
 #[cfg(target_os = "redox")]
 const SEPARATOR: char = ';';
 
+/// cbindgen:ignore
 const SHADOW_FILE: &core::ffi::CStr = c"/etc/shadow";
 
 #[derive(Clone, Copy, Debug)]
@@ -65,7 +68,9 @@ impl DerefMut for MaybeAllocated {
     }
 }
 
+/// cbindgen:ignore
 static mut SHADOW_BUF: Option<MaybeAllocated> = None;
+/// cbindgen:ignore
 static mut SHADOW: spwd = spwd {
     sp_namp: ptr::null_mut(),
     sp_pwdp: ptr::null_mut(),
@@ -78,6 +83,7 @@ static mut SHADOW: spwd = spwd {
     sp_flag: 0,
 };
 
+/// cbindgen:ignore
 static LINE_READER: SyncUnsafeCell<Option<Lines<BufReader<File>>>> = SyncUnsafeCell::new(None);
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
