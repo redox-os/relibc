@@ -27,8 +27,8 @@ use crate::{
     fs::File,
     header::{
         errno::{
-            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM,
-            ENOSYS, EOPNOTSUPP, EPERM,
+            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
+            ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
             self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
@@ -61,11 +61,7 @@ use crate::{
         free,
         sys::timer::{TIMERS, timer_routine, timer_update_wake_time},
     },
-    sync::{
-        self, Mutex,
-        rwlock::RwLock,
-        sys::timer::{timer_routine, timer_update_wake_time},
-    },
+    sync::rwlock::RwLock,
 };
 
 pub use redox_rt::proc::FdGuard;
@@ -1174,26 +1170,32 @@ impl Pal for Sys {
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        redox_rt::sys::posix_setresugid(&Resugid {
-            ruid: None,
-            euid: None,
-            suid: None,
-            rgid: cvt_uid(rgid)?,
-            egid: cvt_uid(egid)?,
-            sgid: cvt_uid(sgid)?,
-        })?;
+        redox_rt::sys::posix_setresugid(
+            &Resugid {
+                ruid: None,
+                euid: None,
+                suid: None,
+                rgid: cvt_uid(rgid)?,
+                egid: cvt_uid(egid)?,
+                sgid: cvt_uid(sgid)?,
+            },
+            None,
+        )?;
         Ok(())
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        redox_rt::sys::posix_setresugid(&Resugid {
-            ruid: cvt_uid(ruid)?,
-            euid: cvt_uid(euid)?,
-            suid: cvt_uid(suid)?,
-            rgid: None,
-            egid: None,
-            sgid: None,
-        })?;
+        redox_rt::sys::posix_setresugid(
+            &Resugid {
+                ruid: cvt_uid(ruid)?,
+                euid: cvt_uid(euid)?,
+                suid: cvt_uid(suid)?,
+                rgid: None,
+                egid: None,
+                sgid: None,
+            },
+            None,
+        )?;
         Ok(())
     }
 
@@ -1205,6 +1207,8 @@ impl Pal for Sys {
         mut envp: *const *mut c_char,
         use_path: bool,
     ) -> Result<pid_t> {
+        use crate::header::spawn::Flags;
+
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
         let executable = File::open(program, fcntl::O_RDONLY)?;
         let cwd = path::clone_cwd().unwrap();
@@ -1220,13 +1224,13 @@ impl Pal for Sys {
             new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
         }
 
-        let extra_info = redox_rt::proc::ExtraInfo {
+        let mut extra_info = redox_rt::proc::ExtraInfo {
             cwd: Some(cwd.as_bytes()),
             sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
             sigprocmask: if let Some(fat) = fat
-                && crate::header::spawn::Flags::from_bits(fat.flags)
+                && Flags::from_bits(fat.flags)
                     .unwrap()
-                    .contains(crate::header::spawn::Flags::POSIX_SPAWN_SETSIGMASK)
+                    .contains(Flags::POSIX_SPAWN_SETSIGMASK)
             {
                 fat.sigmask
             } else {
@@ -1279,8 +1283,64 @@ impl Pal for Sys {
                     }
                     crate::header::spawn::Operation::Chdir(_) => todo!(),
                     crate::header::spawn::Operation::FChdir(_) => todo!(),
-                    crate::header::spawn::Operation::Dup2(_, _) => todo!(),
+                    crate::header::spawn::Operation::Dup2(old, new) => {
+                        new_file_table.call_wo(
+                            [(old as usize).to_ne_bytes(), (new as usize).to_ne_bytes()]
+                                .into_iter()
+                                .flatten()
+                                .collect::<Vec<u8>>()
+                                .as_slice(),
+                            syscall::CallFlags::empty(),
+                            &[syscall::flag::FileTableVerb::Dup2 as u64],
+                        )?;
+                    }
                 }
+            }
+        }
+
+        if let Some(attr) = fat {
+            let flags = Flags::from_bits(attr.flags).ok_or(Errno(EINVAL))?;
+
+            if flags.contains(Flags::POSIX_SPAWN_SETPGROUP) {
+                if attr.pgroup != 0 {
+                    redox_rt::sys::posix_setpgid(
+                        proc_fd.as_raw_fd(),
+                        usize::try_from(attr.pgroup).map_err(|_| Errno(EINVAL))?,
+                    )?;
+                } else {
+                    redox_rt::sys::posix_setpgid(proc_fd.as_raw_fd(), proc_fd.as_raw_fd())?;
+                }
+            }
+
+            if flags.contains(Flags::POSIX_SPAWN_SETSCHEDPARAM) {
+                todo!()
+            }
+
+            if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
+                let parent_resugid = redox_rt::sys::posix_getresugid();
+
+                redox_rt::sys::posix_setresugid(
+                    &Resugid {
+                        ruid: None,
+                        euid: Some(parent_resugid.ruid),
+                        suid: None,
+                        rgid: None,
+                        egid: Some(parent_resugid.rgid),
+                        sgid: None,
+                    },
+                    Some(proc_fd.as_raw_fd()),
+                )?;
+            }
+
+            // todo: if set-uid bit is set, euid must be owner id
+            // todo: if set-gid bit is set, egid is file's gid
+
+            if flags.contains(Flags::POSIX_SPAWN_SETSIGMASK) {
+                extra_info.sigprocmask = attr.sigmask;
+            }
+
+            if flags.contains(Flags::POSIX_SPAWN_SETSIGDEF) {
+                todo!()
             }
         }
 
@@ -1297,11 +1357,11 @@ impl Pal for Sys {
             &extra_info,
             None,
         )? {
-            let interp_path = CStr::from_bytes_with_nul(&interp_path)
-                .map_err(|_| platform::Errno(syscall::error::ENOEXEC))?;
+            let interp_path =
+                CStr::from_bytes_with_nul(&interp_path).map_err(|_| Errno(ENOEXEC))?;
 
             let interpreter = File::open(interp_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC)
-                .map_err(|_| platform::Errno(syscall::error::ENOEXEC))?;
+                .map_err(|_| Errno(ENOENT))?;
 
             redox_rt::proc::fexec_impl(
                 FdGuard::new(interpreter.fd as usize).to_upper().unwrap(),
@@ -1312,7 +1372,8 @@ impl Pal for Sys {
                 envs.as_slice(),
                 &extra_info,
                 Some(interp_override),
-            )?;
+            )
+            .unwrap();
         }
 
         let start_fd = child.thr_fd.dup(b"start")?;
