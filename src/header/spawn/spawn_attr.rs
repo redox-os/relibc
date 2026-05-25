@@ -42,71 +42,42 @@ pub struct posix_spawnattr_t {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn posix_spawnattr_init(attr: *mut posix_spawnattr_t) -> c_int {
-    if attr.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        *attr = zeroed();
-    }
+pub extern "C" fn posix_spawnattr_init(attr: &mut posix_spawnattr_t) -> c_int {
+    *attr = unsafe { zeroed() };
     0
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn posix_spawnattr_destroy(attr: *mut posix_spawnattr_t) -> c_int {
-    if attr.is_null() {
-        return EINVAL;
-    }
-
+pub extern "C" fn posix_spawnattr_destroy(attr: &mut posix_spawnattr_t) -> c_int {
+    *attr = unsafe { zeroed() };
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setschedparam(
-    attr: *mut posix_spawnattr_t,
-    schedparam: *const sched_param,
+    attr: &mut posix_spawnattr_t,
+    schedparam: &sched_param,
 ) -> c_int {
-    if attr.is_null() || schedparam.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        (*attr).param = *schedparam;
-    }
-
+    (*attr).param = *schedparam;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getschedparam(
-    attr: *const posix_spawnattr_t,
-    schedparam: *mut sched_param,
+    attr: &posix_spawnattr_t,
+    schedparam: &mut sched_param,
 ) -> c_int {
-    if attr.is_null() || schedparam.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        *schedparam = (*attr).param;
-    }
-
+    *schedparam = (*attr).param;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setschedpolicy(
-    attr: *mut posix_spawnattr_t,
+    attr: &mut posix_spawnattr_t,
     schedpolicy: c_int,
 ) -> c_int {
-    if attr.is_null() {
-        return EINVAL;
-    }
-
     match schedpolicy {
-        SCHED_FIFO | SCHED_RR | SCHED_OTHER => unsafe {
-            (*attr).policy = schedpolicy;
-        },
+        SCHED_FIFO | SCHED_RR | SCHED_OTHER => (*attr).policy = schedpolicy,
         _ => return EINVAL,
     }
 
@@ -115,138 +86,87 @@ pub unsafe extern "C" fn posix_spawnattr_setschedpolicy(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getschedpolicy(
-    attr: *const posix_spawnattr_t,
-    schedpolicy: *mut c_int,
+    attr: &posix_spawnattr_t,
+    schedpolicy: &mut c_int,
 ) -> c_int {
-    if attr.is_null() || schedpolicy.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        *schedpolicy = (*attr).policy;
-    }
+    *schedpolicy = (*attr).policy;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setsigdefault(
-    attr: *mut posix_spawnattr_t,
-    sigdefault: *const sigset_t,
+    attr: &mut posix_spawnattr_t,
+    sigdefault: &sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigdefault.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        (*attr).sigdefault = *sigdefault;
-    }
+    (*attr).sigdefault = *sigdefault;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getsigdefault(
-    attr: *const posix_spawnattr_t,
-    sigdefault: *mut sigset_t,
+    attr: &posix_spawnattr_t,
+    sigdefault: &mut sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigdefault.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        *sigdefault = (*attr).sigdefault;
-    }
+    *sigdefault = (*attr).sigdefault;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setsigmask(
-    attr: *mut posix_spawnattr_t,
-    sigmask: *const sigset_t,
+    attr: &mut posix_spawnattr_t,
+    sigmask: &sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigmask.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        (*attr).sigmask = *sigmask;
-    }
+    (*attr).sigmask = *sigmask;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getsigmask(
-    attr: *const posix_spawnattr_t,
-    sigmask: *mut sigset_t,
+    attr: &posix_spawnattr_t,
+    sigmask: &mut sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigmask.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        *sigmask = (*attr).sigmask;
-    }
+    *sigmask = (*attr).sigmask;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setflags(
-    attr: *mut posix_spawnattr_t,
+    attr: &mut posix_spawnattr_t,
     flags: c_short,
 ) -> c_int {
-    if attr.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        match Flags::from_bits(flags) {
-            Some(v) => (*attr).flags = v.bits(),
-            None => {
-                return EINVAL;
-            }
+    match Flags::from_bits(flags) {
+        Some(v) => (*attr).flags = v.bits(),
+        None => {
+            return EINVAL;
         }
     }
+
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getflags(
-    attr: *const posix_spawnattr_t,
-    flags: *mut c_short,
+    attr: &posix_spawnattr_t,
+    flags: &mut c_short,
 ) -> c_int {
-    if attr.is_null() || flags.is_null() {
-        return EINVAL;
-    }
-
-    unsafe { *flags = (*attr).flags }
+    *flags = (*attr).flags;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setpgroup(
-    attr: *mut posix_spawnattr_t,
+    attr: &mut posix_spawnattr_t,
     pgroup: pid_t,
 ) -> c_int {
-    if attr.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        (*attr).pgroup = pgroup;
-    }
+    (*attr).pgroup = pgroup;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getpgroup(
-    attr: *const posix_spawnattr_t,
-    pgroup: *mut pid_t,
+    attr: &posix_spawnattr_t,
+    pgroup: &mut pid_t,
 ) -> c_int {
-    if attr.is_null() || pgroup.is_null() {
-        return EINVAL;
-    }
-
-    unsafe {
-        *pgroup = (*attr).pgroup;
-    }
+    *pgroup = (*attr).pgroup;
     0
 }
