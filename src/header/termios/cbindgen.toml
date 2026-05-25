@@ -4,7 +4,8 @@
 # - "The <termios.h> header shall define the pid_t type as described in <sys/types.h>."
 sys_includes = []
 after_includes = """
-#include <bits/pid-t.h> // for pid_t from sys/types.h
+#include <bits/pid-t.h>   // for pid_t from sys/types.h
+#include <bits/winsize.h> // for winsize
 """
 include_guard = "_RELIBC_TERMIOS_H"
 language = "C"

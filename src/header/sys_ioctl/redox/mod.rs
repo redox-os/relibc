@@ -4,14 +4,12 @@ use syscall;
 
 use crate::{
     error::{Errno, Result, ResultExt},
-    header::{errno::EINVAL, fcntl, termios},
+    header::{bits_winsize::winsize, errno::EINVAL, fcntl, termios},
     platform::{
         Pal, Sys,
         types::{c_int, c_ulong, c_ulonglong, c_void, pid_t},
     },
 };
-
-use super::winsize;
 
 mod drm;
 

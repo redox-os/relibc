@@ -29,7 +29,7 @@ pub unsafe extern "C" fn openpty(
     aslave: *mut c_int,
     namep: *mut c_char,
     termp: *const termios::termios,
-    winp: *const sys_ioctl::winsize,
+    winp: *const termios::winsize,
 ) -> c_int {
     let mut tmp_name = [0; limits::PATH_MAX];
     let name = if !namep.is_null() {
@@ -63,7 +63,7 @@ pub unsafe extern "C" fn forkpty(
     pm: *mut c_int,
     name: *mut c_char,
     tio: *const termios::termios,
-    ws: *const sys_ioctl::winsize,
+    ws: *const termios::winsize,
 ) -> c_int {
     let mut m = 0;
     let mut s = 0;

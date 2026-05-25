@@ -1,0 +1,13 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/termios.h.html
+#
+# This type is split out to include it in the following headers:
+# - sys/ioctl.h (Non-POSIX)
+# - termios.h (POSIX, where it should be defined)
+include_guard = "_RELIBC_BITS_WINSIZE_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+
+[export]
+include = ["winsize"]
