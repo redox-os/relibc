@@ -4,7 +4,7 @@
 
 use core::{
     convert::TryFrom,
-    ffi::VaListImpl,
+    ffi::VaList,
     mem::{self, MaybeUninit},
     ptr, slice,
 };
@@ -314,7 +314,7 @@ pub unsafe extern "C" fn execle(
 ) -> c_int {
     unsafe {
         with_argv(__valist, arg0, |args, mut remaining_va| {
-            let envp = remaining_va.arg::<*const *mut c_char>();
+            let envp = remaining_va.next_arg::<*const *mut c_char>();
             execve(path, args.as_ptr().cast(), envp)
         })
     }
@@ -1244,16 +1244,15 @@ pub extern "C" fn vfork() -> pid_t {
 }
 
 unsafe fn with_argv(
-    mut va: VaListImpl,
+    mut va: VaList,
     arg0: *const c_char,
-    f: impl FnOnce(&[*const c_char], VaListImpl) -> c_int,
+    f: impl FnOnce(&[*const c_char], VaList) -> c_int,
 ) -> c_int {
     let argc = 1 + unsafe {
-        va.with_copy(|mut copy| {
-            core::iter::from_fn(|| Some(copy.arg::<*const c_char>()))
-                .position(|p| p.is_null())
-                .unwrap()
-        })
+        let mut copy = va.clone();
+        core::iter::from_fn(|| Some(copy.next_arg::<*const c_char>()))
+            .position(|p| p.is_null())
+            .unwrap()
     };
 
     let mut stack: [MaybeUninit<*const c_char>; 32] = [MaybeUninit::uninit(); 32];
@@ -1276,11 +1275,11 @@ unsafe fn with_argv(
     out[0].write(arg0);
 
     for inner in out.iter_mut().take(argc).skip(1) {
-        (*inner).write(unsafe { va.arg::<*const c_char>() });
+        (*inner).write(unsafe { va.next_arg::<*const c_char>() });
     }
     out[argc].write(core::ptr::null());
     // NULL
-    unsafe { va.arg::<*const c_char>() };
+    unsafe { va.next_arg::<*const c_char>() };
 
     f(unsafe { out.assume_init_ref() }, va);
 

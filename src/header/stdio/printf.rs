@@ -127,36 +127,36 @@ impl VaArg {
             (FmtKind::Percent, _) => panic!("Can't call arg_from on %"),
 
             (FmtKind::Char, IntKind::Long) | (FmtKind::Char, IntKind::LongLong) => {
-                VaArg::wint_t(unsafe { ap.arg::<wint_t>() })
+                VaArg::wint_t(unsafe { ap.next_arg::<wint_t>() })
             }
 
             (FmtKind::Char, _)
             | (FmtKind::Unsigned, IntKind::Byte)
             | (FmtKind::Signed, IntKind::Byte) => {
                 // c_int is passed but truncated to c_char
-                VaArg::c_char(unsafe { ap.arg::<c_int>() } as c_char)
+                VaArg::c_char(unsafe { ap.next_arg::<c_int>() } as c_char)
             }
             (FmtKind::Unsigned, IntKind::Short) | (FmtKind::Signed, IntKind::Short) => {
                 // c_int is passed but truncated to c_short
-                VaArg::c_short(unsafe { ap.arg::<c_int>() } as c_short)
+                VaArg::c_short(unsafe { ap.next_arg::<c_int>() } as c_short)
             }
             (FmtKind::Unsigned, IntKind::Int) | (FmtKind::Signed, IntKind::Int) => {
-                VaArg::c_int(unsafe { ap.arg::<c_int>() })
+                VaArg::c_int(unsafe { ap.next_arg::<c_int>() })
             }
             (FmtKind::Unsigned, IntKind::Long) | (FmtKind::Signed, IntKind::Long) => {
-                VaArg::c_long(unsafe { ap.arg::<c_long>() })
+                VaArg::c_long(unsafe { ap.next_arg::<c_long>() })
             }
             (FmtKind::Unsigned, IntKind::LongLong) | (FmtKind::Signed, IntKind::LongLong) => {
-                VaArg::c_longlong(unsafe { ap.arg::<c_longlong>() })
+                VaArg::c_longlong(unsafe { ap.next_arg::<c_longlong>() })
             }
             (FmtKind::Unsigned, IntKind::IntMax) | (FmtKind::Signed, IntKind::IntMax) => {
-                VaArg::intmax_t(unsafe { ap.arg::<intmax_t>() })
+                VaArg::intmax_t(unsafe { ap.next_arg::<intmax_t>() })
             }
             (FmtKind::Unsigned, IntKind::PtrDiff) | (FmtKind::Signed, IntKind::PtrDiff) => {
-                VaArg::ptrdiff_t(unsafe { ap.arg::<ptrdiff_t>() })
+                VaArg::ptrdiff_t(unsafe { ap.next_arg::<ptrdiff_t>() })
             }
             (FmtKind::Unsigned, IntKind::Size) | (FmtKind::Signed, IntKind::Size) => {
-                VaArg::ssize_t(unsafe { ap.arg::<ssize_t>() })
+                VaArg::ssize_t(unsafe { ap.next_arg::<ssize_t>() })
             }
 
             (FmtKind::AnyNotation, IntKind::LongLong)
@@ -165,11 +165,11 @@ impl VaArg {
                 VaArg::c_longdouble(unsafe { VaArg::extract_longdouble(ap) })
             }
             (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
-                VaArg::c_double(unsafe { ap.arg::<c_double>() })
+                VaArg::c_double(unsafe { ap.next_arg::<c_double>() })
             }
 
             (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _) => {
-                VaArg::pointer(unsafe { ap.arg::<*const c_void>() })
+                VaArg::pointer(unsafe { ap.next_arg::<*const c_void>() })
             }
         }
     }
@@ -348,13 +348,13 @@ impl VaListCache {
             // point. Reaching here means there are unused gaps in the
             // arguments. Ultimately we'll have to settle down with
             // defaulting to c_int.
-            self.args.push(VaArg::c_int(unsafe { ap.arg::<c_int>() }))
+            self.args.push(VaArg::c_int(unsafe { ap.next_arg::<c_int>() }))
         }
 
         // Add the value to the cache
         self.args.push(match default {
             Some((fmtkind, intkind)) => unsafe { VaArg::arg_from(fmtkind, intkind, ap) },
-            None => VaArg::c_int(unsafe { ap.arg::<c_int>() }),
+            None => VaArg::c_int(unsafe { ap.next_arg::<c_int>() }),
         });
 
         // Return the value
@@ -776,7 +776,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
             match num {
                 Number::Next => varargs
                     .args
-                    .push(VaArg::c_int(unsafe { ap.arg::<c_int>() })),
+                    .push(VaArg::c_int(unsafe { ap.next_arg::<c_int>() })),
                 Number::Index(i) => {
                     positional.insert(i - 1, (FmtKind::Signed, IntKind::Int));
                 }

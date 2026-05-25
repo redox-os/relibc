@@ -248,7 +248,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                                 n.parse::<$type>().map_err(|_| 0)?
                             };
                             if !ignore {
-                                unsafe { *ap.arg::<*mut $type>() = n };
+                                unsafe { *ap.next_arg::<*mut $type>() = n };
                                 matched += 1;
                             }
                         }};
@@ -268,7 +268,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                                 $type::from_str_radix(&n, radix).map_err(|_| 0)?
                             };
                             if !ignore {
-                                unsafe { *ap.arg::<*mut $final>() = n as $final };
+                                unsafe { *ap.next_arg::<*mut $final>() = n as $final };
                                 matched += 1;
                             }
                         }};
@@ -350,7 +350,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                             }
 
                             let mut ptr: Option<*mut $type> =
-                                if ignore { None } else { Some(ap.arg()) };
+                                if ignore { None } else { Some(ap.next_arg()) };
 
                             while width.map(|w| w > 0).unwrap_or(true) && !character.is_whitespace()
                             {
@@ -395,7 +395,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                             let ptr: Option<*mut $type> = if ignore {
                                 None
                             } else {
-                                Some(unsafe { ap.arg() })
+                                Some(unsafe { ap.next_arg() })
                             };
 
                             for i in 0..width.unwrap_or(1) {
@@ -460,7 +460,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                     let mut ptr: Option<*mut c_char> = if ignore {
                         None
                     } else {
-                        Some(unsafe { ap.arg() })
+                        Some(unsafe { ap.next_arg() })
                     };
 
                     // While we haven't used up all the width, and it matches
@@ -490,7 +490,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                 }
                 'n' => {
                     if !ignore {
-                        unsafe { *ap.arg::<*mut c_int>() = count as c_int };
+                        unsafe { *ap.next_arg::<*mut c_int>() = count as c_int };
                     }
                 }
                 _ => return Err(-1),

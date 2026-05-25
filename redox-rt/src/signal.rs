@@ -655,6 +655,8 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
 
     #[cfg(target_arch = "x86_64")]
     {
+        // On newer rust, cpuid is not unsafe
+        #[allow(unused_unsafe)]
         let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
         SUPPORTS_AVX.store(u8::from(cpuid_eax1_ecx & 1 << 28 != 0), Ordering::Relaxed);
