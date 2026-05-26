@@ -68,6 +68,13 @@ pub const PTRACE_SYSEMU_SINGLESTEP: c_int = 32;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ptrace(request: c_int, mut __valist: ...) -> c_int {
     // Musl also just grabs the arguments from the varargs...
-    unsafe { Sys::ptrace(request, __valist.next_arg(), __valist.next_arg(), __valist.next_arg()) }
-        .or_minus_one_errno()
+    unsafe {
+        Sys::ptrace(
+            request,
+            __valist.next_arg(),
+            __valist.next_arg(),
+            __valist.next_arg(),
+        )
+    }
+    .or_minus_one_errno()
 }

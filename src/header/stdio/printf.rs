@@ -184,16 +184,15 @@ impl VaArg {
 
         // exactly same as core::ffi::VaListImpl but all variables exposed
         #[repr(C)]
-        struct VaListImpl {
+        struct VaListInner {
             gp_offset: i32,
             fp_offset: i32,
-            overflow_arg_area: *mut u8,
-            reg_save_area: *mut u8,
+            overflow_arg_area: *const c_void,
+            reg_save_area: *const c_void,
         }
 
         let ap_impl = unsafe {
-            // The double deconstruct is intended
-            let ptr_to_struct = *(core::ptr::from_mut(ap).cast::<*mut VaListImpl>());
+            let ptr_to_struct = ap as *mut core::ffi::VaList as *mut VaListInner;
             &mut *ptr_to_struct
         };
 
@@ -210,17 +209,16 @@ impl VaArg {
 
         // exactly same as core::ffi::VaListImpl but all variables exposed
         #[repr(C)]
-        struct VaListImpl {
-            stack: *mut u8,
-            gr_top: *mut u8,
-            vr_top: *mut u8,
+        struct VaListInner {
+            stack: *const c_void,
+            gr_top: *const c_void,
+            vr_top: *const c_void,
             gr_offs: i32,
             vr_offs: i32,
         }
 
-        let ap_impl: &mut VaListImpl = unsafe {
-            // The double deconstruct is intended
-            let ptr_to_struct = *(ap as *mut core::ffi::VaList as *mut *mut VaListImpl);
+        let ap_impl: &mut VaListInner = unsafe {
+            let ptr_to_struct = ap as *mut core::ffi::VaList as *mut VaListInner;
             &mut *ptr_to_struct
         };
 
@@ -348,7 +346,8 @@ impl VaListCache {
             // point. Reaching here means there are unused gaps in the
             // arguments. Ultimately we'll have to settle down with
             // defaulting to c_int.
-            self.args.push(VaArg::c_int(unsafe { ap.next_arg::<c_int>() }))
+            self.args
+                .push(VaArg::c_int(unsafe { ap.next_arg::<c_int>() }))
         }
 
         // Add the value to the cache
