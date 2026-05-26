@@ -112,7 +112,7 @@ pub unsafe extern "C" fn mremap(
     flags: c_int,
     mut __valist: ...
 ) -> *mut c_void {
-    let new_address = unsafe { __valist.arg::<*mut c_void>() };
+    let new_address = unsafe { __valist.next_arg::<*mut c_void>() };
     match unsafe { Sys::mremap(old_address, old_size, new_size, flags, new_address) } {
         Ok(ptr) => ptr,
         Err(Errno(errno)) => {

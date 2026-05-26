@@ -122,7 +122,7 @@ pub unsafe extern "C" fn strfmon(
             Some('i') => {
                 // International formatting
                 flags.international = true;
-                let value = unsafe { args.arg::<f64>() }; // Get the argument as f64
+                let value = unsafe { args.next_arg::<f64>() }; // Get the argument as f64
                 if let Some(written) =
                     format_monetary(&mut buffer[pos..], value, &DEFAULT_MONETARY, &flags)
                 {
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn strfmon(
             }
             Some('n') => {
                 // Locale-specific formatting
-                let value = unsafe { args.arg::<f64>() }; // Get the argument as f64
+                let value = unsafe { args.next_arg::<f64>() }; // Get the argument as f64
                 if let Some(written) =
                     format_monetary(&mut buffer[pos..], value, &DEFAULT_MONETARY, &flags)
                 {
