@@ -181,9 +181,9 @@ pub unsafe extern "C" fn fwide(stream: *mut FILE, mode: c_int) -> c_int {
 pub unsafe extern "C" fn fwscanf(
     stream: *mut FILE,
     format: *const wchar_t,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
-    unsafe { vfwscanf(stream, format, __valist.as_va_list()) }
+    unsafe { vfwscanf(stream, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getwc.html>.
@@ -340,9 +340,9 @@ pub unsafe extern "C" fn vswscanf(
 pub unsafe extern "C" fn swscanf(
     s: *const wchar_t,
     format: *const wchar_t,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
-    unsafe { vswscanf(s, format, __valist.as_va_list()) }
+    unsafe { vswscanf(s, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ungetwc.html>.
@@ -394,9 +394,9 @@ pub unsafe extern "C" fn vfwprintf(
 pub unsafe extern "C" fn fwprintf(
     stream: *mut FILE,
     format: *const wchar_t,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
-    unsafe { vfwprintf(stream, format, __valist.as_va_list()) }
+    unsafe { vfwprintf(stream, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfwprintf.html>.
@@ -407,8 +407,8 @@ pub unsafe extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fwprintf.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wprintf(format: *const wchar_t, mut __valist: ...) -> c_int {
-    unsafe { vfwprintf(&raw mut *stdout, format, __valist.as_va_list()) }
+pub unsafe extern "C" fn wprintf(format: *const wchar_t, __valist: ...) -> c_int {
+    unsafe { vfwprintf(&raw mut *stdout, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfwprintf.html>.
@@ -431,9 +431,9 @@ pub unsafe extern "C" fn swprintf(
     s: *mut wchar_t,
     n: size_t,
     format: *const wchar_t,
-    mut __valist: ...
+    __valist: ...
 ) -> c_int {
-    unsafe { vswprintf(s, n, format, __valist.as_va_list()) }
+    unsafe { vswprintf(s, n, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcpcpy.html>.
@@ -1052,8 +1052,8 @@ pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wscanf.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wscanf(format: *const wchar_t, mut __valist: ...) -> c_int {
-    unsafe { vfwscanf(stdin, format, __valist.as_va_list()) }
+pub unsafe extern "C" fn wscanf(format: *const wchar_t, __valist: ...) -> c_int {
+    unsafe { vfwscanf(stdin, format, __valist) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcscasecmp.html>.
