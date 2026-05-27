@@ -31,4 +31,3 @@ pub use crate::header::{
     bits_timer_t::timer_t,
     bits_uid_t::uid_t,
 };
-use crate::platform::types::{c_char, c_longlong, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort};
