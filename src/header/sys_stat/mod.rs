@@ -16,19 +16,31 @@ use crate::{
     },
 };
 
+/// Type of file.
 pub const S_IFMT: mode_t = 0o0_170_000;
 
+/// Directory.
 pub const S_IFDIR: mode_t = 0o040_000;
+/// Character special.
 pub const S_IFCHR: mode_t = 0o020_000;
+/// Block special.
 pub const S_IFBLK: mode_t = 0o060_000;
+/// Regular.
 pub const S_IFREG: mode_t = 0o100_000;
+/// FIFO special.
 pub const S_IFIFO: mode_t = 0o010_000;
+/// Symbolic link.
 pub const S_IFLNK: mode_t = 0o120_000;
+/// Socket.
 pub const S_IFSOCK: mode_t = 0o140_000;
 
+/// Read, write, execute/search by owner.
 pub const S_IRWXU: mode_t = 0o0_700;
+/// Read permission, owner.
 pub const S_IRUSR: mode_t = 0o0_400;
+/// Write permission, owner.
 pub const S_IWUSR: mode_t = 0o0_200;
+/// Execute/search permission, owner.
 pub const S_IXUSR: mode_t = 0o0_100;
 
 // Defined for compatibility
@@ -36,17 +48,28 @@ pub const S_IREAD: mode_t = S_IRUSR;
 pub const S_IWRITE: mode_t = S_IWUSR;
 pub const S_IEXEC: mode_t = S_IXUSR;
 
+/// Read, write, execute/search by group.
 pub const S_IRWXG: mode_t = 0o0_070;
+/// Read permission, group.
 pub const S_IRGRP: mode_t = 0o0_040;
+/// Write permission, group.
 pub const S_IWGRP: mode_t = 0o0_020;
+/// Execute/search permission, group.
 pub const S_IXGRP: mode_t = 0o0_010;
 
+/// Read, write, execute/search by others.
 pub const S_IRWXO: mode_t = 0o0_007;
+/// Read permission, others.
 pub const S_IROTH: mode_t = 0o0_004;
+/// Write permission, others.
 pub const S_IWOTH: mode_t = 0o0_002;
+/// Execute/search permission, others.
 pub const S_IXOTH: mode_t = 0o0_001;
+/// Set-user-ID on execution.
 pub const S_ISUID: mode_t = 0o4_000;
+/// Set-group-ID on execution.
 pub const S_ISGID: mode_t = 0o2_000;
+/// On directories, restricted deletion flag.
 pub const S_ISVTX: mode_t = 0o1_000;
 
 pub const UTIME_NOW: c_long = (1 << 30) - 1;
@@ -56,19 +79,37 @@ pub const UTIME_OMIT: c_long = (1 << 30) - 2;
 #[repr(C)]
 #[derive(Default)]
 pub struct stat {
+    /// Device ID of device containing file.
     pub st_dev: dev_t,
+    /// File serial number.
     pub st_ino: ino_t,
+    /// Number of hard links to the file.
     pub st_nlink: nlink_t,
+    /// Mode of file.
     pub st_mode: mode_t,
+    /// User ID of file.
     pub st_uid: uid_t,
+    /// Group ID of file.
     pub st_gid: gid_t,
+    /// Device ID (if file is character or block special).
     pub st_rdev: dev_t,
+    /// For regular files, the file size in bytes.
+    /// For symbolic links, the length in bytes of the pathname contained
+    /// in the symbolic link.
+    /// For a shared or typed memory object, the length in bytes.
+    /// For other file types, the use of this field is unspecified.
     pub st_size: off_t,
+    /// A file system-specific preferred I/O block size for this object.
+    /// In some file system types, this may vary from file to file.
     pub st_blksize: blksize_t,
+    /// Number of blocks allocated for this object.
     pub st_blocks: blkcnt_t,
 
+    /// Last data access timestamp.
     pub st_atim: timespec,
+    /// Last data modification timestamp.
     pub st_mtim: timespec,
+    /// Last file status change timestamp.
     pub st_ctim: timespec,
 
     // Compared to glibc, our struct is for some reason 24 bytes too small.
