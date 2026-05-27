@@ -1273,7 +1273,16 @@ impl Pal for Sys {
                         path,
                         flag,
                         mode,
-                    } => todo!(),
+                    } => {
+                        let src_fd =
+                            Sys::open(unsafe { CStr::from_ptr(path) }, flag, mode)? as usize;
+                        syscall::sendfd(
+                            new_file_table.as_raw_fd(),
+                            src_fd,
+                            0,
+                            u64::try_from(fd).map_err(|_| Errno(EBADFD))?,
+                        )?;
+                    }
                     crate::header::spawn::Operation::Close(fd) => {
                         new_file_table.call_wo(
                             &(fd as usize).to_ne_bytes(),
@@ -1284,15 +1293,15 @@ impl Pal for Sys {
                     crate::header::spawn::Operation::Chdir(_) => todo!(),
                     crate::header::spawn::Operation::FChdir(_) => todo!(),
                     crate::header::spawn::Operation::Dup2(old, new) => {
-                        new_file_table.call_wo(
-                            [(old as usize).to_ne_bytes(), (new as usize).to_ne_bytes()]
-                                .into_iter()
-                                .flatten()
-                                .collect::<Vec<u8>>()
-                                .as_slice(),
-                            syscall::CallFlags::empty(),
-                            &[syscall::flag::FileTableVerb::Dup2 as u64],
-                        )?;
+                        // new_file_table.call_wo(
+                        //     [(old as usize).to_ne_bytes(), (new as usize).to_ne_bytes()]
+                        //         .into_iter()
+                        //         .flatten()
+                        //         .collect::<Vec<u8>>()
+                        //         .as_slice(),
+                        //     syscall::CallFlags::empty(),
+                        //     &[syscall::flag::FileTableVerb::Dup2 as u64],
+                        // )?;
                     }
                 }
             }
