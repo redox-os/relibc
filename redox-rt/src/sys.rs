@@ -6,7 +6,7 @@ use core::{
 
 use ioslice::IoSlice;
 use syscall::{
-    CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
+    Call, CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
     data::StdFsCallMeta,
     error::{self, EINTR, ENODEV, ESRCH, Error, Result},
 };
@@ -171,33 +171,14 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     }
     .map(|awoken| awoken as u32)
 }
-unsafe fn raw_sys_call(
-    fd: usize,
-    payload_ptr: *const u8,
-    len: usize,
-    flags: CallFlags,
-    metadata: &[u64],
-) -> Result<usize> {
-    unsafe {
-        syscall::syscall5(
-            syscall::SYS_CALL,
-            fd,
-            payload_ptr as usize,
-            len,
-            metadata.len() | flags.bits(),
-            metadata.as_ptr() as usize,
-        )
-    }
-}
-pub fn sys_call_ro(
-    fd: usize,
+pub fn sys_call_ro<T: Call>(
+    fd: T,
     payload: &mut [u8],
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
     unsafe {
-        raw_sys_call(
-            fd,
+        fd.raw_call(
             payload.as_mut_ptr(),
             payload.len(),
             flags | CallFlags::READ,
@@ -205,10 +186,14 @@ pub fn sys_call_ro(
         )
     }
 }
-pub fn sys_call_wo(fd: usize, payload: &[u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+pub fn sys_call_wo<T: Call>(
+    fd: T,
+    payload: &[u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
     unsafe {
-        raw_sys_call(
-            fd,
+        fd.raw_call(
             payload.as_ptr(),
             payload.len(),
             flags | CallFlags::WRITE,
@@ -216,15 +201,14 @@ pub fn sys_call_wo(fd: usize, payload: &[u8], flags: CallFlags, metadata: &[u64]
         )
     }
 }
-pub fn sys_call_rw(
-    fd: usize,
+pub fn sys_call_rw<T: Call>(
+    fd: T,
     payload: &mut [u8],
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
     unsafe {
-        raw_sys_call(
-            fd,
+        fd.raw_call(
             payload.as_mut_ptr(),
             payload.len(),
             flags | CallFlags::READ | CallFlags::WRITE,
@@ -232,14 +216,15 @@ pub fn sys_call_rw(
         )
     }
 }
-pub fn sys_call(
-    fd: usize,
+pub fn sys_call<T: Call>(
+    fd: T,
     payload: &mut [u8],
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
-    unsafe { raw_sys_call(fd, payload.as_mut_ptr(), payload.len(), flags, metadata) }
+    unsafe { fd.raw_call(payload.as_mut_ptr(), payload.len(), flags, metadata) }
 }
+
 pub fn this_proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
     proc_call(
         crate::current_proc_fd().as_raw_fd(),
@@ -549,13 +534,21 @@ pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<
     ns_this_scheme.call_wo(&cap_bytes, CallFlags::FD, &[])?;
     Ok(())
 }
-pub fn std_fs_call_ro(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+pub fn std_fs_call_ro<T: Call>(
+    fd: T,
+    payload: &mut [u8],
+    metadata: &StdFsCallMeta,
+) -> Result<usize> {
     sys_call_ro(fd, payload, CallFlags::STD_FS, metadata)
 }
-pub fn std_fs_call_wo(fd: usize, payload: &[u8], metadata: &StdFsCallMeta) -> Result<usize> {
+pub fn std_fs_call_wo<T: Call>(fd: T, payload: &[u8], metadata: &StdFsCallMeta) -> Result<usize> {
     sys_call_wo(fd, payload, CallFlags::STD_FS, metadata)
 }
-pub fn std_fs_call_rw(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+pub fn std_fs_call_rw<T: Call>(
+    fd: T,
+    payload: &mut [u8],
+    metadata: &StdFsCallMeta,
+) -> Result<usize> {
     sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
 }
 pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
