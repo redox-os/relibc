@@ -255,9 +255,7 @@ unsafe fn serialize_ancillary_data_to_stream(
     }
 
     let mut cmsg: *mut cmsghdr = unsafe { CMSG_FIRSTHDR(msg) };
-    let mut cmsg_count = 0;
     while !cmsg.is_null() {
-        cmsg_count += 1;
         let current_cmsg = unsafe { &*cmsg };
         let min_cmsg_len = unsafe { CMSG_ALIGN(mem::size_of::<cmsghdr>()) };
         if current_cmsg.cmsg_len < min_cmsg_len {

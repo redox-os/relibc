@@ -1024,7 +1024,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             ))]
             let buf = create_set_addr_space_buf_for_fork(
                 new_addr_space_fd.as_raw_fd(),
-                __relibc_internal_fork_ret as usize,
+                __relibc_internal_fork_ret as *const () as usize,
                 initial_rsp as usize,
                 arg1,
             );
