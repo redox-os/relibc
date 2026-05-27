@@ -1,5 +1,7 @@
 include_guard = "_RELIBC_SYS_IOCTL_H"
 after_includes = """
+#include <bits/winsize.h> // for winsize from termios.h
+
 // Shamelessly copy-pasted from musl
 
 #define _IOC(a,b,c,d) ( ((a)<<30) | ((b)<<8) | (c) | ((d)<<16) )
@@ -21,4 +23,4 @@ cpp_compat = true
 prefix_with_name = true
 
 [export]
-include = ["sgttyb", "winsize"]
+include = ["sgttyb"]
