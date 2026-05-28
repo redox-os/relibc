@@ -438,7 +438,7 @@ pub trait Pal {
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: *const *mut c_char,
-        envp: *const *mut c_char,
+        envp: Option<*const *mut c_char>,
         use_path: bool,
     ) -> Result<pid_t>;
 

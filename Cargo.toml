@@ -69,7 +69,7 @@ ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.3"
 redox_protocols = { package = "libredox", version = "0.1.17", default-features = false, features = ["protocol"] }
-redox_syscall = "0.9.0"
+redox_syscall = "0.8.1"
 [build-dependencies]
 cc = "1"
 

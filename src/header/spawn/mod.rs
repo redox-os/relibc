@@ -19,6 +19,7 @@ use crate::{
     },
     platform::{
         self, Pal,
+        sys::path,
         types::{c_char, c_int, pid_t},
     },
 };
@@ -29,9 +30,11 @@ fn spawn(
     file_actions: Option<&posix_spawn_file_actions_t>,
     spawn_attr: Option<&posix_spawnattr_t>,
     argv: *const *mut c_char,
-    envp: *const *mut c_char,
+    envp: Option<*const *mut c_char>,
     use_path: bool,
 ) -> Result<()> {
+    let original_cwd = path::clone_cwd().unwrap().to_string();
+
     if use_path {
         let path = unsafe { getenv(c"PATH".as_ptr()) };
         let path_env = unsafe { CStr::from_nullable_ptr(path).unwrap().to_str().unwrap() };
@@ -79,6 +82,10 @@ fn spawn(
             if let Some(pid) = pid {
                 *pid = v;
             }
+        })
+        .map_err(|e| {
+            path::chdir(original_cwd.as_str()).unwrap();
+            e
         })?;
     }
 
@@ -88,21 +95,21 @@ fn spawn(
 #[unsafe(no_mangle)]
 pub extern "C" fn posix_spawn(
     pid: *mut pid_t,
-    program: *const c_char,
+    path: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
-    spawn_attr: *const posix_spawnattr_t,
+    attrp: *const posix_spawnattr_t,
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    let program = unsafe { CStr::from_ptr(program).to_str().unwrap().to_string() };
+    let program = unsafe { CStr::from_ptr(path).to_str().unwrap().to_string() };
 
     if let Err(e) = spawn(
         unsafe { pid.as_mut() },
         program,
         unsafe { file_actions.as_ref() },
-        unsafe { spawn_attr.as_ref() },
+        unsafe { attrp.as_ref() },
         argv,
-        envp,
+        if envp.is_null() { None } else { Some(envp) },
         false,
     ) {
         return e.0;
@@ -113,22 +120,22 @@ pub extern "C" fn posix_spawn(
 #[unsafe(no_mangle)]
 pub extern "C" fn posix_spawnp(
     pid: *mut pid_t,
-    program: *const c_char,
+    path: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
-    spawn_attr: *const posix_spawnattr_t,
+    attrp: *const posix_spawnattr_t,
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    let program = unsafe { CStr::from_ptr(program).to_str().unwrap().to_string() };
+    let program = unsafe { CStr::from_ptr(path).to_str().unwrap().to_string() };
 
     if let Err(e) = spawn(
         unsafe { pid.as_mut() },
-        program,
+        program.clone(),
         unsafe { file_actions.as_ref() },
-        unsafe { spawn_attr.as_ref() },
+        unsafe { attrp.as_ref() },
         argv,
-        envp,
-        true,
+        if envp.is_null() { None } else { Some(envp) },
+        if program.contains('/') { false } else { true },
     ) {
         return e.0;
     }
