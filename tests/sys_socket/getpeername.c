@@ -13,11 +13,13 @@ void print_sockaddr(char *ctx, struct sockaddr *addr) {
         raw_ip_addr = &(ipv4->sin_addr);
         port = ntohs(ipv4->sin_port);
         fam = "AF_INET";
+#ifdef AF_INET6
     } else if (addr->sa_family == AF_INET6) {
         struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)addr;
         raw_ip_addr = &(ipv6->sin6_addr);
         port = ntohs(ipv6->sin6_port);
         fam = "AF_INET6";
+#endif
     } else {
         printf("Unknown address family: %d\n", addr->sa_family);
         exit(1);
