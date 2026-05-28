@@ -1282,7 +1282,7 @@ impl Pal for Sys {
                             0,
                             u64::try_from(fd).map_err(|_| Errno(EBADFD))?,
                         )?;
-                        Sys::close(src_fd as i32)?;
+                        core::mem::forget(src_fd);
                     }
                     crate::header::spawn::Operation::Close(fd) => {
                         new_file_table.call_wo(
