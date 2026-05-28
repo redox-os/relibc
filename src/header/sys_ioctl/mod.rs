@@ -27,7 +27,10 @@ pub struct sgttyb {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     // TODO: Somehow support varargs to syscall??
+    #[cfg(target_os = "linux")]
     unsafe { Sys::ioctl(fd, request, out).or_minus_one_errno() }
+    #[cfg(target_os = "redox")]
+    unsafe { self::redox::ioctl_inner(fd, request, out) }.or_minus_one_errno()
 }
 
 #[cfg(target_os = "linux")]
