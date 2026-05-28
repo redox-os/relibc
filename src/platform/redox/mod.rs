@@ -22,19 +22,20 @@ use self::{
 };
 use super::{Pal, Read, types::*};
 use crate::{
+    alloc::string::ToString,
     c_str::{CStr, CString},
     error::{Errno, Result},
     fs::File,
     header::{
         errno::{
             EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
-            ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
+            ENOEXEC, ENOMEM, ENOSYS, ENOTDIR, EOPNOTSUPP, EPERM,
         },
         fcntl::{
             self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
             F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
-        limits,
+        limits::{self, NAME_MAX},
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
@@ -45,7 +46,7 @@ use crate::{
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
         sys_select::timeval,
-        sys_stat::{S_ISVTX, stat},
+        sys_stat::{self, S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
@@ -1211,7 +1212,9 @@ impl Pal for Sys {
 
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
         let executable = File::open(program, fcntl::O_RDONLY)?;
-        let cwd = path::clone_cwd().unwrap();
+        let original_cwd = path::clone_cwd().unwrap().to_string();
+        let mut cwd = original_cwd.clone();
+        cwd.reserve_exact(NAME_MAX - cwd.len());
         let proc_fd = child.proc_fd.unwrap();
         let curr_proc_fd = redox_rt::current_proc_fd();
         let file_table = RtTcb::current()
@@ -1223,28 +1226,6 @@ impl Pal for Sys {
             let new_file_table = child.thr_fd.dup(b"current-filetable")?;
             new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
         }
-
-        let mut extra_info = redox_rt::proc::ExtraInfo {
-            cwd: Some(cwd.as_bytes()),
-            sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
-            sigprocmask: if let Some(fat) = fat
-                && Flags::from_bits(fat.flags)
-                    .unwrap()
-                    .contains(Flags::POSIX_SPAWN_SETSIGMASK)
-            {
-                fat.sigmask
-            } else {
-                redox_rt::signal::get_sigmask().unwrap()
-            },
-            umask: redox_rt::sys::get_umask(),
-            thr_fd: child.thr_fd.as_raw_fd(),
-            proc_fd: proc_fd.as_raw_fd(),
-            ns_fd: redox_rt::current_namespace_fd().ok(),
-            cwd_fd: path::current_dir()
-                .ok()
-                .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
-            same_process: false,
-        };
 
         let mut args = Vec::new();
         let mut envs = Vec::new();
@@ -1282,7 +1263,6 @@ impl Pal for Sys {
                             0,
                             u64::try_from(fd).map_err(|_| Errno(EBADFD))?,
                         )?;
-                        core::mem::forget(src_fd);
                     }
                     crate::header::spawn::Operation::Close(fd) => {
                         new_file_table.call_wo(
@@ -1291,8 +1271,21 @@ impl Pal for Sys {
                             &[syscall::flag::FileTableVerb::Close as u64],
                         )?;
                     }
-                    crate::header::spawn::Operation::Chdir(_) => todo!(),
-                    crate::header::spawn::Operation::FChdir(_) => todo!(),
+                    crate::header::spawn::Operation::Chdir(path) => {
+                        let path = unsafe { CStr::from_ptr(path) };
+                        let mut stat = sys_stat::stat::default();
+                        let fd = Sys::stat(path, Out::from_mut(&mut stat))?;
+
+                        if sys_stat::S_IFDIR & sys_stat::S_IFMT != sys_stat::S_IFDIR {
+                            return Err(Errno(ENOTDIR));
+                        }
+                        cwd = path.to_str().unwrap().to_string();
+                        path::chdir(cwd.as_str())?;
+                    }
+                    crate::header::spawn::Operation::FChdir(fd) => {
+                        path::fchdir(fd)?;
+                        path::getcwd(Out::from_mut(unsafe { cwd.as_bytes_mut() }))?;
+                    }
                     crate::header::spawn::Operation::Dup2(old, new) => {
                         new_file_table.call_wo(
                             [(old as usize).to_ne_bytes(), (new as usize).to_ne_bytes()]
@@ -1313,6 +1306,28 @@ impl Pal for Sys {
                 &[syscall::flag::FileTableVerb::CloseCloExec as u64],
             )?;
         }
+
+        let mut extra_info = redox_rt::proc::ExtraInfo {
+            cwd: Some(cwd.as_bytes()),
+            sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
+            sigprocmask: if let Some(fat) = fat
+                && Flags::from_bits(fat.flags)
+                    .unwrap()
+                    .contains(Flags::POSIX_SPAWN_SETSIGMASK)
+            {
+                fat.sigmask
+            } else {
+                redox_rt::signal::get_sigmask().unwrap()
+            },
+            umask: redox_rt::sys::get_umask(),
+            thr_fd: child.thr_fd.as_raw_fd(),
+            proc_fd: proc_fd.as_raw_fd(),
+            ns_fd: redox_rt::current_namespace_fd().ok(),
+            cwd_fd: path::current_dir()
+                .ok()
+                .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
+            same_process: false,
+        };
 
         if let Some(attr) = fat {
             let flags = Flags::from_bits(attr.flags).ok_or(Errno(EINVAL))?;
@@ -1391,6 +1406,8 @@ impl Pal for Sys {
             )
             .unwrap();
         }
+
+        path::chdir(original_cwd.as_str())?;
 
         let start_fd = child.thr_fd.dup(b"start")?;
         start_fd.write(&[0])?;
