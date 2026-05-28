@@ -464,7 +464,7 @@ pub fn fexec_impl(
     ));
 
     // Close all O_CLOEXEC file descriptors. TODO: close_range?
-    {
+    if extrainfo.same_process {
         // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
         // scenarios. While execve() is undefined according to POSIX if there exist sibling
         // threads, it could still be allowed by keeping certain file descriptors and instead

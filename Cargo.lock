@@ -461,12 +461,12 @@ dependencies = [
 
 [[package]]
 name = "redox_event"
-version = "0.4.6"
-source = "git+https://gitlab.redox-os.org/EuclidDivisionLemma/event?branch=spawn#17c4e4c5f0aaf83a2a8057b78ad75364e1f2242a"
+version = "0.4.7"
+source = "git+https://gitlab.redox-os.org/EuclidDivisionLemma/event?branch=spawn#48847ea51f9d06c8e2fc7ba3441343d12944e482"
 dependencies = [
  "bitflags",
  "libredox",
- "redox_syscall 0.8.0",
+ "redox_syscall 0.9.0",
 ]
 
 [[package]]
@@ -481,7 +481,7 @@ dependencies = [
 [[package]]
 name = "redox_syscall"
 version = "0.9.0"
-source = "git+https://gitlab.redox-os.org/EuclidDivisionLemma/syscall/?branch=spawn#4a768587a071f8c87e915c6b0836d272bed1d56c"
+source = "git+https://gitlab.redox-os.org/EuclidDivisionLemma/syscall/?branch=spawn#d28cf36f5a6684fcbf8be449af55e12d0024d503"
 dependencies = [
  "bitflags",
 ]
