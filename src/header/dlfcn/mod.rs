@@ -20,12 +20,24 @@ use crate::{
     platform::types::{c_char, c_int, c_void},
 };
 
+/// Relocations are performed at an implementation-defined time.
 pub const RTLD_LAZY: c_int = 1 << 0;
+/// Relocations are performed when the object is loaded.
 pub const RTLD_NOW: c_int = 1 << 1;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/dlopen.3.html>.
+/// Don't load the shared object.
 pub const RTLD_NOLOAD: c_int = 1 << 2;
+/// All symbols are available for relocation processing of other modules.
 pub const RTLD_GLOBAL: c_int = 1 << 8;
+/// All symbold are not made available for relocation processing by other
+/// modules.
 pub const RTLD_LOCAL: c_int = 0x0000;
 
+/// Special purpose value for `handle` for `dlsym()` reserved by POSIX for
+/// future use.
+/// The identifier lookup happens in the normal global scope; that is, a
+/// search for an identifier using `handle` would find the same definition
+/// as a direct use of this identifier in the program code.
 #[allow(clippy::zero_ptr)] // related cbindgen issue: https://github.com/mozilla/cbindgen/issues/948
 pub const RTLD_DEFAULT: *mut c_void = 0 as *mut c_void; // XXX: cbindgen doesn't like ptr::null_mut() for publically exported constants
 
@@ -42,9 +54,13 @@ fn set_last_error(error: DlError) {
 #[repr(C)]
 #[allow(non_camel_case_types)]
 pub struct Dl_info_t {
+    /// Pathname of mapped object file.
     dli_fname: *const c_char,
+    /// Base of mapped address range.
     dli_fbase: *mut c_void,
+    /// Symbol name or null pointer.
     dli_sname: *const c_char,
+    /// Symbol address of null pointer.
     dli_saddr: *mut c_void,
 }
 
