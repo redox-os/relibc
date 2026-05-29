@@ -89,18 +89,33 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "x86")]
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
+    use syscall::CallFlags;
+
     let mut env = syscall::EnvRegisters::default();
 
-    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env")
-        .expect("failed to open handle for process registers");
-
-    syscall::read(file_fd, &mut env).expect("failed to read gsbase");
+    tcb.thread_fd()
+        .call_ro(
+            &mut env,
+            CallFlags::empty(),
+            &[
+                ProcSchemeVerb::RegsEnv as u64,
+                CallFlags::READ.bits() as u64,
+            ],
+        )
+        .expect("failed to read gsbase");
 
     env.gsbase = tls_end as u32;
 
-    syscall::write(file_fd, &env).expect("failed to write gsbase");
-
-    let _ = crate::sys::close_raw(file_fd);
+    tcb.thread_fd()
+        .call_wo(
+            &env,
+            CallFlags::empty(),
+            &[
+                ProcSchemeVerb::RegsEnv as u64,
+                CallFlags::WRITE.bits() as u64,
+            ],
+        )
+        .expect("failed to write gsbase");
 
     TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
 }
@@ -109,18 +124,33 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: usize) {
+    use syscall::{CallFlags, ProcSchemeVerb};
+
     let mut env = syscall::EnvRegisters::default();
 
-    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env")
-        .expect("failed to open handle for process registers");
-
-    syscall::read(file_fd, &mut env).expect("failed to read fsbase");
+    tcb.thread_fd()
+        .call_ro(
+            &mut env,
+            CallFlags::empty(),
+            &[
+                ProcSchemeVerb::RegsEnv as u64,
+                CallFlags::READ.bits() as u64,
+            ],
+        )
+        .expect("failed to read fsbase");
 
     env.fsbase = tls_end_and_tcb_start as u64;
 
-    syscall::write(file_fd, &env).expect("failed to write fsbase");
-
-    let _ = crate::sys::close_raw(file_fd);
+    tcb.thread_fd()
+        .call_wo(
+            &env,
+            CallFlags::empty(),
+            &[
+                ProcSchemeVerb::RegsEnv as u64,
+                CallFlags::WRITE.bits() as u64,
+            ],
+        )
+        .expect("failed to write fsbase");
 
     TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
 }

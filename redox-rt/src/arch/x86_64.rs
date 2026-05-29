@@ -6,6 +6,7 @@ use core::{
 };
 
 use syscall::{
+    CallFlags, ProcSchemeVerb,
     data::{SigProcControl, Sigcontrol},
     error::*,
 };
@@ -75,12 +76,18 @@ pub struct ArchIntRegs {
 pub unsafe fn deactivate_tcb(open_via_dup: &FdGuardUpper) -> Result<()> {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = open_via_dup.dup_into_upper(b"regs/env")?;
-
     env.fsbase = 0;
     env.gsbase = 0;
 
-    file.write(&env)?;
+    open_via_dup.call_wo(
+        &env,
+        CallFlags::empty(),
+        &[
+            ProcSchemeVerb::RegsEnv as u64,
+            CallFlags::WRITE.bits() as u64,
+        ],
+    )?;
+
     crate::TLS_ACTIVATED.store(false, core::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
