@@ -5,16 +5,10 @@ use super::{
 
 use crate::{
     error::Errno,
-    fs::File,
     header::{bits_sigset_t::sigset_t, errno::*, fcntl::*, sys_epoll::*},
-    io::prelude::*,
 };
 use core::{mem, slice};
-use log::warn;
-use syscall::{
-    data::{Event, TimeSpec},
-    flag::EVENT_READ,
-};
+use syscall::{data::Event, flag::EVENT_READ};
 
 fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
     let mut event_flags = syscall::EventFlags::empty();
@@ -104,21 +98,7 @@ impl PalEpoll for Sys {
         }
 
         let timer_opt = if timeout != -1 {
-            // TODO: Any of syscall inside this can fail, there's a race condition on kernel reusing fd numbers
-            let mut i = 10;
-            loop {
-                match register_timeout(epfd, timeout) {
-                    Ok(timer) => break Some(timer),
-                    Err(_) if i > 0 => {
-                        i += 1;
-                        continue;
-                    }
-                    Err(_) => {
-                        warn!("Gave up writing timeout for epoll");
-                        break None;
-                    }
-                }
-            }
+            Some(register_timeout(epfd, timeout)?)
         } else {
             None
         };
@@ -149,12 +129,6 @@ impl PalEpoll for Sys {
                 let event_ptr = events.add(i);
                 let target_ptr = events.add(count);
                 let event = *(event_ptr as *mut Event);
-                if let Some(ref timer) = timer_opt {
-                    if event.id as c_int == timer.fd {
-                        // Do not count timer event
-                        continue;
-                    }
-                }
                 *target_ptr = epoll_event {
                     events: event_flags_to_epoll(event.flags),
                     data: epoll_data {
@@ -170,26 +144,16 @@ impl PalEpoll for Sys {
     }
 }
 
-fn register_timeout(epfd: i32, timeout: i32) -> Result<File, Errno> {
-    let mut timer = File::open(c"/scheme/time/4".into(), O_RDWR)?;
-    if let Err(e) = Sys::write(
+fn register_timeout(epfd: i32, timeout: i32) -> Result<usize, Errno> {
+    if timeout < 0 {
+        return Err(Errno(EINVAL));
+    }
+    Sys::write(
         epfd,
         &Event {
-            id: timer.fd as usize,
+            id: syscall::EVENT_TIMEOUT_ID,
             flags: EVENT_READ,
-            data: 0,
+            data: timeout as usize,
         },
-    ) {
-        return Err(e);
-    }
-    let mut time = TimeSpec::default();
-    let _ = timer
-        .read(&mut time)
-        .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
-    time.tv_sec += (timeout as i64) / 1000;
-    time.tv_nsec += (timeout % 1000) * 1000000;
-    let _ = timer
-        .write(&time)
-        .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
-    Ok(timer)
+    )
 }
