@@ -158,11 +158,11 @@ pub unsafe fn init(
         let mut env = syscall::EnvRegisters::default();
 
         {
-            let file = thr_fd
-                .dup(b"regs/env")
-                .expect_notls("failed to open handle for process registers");
+            use syscall::{CallFlags, ProcSchemeVerb};
 
-            file.read(&mut env).expect_notls("failed to read gsbase");
+            let file = thr_fd
+                .call_ro(&mut env, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::READ.bits() as u64])
+                .expect_notls("failed to open handle for process registers");
         }
 
         tp = env.gsbase as usize;
@@ -172,11 +172,11 @@ pub unsafe fn init(
         let mut env = syscall::EnvRegisters::default();
 
         {
-            let file = thr_fd
-                .dup(b"regs/env")
-                .expect_notls("failed to open handle for process registers");
+            use syscall::{CallFlags, ProcSchemeVerb};
 
-            file.read(&mut env).expect_notls("failed to read fsbase");
+            let file = thr_fd
+                .call_ro(&mut env, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::READ.bits() as u64])
+                .expect_notls("failed to open handle for process registers");
         }
 
         tp = env.fsbase as usize;

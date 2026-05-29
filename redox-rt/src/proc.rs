@@ -1065,12 +1065,9 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         }
         {
             // Copy environment registers.
-            let cur_env_regs_fd = cur_thr_fd.dup(b"regs/env")?;
-            let new_env_regs_fd = new_thr_fd.dup(b"regs/env")?;
-
             let mut env_regs = syscall::EnvRegisters::default();
-            cur_env_regs_fd.read(&mut env_regs)?;
-            new_env_regs_fd.write(&env_regs)?;
+            cur_thr_fd.call_ro(&mut env_regs, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::READ.bits() as u64])?;
+            new_thr_fd.call_wo(&env_regs, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::WRITE.bits() as u64])?;
         }
     }
     // Copy the file table. We do this last to ensure that all previously used file descriptors are

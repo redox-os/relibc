@@ -84,36 +84,30 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "x86")]
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
+    use syscall::CallFlags;
+
     let mut env = syscall::EnvRegisters::default();
 
-    let file = tcb
-        .thread_fd()
-        .dup(b"regs/env")
-        .expect_notls("failed to open handle for process registers");
-
-    file.read(&mut env).expect_notls("failed to read gsbase");
+    tcb.thread_fd().call_ro(&mut env, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::READ.bits() as u64]).expect_notls("failed to read gsbase");
 
     env.gsbase = tls_end as u32;
 
-    file.write(&env).expect_notls("failed to write gsbase");
+    tcb.thread_fd().call_wo(&env, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::WRITE.bits() as u64]).expect_notls("failed to write gsbase");
 }
 
 /// OS and architecture specific code to activate TLS - Redox x86_64
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: usize) {
+    use syscall::{CallFlags, ProcSchemeVerb};
+
     let mut env = syscall::EnvRegisters::default();
 
-    let file = tcb
-        .thread_fd()
-        .dup(b"regs/env")
-        .expect_notls("failed to open handle for process registers");
-
-    file.read(&mut env).expect_notls("failed to read fsbase");
+    tcb.thread_fd().call_ro(&mut env, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::READ.bits() as u64]).expect_notls("failed to read fsbase");
 
     env.fsbase = tls_end_and_tcb_start as u64;
 
-    file.write(&env).expect_notls("failed to write fsbase");
+    tcb.thread_fd().call_wo(&env, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::WRITE.bits() as u64]).expect_notls("failed to write fsbase");
 }
 
 /// OS and architecture specific code to activate TLS - Redox riscv64
