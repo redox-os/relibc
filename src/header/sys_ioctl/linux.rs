@@ -1,62 +1,34 @@
-use crate::{
-    error::ResultExt,
-    platform::{
-        Sys,
-        types::{c_int, c_ulong, c_void},
-    },
-};
+use crate::{header::sys_ioctl::FIONREAD, platform::types::c_ulong};
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
-    // TODO: Somehow support varargs to syscall??
-    unsafe { Sys::ioctl(fd, request, out).or_minus_one_errno() }
-}
-
-pub const TCGETS: c_ulong = 0x5401;
-pub const TCSETS: c_ulong = 0x5402;
-pub const TCSETSW: c_ulong = 0x5403;
-pub const TCSETSF: c_ulong = 0x5404;
 pub const TCGETA: c_ulong = 0x5405;
 pub const TCSETA: c_ulong = 0x5406;
 pub const TCSETAW: c_ulong = 0x5407;
 pub const TCSETAF: c_ulong = 0x5408;
-pub const TCSBRK: c_ulong = 0x5409;
-pub const TCXONC: c_ulong = 0x540A;
-pub const TCFLSH: c_ulong = 0x540B;
 pub const TIOCEXCL: c_ulong = 0x540C;
 pub const TIOCNXCL: c_ulong = 0x540D;
-pub const TIOCSCTTY: c_ulong = 0x540E;
-pub const TIOCGPGRP: c_ulong = 0x540F;
-pub const TIOCSPGRP: c_ulong = 0x5410;
 pub const TIOCOUTQ: c_ulong = 0x5411;
 pub const TIOCSTI: c_ulong = 0x5412;
-pub const TIOCGWINSZ: c_ulong = 0x5413;
-pub const TIOCSWINSZ: c_ulong = 0x5414;
 pub const TIOCMGET: c_ulong = 0x5415;
 pub const TIOCMBIS: c_ulong = 0x5416;
 pub const TIOCMBIC: c_ulong = 0x5417;
 pub const TIOCMSET: c_ulong = 0x5418;
 pub const TIOCGSOFTCAR: c_ulong = 0x5419;
 pub const TIOCSSOFTCAR: c_ulong = 0x541A;
-pub const FIONREAD: c_ulong = 0x541B;
 pub const TIOCINQ: c_ulong = FIONREAD;
 pub const TIOCLINUX: c_ulong = 0x541C;
 pub const TIOCCONS: c_ulong = 0x541D;
 pub const TIOCGSERIAL: c_ulong = 0x541E;
 pub const TIOCSSERIAL: c_ulong = 0x541F;
 pub const TIOCPKT: c_ulong = 0x5420;
-pub const FIONBIO: c_ulong = 0x5421;
 pub const TIOCNOTTY: c_ulong = 0x5422;
 pub const TIOCSETD: c_ulong = 0x5423;
 pub const TIOCGETD: c_ulong = 0x5424;
 pub const TCSBRKP: c_ulong = 0x5425;
 pub const TIOCSBRK: c_ulong = 0x5427;
 pub const TIOCCBRK: c_ulong = 0x5428;
-pub const TIOCGSID: c_ulong = 0x5429;
 pub const TIOCGRS485: c_ulong = 0x542E;
 pub const TIOCSRS485: c_ulong = 0x542F;
 pub const TIOCGPTN: c_ulong = 0x8004_5430;
-pub const TIOCSPTLCK: c_ulong = 0x4004_5431;
 pub const TIOCGDEV: c_ulong = 0x8004_5432;
 pub const TCGETX: c_ulong = 0x5432;
 pub const TCSETX: c_ulong = 0x5433;
@@ -65,7 +37,6 @@ pub const TCSETXW: c_ulong = 0x5435;
 pub const TIOCSIG: c_ulong = 0x4004_5436;
 pub const TIOCVHANGUP: c_ulong = 0x5437;
 pub const TIOCGPKT: c_ulong = 0x8004_5438;
-pub const TIOCGPTLCK: c_ulong = 0x8004_5439;
 pub const TIOCGEXCL: c_ulong = 0x8004_5440;
 pub const TIOCGPTPEER: c_ulong = 0x5441;
 
@@ -133,7 +104,6 @@ pub const FIOSETOWN: c_ulong = 0x8901;
 pub const SIOCSPGRP: c_ulong = 0x8902;
 pub const FIOGETOWN: c_ulong = 0x8903;
 pub const SIOCGPGRP: c_ulong = 0x8904;
-pub const SIOCATMARK: c_ulong = 0x8905;
 pub const SIOCGSTAMP: c_ulong = 0x8906;
 pub const SIOCGSTAMPNS: c_ulong = 0x8907;
 
