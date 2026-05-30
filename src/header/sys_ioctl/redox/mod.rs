@@ -3,7 +3,7 @@ use redox_rt::proc::FdGuard;
 use syscall;
 
 use crate::{
-    error::{Errno, Result, ResultExt},
+    error::{Errno, Result},
     header::{bits_winsize::winsize, errno::EINVAL, fcntl, termios},
     platform::{
         Pal, Sys,
@@ -79,7 +79,7 @@ impl IoctlBuffer {
     }
 }
 
-unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
+pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
     match request {
         FIONBIO => {
             let mut flags = Sys::fcntl(fd, fcntl::F_GETFL, 0)?;
