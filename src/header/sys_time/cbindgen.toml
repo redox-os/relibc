@@ -1,8 +1,14 @@
-# sys/select brings in bits/timespec.h
-# bits/timespec.h brings in time_t
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_time.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/time.h> header shall define the fd_set type and the timeval structure, as described in <sys/select.h>."
+# - "The <sys/time.h> header shall define the time_t and suseconds_t types as described in <sys/types.h>."
+# - "The <sys/time.h> header shall define the following as described in <sys/select.h>: FD_CLR() FD_ISSET() FD_SET() FD_ZERO() FD_SETSIZE"
+# - "Inclusion of the <sys/time.h> header may make visible all symbols from the <sys/select.h> header."
+#
 # sys/select brings in bits/timeval.h
 # bits/timeval.h brings in time_t and suseconds_t
-# features.h needed for #[deprecated] annotations
+# features.h needed for deprecated annotations
 sys_includes = ["sys/select.h", "features.h"]
 include_guard = "_RELIBC_SYS_TIME_H"
 language = "C"
