@@ -1,4 +1,11 @@
-# fcntl.h brings in O_CREAT and O_EXCL
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html
+#
+# Spec quotations relating to includes:
+# - "The <semaphore.h> header shall define the timespec structure as described in <time.h>."
+# - "The <semaphore.h> header shall define O_CREAT and O_EXCL as described in <fcntl.h>."
+# - "Inclusion of the <semaphore.h> header may make visible symbols defined in the <fcntl.h> and <time.h> headers."
+#
+# bits/clockid-t.h brings in clockid_t directly instead of indirectly from time.h for sem_clockwait
 sys_includes = ["fcntl.h"]
 include_guard = "_RELIBC_SEMAPHORE_H"
 after_includes = """
