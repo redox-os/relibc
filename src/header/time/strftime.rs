@@ -113,26 +113,26 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 // Abbreviated weekday name: %a
                 b'a' => {
                     // `ABDAY_1 + tm_wday` is the correct langinfo ID for abbreviated weekdays
-                    let s = unsafe { langinfo_to_str(ABDAY_1 + (*t).tm_wday) };
+                    let s = unsafe { langinfo_to_str(ABDAY_1 + (*t).tm_wday as usize) };
                     w!(s);
                 }
 
                 // Full weekday name: %A
                 b'A' => {
                     // `DAY_1 + tm_wday` is the correct langinfo ID for full weekdays
-                    let s = unsafe { langinfo_to_str(DAY_1 + (*t).tm_wday) };
+                    let s = unsafe { langinfo_to_str(DAY_1 + (*t).tm_wday as usize) };
                     w!(s);
                 }
 
                 // Abbreviated month name: %b or %h
                 b'b' | b'h' => {
-                    let s = unsafe { langinfo_to_str(ABMON_1 + (*t).tm_mon) };
+                    let s = unsafe { langinfo_to_str(ABMON_1 + (*t).tm_mon as usize) };
                     w!(s);
                 }
 
                 // Full month name: %B
                 b'B' => {
-                    let s = unsafe { langinfo_to_str(MON_1 + (*t).tm_mon) };
+                    let s = unsafe { langinfo_to_str(MON_1 + (*t).tm_mon as usize) };
                     w!(s);
                 }
 
