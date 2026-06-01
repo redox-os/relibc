@@ -4,16 +4,18 @@
 
 // TODO : involve loading locale data. Currently, the implementation only supports the "C" locale.
 
-use crate::header::bits_locale_t::locale_t;
+use crate::{header::bits_locale_t::locale_t, platform::types::size_t};
 use core::ffi::c_char;
 
+// TODO move `nl_item` to nl_types.h (not yet present in relibc) or bits header
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/langinfo.h.html>.
 ///
 /// POSIX type for items used with `nl_langinfo`
-/// In practice, this is an integer index into the string table.
-pub type nl_item = i32;
+/// In practice, this is an index into the string table.
+pub type nl_item = size_t;
 
 // Static string table for langinfo constants
+/// cbindgen:ignore
 static STRING_TABLE: [&[u8]; 81] = [
     b"UTF-8\0",                // CODESET
     b"%a %b %e %H:%M:%S %Y\0", // D_T_FMT
@@ -201,8 +203,8 @@ pub const ABALTMON_12: nl_item = 80;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nl_langinfo(item: nl_item) -> *mut c_char {
     // Validate the item and perform the lookup
-    let ptr = if (item as usize) < STRING_TABLE.len() {
-        STRING_TABLE[item as usize].as_ptr().cast::<c_char>()
+    let ptr = if item < STRING_TABLE.len() {
+        STRING_TABLE[item].as_ptr().cast::<c_char>()
     } else {
         // Return a pointer to an empty string if the item is invalid
         c"".as_ptr().cast::<c_char>()
