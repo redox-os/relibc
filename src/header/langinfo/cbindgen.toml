@@ -1,6 +1,16 @@
-sys_includes = ["stddef.h", "stdint.h", "features.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/langinfo.h.html
+#
+# Spec quotations relating to includes:
+# - "The <langinfo.h> header shall define the locale_t type as described in <locale.h>."
+# - "The <langinfo.h> header shall define the nl_item type as described in <nl_types.h>."
+# - "Inclusion of the <langinfo.h> header may also make visible all symbols from <nl_types.h>."
+#
+# TODO move nl_item to nl_types.h (we don't have this header yet) or bits header
 include_guard = "_RELIBC_LANGINFO_H"
-after_includes = "#include <bits/locale-t.h> // locale_t"
+after_includes = """
+#include <bits/locale-t.h> // for locale_t from locale.h
+#include <bits/size-t.h>   // for size_t frome sys/types.h
+"""
 language = "C"
 style = "tag"
 no_includes = true
