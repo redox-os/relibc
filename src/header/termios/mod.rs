@@ -22,21 +22,34 @@ pub mod sys;
 #[path = "redox.rs"]
 pub mod sys;
 
+/// Used for terminal special characters.
 pub type cc_t = c_uchar;
+/// Used for terminal baud rates.
 pub type speed_t = c_uint;
+/// Used for terminal modes.
 pub type tcflag_t = c_uint;
 
+/// Suspend output.
 pub const TCOOFF: c_int = 0;
+/// Restart output.
 pub const TCOON: c_int = 1;
+/// Transmit a `STOP` character, intended to suspend input data.
 pub const TCIOFF: c_int = 2;
+/// Transmit a `START` character, intended to restart input data.
 pub const TCION: c_int = 3;
 
+/// Flush pending input.
 pub const TCIFLUSH: c_int = 0;
+/// Flush untransmitted output.
 pub const TCOFLUSH: c_int = 1;
+/// Flush bot pending input and untransmitted output.
 pub const TCIOFLUSH: c_int = 2;
 
+/// Change attributes immediately.
 pub const TCSANOW: c_int = 0;
+/// Change attributes when output has drained.
 pub const TCSADRAIN: c_int = 1;
+/// Change attributes when output has drained; also flush pending input.
 pub const TCSAFLUSH: c_int = 2;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/termios.h.html>.
@@ -44,11 +57,16 @@ pub const TCSAFLUSH: c_int = 2;
 #[repr(C)]
 #[derive(Default, Clone)]
 pub struct termios {
+    /// Input modes.
     pub c_iflag: tcflag_t,
+    /// Output modes.
     pub c_oflag: tcflag_t,
+    /// Control modes.
     pub c_cflag: tcflag_t,
+    /// Local modes.
     pub c_lflag: tcflag_t,
     pub c_line: cc_t,
+    /// Control characters.
     pub c_cc: [cc_t; NCCS],
     pub __c_ispeed: speed_t,
     pub __c_ospeed: speed_t,
@@ -60,10 +78,15 @@ pub struct termios {
 #[repr(C)]
 #[derive(Default, Clone)]
 pub struct termios {
+    /// Input modes.
     pub c_iflag: tcflag_t,
+    /// Output modes.
     pub c_oflag: tcflag_t,
+    /// Control modes.
     pub c_cflag: tcflag_t,
+    /// Local modes.
     pub c_lflag: tcflag_t,
+    /// Control characters.
     pub c_cc: [cc_t; NCCS],
 }
 
