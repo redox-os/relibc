@@ -1,5 +1,12 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/socket.h> header shall define the iovec structure as described in <sys/uio.h>."
+# - "The <sys/socket.h> header shall define the size_t and ssize_t types as described in <sys/types.h>."
+# - "Inclusion of <sys/socket.h> may also make visible all symbols from <sys/uio.h>."
+#
 # bits/iovec.h brings in size_t
-sys_includes = ["stddef.h", "stdint.h"]
+# bits/socklen_t brings in stdint.h for uint32_t for socklen_t
 include_guard = "_RELIBC_SYS_SOCKET_H"
 after_includes = """
 #include <bits/iovec.h>      // for iovec from sys/uio.h
