@@ -61,7 +61,9 @@ pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_in
             {
                 match hex_or_oct.bytes().next() {
                     Some(b'x' | b'X') => u32::from_str_radix(&hex_or_oct[1..], 16),
-                    Some(b'o' | b'O') => u32::from_str_radix(&hex_or_oct[1..], 8),
+                    // While it is true that C2Y accepts 0o and 0O as octal prefixes, C17 doesn't
+                    // The POSIX spec defers to C17
+                    // see https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_addr.html
                     _ => u32::from_str_radix(&hex_or_oct, 8),
                 }
             } else {
