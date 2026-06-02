@@ -14,8 +14,7 @@
 #endif // _WCHAR_T
 
 #include <bits/size-t.h>
-
-#define NULL 0
+#include <bits/null.h>
 
 #ifndef __PTRDIFF_TYPE__
 #define __PTRDIFF_TYPE__ long int
