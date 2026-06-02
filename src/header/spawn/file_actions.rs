@@ -1,12 +1,11 @@
-use core::{
-    ffi::{c_char, c_int},
-    mem::ManuallyDrop,
-    ptr::null_mut,
+use core::{mem::ManuallyDrop, ptr::null_mut};
+
+use alloc::{ffi::CString, vec::Vec};
+
+use crate::{
+    header::errno::EBADF,
+    platform::types::{c_char, c_int, mode_t},
 };
-
-use alloc::vec::Vec;
-
-use crate::{header::errno::EBADF, platform::types::mode_t};
 
 const OPEN: c_char = 1;
 const CLOSE: c_char = 2;
@@ -15,16 +14,16 @@ const FCHDIR: c_char = 4;
 const DUP2: c_char = 5;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Action {
     Open {
         fd: c_int,
-        path: *const c_char,
+        path: CString,
         flag: c_int,
         mode: mode_t,
     },
     Close(c_int),
-    Chdir(*const c_char),
+    Chdir(CString),
     FChdir(c_int),
     Dup2(c_int, c_int),
 }
@@ -62,7 +61,7 @@ impl Iterator for FileActionsIter {
         };
         let e = actions.get(self.curr)?;
         self.curr += 1;
-        Some(*e)
+        Some((*e).clone())
     }
 }
 
@@ -73,7 +72,7 @@ impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
 
     fn into_iter(self) -> Self::IntoIter {
         FileActionsIter {
-            actions: *self,
+            actions: (*self).clone(),
             curr: 0,
         }
     }
@@ -121,7 +120,11 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
     }
     file_actions.add_action(Action::Open {
         fd,
-        path,
+        path: if path.is_null() {
+            CString::new("").unwrap()
+        } else {
+            unsafe { CString::from_raw(path as *mut c_char) }
+        },
         flag: oflag,
         mode,
     });
@@ -145,7 +148,13 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
     file_actions: &mut posix_spawn_file_actions_t,
     path: *const c_char,
 ) -> c_int {
-    file_actions.add_action(Action::Chdir(path));
+    file_actions.add_action(Action::Chdir(unsafe {
+        if path.is_null() {
+            CString::new("").unwrap()
+        } else {
+            CString::from_raw(path as *mut c_char)
+        }
+    }));
     0
 }
 
