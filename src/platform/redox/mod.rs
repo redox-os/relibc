@@ -1266,8 +1266,11 @@ impl Pal for Sys {
                         flag,
                         mode,
                     } => {
-                        let src_fd =
-                            Sys::open(unsafe { CStr::from_ptr(path) }, flag, mode)? as usize;
+                        let src_fd = Sys::open(
+                            CStr::from_bytes_with_nul(path.as_bytes_with_nul()).unwrap(),
+                            flag,
+                            mode,
+                        )? as usize;
                         syscall::sendfd(
                             new_file_table.as_raw_fd(),
                             src_fd,
@@ -1283,10 +1286,10 @@ impl Pal for Sys {
                         )?;
                     }
                     crate::header::spawn::Action::Chdir(path) => {
-                        let path = unsafe { CStr::from_ptr(path) };
-                        cwd = path.to_str().unwrap().to_string();
+                        let path = path.to_str().unwrap();
+                        cwd = path.to_string();
 
-                        path::chdir(cwd.as_str())?;
+                        path::chdir(path)?;
                     }
                     crate::header::spawn::Action::FChdir(fd) => {
                         path::fchdir(fd)?;
