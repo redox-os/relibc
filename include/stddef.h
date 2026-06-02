@@ -1,6 +1,5 @@
 #ifndef _STDDEF_H
 #define _STDDEF_H
-#include <stdint.h>
 
 // wchar_t should come before NULL and size_t
 // according to comment in wchar cbindgen
@@ -8,7 +7,7 @@
 #define _WCHAR_T
 #ifndef __cplusplus
     #ifndef __WCHAR_TYPE__
-        #define __WCHAR_TYPE__ int32_t
+        #define __WCHAR_TYPE__ int
     #endif
     typedef __WCHAR_TYPE__ wchar_t;
 #endif // __cplusplus
