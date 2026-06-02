@@ -6,7 +6,7 @@ mod file_actions;
 mod spawn_attr;
 
 use alloc::string::{String, ToString};
-pub use file_actions::{Operation, posix_spawn_file_actions_t};
+pub use file_actions::{Action, posix_spawn_file_actions_t};
 pub use spawn_attr::{Flags, posix_spawnattr_t};
 
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-fn spawn(
+unsafe fn spawn(
     pid: Option<&mut pid_t>,
     mut program: String,
     file_actions: Option<&posix_spawn_file_actions_t>,
@@ -93,7 +93,7 @@ fn spawn(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn posix_spawn(
+pub unsafe extern "C" fn posix_spawn(
     pid: *mut pid_t,
     path: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
@@ -103,22 +103,24 @@ pub extern "C" fn posix_spawn(
 ) -> c_int {
     let program = unsafe { CStr::from_ptr(path).to_str().unwrap().to_string() };
 
-    if let Err(e) = spawn(
-        unsafe { pid.as_mut() },
-        program,
-        unsafe { file_actions.as_ref() },
-        unsafe { attrp.as_ref() },
-        argv,
-        if envp.is_null() { None } else { Some(envp) },
-        false,
-    ) {
+    if let Err(e) = unsafe {
+        spawn(
+            pid.as_mut(),
+            program,
+            file_actions.as_ref(),
+            attrp.as_ref(),
+            argv,
+            if envp.is_null() { None } else { Some(envp) },
+            false,
+        )
+    } {
         return e.0;
     }
     0
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn posix_spawnp(
+pub unsafe extern "C" fn posix_spawnp(
     pid: *mut pid_t,
     path: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
@@ -128,15 +130,17 @@ pub extern "C" fn posix_spawnp(
 ) -> c_int {
     let program = unsafe { CStr::from_ptr(path).to_str().unwrap().to_string() };
 
-    if let Err(e) = spawn(
-        unsafe { pid.as_mut() },
-        program.clone(),
-        unsafe { file_actions.as_ref() },
-        unsafe { attrp.as_ref() },
-        argv,
-        if envp.is_null() { None } else { Some(envp) },
-        if program.contains('/') { false } else { true },
-    ) {
+    if let Err(e) = unsafe {
+        spawn(
+            pid.as_mut(),
+            program.clone(),
+            file_actions.as_ref(),
+            attrp.as_ref(),
+            argv,
+            if envp.is_null() { None } else { Some(envp) },
+            if program.contains('/') { false } else { true },
+        )
+    } {
         return e.0;
     }
     0

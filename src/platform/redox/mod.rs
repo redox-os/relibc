@@ -1259,8 +1259,8 @@ impl Pal for Sys {
 
         if let Some(fac) = fac {
             for action in fac {
-                match action.operation {
-                    crate::header::spawn::Operation::Open {
+                match action {
+                    crate::header::spawn::Action::Open {
                         fd,
                         path,
                         flag,
@@ -1275,24 +1275,24 @@ impl Pal for Sys {
                             u64::try_from(fd).map_err(|_| Errno(EBADFD))?,
                         )?;
                     }
-                    crate::header::spawn::Operation::Close(fd) => {
+                    crate::header::spawn::Action::Close(fd) => {
                         new_file_table.call_wo(
                             &(fd as usize).to_ne_bytes(),
                             syscall::CallFlags::empty(),
                             &[syscall::flag::FileTableVerb::Close as u64],
                         )?;
                     }
-                    crate::header::spawn::Operation::Chdir(path) => {
+                    crate::header::spawn::Action::Chdir(path) => {
                         let path = unsafe { CStr::from_ptr(path) };
                         cwd = path.to_str().unwrap().to_string();
 
                         path::chdir(cwd.as_str())?;
                     }
-                    crate::header::spawn::Operation::FChdir(fd) => {
+                    crate::header::spawn::Action::FChdir(fd) => {
                         path::fchdir(fd)?;
                         path::getcwd(Out::from_mut(unsafe { cwd.as_bytes_mut() }))?;
                     }
-                    crate::header::spawn::Operation::Dup2(old, new) => {
+                    crate::header::spawn::Action::Dup2(old, new) => {
                         new_file_table.call_wo(
                             [(old as usize).to_ne_bytes(), (new as usize).to_ne_bytes()]
                                 .into_iter()

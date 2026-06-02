@@ -1,16 +1,12 @@
 use core::{
     ffi::{c_char, c_int},
-    ptr::{null, null_mut},
+    mem::ManuallyDrop,
+    ptr::null_mut,
 };
 
-use crate::{
-    error::{Errno, Result},
-    header::{
-        errno::{EBADF, ENOMEM},
-        stdlib::{free, malloc},
-    },
-    platform::types::{c_void, mode_t},
-};
+use alloc::vec::Vec;
+
+use crate::{header::errno::EBADF, platform::types::mode_t};
 
 const OPEN: c_char = 1;
 const CLOSE: c_char = 2;
@@ -20,7 +16,7 @@ const DUP2: c_char = 5;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub enum Operation {
+pub enum Action {
     Open {
         fd: c_int,
         path: *const c_char,
@@ -33,76 +29,64 @@ pub enum Operation {
     Dup2(c_int, c_int),
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct OperationNode {
-    pub operation: Operation,
-    next: *const OperationNode,
-}
-
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct posix_spawn_file_actions_t {
-    len: usize,
-    pub head: *const OperationNode,
-    pub tail: *mut OperationNode,
+    file_actions: *mut Action,
+    length: usize,
+    capacity: usize,
 }
 
-pub struct FileActionsIter<'a> {
-    curr: Option<&'a OperationNode>,
+impl posix_spawn_file_actions_t {
+    pub fn add_action(&mut self, action: Action) {
+        let v = unsafe { &mut Vec::from_raw_parts(self.file_actions, self.length, self.capacity) };
+        v.push(action);
+    }
 }
 
-impl<'a> Iterator for FileActionsIter<'a> {
-    type Item = &'a OperationNode;
+pub struct FileActionsIter {
+    actions: posix_spawn_file_actions_t,
+    curr: usize,
+}
+
+impl Iterator for FileActionsIter {
+    type Item = Action;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let curr = self.curr?;
-        self.curr = unsafe { curr.next.as_ref() };
-        Some(curr)
+        let actions = unsafe {
+            &Vec::from_raw_parts(
+                self.actions.file_actions,
+                self.actions.length,
+                self.actions.capacity,
+            )
+        };
+        let e = actions.get(self.curr)?;
+        self.curr += 1;
+        Some(*e)
     }
 }
 
 impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
-    type Item = &'a OperationNode;
+    type Item = Action;
 
-    type IntoIter = FileActionsIter<'a>;
+    type IntoIter = FileActionsIter;
 
     fn into_iter(self) -> Self::IntoIter {
         FileActionsIter {
-            curr: unsafe { self.head.as_ref() },
+            actions: *self,
+            curr: 0,
         }
     }
-}
-
-fn copy_op(file_actions: &mut posix_spawn_file_actions_t, op: Operation) -> Result<()> {
-    let new = unsafe { malloc(size_of::<OperationNode>()) };
-
-    let new_ref = unsafe { (new as *mut OperationNode).as_mut().ok_or(Errno(ENOMEM))? };
-
-    (*new_ref).next = null();
-    (*new_ref).operation = op;
-
-    if (*file_actions).head.is_null() && (*file_actions).tail.is_null() {
-        (*file_actions).head = new as *const OperationNode;
-        (*file_actions).tail = new as *mut OperationNode;
-        (*file_actions).len += 1;
-    } else {
-        let tail = unsafe { (*file_actions).tail.as_mut().unwrap() };
-        (*tail).next = new as *mut OperationNode;
-        (*file_actions).tail = new as *mut OperationNode;
-        (*file_actions).len += 1;
-    }
-
-    Ok(())
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_init(
     file_actions: &mut posix_spawn_file_actions_t,
 ) -> c_int {
-    (*file_actions).head = null();
-    (*file_actions).tail = null_mut();
-    (*file_actions).len = 0;
-
+    let mut v = ManuallyDrop::new(Vec::new());
+    file_actions.file_actions = v.as_mut_ptr();
+    file_actions.capacity = v.capacity();
+    file_actions.length = 0;
     0
 }
 
@@ -110,25 +94,16 @@ pub unsafe extern "C" fn posix_spawn_file_actions_init(
 pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     file_actions: &mut posix_spawn_file_actions_t,
 ) -> c_int {
-    if (*file_actions).head.is_null() {
-        assert!((*file_actions).tail.is_null() && (*file_actions).len == 0);
-        return 0;
-    }
-
-    let node = unsafe { (*file_actions).head.as_ref().unwrap() };
-
-    while !(*file_actions).head.is_null() {
-        let head = (*file_actions).head;
-        let next = unsafe { (*head).next };
-        (*file_actions).head = next;
-
-        unsafe {
-            free(head as *mut c_void);
-        }
-    }
-
-    (*file_actions).tail = null_mut();
-    (*file_actions).len = 0;
+    let v = unsafe {
+        &Vec::from_raw_parts(
+            file_actions.file_actions,
+            file_actions.length,
+            file_actions.capacity,
+        )
+    };
+    file_actions.capacity = 0;
+    file_actions.length = 0;
+    file_actions.file_actions = null_mut();
 
     0
 }
@@ -144,18 +119,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
     if fd < 0 {
         return EBADF;
     }
-
-    let open_op = Operation::Open {
+    file_actions.add_action(Action::Open {
         fd,
         path,
         flag: oflag,
         mode,
-    };
-
-    if let Err(e) = copy_op(file_actions, open_op) {
-        return e.0;
-    }
-
+    });
     0
 }
 
@@ -167,12 +136,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
     if fd < 0 {
         return EBADF;
     }
-
-    let close_op = Operation::Close(fd);
-
-    if let Err(e) = copy_op(file_actions, close_op) {
-        return e.0;
-    }
+    file_actions.add_action(Action::Close(fd));
     0
 }
 
@@ -181,12 +145,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
     file_actions: &mut posix_spawn_file_actions_t,
     path: *const c_char,
 ) -> c_int {
-    let chdir_op = Operation::Chdir(path);
-
-    if let Err(e) = copy_op(file_actions, chdir_op) {
-        return e.0;
-    }
-
+    file_actions.add_action(Action::Chdir(path));
     0
 }
 
@@ -198,13 +157,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
     if fd < 0 {
         return EBADF;
     }
-
-    let fchdir_op = Operation::FChdir(fd);
-
-    if let Err(e) = copy_op(file_actions, fchdir_op) {
-        return e.0;
-    }
-
+    file_actions.add_action(Action::FChdir(fd));
     0
 }
 
@@ -217,12 +170,6 @@ pub unsafe extern "C" fn posix_spawn_file_actions_adddup2(
     if fd < 0 || new < 0 {
         return EBADF;
     }
-
-    let dup2_op = Operation::Dup2(fd, new);
-
-    if let Err(e) = copy_op(file_actions, dup2_op) {
-        return e.0;
-    }
-
+    file_actions.add_action(Action::Dup2(fd, new));
     0
 }
