@@ -1,0 +1,11 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stddef.h.html
+#
+# This type is split out to prevent importing all of stddef.h into other headers.
+#
+# POSIX headers that require NULL (without the rest of stddef.h):
+# - locale.h
+# - stddef.h (where it should be defined)
+# - time.h
+include_guard = "_RELIBC_BITS_NULL_T_H"
+language = "C"
+no_includes = true

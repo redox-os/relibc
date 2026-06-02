@@ -9,16 +9,17 @@
 # - "NULL As described in <stddef.h>."
 # - "Inclusion of the <time.h> header may make visible all symbols from the <signal.h> header."
 #
-# stddef.h brings in size_t and NULL
 # bits/timespec.h brings in time_t
 # features.h included for deprecated annotations
-sys_includes = ["stddef.h", "features.h"]
+sys_includes = ["features.h"]
 include_guard = "_RELIBC_TIME_H"
 language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
 after_includes = """
+#include <bits/null.h>      // for NULL from stddef.h
+#include <bits/size-t.h>    // for size_t from sys/types.h
 #include <bits/clock-t.h>   // for clock_t from sys/types.h
 #include <bits/clockid-t.h> // for clockid_t from sys/types.h
 #include <bits/pid-t.h>     // for pid_t from sys/types.h
