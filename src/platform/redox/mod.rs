@@ -41,7 +41,6 @@ use crate::{
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
         stdlib::posix_memalign,
-        string::strlen,
         sys_file,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
@@ -57,6 +56,7 @@ use crate::{
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
+    iter::NulTerminated,
     ld_so::tcb::OsSpecific,
     out::Out,
     platform::{
@@ -1205,8 +1205,8 @@ impl Pal for Sys {
         program: CStr,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
-        mut argv: *const *mut c_char,
-        envp: Option<*const *mut c_char>,
+        argv: NulTerminated<*mut c_char>,
+        envp: Option<NulTerminated<*mut c_char>>,
         use_path: bool,
     ) -> Result<pid_t> {
         use crate::header::spawn::Flags;
@@ -1230,30 +1230,24 @@ impl Pal for Sys {
         let mut args = Vec::new();
         let mut envs = Vec::new();
 
-        let len = unsafe { strlen(*argv) };
-        let program_name =
-            str::from_utf8(unsafe { slice::from_raw_parts(*argv as *const u8, len) }).unwrap();
-        let program_name: String =
-            redox_path::canonicalize_using_cwd(Some(original_cwd.as_str()), program_name)
-                .ok_or(Errno(ENOENT))?;
-        argv = unsafe { argv.add(1) };
-        args.push(program_name.as_bytes());
-
-        while unsafe { !(*argv).is_null() } {
-            let arg = unsafe { *argv };
-            let len = unsafe { strlen(arg) };
-            args.push(unsafe { slice::from_raw_parts(arg as *const u8, len) });
-            argv = unsafe { argv.add(1) };
+        for arg in argv {
+            args.push(unsafe { CStr::from_ptr(*arg).to_chars() });
         }
 
-        if let Some(mut envp) = envp {
-            while unsafe { !(*envp).is_null() } {
-                let env = unsafe { *envp };
-                let len = unsafe { strlen(env) };
-                envs.push(unsafe { slice::from_raw_parts(env as *const u8, len) });
-                envp = unsafe { envp.add(1) };
+        if let Some(envp) = envp {
+            for env in envp {
+                envs.push(unsafe { CStr::from_ptr(*env).to_chars() });
             }
         }
+
+        let mut program_name = String::new();
+
+        program_name = redox_path::canonicalize_using_cwd(
+            Some(original_cwd.as_str()),
+            str::from_utf8(args[0]).unwrap(),
+        )
+        .ok_or(Errno(ENOENT))?;
+        args[0] = program_name.as_bytes();
 
         let new_file_table = child.thr_fd.dup(b"filetable")?;
 
@@ -1286,10 +1280,9 @@ impl Pal for Sys {
                         )?;
                     }
                     crate::header::spawn::Action::Chdir(path) => {
-                        let path = path.to_str().unwrap();
-                        cwd = path.to_string();
+                        cwd = path.to_str().unwrap().to_string();
 
-                        path::chdir(path)?;
+                        path::chdir(path.to_str().unwrap())?;
                     }
                     crate::header::spawn::Action::FChdir(fd) => {
                         path::fchdir(fd)?;

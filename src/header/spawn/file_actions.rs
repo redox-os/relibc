@@ -1,4 +1,4 @@
-use core::{mem::ManuallyDrop, ptr::null_mut};
+use core::{mem::ManuallyDrop, slice};
 
 use alloc::{ffi::CString, vec::Vec};
 
@@ -13,7 +13,6 @@ const CHDIR: c_char = 3;
 const FCHDIR: c_char = 4;
 const DUP2: c_char = 5;
 
-#[repr(C)]
 #[derive(Debug, Clone)]
 pub enum Action {
     Open {
@@ -31,15 +30,19 @@ pub enum Action {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct posix_spawn_file_actions_t {
-    file_actions: *mut Action,
+    file_actions: usize,
     length: usize,
     capacity: usize,
 }
 
 impl posix_spawn_file_actions_t {
     pub fn add_action(&mut self, action: Action) {
-        let v = unsafe { &mut Vec::from_raw_parts(self.file_actions, self.length, self.capacity) };
+        let mut v = unsafe {
+            Vec::from_raw_parts(self.file_actions as *mut Action, self.length, self.capacity)
+        };
         v.push(action);
+        let raw = v.into_raw_parts();
+        (self.file_actions, self.length, self.capacity) = (raw.0.addr(), raw.1, raw.2);
     }
 }
 
@@ -53,10 +56,9 @@ impl Iterator for FileActionsIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         let actions = unsafe {
-            &Vec::from_raw_parts(
-                self.actions.file_actions,
+            slice::from_raw_parts(
+                self.actions.file_actions as *const Action,
                 self.actions.length,
-                self.actions.capacity,
             )
         };
         let e = actions.get(self.curr)?;
@@ -80,10 +82,11 @@ impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_init(
-    file_actions: &mut posix_spawn_file_actions_t,
+    file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
-    let mut v = ManuallyDrop::new(Vec::new());
-    file_actions.file_actions = v.as_mut_ptr();
+    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
+    let mut v = ManuallyDrop::new(Vec::<Action>::new());
+    file_actions.file_actions = v.as_mut_ptr().addr();
     file_actions.capacity = v.capacity();
     file_actions.length = 0;
     0
@@ -91,30 +94,35 @@ pub unsafe extern "C" fn posix_spawn_file_actions_init(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
-    file_actions: &mut posix_spawn_file_actions_t,
+    file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
+    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
     let v = unsafe {
-        &Vec::from_raw_parts(
-            file_actions.file_actions,
+        Vec::from_raw_parts(
+            file_actions.file_actions as *mut Action,
             file_actions.length,
             file_actions.capacity,
         )
     };
     file_actions.capacity = 0;
     file_actions.length = 0;
-    file_actions.file_actions = null_mut();
+    file_actions.file_actions = 0;
 
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
-    file_actions: &mut posix_spawn_file_actions_t,
+    file_actions: *mut posix_spawn_file_actions_t,
     fd: c_int,
     path: *const c_char,
     oflag: c_int,
     mode: mode_t,
 ) -> c_int {
+    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
+    if path.is_null() {
+        panic!("path cannot be NULL");
+    }
     if fd < 0 {
         return EBADF;
     }
@@ -133,9 +141,10 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
-    file_actions: &mut posix_spawn_file_actions_t,
+    file_actions: *mut posix_spawn_file_actions_t,
     fd: c_int,
 ) -> c_int {
+    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
     if fd < 0 {
         return EBADF;
     }
@@ -145,9 +154,13 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
-    file_actions: &mut posix_spawn_file_actions_t,
+    file_actions: *mut posix_spawn_file_actions_t,
     path: *const c_char,
 ) -> c_int {
+    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
+    if path.is_null() {
+        panic!("path cannot be NULL");
+    }
     file_actions.add_action(Action::Chdir(unsafe {
         if path.is_null() {
             CString::new("").unwrap()
@@ -160,9 +173,10 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
-    file_actions: &mut posix_spawn_file_actions_t,
+    file_actions: *mut posix_spawn_file_actions_t,
     fd: c_int,
 ) -> c_int {
+    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
     if fd < 0 {
         return EBADF;
     }
@@ -172,10 +186,11 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_adddup2(
-    file_actions: &mut posix_spawn_file_actions_t,
+    file_actions: *mut posix_spawn_file_actions_t,
     fd: c_int,
     new: c_int,
 ) -> c_int {
+    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
     if fd < 0 || new < 0 {
         return EBADF;
     }
