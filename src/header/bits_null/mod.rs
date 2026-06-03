@@ -1,5 +1,4 @@
-use crate::platform::types::c_void;
+use crate::platform::types::c_long;
 
 /// Null pointer constant.
-#[expect(clippy::zero_ptr)]
-pub const NULL: *mut c_void = 0 as *mut c_void;
+pub const NULL: c_long = 0;
