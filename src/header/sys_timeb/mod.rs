@@ -19,16 +19,29 @@ use crate::{
 #[repr(C)]
 #[derive(Default)]
 pub struct timeb {
+    /// The seconds portion of the current time.
     pub time: time_t,
+    /// The milliseconds portion of the current time.
     pub millitm: c_ushort,
+    /// The local timezone in minutes west of Greenwich.
     pub timezone: c_short,
+    /// TRUE if Daylight Savings Time is in effect.
     pub dstflag: c_short,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/ftime.html>.
 ///
+/// Sets the `time` and `millitm` members of the `timeb` structure pointed to
+/// by `tp` to contain the seconds and milliseconds portions, respectively,
+/// of the current time in seconds since the Epoch.
+///
 /// # Safety
 /// The caller must ensure that `tp` is convertible to an [`Out<timeb>`].
+///
+/// # Deprecation
+/// The `ftime()` function was marked as legacy in the Open Group Base
+/// Specifications Issue 6, and the entire `sys/timeb.h` header was removed in
+/// Issue 7.
 #[allow(deprecated)]
 #[deprecated]
 #[unsafe(no_mangle)]
