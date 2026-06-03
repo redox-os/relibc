@@ -69,7 +69,6 @@ $(BUILD)/%.c: %.c
 	cp "$*.c" "$@"
 
 FLAGS=\
-	-std=c11 \
 	-fno-builtin \
 	-fno-stack-protector \
 	-Wall \
@@ -145,6 +144,10 @@ else
 endif
 endif
 
+$(BUILD)/bins_static/%_cpp: %.cpp $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) -x c++ "$<" -x none -o "$@" $(FLAGS) $(STATIC_FLAGS)
+
 $(BUILD)/bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	@$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
@@ -170,6 +173,10 @@ $(BUILD)/bins_dynamic/dlfcn: dlfcn.c $(BUILD)/bins_dynamic/sharedlib.so $(DEPS)
 $(BUILD)/bins_dynamic/dlopen_scopes: dlopen_scopes.c $(BUILD)/bins_dynamic/libfoobar.so $(BUILD)/bins_dynamic/libfoo.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+
+$(BUILD)/bins_dynamic/%_cpp: %.cpp $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) -x c++ "$<" -x none -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
 $(BUILD)/bins_dynamic/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"

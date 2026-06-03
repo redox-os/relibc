@@ -15,7 +15,9 @@ after_includes = """
 #include <bits/timespec.h> // for timespec
 #include <bits/pthread.h> // for pthread-related types
 
+#ifndef __cplusplus
 #define thread_local _Thread_local
+#endif
 #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT // once_flag == pthread_once_t
 """
 

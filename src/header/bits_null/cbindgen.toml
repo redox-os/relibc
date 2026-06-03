@@ -9,3 +9,10 @@
 include_guard = "_RELIBC_BITS_NULL_T_H"
 language = "C"
 no_includes = true
+after_includes = """
+#ifdef __cplusplus
+  #define NULL nullptr
+#else
+  #define NULL ((void *)0)
+#endif
+"""
