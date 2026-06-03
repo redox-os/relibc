@@ -114,7 +114,9 @@ pub const SIOCRTMSG: c_ulong = 0x890D;
 pub const SIOCGIFNAME: c_ulong = 0x8910;
 pub const SIOCSIFLINK: c_ulong = 0x8911;
 pub const SIOCGIFCONF: c_ulong = 0x8912;
+/// Get the active flag word of the device.
 pub const SIOCGIFFLAGS: c_ulong = 0x8913;
+/// Set the active flag word of the device.
 pub const SIOCSIFFLAGS: c_ulong = 0x8914;
 pub const SIOCGIFADDR: c_ulong = 0x8915;
 pub const SIOCSIFADDR: c_ulong = 0x8916;
