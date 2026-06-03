@@ -15,6 +15,7 @@ use crate::{
         sys_utsname::utsname,
         time::{itimerspec, timespec},
     },
+    iter::NulTerminated,
     ld_so::tcb::OsSpecific,
     out::Out,
     pthread,
@@ -437,8 +438,8 @@ pub trait Pal {
         program: CStr,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
-        argv: *const *mut c_char,
-        envp: Option<*const *mut c_char>,
+        argv: NulTerminated<*mut c_char>,
+        envp: Option<NulTerminated<*mut c_char>>,
         use_path: bool,
     ) -> Result<pid_t>;
 

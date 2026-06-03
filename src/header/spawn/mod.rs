@@ -17,6 +17,7 @@ use crate::{
         errno::ENOENT,
         stdlib::getenv,
     },
+    iter::NulTerminated,
     platform::{
         self, Pal,
         sys::path,
@@ -29,8 +30,8 @@ unsafe fn spawn(
     mut program: String,
     file_actions: Option<&posix_spawn_file_actions_t>,
     spawn_attr: Option<&posix_spawnattr_t>,
-    argv: *const *mut c_char,
-    envp: Option<*const *mut c_char>,
+    argv: NulTerminated<*mut c_char>,
+    envp: Option<NulTerminated<*mut c_char>>,
     use_path: bool,
 ) -> Result<()> {
     let original_cwd = path::clone_cwd().unwrap().to_string();
@@ -101,7 +102,23 @@ pub unsafe extern "C" fn posix_spawn(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    let program = unsafe { CStr::from_ptr(path).to_str().unwrap().to_string() };
+    let argv = {
+        if argv.is_null() {
+            panic!("argv cannot be NULL")
+        } else {
+            if unsafe { (*argv).is_null() } {
+                panic!("argv must contain the program name");
+            }
+            unsafe { NulTerminated::new(argv).unwrap() }
+        }
+    };
+    let envp = unsafe { NulTerminated::new(envp) };
+    let program = unsafe {
+        CStr::from_ptr(path)
+            .to_str()
+            .expect("path cannot be NULL")
+            .to_string()
+    };
 
     if let Err(e) = unsafe {
         spawn(
@@ -110,7 +127,7 @@ pub unsafe extern "C" fn posix_spawn(
             file_actions.as_ref(),
             attrp.as_ref(),
             argv,
-            if envp.is_null() { None } else { Some(envp) },
+            envp,
             false,
         )
     } {
@@ -128,7 +145,23 @@ pub unsafe extern "C" fn posix_spawnp(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    let program = unsafe { CStr::from_ptr(path).to_str().unwrap().to_string() };
+    let argv = {
+        if argv.is_null() {
+            panic!("argv cannot be NULL")
+        } else {
+            if unsafe { (*argv).is_null() } {
+                panic!("argv must contain the program name");
+            }
+            unsafe { NulTerminated::new(argv).unwrap() }
+        }
+    };
+    let envp = unsafe { NulTerminated::new(envp) };
+    let program = unsafe {
+        CStr::from_ptr(path)
+            .to_str()
+            .expect("path cannot be NULL")
+            .to_string()
+    };
 
     if let Err(e) = unsafe {
         spawn(
@@ -137,7 +170,7 @@ pub unsafe extern "C" fn posix_spawnp(
             file_actions.as_ref(),
             attrp.as_ref(),
             argv,
-            if envp.is_null() { None } else { Some(envp) },
+            envp,
             if program.contains('/') { false } else { true },
         )
     } {
