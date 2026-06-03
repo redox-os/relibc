@@ -23,7 +23,9 @@ pub mod constants;
 #[repr(C)]
 #[derive(Default, CheckVsLibcCrate)]
 pub struct linger {
+    /// Indicates whether linger option is enabled.
     pub l_onoff: c_int,
+    /// Linger time, in seconds.
     pub l_linger: c_int,
 }
 
@@ -31,12 +33,19 @@ pub struct linger {
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
 pub struct msghdr {
+    /// Optional address.
     pub msg_name: *mut c_void,
+    /// Size of address.
     pub msg_namelen: socklen_t,
+    /// Scatter/gather array.
     pub msg_iov: *mut iovec,
+    /// Members in `msg_iov`.
     pub msg_iovlen: size_t,
+    /// Ancilliary data.
     pub msg_control: *mut c_void,
+    /// Ancilliary data buffer length.
     pub msg_controllen: size_t,
+    /// Flags on received message.
     pub msg_flags: c_int,
 }
 
@@ -44,19 +53,27 @@ pub struct msghdr {
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
 pub struct cmsghdr {
+    /// Data byte count, including the `cmsghdr`.
     pub cmsg_len: size_t,
+    /// Originating protocol.
     pub cmsg_level: c_int,
+    /// Protocol-specific type.
     pub cmsg_type: c_int,
 }
 
 // TODO: `ucred` should be behind _GNU_SOURCE include guard
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/unix.7.html>.
+///
+/// Represents UNIX credentials.
 #[repr(C)]
 #[derive(Clone, Debug)]
 // FIXME: CheckVsLibcCrate
 pub struct ucred {
+    /// Process ID of the sending process.
     pub pid: pid_t,
+    /// User ID of the sending process.
     pub uid: uid_t,
+    /// Group ID of the sending process.
     pub gid: gid_t,
 }
 
@@ -64,7 +81,9 @@ pub struct ucred {
 #[repr(C)]
 #[derive(Default, CheckVsLibcCrate)]
 pub struct sockaddr {
+    /// Address family.
     pub sa_family: sa_family_t,
+    /// Socket address.
     pub sa_data: [c_char; 14],
 }
 
@@ -89,6 +108,7 @@ const _SS_PADDING: usize = _SS_MAXSIZE - mem::size_of::<sa_family_t>() - mem::si
 #[repr(C)]
 //#[derive(CheckVsLibcCrate)] FIXME: can't ignore private fields yet
 pub struct sockaddr_storage {
+    /// Address family.
     pub ss_family: sa_family_t,
     __ss_pad2: [u8; _SS_PADDING],
     __ss_align: usize,
