@@ -18,7 +18,8 @@ struct signal {
 	int signum;
 };
 
-void handler() {
+void handler(int sig) {
+	(void) sig;
 	handler_called = 1;
 	return;
 }

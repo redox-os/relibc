@@ -2,8 +2,14 @@
 
 #include "test_helpers.h"
 
+#ifdef INET6_ADDRSTRLEN
+#define _ADDRSTRLEN INET6_ADDRSTRLEN
+#else
+#define _ADDRSTRLEN INET_ADDRSTRLEN
+#endif
+
 void print_sockaddr(char *ctx, struct sockaddr *addr) {
-    char ip_string[INET6_ADDRSTRLEN];
+    char ip_string[_ADDRSTRLEN];
     void *raw_ip_addr;
     char *fam;
     in_port_t port;
