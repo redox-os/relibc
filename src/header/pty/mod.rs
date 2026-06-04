@@ -6,7 +6,9 @@ use core::{mem, ptr, slice};
 
 use crate::{
     header::{
-        bits_sigset_t, fcntl, limits, pthread, signal, sys_ioctl, sys_wait, termios, unistd, utmp,
+        bits_sigset_t, fcntl, limits, pthread, signal,
+        stdlib::{grantpt, posix_openpt, ptsname_r, unlockpt},
+        sys_ioctl, sys_wait, termios, unistd, utmp,
     },
     platform::{
         self,
@@ -14,13 +16,44 @@ use crate::{
     },
 };
 
-#[cfg(target_os = "linux")]
-#[path = "linux.rs"]
-mod imp;
+unsafe fn openpty_inner(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
+    // TODO: wrap in auto-close struct
+    let master = unsafe { posix_openpt(fcntl::O_RDWR | fcntl::O_NOCTTY) };
+    if master < 0 {
+        return Err(());
+    }
 
-#[cfg(target_os = "redox")]
-#[path = "redox.rs"]
-mod imp;
+    let ret = grantpt(master);
+    if ret == -1 {
+        unistd::close(master);
+        return Err(());
+    }
+    let ret = unsafe { unlockpt(master) };
+    if ret == -1 {
+        unistd::close(master);
+        return Err(());
+    }
+
+    let ret = unsafe { ptsname_r(master, name.as_mut_ptr().cast(), name.len()) };
+    if ret < 0 {
+        unistd::close(master);
+        return Err(());
+    }
+
+    let slave = unsafe {
+        fcntl::open(
+            name.as_ptr() as *const c_char,
+            fcntl::O_RDWR | fcntl::O_NOCTTY,
+            0,
+        )
+    };
+    if slave < 0 {
+        unistd::close(master);
+        return Err(());
+    }
+
+    Ok((master, slave))
+}
 
 /// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
 #[unsafe(no_mangle)]
@@ -38,7 +71,7 @@ pub unsafe extern "C" fn openpty(
         &mut tmp_name
     };
 
-    let (master, slave) = match unsafe { imp::openpty(name) } {
+    let (master, slave) = match unsafe { openpty_inner(name) } {
         Ok(ok) => ok,
         Err(()) => return -1,
     };

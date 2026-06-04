@@ -28,7 +28,6 @@ pub const TIOCSBRK: c_ulong = 0x5427;
 pub const TIOCCBRK: c_ulong = 0x5428;
 pub const TIOCGRS485: c_ulong = 0x542E;
 pub const TIOCSRS485: c_ulong = 0x542F;
-pub const TIOCGPTN: c_ulong = 0x8004_5430;
 pub const TIOCGDEV: c_ulong = 0x8004_5432;
 pub const TCGETX: c_ulong = 0x5432;
 pub const TCSETX: c_ulong = 0x5433;
