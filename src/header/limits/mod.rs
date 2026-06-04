@@ -130,3 +130,4 @@ pub const PTHREAD_DESTRUCTOR_ITERATIONS: c_long = _POSIX_THREAD_DESTRUCTOR_ITERA
 pub const PTHREAD_KEYS_MAX: c_long = 4096 * 32;
 pub const PTHREAD_STACK_MIN: c_long = 65536;
 pub const SYMLOOP_MAX: c_long = 64;
+pub const TTY_NAME_MAX: c_long = 32; // "/scheme/pty/".len() + size of usize::MAX as string + 1

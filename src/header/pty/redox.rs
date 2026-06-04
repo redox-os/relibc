@@ -1,29 +1,42 @@
 use crate::{
-    error::ResultExt,
-    header::{fcntl, unistd},
-    platform::{
-        Pal, Sys,
-        types::{c_char, c_int, ssize_t},
+    header::{
+        fcntl,
+        stdlib::{grantpt, posix_openpt, ptsname_r, unlockpt},
+        unistd,
     },
+    platform::types::{c_char, c_int},
 };
 
 pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
-    let master = unsafe { fcntl::open(c"/scheme/pty".as_ptr(), fcntl::O_RDWR, 0) };
+    let master = unsafe { posix_openpt(fcntl::O_RDWR | fcntl::O_NOCTTY) };
     if master < 0 {
         return Err(());
     }
 
-    // TODO: better error handling
-    let count = Sys::fpath(master, name)
-        .map(|u| u as ssize_t)
-        .or_minus_one_errno();
-    if count < 0 {
+    let ret = grantpt(master);
+    if ret == -1 {
         unistd::close(master);
         return Err(());
     }
-    name[count as usize] = 0;
+    let ret = unsafe { unlockpt(master) };
+    if ret == -1 {
+        unistd::close(master);
+        return Err(());
+    }
 
-    let slave = unsafe { fcntl::open(name.as_ptr() as *const c_char, fcntl::O_RDWR, 0) };
+    let ret = unsafe { ptsname_r(master, name.as_mut_ptr().cast(), name.len()) };
+    if ret < 0 {
+        unistd::close(master);
+        return Err(());
+    }
+
+    let slave = unsafe {
+        fcntl::open(
+            name.as_ptr() as *const c_char,
+            fcntl::O_RDWR | fcntl::O_NOCTTY,
+            0,
+        )
+    };
     if slave < 0 {
         unistd::close(master);
         return Err(());
