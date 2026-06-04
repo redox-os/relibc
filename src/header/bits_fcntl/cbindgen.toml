@@ -1,0 +1,7 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdio.h.html
+#
+# These constants are split out to prevent including all of stdio.h into fcntl.h
+include_guard = "_RELIBC_BITS_FCNTL_H"
+language = "C"
+no_includes = true
+cpp_compat = true

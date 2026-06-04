@@ -39,6 +39,7 @@ use crate::{
 use reader::Reader;
 
 pub use self::constants::*;
+pub use crate::header::bits_fcntl::{SEEK_CUR, SEEK_END, SEEK_SET};
 mod constants;
 
 pub use self::default::*;

@@ -16,9 +16,7 @@ pub const F_SVB: c_int = 64;
 pub const F_APP: c_int = 128;
 pub const F_BADJ: c_int = 256;
 
-pub const SEEK_SET: c_int = 0;
-pub const SEEK_CUR: c_int = 1;
-pub const SEEK_END: c_int = 2;
+/// SEEK_SET, SEEK_CUR and SEEK_END defined in fcntl bits header
 
 pub const _IOFBF: c_int = 0;
 pub const _IOLBF: c_int = 1;
