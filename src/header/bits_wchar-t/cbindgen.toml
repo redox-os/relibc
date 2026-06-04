@@ -1,0 +1,18 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stddef.h.html
+#
+# This type is split out to prevent importing all of stddef.h into inttypes.h
+include_guard = "_RELIBC_BITS_WCHAR_T_H"
+after_includes = """
+#ifndef _WCHAR_T
+#define _WCHAR_T
+#ifndef __cplusplus
+    #ifndef __WCHAR_TYPE__
+        #define __WCHAR_TYPE__ int
+    #endif
+    typedef __WCHAR_TYPE__ wchar_t;
+#endif // __cplusplus
+#endif // _WCHAR_T
+"""
+language = "C"
+no_includes = true
+cpp_compat = true
