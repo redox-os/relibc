@@ -1,6 +1,20 @@
-# signal brings in sigevent, size_t and timespec
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/aio.h.html
+#
+# Spec quotations relating to includes:
+# - "The <aio.h> header shall define the off_t, pthread_attr_t, size_t, and ssize_t types as described in <sys/types.h>."
+# - "The <aio.h> header shall define the struct timespec structure as described in <time.h>."
+# - "The <aio.h> header shall define the sigevent structure and sigval union as described in <signal.h>."
+# - "Inclusion of the <aio.h> header may make visible symbols defined in the headers <fcntl.h>, <signal.h>, and <time.h>."
+#
+# TODO don't bring in all of bits/pthread.h
+#
+# signal.h brings in sigevent and sigval
+# signal.h brings in bits/timespec.h for timespec from time.h
+# signal.h brings in bits/pthread.h bringing in pthread_attr_t from sys/types.h
+# signal.h brings in size_t from sys/types.h
 sys_includes = ["signal.h"]
 after_includes = """
+#include <bits/off-t.h>   // for off_t from sys/types.h
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
 """
 include_guard = "_RELIBC_AIO_H"
