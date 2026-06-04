@@ -338,6 +338,8 @@ STATIC_CHECK_EXPECT_NAMES=\
 	args \
 	constructor \
 	destructor \
+	pthread/init \
+	pthread/init_cpp \
 	stdlib/env \
 	unistd/brk \
 	tls
