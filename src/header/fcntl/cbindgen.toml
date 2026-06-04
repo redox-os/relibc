@@ -10,12 +10,12 @@
 # This approach was chosen because unistd.h requires parts of fcntl.h but not the other way around.
 #
 # stdarg.h brings in va_list for ...
-# stdio.h brings in SEEK_SET, SEEK_CUR, and SEEK_END
 # sys/stat.h brings in mode_t, off_t and file mode constants
-sys_includes = ["stdarg.h", "stdio.h", "sys/stat.h"]
+sys_includes = ["stdarg.h", "sys/stat.h"]
 include_guard = "_RELIBC_FCNTL_H"
 after_includes = """
 #include <bits/pid-t.h> // for pid_t from sys/types.h
+#include <bits/fcntl.h> // for SEEK_CUR, SEEK_END and SEEK_SET from stdio.h
 """
 language = "C"
 style = "Tag"

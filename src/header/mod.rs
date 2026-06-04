@@ -11,6 +11,7 @@ pub mod bits_clock_t;
 pub mod bits_clockid_t;
 #[path = "bits_dev-t/mod.rs"]
 pub mod bits_dev_t;
+pub mod bits_fcntl;
 #[path = "bits_gid-t/mod.rs"]
 pub mod bits_gid_t;
 #[path = "bits_id-t/mod.rs"]
