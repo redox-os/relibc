@@ -58,6 +58,8 @@ pub mod bits_timeval;
 pub mod bits_uid_t;
 #[path = "bits_useconds-t/mod.rs"]
 pub mod bits_useconds_t;
+#[path = "bits_wchar-t/mod.rs"]
+pub mod bits_wchar_t;
 pub mod bits_winsize;
 // complex.h implemented in C (currently through openlibm)
 pub mod cpio;

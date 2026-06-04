@@ -3,16 +3,7 @@
 
 // wchar_t should come before NULL and size_t
 // according to comment in wchar cbindgen
-#ifndef _WCHAR_T
-#define _WCHAR_T
-#ifndef __cplusplus
-    #ifndef __WCHAR_TYPE__
-        #define __WCHAR_TYPE__ int
-    #endif
-    typedef __WCHAR_TYPE__ wchar_t;
-#endif // __cplusplus
-#endif // _WCHAR_T
-
+#include <bits/wchar-t.h>
 #include <bits/size-t.h>
 #include <bits/null.h>
 
