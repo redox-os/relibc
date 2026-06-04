@@ -1,7 +1,12 @@
-# sys/time.h brings in sys/select.h which brings in bits/timeval.h
-sys_includes = ["sys/time.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_resource.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/resource.h> header shall define the timeval structure as described in <sys/time.h>."
+# - "The <sys/resource.h> header shall define the id_t type through typedef, as described in <sys/types.h>."
+# - "Inclusion of the <sys/resource.h> header may also make visible all symbols from <sys/time.h>."
 after_includes = """
-#include <bits/id-t.h> // for id_t from sys/types.h
+#include <bits/id-t.h>    // for id_t from sys/types.h
+#include <bits/timeval.h> // for timeval from sys/select.h (previously in sys/time.h)
 """
 include_guard = "_RELIBC_SYS_RESOURCE_H"
 language = "C"
