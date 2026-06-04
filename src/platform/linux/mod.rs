@@ -793,4 +793,15 @@ impl Pal for Sys {
         // GETPID on Linux is 39, which does not exist on Redox
         e_raw(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }).is_ok()
     }
+
+    unsafe fn spawn(
+        program: CStr,
+        fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
+        fat: Option<&crate::header::spawn::posix_spawnattr_t>,
+        argv: crate::iter::NulTerminated<*mut c_char>,
+        envp: Option<crate::iter::NulTerminated<*mut c_char>>,
+        use_path: bool,
+    ) -> Result<pid_t> {
+        todo!()
+    }
 }

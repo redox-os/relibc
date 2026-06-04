@@ -15,12 +15,13 @@ use crate::{
     header::{
         dirent::{opendir, readdir},
         errno::ENOENT,
+        limits::PATH_MAX,
         stdlib::getenv,
+        unistd::{chdir, getcwd},
     },
     iter::NulTerminated,
     platform::{
         self, Pal,
-        sys::path,
         types::{c_char, c_int, pid_t},
     },
 };
@@ -34,7 +35,8 @@ unsafe fn spawn(
     envp: Option<NulTerminated<*mut c_char>>,
     use_path: bool,
 ) -> Result<()> {
-    let original_cwd = path::clone_cwd().unwrap().to_string();
+    let mut original_cwd = [0u8; PATH_MAX];
+    assert!(unsafe { !getcwd(original_cwd.as_mut_ptr() as *mut c_char, PATH_MAX).is_null() });
 
     if use_path {
         let path = unsafe { getenv(c"PATH".as_ptr()) };
@@ -85,7 +87,7 @@ unsafe fn spawn(
             }
         })
         .map_err(|e| {
-            path::chdir(original_cwd.as_str()).unwrap();
+            chdir(original_cwd.as_ptr() as *const c_char);
             e
         })?;
     }

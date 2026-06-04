@@ -24,7 +24,7 @@ pub use self::sys::Sys;
 #[path = "linux/mod.rs"]
 pub(crate) mod sys;
 
-// #[cfg(target_os = "redox")]
+#[cfg(target_os = "redox")]
 #[path = "redox/mod.rs"]
 pub(crate) mod sys;
 
