@@ -55,5 +55,7 @@ pub const TIOCSPTLCK: c_ulong = 0x4004_5431;
 /// location pointed to by `lock`.
 pub const TIOCGPTLCK: c_ulong = 0x8004_5439;
 
+// Get the name of the PT as a c_int.
+pub const TIOCGPTN: c_ulong = 0x8004_5430;
 /// POSIX `sockatmark()` from `sys/socket.h` is intended to replace this.
 pub const SIOCATMARK: c_ulong = 0x8905;

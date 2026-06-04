@@ -924,8 +924,7 @@ pub unsafe extern "C" fn posix_memalign(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "redox")]
-    let r = unsafe { open(c"/scheme/pty".as_ptr(), flags) };
-
+    let r = unsafe { open(c"/scheme/pty/ptmx".as_ptr(), flags) };
     #[cfg(target_os = "linux")]
     let r = unsafe { open(c"/dev/ptmx".as_ptr(), flags) };
 
@@ -939,9 +938,11 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ptsname.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ptsname(fd: c_int) -> *mut c_char {
-    const PTS_BUFFER_LEN: usize = 9 + mem::size_of::<c_int>() * 3 + 1;
+    const PTS_BUFFER_LEN: usize = limits::TTY_NAME_MAX as usize;
     static mut PTS_BUFFER: [c_char; PTS_BUFFER_LEN] = [0; PTS_BUFFER_LEN];
-    if unsafe { ptsname_r(fd, (&raw mut PTS_BUFFER).cast(), PTS_BUFFER_LEN) } != 0 {
+    let ret = unsafe { ptsname_r(fd, (&raw mut PTS_BUFFER).cast(), PTS_BUFFER_LEN) };
+    if ret != 0 {
+        platform::ERRNO.set(ret);
         ptr::null_mut()
     } else {
         (&raw mut PTS_BUFFER).cast()
@@ -959,49 +960,28 @@ pub unsafe extern "C" fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) 
     }
 }
 
-#[cfg(target_os = "redox")]
+// ptsname_r is not allowed to set errno, but it has it as a return value.
 #[inline(always)]
 unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
-    let tty_ptr = unsafe { unistd::ttyname(fd) };
-
-    if !tty_ptr.is_null() {
-        if let Ok(name) = unsafe { CStr::from_ptr(tty_ptr) }.to_str() {
-            let len = name.len();
-            if len > buflen {
-                platform::ERRNO.set(ERANGE);
-                return ERANGE;
-            } else {
-                // we have checked the string will fit in the buffer
-                // so can use strcpy safely
-                let s = name.as_ptr().cast();
-                unsafe {
-                    ptr::copy_nonoverlapping(s, buf, len);
-                }
-                return 0;
-            }
-        }
-    }
-    platform::ERRNO.get()
-}
-
-#[cfg(target_os = "linux")]
-#[inline(always)]
-unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
-    let mut pty = 0;
-    let err = platform::ERRNO.get();
+    let mut pty: c_int = 0;
 
     if unsafe { ioctl(fd, TIOCGPTN, ptr::from_mut(&mut pty).cast::<c_void>()) } == 0 {
+        // Linux and Redox use different resource names for PTS's.
+        #[cfg(target_os = "linux")]
         let name = format!("/dev/pts/{}", pty);
+        #[cfg(target_os = "redox")]
+        let name = format!("/scheme/pty/{}", pty);
         let len = name.len();
-        if len > buflen {
-            platform::ERRNO.set(ERANGE);
+        // We need + 1 to account for the NUL terminator.
+        if len + 1 > buflen {
             ERANGE
         } else {
             // we have checked the string will fit in the buffer
             // so can use strcpy safely
             let s = name.as_ptr().cast();
             unsafe { ptr::copy_nonoverlapping(s, buf, len) };
-            platform::ERRNO.set(err);
+            // NUL-terminate the result.
+            unsafe { *(buf.add(len + 1)) = 0 };
             0
         }
     } else {

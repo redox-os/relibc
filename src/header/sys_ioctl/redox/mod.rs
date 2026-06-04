@@ -123,10 +123,16 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             dup_write(fd, "winsize", winsize)?;
         }
         TIOCGPTLCK => {
-            todo_skip!(0, "ioctl TIOCGPTLCK");
+            let lock = unsafe { &mut *(out as *mut c_int) };
+            dup_read(fd, "ptlock", lock)?;
         }
         TIOCSPTLCK => {
-            todo_skip!(0, "ioctl TIOCSPTLCK");
+            let lock = unsafe { &*(out as *const c_int) };
+            dup_write(fd, "ptlock", lock)?;
+        }
+        TIOCGPTN => {
+            let name = unsafe { &mut *(out as *mut c_int) };
+            dup_read(fd, "ptsname", name)?;
         }
         TCSBRK => {
             todo_skip!(0, "ioctl TCSBRK");
