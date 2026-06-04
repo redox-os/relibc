@@ -1,6 +1,4 @@
-# stddef.h brings in size_t
 # bits/useconds-t.h brings in features.h for deprecated annotation
-sys_includes = ["stddef.h"]
 after_includes = """
 #include <bits/clock-t.h>
 #include <bits/clockid-t.h>
@@ -14,6 +12,7 @@ after_includes = """
 #include <bits/off-t.h>
 #include <bits/pid-t.h>
 #include <bits/reclen-t.h>
+#include <bits/size-t.h>      // for size_t from stddef.h
 #include <bits/ssize-t.h>
 #include <bits/suseconds-t.h>
 #include <bits/sys/stat.h>    // for blkcnt_t and blksize_t
