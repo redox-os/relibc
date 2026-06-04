@@ -21,7 +21,7 @@ use crate::{
     },
     iter::NulTerminated,
     platform::{
-        self, Pal,
+        self, ERRNO, Pal,
         types::{c_char, c_int, pid_t},
     },
 };
@@ -35,8 +35,12 @@ unsafe fn spawn(
     envp: Option<NulTerminated<*mut c_char>>,
     use_path: bool,
 ) -> Result<()> {
-    let mut original_cwd = [0u8; PATH_MAX];
-    assert!(unsafe { !getcwd(original_cwd.as_mut_ptr() as *mut c_char, PATH_MAX).is_null() });
+    let mut original_cwd = [0 as c_char; PATH_MAX];
+    assert!(
+        unsafe { !getcwd(original_cwd.as_mut_ptr() as *mut c_char, PATH_MAX).is_null() },
+        "Error getting cwd: {}",
+        ERRNO.get()
+    );
 
     if use_path {
         let path = unsafe { getenv(c"PATH".as_ptr()) };
@@ -87,7 +91,10 @@ unsafe fn spawn(
             }
         })
         .map_err(|e| {
-            chdir(original_cwd.as_ptr() as *const c_char);
+            let status = chdir(original_cwd.as_ptr() as *const c_char);
+            if status != 0 {
+                panic!("Error switching back to original cwd: {}", ERRNO.get());
+            }
             e
         })?;
     }
