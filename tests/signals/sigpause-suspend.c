@@ -19,10 +19,12 @@
 volatile sig_atomic_t handler_called = 0;
 volatile atomic_bool completed = false;
 
-void handler() {
+void handler(int sig) {
+	(void) sig;
 	handler_called = 1;
 	return;
 }
+
 void *b_thread_func(void *code_raw) {
     int *code = code_raw;
 	printf("Pausing signal %s\n", strsignal(*code));

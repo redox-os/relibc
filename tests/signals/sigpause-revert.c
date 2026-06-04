@@ -14,7 +14,8 @@
 
 volatile sig_atomic_t handler_called = false;
 
-void handler() {
+void handler(int sig) {
+	(void) sig;
     handler_called = true;
 	return;
 }

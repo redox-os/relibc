@@ -1,0 +1,10 @@
+inet_addr("1.2.3.4") = 0x04030201
+inet_addr("0XFE.0xdb.1234") = 0xd204dbfe
+inet_addr("0x0.007777") = 0xff0f0000
+inet_addr("0xabcdef01") = 0x01efcdab
+inet_addr(" 1.2.3.4") = 0xffffffff
+inet_addr("0654.2.3.4") = 0xffffffff
+inet_addr("1.2.3.0x100") = 0xffffffff
+inet_addr("1.0x1abcdef") = 0xffffffff
+inet_addr("") = 0xffffffff
+inet_addr("1.2.3.4.5") = 0xffffffff

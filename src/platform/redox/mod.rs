@@ -93,18 +93,6 @@ fn cvt_uid(id: c_int) -> Result<Option<u32>> {
     Ok(Some(id.try_into().map_err(|_| Errno(EINVAL))?))
 }
 
-macro_rules! path_from_c_str {
-    ($c_str:expr) => {{
-        match $c_str.to_str() {
-            Ok(ok) => ok,
-            Err(err) => {
-                ERRNO.set(EINVAL);
-                return -1;
-            }
-        }
-    }};
-}
-
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
 /// Redox syscall implementation of [`Pal`].
@@ -1228,12 +1216,12 @@ impl Pal for Sys {
                 return Err(Errno(EINVAL));
             }
         } else if evp.sigev_notify == SIGEV_SIGNAL {
-            const n_sig: i32 = NSIG as i32;
-            const rt_min: i32 = SIGRTMIN as i32;
-            const rt_max: i32 = SIGRTMIN as i32;
+            const N_SIG: i32 = NSIG as i32;
+            const RT_MIN: i32 = SIGRTMIN as i32;
+            const RT_MAX: i32 = SIGRTMIN as i32;
             match evp.sigev_signo {
-                0..n_sig => {}
-                rt_min..=rt_max => {}
+                0..N_SIG => {}
+                RT_MIN..=RT_MAX => {}
                 _ => {
                     return Err(Errno(EINVAL));
                 }

@@ -464,15 +464,15 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     // atomicity inside the critical section, consisting of one instruction at 'crit_first', one at
     // 'crit_second', and one at 'crit_third', see asm.
 
-    if stack.regs.rip == __relibc_internal_sigentry_crit_first as usize {
+    if stack.regs.rip == __relibc_internal_sigentry_crit_first as *const () as usize {
         // Reexecute pop rsp and jump steps. This case needs to be different from the one below,
         // since rsp has not been overwritten with the previous context's stack, just yet. At this
         // point, we know [rsp+0] contains the saved RSP, and [rsp-8] contains the saved RIP.
         let stack_ptr = stack.regs.rsp as *const usize;
         stack.regs.rsp = unsafe { stack_ptr.read() };
         stack.regs.rip = unsafe { stack_ptr.sub(1).read() };
-    } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as usize
-        || stack.regs.rip == __relibc_internal_sigentry_crit_third as usize
+    } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as *const () as usize
+        || stack.regs.rip == __relibc_internal_sigentry_crit_third as *const () as usize
     {
         // Almost finished, just reexecute the jump before tmp_rip is overwritten by this
         // deeper-level signal.
@@ -485,7 +485,10 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
 /// Rearrange the restore-stack and sigarea in a way that makes it look like a new signal was
 /// immediately delivered after restoring the allowset to what it was prior to the original signal delivery.
 pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
-    let orig_rip = core::mem::replace(&mut stack.regs.rip, __relibc_internal_sigentry as usize);
+    let orig_rip = core::mem::replace(
+        &mut stack.regs.rip,
+        __relibc_internal_sigentry as *const () as usize,
+    );
     control.saved_ip.set(orig_rip);
     control.saved_archdep_reg.set(stack.regs.rflags);
 }

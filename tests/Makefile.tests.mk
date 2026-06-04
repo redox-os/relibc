@@ -41,6 +41,7 @@ endif
 # Binaries that should generate the same output every time
 EXPECT_NAMES=\
 	alloca \
+	arpa_inet/inet_addr \
 	arpainet \
 	assert \
 	ctype \
