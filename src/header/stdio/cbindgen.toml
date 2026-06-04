@@ -3,6 +3,7 @@ sys_includes = ["stdarg.h", "stddef.h", "stdint.h", "features.h"]
 after_includes = """
 #include <bits/off-t.h>   // for off_t from sys/types.h
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
+#include <bits/fcntl.h>   // for SEEK_CUR, SEEK_END and SEEK_SET
 """
 include_guard = "_RELIBC_STDIO_H"
 trailer = """

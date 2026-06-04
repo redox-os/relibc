@@ -11,10 +11,8 @@
 # Note that unistd.h may include fcntl.h and fcntl.h may include unistd.h thus creating a cycle.
 # Relibc decides that unistd.h will include fcntl.h and fcntl.h will not include unistd.h.
 #
-# TODO fctnl.h shouldn't include all of stdio.h (split out some bits)
-#
 # stddef.h brings in size_t and NULL
-# fcntl.h brings in stdio.h bringing in SEEK_CUR, SEEK_END and SEEK_SET
+# fcntl.h brings in bits/fcntl.h bringing in SEEK_CUR, SEEK_END and SEEK_SET
 # fcntl.h brings in sys/stat.h bringing in off_t, gid_t and uid_t
 # fcntl.h brings in pid_t
 # bits/useconds-t.h brings in features.h (for deprecated annotations)
