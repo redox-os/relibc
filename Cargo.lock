@@ -472,7 +472,7 @@ dependencies = [
 [[package]]
 name = "redox_syscall"
 version = "0.8.1"
-source = "git+https://gitlab.redox-os.org/EuclidDivisionLemma/syscall/?branch=spawn#2708fc84ac7347d16408e8b73f62ec7656f0bc25"
+source = "git+https://gitlab.redox-os.org/redox-os/syscall/#79cb6d9057642be31623677458a93aa88145864f"
 dependencies = [
  "bitflags",
 ]
@@ -632,9 +632,9 @@ dependencies = [
 
 [[package]]
 name = "typenum"
-version = "1.20.0"
+version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40ce102ab67701b8526c123c1bab5cbe42d7040ccfd0f64af1a385808d2f43de"
+checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "unicode-ident"
