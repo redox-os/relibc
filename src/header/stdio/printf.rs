@@ -192,11 +192,11 @@ impl VaArg {
         }
 
         let ap_impl = unsafe {
-            let ptr_to_struct = ap as *mut core::ffi::VaList as *mut VaListInner;
+            let ptr_to_struct = core::ptr::from_mut::<core::ffi::VaList>(ap).cast::<VaListInner>();
             &mut *ptr_to_struct
         };
 
-        let ptr = ap_impl.overflow_arg_area as *const c_longdouble;
+        let ptr = ap_impl.overflow_arg_area.cast::<c_longdouble>();
         let val = unsafe { ptr.read() };
 
         ap_impl.overflow_arg_area = unsafe { ap_impl.overflow_arg_area.add(16) };

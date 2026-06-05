@@ -288,11 +288,7 @@ impl PosixLocaleDef {
         let mut locale = PosixLocaleDef::default();
 
         let mut lines = content.lines();
-        loop {
-            let Some(line) = lines.next() else {
-                break;
-            };
-
+        while let Some(line) = lines.next() {
             let trimmed = line.trim();
             if trimmed.is_empty() || trimmed.starts_with('#') {
                 continue;
@@ -303,10 +299,7 @@ impl PosixLocaleDef {
                 continue;
             };
             let mut val: String = String::new();
-            loop {
-                let Some(chunk) = parts.next() else {
-                    break;
-                };
+            while let Some(chunk) = parts.next() {
                 if !chunk.ends_with('\\') {
                     val.push_str(chunk);
                     break;

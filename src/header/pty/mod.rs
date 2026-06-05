@@ -42,7 +42,7 @@ unsafe fn openpty_inner(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
 
     let slave = unsafe {
         fcntl::open(
-            name.as_ptr() as *const c_char,
+            name.as_ptr().cast::<c_char>(),
             fcntl::O_RDWR | fcntl::O_NOCTTY,
             0,
         )
