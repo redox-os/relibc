@@ -110,12 +110,11 @@ pub(crate) unsafe fn create(
 ) -> Result<pthread_t, Errno> {
     let attrs = attrs.cloned().unwrap_or_default();
 
+    #[cfg(not(target_os = "redox"))]
     let mut current_sigmask = 0_u64;
     #[cfg(target_os = "redox")]
-    {
-        current_sigmask =
-            redox_rt::signal::get_sigmask().expect("failed to obtain sigprocmask for caller");
-    }
+    let mut current_sigmask =
+        redox_rt::signal::get_sigmask().expect("failed to obtain sigprocmask for caller");
 
     // Create a locked mutex, unlocked by the thread after it has started.
     let synchronization_mutex = unsafe { Mutex::locked(current_sigmask) };

@@ -135,6 +135,7 @@ math_libm = []
 no_trace = ["log/release_max_level_debug"]
 # for very verbose activity beyond trace level
 trace_tls = []
+ip6 = []
 
 [profile.dev]
 panic = "abort"

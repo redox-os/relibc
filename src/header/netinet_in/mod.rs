@@ -22,6 +22,7 @@ pub struct in_addr {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 #[repr(C)]
 pub struct in6_addr {
     pub s6_addr: [u8; 16],
@@ -39,6 +40,7 @@ pub struct sockaddr_in {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 #[repr(C)]
+#[cfg(feature = "ip6")]
 pub struct sockaddr_in6 {
     pub sin6_family: sa_family_t,
     pub sin6_port: in_port_t,
@@ -49,6 +51,7 @@ pub struct sockaddr_in6 {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 #[repr(C)]
+#[cfg(feature = "ip6")]
 pub struct ipv6_mreq {
     pub ipv6mr_multiaddr: in6_addr,
     pub ipv6mr_interface: u32,
@@ -58,6 +61,7 @@ pub struct ipv6_mreq {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 pub const INET_ADDRSTRLEN: c_int = 16;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 pub const INET6_ADDRSTRLEN: c_int = 46;
 
 // IP options
@@ -82,6 +86,7 @@ pub const IPPROTO_UDP: u8 = 17;
 /// Non-POSIX.
 pub const IPPROTO_IDP: u8 = 22;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 pub const IPPROTO_IPV6: u8 = 41;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 pub const IPPROTO_RAW: u8 = 0xff;
@@ -91,20 +96,29 @@ pub const IPPROTO_MAX: u8 = 0xff;
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/ip.7.html>.
 pub const IP_TTL: c_int = 2;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 pub const IPV6_UNICAST_HOPS: c_int = 16;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 pub const IPV6_MULTICAST_IF: c_int = 17;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 pub const IPV6_MULTICAST_HOPS: c_int = 18;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 pub const IPV6_MULTICAST_LOOP: c_int = 19;
 /// Non-POSIX.
+#[cfg(feature = "ip6")]
 pub const IPV6_ADD_MEMBERSHIP: c_int = 20;
+#[cfg(feature = "ip6")]
 pub const IPV6_JOIN_GROUP: c_int = 20;
 /// Non-POSIX.
+#[cfg(feature = "ip6")]
 pub const IPV6_DROP_MEMBERSHIP: c_int = 21;
+#[cfg(feature = "ip6")]
 pub const IPV6_LEAVE_GROUP: c_int = 21;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
+#[cfg(feature = "ip6")]
 pub const IPV6_V6ONLY: c_int = 26;
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/ip.7.html>.
 pub const IP_MULTICAST_IF: c_int = 32;
@@ -166,12 +180,14 @@ pub struct group_source_req {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 #[unsafe(no_mangle)]
+#[cfg(feature = "ip6")]
 pub static in6addr_any: in6_addr = in6_addr {
     s6_addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 #[unsafe(no_mangle)]
+#[cfg(feature = "ip6")]
 pub static in6addr_loopback: in6_addr = in6_addr {
     s6_addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 };

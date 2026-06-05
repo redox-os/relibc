@@ -33,21 +33,21 @@ use crate::{
 
 // Optional callback from user invoked on exit.
 type ExitCallback = Option<unsafe extern "C" fn(c_int)>;
-static mut on_exit: ExitCallback = None;
+static mut ON_EXIT: ExitCallback = None;
 
 // Messages from this module are written to this sink.
-static mut error_sink: *mut FILE = ptr::null_mut();
+static mut ERROR_SINK: *mut FILE = ptr::null_mut();
 
 /// Set global [`FILE`] sink to write errors and warnings.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn err_set_file(fp: *mut FILE) {
     if fp.is_null() {
         unsafe {
-            error_sink = stdio::stderr;
+            ERROR_SINK = stdio::stderr;
         }
     } else {
         unsafe {
-            error_sink = fp;
+            ERROR_SINK = fp;
         }
     }
 }
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn err_set_file(fp: *mut FILE) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn err_set_exit(ef: ExitCallback) {
     unsafe {
-        on_exit = ef;
+        ON_EXIT = ef;
     }
 }
 
@@ -174,14 +174,14 @@ pub unsafe extern "C" fn vwarnx(fmt: *const c_char, args: va_list) {
 // Write error messages for err and warn to the currently set sink.
 unsafe fn display_message(code: Option<c_int>, fmt: *const c_char, args: va_list) {
     // SAFETY:
-    // * error_sink is only null once on start but otherwise always stderr or a user set file
+    // * ERROR_SINK is only null once on start but otherwise always stderr or a user set file
     // * User is trusted to pass in a valid file pointer if err_set_file is used
-    if unsafe { error_sink.is_null() } {
+    if unsafe { ERROR_SINK.is_null() } {
         unsafe {
-            error_sink = stdio::stderr;
+            ERROR_SINK = stdio::stderr;
         }
     }
-    let sink = unsafe { error_sink };
+    let sink = unsafe { ERROR_SINK };
 
     // "progname:" is always printed
     // SAFETY:
@@ -223,7 +223,7 @@ unsafe fn err_exit(eval: c_int, code: Option<c_int>, fmt: *const c_char, args: v
         display_message(code, fmt, args);
     }
 
-    if let Some(callback) = unsafe { on_exit } {
+    if let Some(callback) = unsafe { ON_EXIT } {
         // errx will hit the unwrap.
         unsafe {
             callback(code.unwrap_or_else(|| ERRNO.get()));

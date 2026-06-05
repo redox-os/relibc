@@ -19,6 +19,7 @@ int main(void) {
     for (char counter = 0; (entry = readdir(dir)); counter += 1) {
         puts(entry->d_name);
 
+        (void) counter;
         //if (counter == 4) {
         //    tell = telldir(dir);
         //}

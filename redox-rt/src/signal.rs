@@ -24,7 +24,7 @@ static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::Atomi
 pub fn sighandler_function() -> usize {
     // TODO: HWCAP?
 
-    __relibc_internal_sigentry as usize
+    __relibc_internal_sigentry as *const () as usize
 }
 
 /// ucontext_t representation
@@ -409,7 +409,7 @@ fn convert_old(action: &RawAction) -> Sigaction {
     let handler = (old_first & !(u64::from(STORED_FLAGS) << 32)) as usize;
     let flags = SigactionFlags::from_bits_retain(((old_first >> 32) as u32) & STORED_FLAGS);
 
-    let kind = if handler == default_handler as usize {
+    let kind = if handler == default_handler as *const () as usize {
         SigactionKind::Default
     } else if flags.contains(SigactionFlags::IGNORED) {
         SigactionKind::Ignore
@@ -492,7 +492,7 @@ fn sigaction_inner(
                 MASK_DONTCARE,
                 SigactionFlags::IGNORED,
                 if matches!(new.kind, SigactionKind::Default) {
-                    default_handler as usize
+                    default_handler as *const () as usize
                 } else {
                     0
                 },
@@ -502,7 +502,7 @@ fn sigaction_inner(
         (SIGTSTP | SIGTTOU | SIGTTIN, SigactionKind::Default) => (
             MASK_DONTCARE,
             SigactionFlags::SIG_SPECIFIC,
-            default_handler as usize,
+            default_handler as *const () as usize,
         ),
         (SIGCHLD, SigactionKind::Default) => {
             let nocldstop_bit = new.flags & SigactionFlags::SIG_SPECIFIC;
@@ -519,11 +519,11 @@ fn sigaction_inner(
             (
                 MASK_DONTCARE,
                 SigactionFlags::IGNORED | nocldstop_bit,
-                default_handler as usize,
+                default_handler as *const () as usize,
             )
         }
 
-        (_, SigactionKind::Default) => (new.mask, new.flags, default_handler as usize),
+        (_, SigactionKind::Default) => (new.mask, new.flags, default_handler as *const () as usize),
         (_, SigactionKind::Handled { .. }) => (new.mask, new.flags, explicit_handler),
     };
     let new_first = (handler as u64) | (u64::from(flags.bits() & STORED_FLAGS) << 32);
@@ -635,7 +635,7 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
                 SigactionFlags::empty()
             };
             action.first.store(
-                (u64::from(bits.bits()) << 32) | default_handler as u64,
+                (u64::from(bits.bits()) << 32) | default_handler as *const () as u64,
                 Ordering::Relaxed,
             );
         }
