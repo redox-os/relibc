@@ -368,7 +368,7 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
     }
 
     // Look for the neighbor functions in memory until the end
-    let mut f = unsafe { &__fini_array_end } as *const _;
+    let mut f = core::ptr::from_ref(unsafe { &__fini_array_end });
     #[allow(clippy::op_ref)]
     while f > &raw const __fini_array_start {
         f = unsafe { f.offset(-1) };

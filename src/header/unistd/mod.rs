@@ -823,7 +823,7 @@ pub extern "C" fn nice(incr: c_int) -> c_int {
         return -1;
     }
 
-    return new_nice;
+    new_nice
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pause.html>.
