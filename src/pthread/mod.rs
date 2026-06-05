@@ -52,7 +52,7 @@ pub unsafe fn init() {
 //const FIRST_THREAD_IDX: usize = 1;
 
 pub unsafe fn terminate_from_main_thread() {
-    for (_, tcb) in OS_TID_TO_PTHREAD.lock().iter() {
+    for tcb in OS_TID_TO_PTHREAD.lock().values() {
         let _ = unsafe { cancel(&(*tcb.0).pthread) };
     }
 }

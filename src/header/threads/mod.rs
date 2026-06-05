@@ -137,9 +137,9 @@ pub unsafe extern "C" fn mtx_destroy(mtx: *mut mtx_t) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mtx_init(mtx: *mut mtx_t, ty: c_int) -> c_int {
     let mut attr = MaybeUninit::<pthread_mutexattr_t>::uninit();
-    let _ = unsafe {
+    unsafe {
         pthread_mutexattr_init(attr.as_mut_ptr());
-    };
+    }
     let mut attr = unsafe { attr.assume_init() };
 
     let _ = unsafe {
@@ -260,7 +260,7 @@ pub unsafe extern "C" fn thrd_exit(ret: c_int) -> ! {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/thrd_join.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn thrd_join(thrd: thrd_t, retval: *mut c_int) -> c_int {
-    if unsafe { pthread_join(thrd, retval as *mut *mut c_void) } == 0 {
+    if unsafe { pthread_join(thrd, retval.cast::<*mut c_void>()) } == 0 {
         thrd_success
     } else {
         thrd_error

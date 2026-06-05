@@ -153,7 +153,7 @@ impl Write for StringWriter {
         if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
             unsafe {
-                ptr::copy_nonoverlapping(buf.as_ptr() as _, self.0, copy_size);
+                ptr::copy_nonoverlapping(buf.as_ptr().cast(), self.0, copy_size);
                 self.1 -= copy_size;
 
                 self.0 = self.0.add(copy_size);

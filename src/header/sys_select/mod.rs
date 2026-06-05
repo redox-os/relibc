@@ -38,7 +38,7 @@ pub struct fd_set {
 }
 
 #[allow(clippy::needless_update)]
-pub fn select_epoll(
+pub unsafe fn select_epoll(
     nfds: c_int,
     readfds: Option<&mut fd_set>,
     writefds: Option<&mut fd_set>,
@@ -188,30 +188,32 @@ pub unsafe extern "C" fn select(
     timeout: *mut timeval,
 ) -> c_int {
     trace_expr!(
-        select_epoll(
-            nfds,
-            if readfds.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *readfds })
-            },
-            if writefds.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *writefds })
-            },
-            if exceptfds.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *exceptfds })
-            },
-            if timeout.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *timeout })
-            },
-            core::ptr::null(),
-        ),
+        unsafe {
+            select_epoll(
+                nfds,
+                if readfds.is_null() {
+                    None
+                } else {
+                    Some(&mut *readfds)
+                },
+                if writefds.is_null() {
+                    None
+                } else {
+                    Some(&mut *writefds)
+                },
+                if exceptfds.is_null() {
+                    None
+                } else {
+                    Some(&mut *exceptfds)
+                },
+                if timeout.is_null() {
+                    None
+                } else {
+                    Some(&mut *timeout)
+                },
+                core::ptr::null(),
+            )
+        },
         "select({}, {:p}, {:p}, {:p}, {:p})",
         nfds,
         readfds,
@@ -242,26 +244,28 @@ pub unsafe extern "C" fn pselect(
         }
     };
     trace_expr!(
-        select_epoll(
-            nfds,
-            if readfds.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *readfds })
-            },
-            if writefds.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *writefds })
-            },
-            if exceptfds.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *exceptfds })
-            },
-            micro_timeout.as_mut(),
-            sigmask
-        ),
+        unsafe {
+            select_epoll(
+                nfds,
+                if readfds.is_null() {
+                    None
+                } else {
+                    Some(&mut *readfds)
+                },
+                if writefds.is_null() {
+                    None
+                } else {
+                    Some(&mut *writefds)
+                },
+                if exceptfds.is_null() {
+                    None
+                } else {
+                    Some(&mut *exceptfds)
+                },
+                micro_timeout.as_mut(),
+                sigmask,
+            )
+        },
         "pselect({}, {:p}, {:p}, {:p}, {:p}, {:p})",
         nfds,
         readfds,
