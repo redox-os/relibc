@@ -2,8 +2,16 @@
 //TODO: improve implementation
 
 use crate::{
-    header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
-    platform::types::{c_uint, clockid_t},
+    error::{Errno, Result},
+    header::{
+        errno,
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
+    },
+    platform::{
+        Pal, Sys,
+        types::{c_uint, clockid_t},
+    },
+    sync::FutexAtomicTy,
 };
 
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -27,12 +35,12 @@ impl Semaphore {
         crate::sync::futex_wake(&self.count, i32::MAX);
     }
 
-    pub fn try_wait(&self) -> u32 {
+    pub fn try_wait(&self) -> bool {
         loop {
             let value = self.count.load(Ordering::SeqCst);
 
             if value == 0 {
-                return 0;
+                return false;
             }
 
             if self
@@ -41,34 +49,29 @@ impl Semaphore {
                 .is_ok()
             {
                 // Acquired
-                return value;
+                return true;
             }
             // Try again (as long as value > 0)
         }
     }
 
-    pub fn wait(&self, timeout_opt: Option<&timespec>, clock_id: clockid_t) -> Result<(), ()> {
+    pub fn wait(&self, timeout_opt: Option<&timespec>, clock_id: clockid_t) -> Result<()> {
         loop {
-            let value = self.try_wait();
-
-            if value == 0 {
+            if self.try_wait() {
                 return Ok(());
             }
-
+            // value must be zero
             if let Some(timeout) = timeout_opt {
                 let relative = match clock_id {
                     // FUTEX expect monotonic clock
                     CLOCK_MONOTONIC => timeout.clone(),
-                    CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout) {
-                        Ok(relative) => relative,
-                        Err(_) => return Err(()),
-                    },
-                    _ => return Err(()),
+                    CLOCK_REALTIME => timespec_realtime_to_monotonic(timeout)?,
+                    _ => return Err(Errno(errno::EINVAL)),
                 };
-                crate::sync::futex_wait(&self.count, value, Some(&relative));
+                unsafe { Sys::futex_wait(self.count.ptr(), 0, Some(&relative))? };
             } else {
                 // Use futex to wait for the next change, without a timeout
-                crate::sync::futex_wait(&self.count, value, None);
+                unsafe { Sys::futex_wait(self.count.ptr(), 0, None)? };
             }
         }
     }
