@@ -6,12 +6,6 @@ use crate::{
     platform::types::{c_char, c_int, mode_t, size_t},
 };
 
-const OPEN: c_char = 1;
-const CLOSE: c_char = 2;
-const CHDIR: c_char = 3;
-const FCHDIR: c_char = 4;
-const DUP2: c_char = 5;
-
 #[derive(Debug, Clone)]
 pub enum Action {
     Open {
