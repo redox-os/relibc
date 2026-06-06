@@ -31,7 +31,6 @@ use crate::{
     raw_cell::RawCell,
 };
 
-#[cfg(feature = "ip6")]
 use crate::header::netinet_in::sockaddr_in6;
 
 #[cfg(target_os = "linux")]
@@ -1061,14 +1060,9 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
         if !bai.ai_addr.is_null() {
             if bai.ai_addrlen == mem::size_of::<sockaddr_in>() as socklen_t {
                 unsafe { drop(Box::from_raw(bai.ai_addr.cast::<sockaddr_in>())) };
+            } else if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() as socklen_t {
+                unsafe { drop(Box::from_raw(bai.ai_addr.cast::<sockaddr_in6>())) };
             } else {
-                #[cfg(feature = "ip6")]
-                if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() as socklen_t {
-                    unsafe { drop(Box::from_raw(bai.ai_addr.cast::<sockaddr_in6>())) };
-                } else {
-                    todo_skip!(0, "freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);
-                }
-                #[cfg(not(feature = "ip6"))]
                 todo_skip!(0, "freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);
             }
         }
