@@ -5,7 +5,12 @@
 mod file_actions;
 mod spawn_attr;
 
-use alloc::string::{String, ToString};
+use core::str::FromStr;
+
+use alloc::{
+    ffi::CString,
+    string::{String, ToString},
+};
 pub use file_actions::{Action, posix_spawn_file_actions_t};
 pub use spawn_attr::{Flags, posix_spawnattr_t};
 
@@ -14,7 +19,7 @@ use crate::{
     error::{Errno, Result},
     header::{
         dirent::{opendir, readdir},
-        errno::ENOENT,
+        errno::{ENOENT, ENOTDIR},
         limits::PATH_MAX,
         stdlib::getenv,
         unistd::{chdir, getcwd},
@@ -48,13 +53,16 @@ unsafe fn spawn(
         let path_elements = path_env.split(':');
         let mut flag = false;
 
-        for path_element in path_elements {
+        'a: for path_element in path_elements {
+            let pe = CString::from_str(path_element).unwrap();
             let dir = if let Some(dir) =
-                unsafe { opendir(path_element.as_bytes().as_ptr() as *const c_char).as_mut() }
+                unsafe { opendir(pe.as_bytes_with_nul().as_ptr() as *const c_char).as_mut() }
             {
                 dir
-            } else {
+            } else if ERRNO.get() == 0 || ERRNO.get() == ENOTDIR || ERRNO.get() == ENOENT {
                 continue;
+            } else {
+                return Err(Errno(ERRNO.get()));
             };
 
             while let Some(dir_ent) = unsafe { readdir(dir).as_ref() } {
@@ -66,7 +74,7 @@ unsafe fn spawn(
                 if dir_ent_name == program {
                     flag = true;
                     program = format!("{}/{}", path_element, program);
-                    break;
+                    break 'a;
                 }
             }
         }
@@ -76,9 +84,11 @@ unsafe fn spawn(
         }
     }
 
+    let program = CString::from_str(program.as_str()).unwrap();
+
     unsafe {
         platform::Sys::spawn(
-            CStr::from_bytes_with_nul_unchecked(program.as_bytes()),
+            CStr::from_bytes_with_nul(program.as_bytes_with_nul()).unwrap(),
             file_actions,
             spawn_attr,
             argv,
