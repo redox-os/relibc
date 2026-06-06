@@ -1,10 +1,9 @@
-use core::{mem::ManuallyDrop, slice};
-
 use alloc::{ffi::CString, vec::Vec};
+use core::ptr;
 
 use crate::{
     header::errno::EBADF,
-    platform::types::{c_char, c_int, mode_t},
+    platform::types::{c_char, c_int, mode_t, size_t},
 };
 
 const OPEN: c_char = 1;
@@ -27,22 +26,21 @@ pub enum Action {
     Dup2(c_int, c_int),
 }
 
+struct FileActions(Vec<Action>);
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct posix_spawn_file_actions_t {
-    file_actions: usize,
-    length: usize,
-    capacity: usize,
+    __relibc_internal_size: [u8; 24],
+    __relibc_internal_align: size_t,
 }
 
 impl posix_spawn_file_actions_t {
     pub fn add_action(&mut self, action: Action) {
-        let mut v = unsafe {
-            Vec::from_raw_parts(self.file_actions as *mut Action, self.length, self.capacity)
-        };
-        v.push(action);
-        let raw = v.into_raw_parts();
-        (self.file_actions, self.length, self.capacity) = (raw.0.addr(), raw.1, raw.2);
+        let v = ptr::from_mut(self).cast::<FileActions>();
+        unsafe {
+            (*v).0.push(action);
+        }
     }
 }
 
@@ -56,12 +54,12 @@ impl Iterator for FileActionsIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         let actions = unsafe {
-            slice::from_raw_parts(
-                self.actions.file_actions as *const Action,
-                self.actions.length,
-            )
+            ptr::from_mut(&mut self.actions)
+                .cast::<FileActions>()
+                .as_ref()
+                .unwrap()
         };
-        let e = actions.get(self.curr)?;
+        let e = actions.0.get(self.curr)?;
         self.curr += 1;
         Some((*e).clone())
     }
@@ -84,11 +82,14 @@ impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
 pub unsafe extern "C" fn posix_spawn_file_actions_init(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
-    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    let mut v = ManuallyDrop::new(Vec::<Action>::new());
-    file_actions.file_actions = v.as_mut_ptr().addr();
-    file_actions.capacity = v.capacity();
-    file_actions.length = 0;
+    if file_actions.is_null() {
+        panic!("file_actions cannot be NULL");
+    }
+    let v = Vec::new();
+    let actions = FileActions(v);
+    unsafe {
+        ptr::write(file_actions.cast::<FileActions>(), actions);
+    }
     0
 }
 
@@ -96,18 +97,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_init(
 pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
-    let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    let v = unsafe {
-        Vec::from_raw_parts(
-            file_actions.file_actions as *mut Action,
-            file_actions.length,
-            file_actions.capacity,
-        )
-    };
-    file_actions.capacity = 0;
-    file_actions.length = 0;
-    file_actions.file_actions = 0;
-
+    if file_actions.is_null() {
+        panic!("file_actions cannot be NULL");
+    }
+    unsafe {
+        let _ = *(file_actions.cast::<FileActions>());
+    }
     0
 }
 
