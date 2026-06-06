@@ -87,42 +87,6 @@ pub unsafe extern "C" fn glob(
         })
     };
 
-    let errfunc = match errfunc {
-        Some(f) => f,
-        None => default_errfunc,
-    };
-
-    // Do the globbing
-    let mut results = match inner_glob(&base_path, &glob_expr, flags, errfunc) {
-        Ok(res) => res,
-        Err(e) => return e,
-    };
-
-    // Handle GLOB_NOCHECK and no matches
-    if results.is_empty() {
-        if flags & GLOB_NOCHECK == GLOB_NOCHECK {
-            results.push(glob_expr.to_owned_cstring());
-        } else {
-            return GLOB_NOMATCH;
-        }
-    }
-
-    // Handle GLOB_NOSORT
-    if flags & GLOB_NOSORT != GLOB_NOSORT {
-        results.sort();
-    }
-
-    // Set gl_pathc
-    if flags & GLOB_APPEND == GLOB_APPEND {
-        unsafe {
-            (*pglob).gl_pathc += results.len();
-        }
-    } else {
-        unsafe {
-            (*pglob).gl_pathc = results.len();
-        }
-    }
-
     let mut pathv: Box<Vec<*mut c_char>>;
     if flags & GLOB_APPEND == GLOB_APPEND {
         pathv = unsafe { Box::from_raw((*pglob).__opaque.cast()) };
@@ -138,17 +102,49 @@ pub unsafe extern "C" fn glob(
         }
     }
 
-    pathv.reserve_exact(results.len() + 1);
-    pathv.extend(results.into_iter().map(|s| s.into_raw()));
+    let errfunc = match errfunc {
+        Some(f) => f,
+        None => default_errfunc,
+    };
 
+    // Do the globbing
+    let return_value = match inner_glob(&base_path, &glob_expr, flags, errfunc) {
+        Ok(mut results) => {
+            // Handle GLOB_NOCHECK and no matches
+            if results.is_empty() && flags & GLOB_NOCHECK != GLOB_NOCHECK {
+                GLOB_NOMATCH
+            } else {
+                if results.is_empty() {
+                    results.push(glob_expr.to_owned_cstring());
+                }
+
+                // Handle GLOB_NOSORT
+                if flags & GLOB_NOSORT != GLOB_NOSORT {
+                    results.sort();
+                }
+
+                unsafe {
+                    (*pglob).gl_pathc += results.len();
+                }
+
+                pathv.reserve_exact(results.len());
+                pathv.extend(results.into_iter().map(|s| s.into_raw()));
+
+                0
+            }
+        }
+        Err(e) => e,
+    };
+
+    // add terminating NULL
+    pathv.reserve_exact(1);
     pathv.push(ptr::null_mut());
-
     unsafe {
         (*pglob).gl_pathv = pathv.as_ptr().cast_mut();
         (*pglob).__opaque = Box::into_raw(pathv).cast();
     }
 
-    0
+    return_value
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/glob.html>.
