@@ -9,16 +9,10 @@
 
 #include "test_helpers.h"
 
-#ifdef INET6_ADDRSTRLEN
-#define _ADDRSTRLEN INET6_ADDRSTRLEN
-#else
-#define _ADDRSTRLEN INET_ADDRSTRLEN
-#endif
-
 int main(void) {
     struct addrinfo hints, *res;
     int errcode;
-    char addrstr[_ADDRSTRLEN];
+    char addrstr[INET6_ADDRSTRLEN];
     void *ptr;
 
     memset(&hints, 0, sizeof(hints));
@@ -37,16 +31,14 @@ int main(void) {
         case AF_INET:
             ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
             break;
-#ifdef AF_INET6
         case AF_INET6:
             ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
             break;
-#endif
         default:
             ptr = NULL;
         }
         if (ptr) {
-            inet_ntop(res->ai_family, ptr, addrstr, _ADDRSTRLEN);
+            inet_ntop(res->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
 
             printf(
                 "IPv%d address: %s (%s)\n",
