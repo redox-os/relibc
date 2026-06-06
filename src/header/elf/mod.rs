@@ -77,7 +77,7 @@ pub const EI_MAG2: usize = 2;
 pub const ELFMAG2: c_char = 'L' as c_char;
 pub const EI_MAG3: usize = 3;
 pub const ELFMAG3: c_char = 'F' as c_char;
-pub const ELFMAG: &str = "\x7fELF";
+// ELFMAG is defined in cbindgen.toml
 pub const SELFMAG: usize = 4;
 pub const EI_CLASS: usize = 4;
 pub const ELFCLASSNONE: usize = 0;
