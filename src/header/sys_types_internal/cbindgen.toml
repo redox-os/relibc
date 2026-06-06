@@ -25,18 +25,3 @@ after_includes = """
 include_guard = "_RELIBC_SYS_TYPES_INTERNAL_H"
 language = "C"
 no_includes = true
-
-[export]
-include = [
-  "u_char",
-  "uchar",
-  "u_short",
-  "ushort",
-  "u_int",
-  "uint",
-  "u_long",
-  "ulong",
-  "quad_t",
-  "u_quad_t",
-  "caddr_t"
-]
