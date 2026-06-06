@@ -80,7 +80,7 @@ pub unsafe extern "C" fn wcstoimax(
     base: c_int,
 ) -> intmax_t {
     skipws!(ptr);
-    let result = strto_impl!(intmax_t, ptr, base);
+    let result = wcsto_impl!(intmax_t, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn wcstoumax(
     base: c_int,
 ) -> uintmax_t {
     skipws!(ptr);
-    let result = strtou_impl!(uintmax_t, ptr, base);
+    let result = wcsto_impl!(uintmax_t, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
