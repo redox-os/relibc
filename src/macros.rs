@@ -127,11 +127,16 @@ macro_rules! skipws {
 }
 
 #[macro_export]
-macro_rules! strtou_impl {
-    ($type:ident, $ptr:expr, $base:expr) => {
-        strtou_impl!($type, $ptr, $base, false)
-    };
-    ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
+macro_rules! wcsto_impl {
+    ($type:ident, $ptr:expr, $base:expr) => {{
+        let has_minus = unsafe { *$ptr } == '-' as wchar_t;
+        let has_plus = unsafe { *$ptr } == '+' as wchar_t;
+        if has_minus || has_plus {
+            $ptr = unsafe { $ptr.add(1) };
+        }
+
+        let type_is_signed = $type::MIN != 0;
+
         let mut base = $base;
 
         if (base == 16 || base == 0)
@@ -156,7 +161,7 @@ macro_rules! strtou_impl {
             char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base as u32))
         {
             let new = result.checked_mul(base as $type).and_then(|result| {
-                if $negative {
+                if has_minus && type_is_signed {
                     #[cfg(target_arch = "x86")]
                     {
                         result.checked_sub(
@@ -189,6 +194,9 @@ macro_rules! strtou_impl {
             };
 
             $ptr = unsafe { $ptr.add(1) };
+        }
+        if has_minus && !type_is_signed {
+            result = $type::MAX - result + 1;
         }
         result
     }};
@@ -296,14 +304,6 @@ macro_rules! strto_impl {
         set_endptr(idx);
 
         num
-    }};
-    // this variant is used by wchar (also wcstoimax and wcstoumax from inttypes)
-    ($type:ident, $ptr:expr, $base:expr) => {{
-        let negative = unsafe { *$ptr } == '-' as wchar_t;
-        if negative {
-            $ptr = unsafe { $ptr.add(1) };
-        }
-        strtou_impl!($type, $ptr, $base, negative)
     }};
 }
 

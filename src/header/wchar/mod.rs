@@ -855,7 +855,7 @@ pub unsafe extern "C" fn wcstol(
     base: c_int,
 ) -> c_long {
     skipws!(ptr);
-    let result = strto_impl!(c_long, ptr, base);
+    let result = wcsto_impl!(c_long, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
@@ -870,7 +870,7 @@ pub unsafe extern "C" fn wcstoll(
     base: c_int,
 ) -> c_longlong {
     skipws!(ptr);
-    let result = strto_impl!(c_longlong, ptr, base);
+    let result = wcsto_impl!(c_longlong, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
@@ -885,7 +885,7 @@ pub unsafe extern "C" fn wcstoul(
     base: c_int,
 ) -> c_ulong {
     skipws!(ptr);
-    let result = strtou_impl!(c_ulong, ptr, base);
+    let result = wcsto_impl!(c_ulong, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
@@ -900,7 +900,7 @@ pub unsafe extern "C" fn wcstoull(
     base: c_int,
 ) -> c_ulonglong {
     skipws!(ptr);
-    let result = strtou_impl!(c_ulonglong, ptr, base);
+    let result = wcsto_impl!(c_ulonglong, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
