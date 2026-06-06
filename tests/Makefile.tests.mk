@@ -71,6 +71,7 @@ EXPECT_NAMES=\
 	locale/setlocale \
 	math \
 	regex \
+	semaphore/lock \
 	setjmp \
 	sigaction \
 	sigaltstack \

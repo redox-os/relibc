@@ -3,8 +3,15 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.
 
 use crate::{
-    header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec},
-    platform::types::{c_char, c_int, c_long, c_uint, clockid_t},
+    error::ResultExt,
+    header::{
+        errno,
+        time::{self, timespec},
+    },
+    platform::{
+        self,
+        types::{c_char, c_int, c_long, c_uint, clockid_t},
+    },
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.
@@ -67,9 +74,12 @@ pub unsafe extern "C" fn sem_post(sem: *mut sem_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_trywait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_trywait(sem: *mut sem_t) -> c_int {
-    unsafe { get(sem) }.try_wait();
-
-    0
+    if unsafe { get(sem) }.try_wait() {
+        0
+    } else {
+        platform::ERRNO.set(errno::EAGAIN);
+        -1
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_unlink.html>.
@@ -81,9 +91,10 @@ pub unsafe extern "C" fn sem_unlink(name: *const c_char) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_trywait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
-    if let Ok(()) = unsafe { get(sem) }.wait(None, CLOCK_MONOTONIC) {}; // TODO handle error
-
-    0
+    unsafe { get(sem) }
+        .wait(None, time::CLOCK_MONOTONIC)
+        .map(|_| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_clockwait.html>.
@@ -93,18 +104,19 @@ pub unsafe extern "C" fn sem_clockwait(
     clock_id: clockid_t,
     abstime: *const timespec,
 ) -> c_int {
-    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { (*abstime).clone() }), clock_id) {}; // TODO handle error
-
-    0
+    unsafe { get(sem) }
+        .wait(Some(&unsafe { (*abstime).clone() }), clock_id)
+        .map(|_| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_timedwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec) -> c_int {
-    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { (*abstime).clone() }), CLOCK_REALTIME) {
-    }; // TODO handle error
-
-    0
+    unsafe { get(sem) }
+        .wait(Some(&unsafe { (*abstime).clone() }), time::CLOCK_REALTIME)
+        .map(|_| 0)
+        .or_minus_one_errno()
 }
 
 unsafe fn get<'any>(sem: *mut sem_t) -> &'any RlctSempahore {
