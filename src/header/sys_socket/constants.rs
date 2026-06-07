@@ -139,7 +139,8 @@ pub const MSG_TRUNC: c_int = 32;
 pub const MSG_DONTWAIT: c_int = 64;
 /// Attempt to fill the read buffer.
 pub const MSG_WAITALL: c_int = 256;
-/// Do not generate SIGPIPE
+/// No SIGPIPE generated when an attempt to send is made on a stream-oriented
+/// socket that is no longer connected.
 pub const MSG_NOSIGNAL: c_int = 0x4000;
 /// Atomically set the `FD_CLOEXEC` flag on any file descriptors created via
 /// `SCM_RIGHTS` during `recvmsg()`.
