@@ -3,7 +3,7 @@ use core::convert::TryInto;
 use crate::{
     error::Errno,
     fs::File,
-    header::{errno, fcntl, limits, sys_statvfs},
+    header::{errno, fcntl, limits, sys_statvfs, unistd::sysconf::constants::*},
     io::Read,
     out::Out,
     platform::{
@@ -12,56 +12,13 @@ use crate::{
     },
 };
 
-// POSIX.1 {
-pub const _SC_ARG_MAX: c_int = 0;
-pub const _SC_CHILD_MAX: c_int = 1;
-pub const _SC_CLK_TCK: c_int = 2;
-pub const _SC_NGROUPS_MAX: c_int = 3;
-pub const _SC_OPEN_MAX: c_int = 4;
-pub const _SC_STREAM_MAX: c_int = 5;
-pub const _SC_TZNAME_MAX: c_int = 6;
-// ...
-pub const _SC_TIMERS: c_int = 11;
-// ...
-pub const _SC_SHARED_MEMORY_OBJECTS: c_int = 22;
-// ...
-pub const _SC_VERSION: c_int = 29;
-pub const _SC_PAGESIZE: c_int = 30;
-pub const _SC_PAGE_SIZE: c_int = 30;
-// ...
-pub const _SC_RE_DUP_MAX: c_int = 44;
-
+// TODO why are these numbered differently to linux?
 pub const _SC_NPROCESSORS_CONF: c_int = 57;
 pub const _SC_NPROCESSORS_ONLN: c_int = 58;
 pub const _SC_PHYS_PAGES: c_int = 59;
 pub const _SC_AVPHYS_PAGES: c_int = 60;
-
-// ...
-pub const _SC_THREADS: c_int = 67;
-pub const _SC_GETGR_R_SIZE_MAX: c_int = 69;
-pub const _SC_GETPW_R_SIZE_MAX: c_int = 70;
-pub const _SC_LOGIN_NAME_MAX: c_int = 71;
-pub const _SC_TTY_NAME_MAX: c_int = 72;
-// ...
-pub const _SC_THREAD_ATTR_STACKADDR: c_int = 77;
-pub const _SC_THREAD_ATTR_STACKSIZE: c_int = 78;
-// ...
-pub const _SC_MONOTONIC_CLOCK: c_int = 149;
-pub const _SC_SEMAPHORES: c_int = 21;
-// ...
-pub const _SC_BARRIERS: c_int = 133;
-// ...
-pub const _SC_SHELL: c_int = 157;
-// ...
-pub const _SC_TIMEOUTS: c_int = 164;
-// ...
-pub const _SC_SYMLOOP_MAX: c_int = 173;
-// ...
-pub const _SC_HOST_NAME_MAX: c_int = 180;
-// ...
 pub const _SC_SIGQUEUE_MAX: c_int = 190;
 pub const _SC_REALTIME_SIGNALS: c_int = 191;
-// } POSIX.1
 
 pub(super) fn sysconf_impl(name: c_int) -> c_long {
     //TODO: Real values
