@@ -1207,7 +1207,7 @@ impl Pal for Sys {
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: NulTerminated<*mut c_char>,
         envp: Option<NulTerminated<*mut c_char>>,
-        use_path: bool,
+        dir_ent_name: Option<String>,
     ) -> Result<pid_t> {
         use crate::header::spawn::Flags;
 
@@ -1242,11 +1242,20 @@ impl Pal for Sys {
 
         let mut program_name = String::new();
 
-        program_name = redox_path::canonicalize_using_cwd(
-            Some(original_cwd.as_str()),
-            str::from_utf8(args[0]).unwrap(),
-        )
-        .ok_or(Errno(ENOENT))?;
+        if let Some(ent) = dir_ent_name {
+            let mut binary = str::from_utf8(args[0]).unwrap().to_string();
+            binary.insert_str(0, "./");
+
+            program_name = redox_path::canonicalize_using_cwd(Some(ent.as_str()), binary.as_str())
+                .ok_or(Errno(ENOENT))?;
+        } else {
+            program_name = redox_path::canonicalize_using_cwd(
+                Some(original_cwd.as_str()),
+                str::from_utf8(args[0]).unwrap(),
+            )
+            .ok_or(Errno(ENOENT))?;
+        }
+
         args[0] = program_name.as_bytes();
 
         let new_file_table = child.thr_fd.dup(b"filetable")?;

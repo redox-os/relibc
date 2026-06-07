@@ -1,5 +1,7 @@
 use core::num::NonZeroU64;
 
+use alloc::string::String;
+
 use super::types::*;
 use crate::{
     c_str::CStr,
@@ -440,7 +442,7 @@ pub trait Pal {
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: NulTerminated<*mut c_char>,
         envp: Option<NulTerminated<*mut c_char>>,
-        use_path: bool,
+        dir_ent_name: Option<String>,
     ) -> Result<pid_t>;
 
     /// Platform implementation of [`symlink()`](crate::header::unistd::symlink) from [`unistd.h`](crate::header::unistd).
