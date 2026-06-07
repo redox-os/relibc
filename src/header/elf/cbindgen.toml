@@ -1,5 +1,7 @@
 sys_includes = ["stdint.h"]
 after_includes = """
+#define ELFMAG \"\\x7f\" \"ELF\"
+
 #define ELF32_ST_BIND(val)      (((unsigned char) (val)) >> 4)
 #define ELF32_ST_TYPE(val)      ((val) & 0xf)
 #define ELF32_ST_INFO(bind, type)   (((bind) << 4) + ((type) & 0xf))
@@ -39,7 +41,7 @@ after_includes = """
 """
 include_guard = "_ELF_H"
 language = "C"
-style = "Tag"
+style = "Both"
 no_includes = true
 cpp_compat = true
 

@@ -83,6 +83,8 @@ pub const IPPROTO_UDP: u8 = 17;
 pub const IPPROTO_IDP: u8 = 22;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 pub const IPPROTO_IPV6: u8 = 41;
+/// Non-POSIX.
+pub const IPPROTO_ICMPV6: u8 = 58;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 pub const IPPROTO_RAW: u8 = 0xff;
 /// Non-POSIX.
