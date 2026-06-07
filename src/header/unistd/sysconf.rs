@@ -8,6 +8,9 @@ mod sys;
 #[path = "sysconf/linux.rs"]
 mod sys;
 
+pub mod constants;
+
+pub use constants::*;
 pub use sys::*;
 
 use core::ffi::{c_int, c_long};
