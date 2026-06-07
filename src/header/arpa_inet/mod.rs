@@ -25,9 +25,22 @@ use crate::{
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_addr.html>.
 ///
+/// Converts the string pointed to by `cp`, in the standard IPv4 dotted
+/// decimal notation, to an integer value suitable for use as an Internet
+/// address.
+///
 /// # Deprecated
 /// The `inet_addr()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 8.
+///
+/// Applications should prefer `inet_pton()` over `inet_addr()` for the
+/// following reasons:
+/// - The return value from `inet_addr()` when converting 255.255.255.255 is
+///   indistinguishable from an error.
+/// - The `inet_pton()` function supports multiple address families.
+/// - The alternative textual representations supported by `inet_addr()` (but
+///   not `inet_pton()`) are often used maliciously to confuse or mislead
+///   users (e.g, for phishing).
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
@@ -41,6 +54,10 @@ pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/inet_aton.3.html>.
+///
+/// Converts the Internet host address `cp` from the IPv4 numbers-and-dots
+/// notation into binary form (in network byte order) and stores it in the
+/// structure that `inp` points to.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_int {
     let cp_cstr = unsafe { CStr::from_ptr(cp) };
@@ -95,6 +112,9 @@ pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_in
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xns/inet_lnaof.html>.
 ///
+/// Takes an Internet host address specified by `in` and extracts the local
+/// network address part, in host byte order.
+///
 /// # Deprecation
 /// The `inet_lnaof()` function was specified in Networking Services Issue 5,
 /// but not in the Open Group Base Specifications Issue 6 and later.
@@ -111,6 +131,10 @@ pub extern "C" fn inet_lnaof(r#in: in_addr) -> in_addr_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xns/inet_makeaddr.html>.
+///
+/// Takes the Internet network number specified by `net` and the local network
+/// address specified by `lna`, both in host byte order, and constructs an
+/// Internet address from them.
 ///
 /// # Deprecation
 /// The `inet_makeaddr()` function was specified in Networking Services Issue
@@ -133,6 +157,9 @@ pub extern "C" fn inet_makeaddr(net: in_addr_t, lna: in_addr_t) -> in_addr {
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xns/inet_netof.html>.
 ///
+/// Takes an Internet host address specified by `in` and extracts the network
+/// number part, in host byte order.
+///
 /// # Deprecation
 /// The `inet_netof()` function was specified in Networking Services Issue 5,
 /// but not in the Open Group Base Specifications Issue 6 and later.
@@ -150,6 +177,10 @@ pub extern "C" fn inet_netof(r#in: in_addr) -> in_addr_t {
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xns/inet_network.html>.
 ///
+/// Converts the string pointed to by `cp`, in the Internet standard dot
+/// notation, to an integer value suitable for use as an Internet network
+/// number.
+///
 /// # Deprecation
 /// The `inet_network()` function was specified in Networking Services Issue 5,
 /// but not in the Open Group Base Specifications Issue 6 and later.
@@ -164,9 +195,15 @@ pub unsafe extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_addr.html>.
 ///
+/// Converts the Internet host address specified by `in` to a string in the
+/// Internet standard dot notation.
+///
 /// # Deprecation
 /// The `inet_ntoa()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 8.
+///
+/// Applications should prefer `inet_ntop()` over `inet_ntoa()` as it supports
+/// multiple address families and is thread-safe.
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *mut c_char {
@@ -185,6 +222,8 @@ pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *mut c_char {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_ntop.html>.
+///
+/// Converts a numeric address into a text string suitable for presentation.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_ntop(
     af: c_int,
@@ -216,6 +255,9 @@ pub unsafe extern "C" fn inet_ntop(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_ntop.html>.
+///
+/// Converts an address in its standard text presentation form into its
+/// numeric binary form.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_void) -> c_int {
     if af != AF_INET {
