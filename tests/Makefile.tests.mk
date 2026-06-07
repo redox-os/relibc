@@ -11,7 +11,7 @@ FAILING_TESTS += malloc/usable_size
 FAILING_TESTS += mkfifo
 # Waitpid had EINTR
 FAILING_TESTS += sigchld
-# not triggering ERANGE 
+# not triggering ERANGE
 FAILING_TESTS += stdlib/ptsname
 # Hang
 FAILING_TESTS += sys_epoll/epollet
@@ -77,7 +77,8 @@ EXPECT_NAMES=\
 	sigaltstack \
 	signal \
 	sigsetjmp \
-	spawn \
+	spawn/file_actions \
+	spawn/spawn_attr \
 	stdio/all \
 	stdio/buffer \
 	stdio/dprintf \

@@ -47,6 +47,7 @@ unsafe fn spawn(
         ERRNO.get()
     );
 
+    let mut path_path = None;
     if use_path {
         let path = unsafe { getenv(c"PATH".as_ptr()) };
         let path_env = unsafe { CStr::from_nullable_ptr(path).unwrap().to_str().unwrap() };
@@ -70,10 +71,12 @@ unsafe fn spawn(
                     CStr::from_ptr(dir_ent.d_name.as_ptr() as *const c_char)
                         .to_str()
                         .unwrap()
+                        .to_string()
                 };
                 if dir_ent_name == program {
                     flag = true;
                     program = format!("{}/{}", path_element, program);
+                    path_path = Some(path_element.to_string());
                     break 'a;
                 }
             }
@@ -93,7 +96,7 @@ unsafe fn spawn(
             spawn_attr,
             argv,
             envp,
-            use_path,
+            path_path,
         )
         .map(|v| {
             if let Some(pid) = pid {
