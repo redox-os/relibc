@@ -11,6 +11,8 @@
 # POSIX states signal.h may include time.h and time.h may include signal.h.
 # To prevent a cycle between both headers we only import the needed types through bits.
 #
+# TODO split out types from bits/pthread.h
+#
 # features.h required for deprecated annotations
 sys_includes = ["features.h"]
 include_guard = "_RELIBC_SIGNAL_H"

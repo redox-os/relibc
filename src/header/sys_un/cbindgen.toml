@@ -2,7 +2,6 @@
 #
 # Spec quotations relating to includes:
 # - "The <sys/un.h> header shall define the sa_family_t type as described in <sys/socket.h>."
-sys_includes = []
 after_includes = """
 #include <bits/safamily-t.h> // for sa_family_t from sys/socket.h
 """

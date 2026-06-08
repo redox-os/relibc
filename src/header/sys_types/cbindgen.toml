@@ -2,7 +2,7 @@
 #
 # There are no spec quotations relating to includes
 #
-# - sys/types/internal.h are fundamental C types (which includes stddef.h)
+# - sys/types/internal.h are fundamental C types
 # - sys/types/internal.h brings in features.h for deprecated annotations for useconds_t
 # - bits/pthread.h is separate for convenience
 sys_includes = [
@@ -10,10 +10,9 @@ sys_includes = [
     "sys/types/internal.h",
     "bits/pthread.h",
 ]
-include_guard = "_SYS_TYPES_H"
+include_guard = "_RELIBC_SYS_TYPES_H"
 no_includes = true
 language = "C"
-style = "Tag"
 
 [enum]
 prefix_with_name = true

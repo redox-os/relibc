@@ -11,16 +11,15 @@
 # - including netinet/in.h in arpa/inet.h
 # - splitting out functions (htonl, htons, ntohl, ntohs) into bits/arpainet.h
 #
-# features.h needed for #[deprecated] annotation
 # bits/arpainet.h brings in inttypes.h
-sys_includes = ["features.h", "netinet/in.h"]
+# features.h needed for deprecated annotation
+sys_includes = ["netinet/in.h", "features.h"]
 include_guard = "_RELIBC_ARPA_INET_H"
 after_includes = """
-#include <bits/arpainet.h> // for htonl, htons, ntohl, ntohs
-#include <bits/socklen-t.h> // for socklen_t
+#include <bits/arpainet.h>  // for htonl, htons, ntohl, ntohs
+#include <bits/socklen-t.h> // for socklen_t from sys/socket.h
 """
 language = "C"
-style = "Tag"
 no_includes = true
 cpp_compat = true
 
