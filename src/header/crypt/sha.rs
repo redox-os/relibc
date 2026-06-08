@@ -77,7 +77,7 @@ pub fn crypt_sha(passw: &str, setting: &str, cipher: ShaType) -> Option<String> 
 
     let has_round;
     // 7 is len("rounds=")
-    if &setting[cursor..cursor + 7] == RSTRING {
+    if setting.get(cursor..cursor + 7) == Some(RSTRING) {
         cursor += 7;
         has_round = true;
         if let Some(c_end) = setting[cursor..].chars().position(|r| r == '$') {
