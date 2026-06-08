@@ -57,4 +57,16 @@ int main(void) {
             printf("Comparison %ld == %ld failed. Time: %s", input, output, asctime(time));
         }
     }
+
+    // mktime must not panic on out-of-range tm_gmtoff
+    {
+        struct tm tg = { 0 };
+        tg.tm_year = 124;
+        tg.tm_mon = 0;
+        tg.tm_mday = 1;
+        tg.tm_hour = 12;
+        tg.tm_gmtoff = 100000;
+        time_t result = mktime(&tg);
+        printf("gmtoff_ignored = %d\n", result != (time_t)-1);
+    }
 }
