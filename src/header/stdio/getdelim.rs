@@ -38,14 +38,18 @@ pub unsafe extern "C" fn getline(
 /// - `stream` has to be a valid file handle returned by fopen and likes.
 ///
 /// # Deviation from POSIX
-/// - **EINVAL is set on stream being NULL or delim not fitting into char** (POSIX allows UB)
-/// - **`*n` can contain invalid data.** The buffer size `n` is not read, instead realloc is called each time. That is in principle
-///   inefficent since the buffer is reallocated in memory for every call, but if `n` is by mistake
-///   bigger than the number of bytes allocated for the buffer, there can be no out-of-bounds write.
-/// - On non-stream-related errors, the error indicator of the stream is *not* set. Posix states
-///   "If an error occurs, the error indicator for the stream shall be set, and the function shall
-///   return -1 and set errno to indicate the error." but in cases that produce EINVAL even glibc
-///   doesn't seem to set the error indicator, so we also don't.
+/// - **EINVAL is set on stream being NULL or delim not fitting into char**
+///   (POSIX allows UB)
+/// - **`*n` can contain invalid data.** The buffer size `n` is not read,
+///   instead realloc is called each time. That is in principle inefficent
+///   since the buffer is reallocated in memory for every call, but if `n` is
+///   by mistake bigger than the number of bytes allocated for the buffer,
+///   there can be no out-of-bounds write.
+/// - On non-stream-related errors, the error indicator of the stream is *not*
+///   set. Posix states "If an error occurs, the error indicator for the stream
+///   shall be set, and the function shall return -1 and set errno to indicate
+///   the error." but in cases that produce EINVAL even glibc doesn't seem to
+///   set the error indicator, so we also don't.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getdelim(
     lineptr: *mut *mut c_char,
