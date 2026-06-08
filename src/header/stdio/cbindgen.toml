@@ -1,5 +1,17 @@
-# stddef.h brings in size_t
-sys_includes = ["stdarg.h", "stddef.h", "stdint.h", "features.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdio.h.html
+#
+# Spec quotations relating to includes:
+# - "off_t As described in <sys/types.h>."
+# - "size_t As described in <stddef.h>."
+# - "ssize_t As described in <sys/types.h>."
+# - "va_list As described in <stdarg.h>."
+# - "The <stdio.h> header shall define NULL as described in <stddef.h>."
+# - "Inclusion of the <stdio.h> header may also make visible all symbols from <stddef.h>."
+#
+# stdarg.h brings in va_list (TODO split out)
+# stddef.h brings in size_t and NULL
+# features.h required for deprecated annotations
+sys_includes = ["stdarg.h", "stddef.h", "features.h"]
 after_includes = """
 #include <bits/off-t.h>   // for off_t from sys/types.h
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
