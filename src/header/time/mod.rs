@@ -23,7 +23,7 @@ use crate::{
 };
 use alloc::collections::BTreeSet;
 use chrono::{
-    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, TimeZone, Timelike, Utc,
+    DateTime, Datelike, NaiveDate, NaiveDateTime, Offset, TimeZone, Timelike, Utc,
     offset::MappedLocalTime,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
@@ -859,15 +859,6 @@ unsafe fn set_timezone(
         }
 
         timezone = -c_long::from(ut_offset.fix().local_minus_utc());
-    }
-}
-
-#[inline(always)]
-pub const fn get_offset(off: c_long) -> Option<FixedOffset> {
-    if off < 0 {
-        FixedOffset::west_opt(off as _)
-    } else {
-        FixedOffset::east_opt(off as _)
     }
 }
 
