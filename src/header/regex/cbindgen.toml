@@ -2,7 +2,6 @@
 #
 # Spec quotations relating to includes:
 # - "The <regex.h> header shall define the size_t type as described in <sys/types.h>."
-sys_includes = []
 after_includes = """
 #include <bits/size-t.h> // for size_t from sys/types.h
 """
