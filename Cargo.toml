@@ -69,6 +69,7 @@ plain = "0.2"
 redox-path = "0.3"
 redox_protocols = { package = "libredox", version = "0.1.17", default-features = false, features = ["protocol"] }
 redox_syscall = "0.8.0"
+
 [build-dependencies]
 cc = "1"
 
@@ -144,3 +145,4 @@ panic = "abort"
 
 [patch.crates-io]
 cc-11 = { git = "https://github.com/tea/cc-rs", branch = "riscv-abi-arch-fix", package = "cc" }
+redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git" }

@@ -25,8 +25,8 @@ use goblin::elf64::{
 };
 
 use syscall::{
-    CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, O_CLOEXEC,
-    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, SetSighandlerData,
+    AddrSpaceVerb, CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map,
+    O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, ProcSchemeVerb, SetSighandlerData,
     error::*,
     flag::{MapFlags, SEEK_SET},
 };
@@ -449,8 +449,11 @@ pub fn fexec_impl(
     );
 
     if interp_override.is_some() {
-        let mmap_min_fd = grants_fd.dup(b"mmap-min-addr")?;
-        let _ = mmap_min_fd.write(&usize::to_ne_bytes(min_mmap_addr));
+        grants_fd.call_wo(
+            &usize::to_ne_bytes(min_mmap_addr),
+            CallFlags::WRITE,
+            &[AddrSpaceVerb::MmapMin as u64],
+        )?;
     }
 
     let addrspace_selection_fd = thread_fd.dup(b"current-addrspace")?.to_upper()?;
@@ -1062,12 +1065,9 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         }
         {
             // Copy environment registers.
-            let cur_env_regs_fd = cur_thr_fd.dup(b"regs/env")?;
-            let new_env_regs_fd = new_thr_fd.dup(b"regs/env")?;
-
             let mut env_regs = syscall::EnvRegisters::default();
-            cur_env_regs_fd.read(&mut env_regs)?;
-            new_env_regs_fd.write(&env_regs)?;
+            cur_thr_fd.call_ro(&mut env_regs, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::READ.bits() as u64])?;
+            new_thr_fd.call_wo(&env_regs, CallFlags::empty(), &[ProcSchemeVerb::RegsEnv as u64, CallFlags::WRITE.bits() as u64])?;
         }
     }
     // Copy the file table. We do this last to ensure that all previously used file descriptors are
@@ -1080,8 +1080,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         let new_filetable_sel_fd = new_thr_fd.dup(b"current-filetable")?;
         new_filetable_sel_fd.write(&usize::to_ne_bytes(new_filetable_fd.as_raw_fd()))?;
     }
-    let start_fd = new_thr_fd.dup(b"start")?;
-    start_fd.write(&[0])?;
+    let start_fd = new_thr_fd.call_wo(&[], CallFlags::empty(), &[ProcSchemeVerb::Start as u64])?;
     Ok(new_pid)
 }
 

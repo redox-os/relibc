@@ -1,6 +1,6 @@
 use core::mem::size_of;
 
-use syscall::Result;
+use syscall::{CallFlags, ProcSchemeVerb, Result};
 
 use crate::{RtTcb, arch::*, proc::*, signal::tmp_disable_signals, static_proc_info};
 
@@ -38,15 +38,13 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
     // the same process) will be discarded. Process-specific signals will ignore this new thread,
     // until it has initialized its own signal handler.
 
-    let start_fd = new_thr_fd.dup(b"start")?;
-
     let fd = new_thr_fd.as_raw_fd();
     unsafe {
         tcb.thr_fd.get().write(Some(new_thr_fd));
     }
 
     // Unblock context.
-    start_fd.write(&[0])?;
+    crate::sys::sys_call_wo(fd, &[], CallFlags::empty(), &[ProcSchemeVerb::Start as u64])?;
 
     Ok(fd)
 }
