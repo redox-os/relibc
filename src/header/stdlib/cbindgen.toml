@@ -1,4 +1,18 @@
-sys_includes = ["stddef.h", "alloca.h", "wchar.h", "features.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdlib.h.html
+#
+# Spec quotations relating to includes:
+# - "The <stdlib.h> header shall define NULL as described in <stddef.h>."
+# - "size_t As described in <stddef.h>."
+# - "wchar_t As described in <stddef.h>."
+# - "In addition, the <stdlib.h> header shall define the following symbolic constants and macros as described in <sys/wait.h>: WCOREDUMP, WEXITSTATUS, WIFEXITED, WIFSIGNALED, WIFSTOPPED, WNOHANG, WSTOPSIG, WTERMSIG, WUNTRACED"
+# - "The <stdlib.h> header shall define the following symbolic constants as described in <fcntl.h>: O_APPEND, O_CLOEXEC, O_CLOFORK, O_DSYNC, O_NOCTTY, O_RDWR, O_RSYNC, O_SYNC"
+# - "Inclusion of the <stdlib.h> header may also make visible all symbols from <fcntl.h>, <limits.h>, <math.h>, <stddef.h>, and <sys/wait.h>."
+#
+# POSIX allows inclusion of stdint.h via: fcntl.h > unistd.h > stdint.h (our fcntl.h doesn't include unistd.h so just include stdint.h here directly instead)
+# stdint.h needed for unintptr_t for __stack_chk_guard
+# sys/wait.h brings in signal.h which brings in features.h
+# features required for deprecated and no return annotations
+sys_includes = ["stddef.h", "sys/wait.h", "fcntl.h", "stdint.h"]
 include_guard = "_RELIBC_STDLIB_H"
 trailer = """
 #ifndef _RELIBC_STDLIB_EXTRA_H
