@@ -1,11 +1,17 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "test_helpers.h"
 
 int main(void)
 {
+    errno = 0;
+    int bad = shmget(IPC_PRIVATE, SIZE_MAX, IPC_CREAT | 0666);
+    UNEXP_IF(shmget, bad, != -1);
+    CHECK_AND_PRINT_ERRNO(EINVAL);
+
     int status;
     key_t key = ftok("example_dir/1-never-gonna-give-you-up", 123);
     size_t size = 1000;

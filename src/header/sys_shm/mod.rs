@@ -73,7 +73,13 @@ pub unsafe extern "C" fn shmget(key: key_t, size: size_t, shmflg: c_int) -> c_in
     }
 
     if (oflag & O_CREAT) != 0 {
-        let total_size = size + mem::size_of::<ShmHeader>();
+        let total_size = match size.checked_add(mem::size_of::<ShmHeader>()) {
+            Some(s) => s,
+            None => {
+                ERRNO.set(EINVAL);
+                return -1;
+            }
+        };
         if ftruncate(fd, total_size as i64) < 0 {
             return -1;
         }
