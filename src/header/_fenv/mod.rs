@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fenv.h.html>.
 
-use crate::platform::types::c_int;
+use crate::platform::types::{c_int, c_ulonglong};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fenv.h.html>.
 pub const FE_ALL_EXCEPT: c_int = 0;
@@ -10,12 +10,12 @@ pub const FE_ALL_EXCEPT: c_int = 0;
 pub const FE_TONEAREST: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fenv.h.html>.
-pub type fexcept_t = u64;
+pub type fexcept_t = c_ulonglong;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fenv.h.html>.
 #[repr(C)]
 pub struct fenv_t {
-    pub cw: u64,
+    pub cw: c_ulonglong,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/feclearexcept.html>.
