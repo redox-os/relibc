@@ -17,6 +17,7 @@
 # stdint.h is permitted by POSIX to be fully included through the following chain:
 # wchar.h > stdlib.h > fcntl.h > unistd.h > stdint.h
 # relibc includes stdint.h here directly instead of indirectly because of how other header includes are defined
+# stdio.h brings in stdarg.h for va_list
 # time.h brings in bits/locale.h for locale_t
 # time.h brings in features.h for deprecated annotations
 after_includes = """
@@ -34,7 +35,6 @@ after_includes = """
 #define __need_size_t
 #define __need_NULL
 #include <stddef.h> // for size_t, wchar_t and NULL
-#include <stdarg.h> // for va_list
 #include <stdio.h>  // for FILE
 #include <time.h>   // for tm
 
