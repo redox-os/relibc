@@ -1,11 +1,26 @@
-sys_includes = [
-    "stdio.h",
-    "time.h",
-    "features.h",
-]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/wchar.h.html
+#
+# Spec quotations relating to includes:
+# - "FILE As described in <stdio.h>."
+# - "locale_t As described in <locale.h>."
+# - "size_t As described in <stddef.h>."
+# - "va_list As described in <stdarg.h>."
+# - "wchar_t As described in <stddef.h>."
+# - "The tag tm shall be declared as naming an incomplete structure type, the contents of which are described in the <time.h> header."
+# - "WCHAR_MAX As described in <stdint.h>."
+# - "WCHAR_MIN As described in <stdint.h>."
+# - "NULL As described in <stddef.h>."
+# - "Inclusion of the <wchar.h> header may make visible all symbols from the headers <ctype.h>, <string.h>, <stdarg.h>, <stddef.h>, <stdio.h>, <stdlib.h>, and <time.h>."
+#
+# We use after_includes here instead of sys_includes to better order the includes while interspersing defines between them.
+#
+# stdint.h is permitted by POSIX to be fully included through the following chain:
+# wchar.h > stdlib.h > fcntl.h > unistd.h > stdint.h
+# relibc includes stdint.h here directly instead of indirectly because of how other header includes are defined
+# time.h brings in bits/locale.h for locale_t
+# time.h brings in features.h for deprecated annotations
 after_includes = """
-// uint32_t, WCHAR_MIN, WCHAR_MAX
-#include <stdint.h>
+#include <stdint.h> // for uint32_t, WCHAR_MIN, WCHAR_MAX
 
 #ifndef _WINT_T
 #define _WINT_T
@@ -18,7 +33,10 @@ after_includes = """
 // NULL, size_t, must come after wchar_t and wint_t
 #define __need_size_t
 #define __need_NULL
-#include <stddef.h>
+#include <stddef.h> // for size_t, wchar_t and NULL
+#include <stdarg.h> // for va_list
+#include <stdio.h>  // for FILE
+#include <time.h>   // for tm
 
 #define WEOF (0xffffffffu)
 """
