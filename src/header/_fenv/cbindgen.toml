@@ -1,4 +1,12 @@
-sys_includes = ["stdint.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fenv.h.html
+#
+# There are no spec quotations relating to includes
+#
+# TODO figure out what type to use for `fenv_t` and `fexcept_t`
+#      currently using `c_ulonglong` as it doesn't bring in
+#      stdint.h (which would be considered namespace pollution)
+#
+# NOTE this header is not currently exported as we are using openlibm
 include_guard = "_RELIBC_FENV_H"
 language = "C"
 style = "Tag"
