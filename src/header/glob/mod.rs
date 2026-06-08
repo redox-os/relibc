@@ -228,22 +228,18 @@ fn list_dir(
                 true
             } else if (*entry).d_type == DT_LNK {
                 // Resolve symbolic link
-                let mut full_path = path.to_owned_cstring().into_string().unwrap();
-                if !full_path.ends_with('/') {
-                    full_path.push('/');
+                let mut full_path = path.to_bytes().to_vec();
+                if !full_path.ends_with(b"/") {
+                    full_path.push(b'/');
                 }
-                full_path.push_str(name.to_str().unwrap());
-                full_path.push('\0');
+                full_path.extend_from_slice(name.as_bytes());
+                let full_path = CString::new(full_path).unwrap();
 
                 let mut link_info = stat::default();
-                if stat(
-                    full_path.as_ptr().cast::<c_char>(),
-                    ptr::from_mut(&mut link_info),
-                ) != 0
-                {
+                if stat(full_path.as_ptr(), ptr::from_mut(&mut link_info)) != 0 {
                     let errno = platform::ERRNO.get();
                     platform::ERRNO.set(old_errno);
-                    if errfunc(full_path.as_ptr().cast::<c_char>(), errno) != 0 || abort_on_error {
+                    if errfunc(full_path.as_ptr(), errno) != 0 || abort_on_error {
                         return Err(GLOB_ABORTED);
                     }
                 }
