@@ -451,19 +451,22 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
         }
     };
 
-    let offset = get_offset(unsafe { (*timeptr).tm_gmtoff }).unwrap();
     let tz = time_zone();
-    // Create DateTime<FixedOffset>
-    let datetime = match offset.from_local_datetime(&naive_local) {
+    let isdst = unsafe { (*timeptr).tm_isdst };
+    let tz_datetime = match tz.from_local_datetime(&naive_local) {
         MappedLocalTime::Single(datetime) => datetime,
-        _ => {
+        MappedLocalTime::Ambiguous(early, late) => {
+            if isdst > 0 {
+                early
+            } else {
+                late
+            }
+        }
+        MappedLocalTime::None => {
             platform::ERRNO.set(EOVERFLOW);
             return -1;
         }
     };
-
-    // Convert to UTC and get timestamp
-    let tz_datetime = datetime.with_timezone(&tz);
     let timestamp = tz_datetime.timestamp();
 
     unsafe { ptr::write(timeptr, datetime_to_tm(&tz_datetime)) };
