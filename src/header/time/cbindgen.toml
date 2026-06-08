@@ -9,6 +9,10 @@
 # - "NULL As described in <stddef.h>."
 # - "Inclusion of the <time.h> header may make visible all symbols from the <signal.h> header."
 #
+# Cycle warning:
+# POSIX states signal.h may include time.h and time.h may include signal.h.
+# To prevent a cycle between both headers we only import the needed types through bits.
+#
 # bits/timespec.h brings in time_t
 # features.h included for deprecated annotations
 sys_includes = ["features.h"]

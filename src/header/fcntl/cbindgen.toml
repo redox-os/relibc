@@ -9,6 +9,8 @@
 # To prevent a cycle between fcntl.h and unistd.h relibc only includes fcntl.h in unistd.h.
 # This approach was chosen because unistd.h requires parts of fcntl.h but not the other way around.
 #
+# TODO split out va_list from stdarg.h
+#
 # stdarg.h brings in va_list for ...
 # sys/stat.h brings in mode_t, off_t and file mode constants
 sys_includes = ["stdarg.h", "sys/stat.h"]

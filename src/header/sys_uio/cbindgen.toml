@@ -4,7 +4,6 @@
 # - "The <sys/uio.h> header shall define the ssize_t and size_t types as described in <sys/types.h>."
 #
 # bits/iovec.h brings in size_t
-sys_includes = []
 after_includes = """
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
 #include <bits/iovec.h>   // for iovec
@@ -14,7 +13,6 @@ after_includes = """
 """
 include_guard = "_RELIBC_SYS_UIO_H"
 language = "C"
-style = "Tag"
 no_includes = true
 cpp_compat = true
 

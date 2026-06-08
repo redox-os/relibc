@@ -1,13 +1,11 @@
 # POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/limits.h.html
 #
 # There are no spec quotations relating to includes
-sys_includes = []
 after_includes = """
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
 """
 include_guard = "_RELIBC_LIMITS_H"
 language = "C"
-style = "Tag"
 no_includes = true
 cpp_compat = true
 

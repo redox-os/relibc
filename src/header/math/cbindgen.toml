@@ -1,8 +1,10 @@
-# Note: changing this file requires `make clean`.
-sys_includes = []
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/math.h.html
+#
+# There are no spec quotations relating to includes
+#
+# NOTE: changing this file requires `make clean`.
 include_guard = "_RELIBC_MATH_H"
 language = "C"
-style = "Type"
 no_includes = true
 cpp_compat = true
 # constants from openlibm

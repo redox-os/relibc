@@ -6,7 +6,6 @@
 # - "Inclusion of the <sys/stat.h> header may make visible all symbols from the <time.h> header."
 #
 # bits/timespec.h brings in time_t
-sys_includes = []
 include_guard = "_RELIBC_SYS_STAT_H"
 after_includes = """
 #include <bits/sys/stat.h> // for blkcnt_t and blksize_t from sys/types.h
