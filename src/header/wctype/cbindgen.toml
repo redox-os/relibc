@@ -1,3 +1,12 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/wctype.h.html
+#
+# Spec quotations relating to includes:
+# - "wint_t As described in <wchar.h>."
+# - "The <wctype.h> header shall define the locale_t type as described in <locale.h>."
+# - "WEOF As described in <wchar.h>."
+# - "Inclusion of the <wctype.h> header may make visible all symbols from the headers <ctype.h>, <stdarg.h>, <stddef.h>, <stdio.h>, <stdlib.h>, <string.h>, <time.h>, and <wchar.h>."
+#
+# wchar.h brings in time.h which brings in bits/locale.h for locale_t
 sys_includes = ["wchar.h" ]
 include_guard = "_RELIBC_WCTYPE_H"
 language = "C"
