@@ -73,12 +73,14 @@ pub unsafe extern "C" fn crypt_r(
         unsafe { *data = crypt_data::new() };
     }
 
-    let key = unsafe { CStr::from_ptr(key) }
-        .to_str()
-        .expect("key must be utf-8");
-    let setting = unsafe { CStr::from_ptr(setting) }
-        .to_str()
-        .expect("setting must be utf-8");
+    let key = unsafe { CStr::from_ptr(key) }.to_bytes();
+    let setting = match unsafe { CStr::from_ptr(setting) }.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            platform::ERRNO.set(EINVAL);
+            return ptr::null_mut();
+        }
+    };
 
     let encoded = if setting.starts_with('$') {
         if setting.starts_with("$1$") {

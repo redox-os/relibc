@@ -92,7 +92,7 @@ fn read_setting(setting: &str) -> Option<(c_uchar, c_uint, c_uint, String)> {
 /// # Note
 /// The `crypt_scrypt` function uses the Scrypt key derivation function for hashing.
 /// The output of the Scrypt operation is base64-encoded using the BCrypt variant of base64.
-pub fn crypt_scrypt(passw: &str, setting: &str) -> Option<String> {
+pub fn crypt_scrypt(passw: &[u8], setting: &str) -> Option<String> {
     if setting.len() < 14 {
         return None;
     }
@@ -102,7 +102,7 @@ pub fn crypt_scrypt(passw: &str, setting: &str) -> Option<String> {
     let params = Params::new(nlog2, r, p, 32).ok()?;
     let mut output = [0u8; 32];
 
-    scrypt(passw.as_bytes(), salt.as_bytes(), &params, &mut output).ok()?;
+    scrypt(passw, salt.as_bytes(), &params, &mut output).ok()?;
 
     Some(format!(
         "$7${}${}${}",
