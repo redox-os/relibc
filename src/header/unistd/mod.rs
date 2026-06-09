@@ -517,19 +517,23 @@ pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut 
 #[deprecated]
 #[unsafe(no_mangle)]
 pub extern "C" fn getdtablesize() -> c_int {
-    let mut lim = mem::MaybeUninit::<sys_resource::rlimit>::uninit();
-    let r = unsafe {
-        sys_resource::getrlimit(
-            sys_resource::RLIMIT_NOFILE as c_int,
-            lim.as_mut_ptr().cast::<sys_resource::rlimit>(),
-        )
-    };
-    if r == 0 {
-        let cur = unsafe { lim.assume_init() }.rlim_cur;
-        match cur {
-            c if c < i32::MAX as u64 => c as i32,
-            _ => i32::MAX,
+    // TODO: Have getrlimit working in Redox
+    #[cfg(not(target_os = "redox"))]
+    {
+        let mut lim = mem::MaybeUninit::<sys_resource::rlimit>::uninit();
+        let r = unsafe {
+            sys_resource::getrlimit(
+                sys_resource::RLIMIT_NOFILE as c_int,
+                lim.as_mut_ptr().cast::<sys_resource::rlimit>(),
+            )
         };
+        if r == 0 {
+            let cur = unsafe { lim.assume_init() }.rlim_cur;
+            return match cur {
+                c if c < i32::MAX as u64 => c as i32,
+                _ => i32::MAX,
+            };
+        }
     }
     -1
 }
