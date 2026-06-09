@@ -33,12 +33,12 @@ pub const POSIX_SPAWN_SETSCHEDULER: c_short = 6;
 
 #[repr(C)]
 pub struct posix_spawnattr_t {
-    pub(crate) param: sched_param,
-    pub(crate) flags: c_short,
-    pub(crate) pgroup: c_int,
+    pub param: sched_param,
+    pub flags: c_short,
+    pub pgroup: c_int,
     policy: c_int,
-    sigdefault: sigset_t,
-    pub(crate) sigmask: sigset_t,
+    pub sigdefault: sigset_t,
+    pub sigmask: sigset_t,
 }
 
 #[unsafe(no_mangle)]
