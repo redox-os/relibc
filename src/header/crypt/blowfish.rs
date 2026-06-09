@@ -61,14 +61,14 @@ fn split_with_prefix(hash: &str) -> Option<(&str, &str, c_uint)> {
 /// # Note
 /// The `crypt_blowfish` function uses the Blowfish block cipher for hashing.
 /// The output of the Blowfish operation is base64-encoded using the BCrypt variant of base64.
-pub fn crypt_blowfish(passw: &str, setting: &str) -> Option<String> {
+pub fn crypt_blowfish(passw: &[u8], setting: &str) -> Option<String> {
     if let Some((prefix, setting, cost)) = split_with_prefix(setting) {
         if !(MIN_COST..=MAX_COST).contains(&cost) {
             return None;
         }
         // Passwords need to be null terminated
         let mut vec = Vec::with_capacity(passw.len() + 1);
-        vec.extend_from_slice(passw.as_bytes());
+        vec.extend_from_slice(passw);
         vec.push(0);
 
         // We only consider the first 72 chars; truncate if necessary.

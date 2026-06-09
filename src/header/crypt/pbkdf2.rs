@@ -36,7 +36,7 @@ use sha2::Sha256;
 /// # Note
 /// The `crypt_pbkdf2` function uses the SHA256 hashing algorithm for the PBKDF2 operation.
 /// The output of the PBKDF2 operation is base64-encoded using the BCrypt variant of base64.
-pub fn crypt_pbkdf2(passw: &str, setting: &str) -> Option<String> {
+pub fn crypt_pbkdf2(passw: &[u8], setting: &str) -> Option<String> {
     if let Some((iter_str, salt)) = &setting[3..].split_once('$') {
         if salt.contains('$') {
             return None;
@@ -50,7 +50,7 @@ pub fn crypt_pbkdf2(passw: &str, setting: &str) -> Option<String> {
 
         let iter = u32::from_str_radix(iter_str, 16).ok()?;
         let mut buffer = [0u8; 32];
-        pbkdf2_hmac::<Sha256>(passw.as_bytes(), actual_salt.as_bytes(), iter, &mut buffer);
+        pbkdf2_hmac::<Sha256>(passw, actual_salt.as_bytes(), iter, &mut buffer);
 
         Some(format!(
             "$8${}${}${}",
