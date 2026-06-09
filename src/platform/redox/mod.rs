@@ -46,7 +46,7 @@ use crate::{
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
         sys_select::timeval,
-        sys_stat::{S_ISVTX, stat},
+        sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
@@ -1212,7 +1212,11 @@ impl Pal for Sys {
         use crate::header::spawn::Flags;
 
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
-        let executable = File::open(program, fcntl::O_RDONLY)?;
+        let executable = FdGuard::new(File::open(program, fcntl::O_RDONLY)?.fd as usize)
+            .to_upper()
+            .unwrap();
+        let mut executable_stat = syscall::Stat::default();
+        executable.fstat(&mut executable_stat)?;
         let original_cwd = path::clone_cwd().unwrap().to_string();
         let mut cwd = original_cwd.clone();
         let proc_fd = child.proc_fd.unwrap();
@@ -1222,10 +1226,8 @@ impl Pal for Sys {
             .dup(b"filetable")?
             .dup(b"copy")?;
 
-        {
-            let new_file_table = child.thr_fd.dup(b"current-filetable")?;
-            new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
-        }
+        let new_file_table = child.thr_fd.dup(b"current-filetable")?;
+        new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
 
         let mut args = Vec::new();
         let mut envs = Vec::new();
@@ -1240,21 +1242,19 @@ impl Pal for Sys {
             }
         }
 
-        let mut program_name = String::new();
-
-        if let Some(ent) = dir_ent_name {
+        let program_name: String = if let Some(ent) = dir_ent_name {
             let mut binary = str::from_utf8(args[0]).unwrap().to_string();
             binary.insert_str(0, "./");
 
-            program_name = redox_path::canonicalize_using_cwd(Some(ent.as_str()), binary.as_str())
-                .ok_or(Errno(ENOENT))?;
+            redox_path::canonicalize_using_cwd(Some(ent.as_str()), binary.as_str())
+                .ok_or(Errno(ENOENT))?
         } else {
-            program_name = redox_path::canonicalize_using_cwd(
+            redox_path::canonicalize_using_cwd(
                 Some(original_cwd.as_str()),
                 str::from_utf8(args[0]).unwrap(),
             )
-            .ok_or(Errno(ENOENT))?;
-        }
+            .ok_or(Errno(ENOENT))?
+        };
 
         args[0] = program_name.as_bytes();
 
@@ -1320,6 +1320,8 @@ impl Pal for Sys {
 
         let mut extra_info = redox_rt::proc::ExtraInfo {
             cwd: Some(cwd.as_bytes()),
+            // Signals set to be ignored by the calling process
+            // must also be ignored by the child process
             sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
             sigprocmask: if let Some(fat) = fat
                 && Flags::from_bits(fat.flags)
@@ -1364,33 +1366,37 @@ impl Pal for Sys {
                 redox_rt::sys::posix_setresugid(
                     &Resugid {
                         ruid: None,
-                        euid: Some(parent_resugid.ruid),
+                        euid: Some(if executable_stat.st_mode as mode_t & S_ISUID == S_ISUID {
+                            executable_stat.st_uid
+                        } else {
+                            parent_resugid.ruid
+                        }),
                         suid: None,
                         rgid: None,
-                        egid: Some(parent_resugid.rgid),
+                        egid: Some(if executable_stat.st_mode as mode_t & S_ISGID == S_ISGID {
+                            executable_stat.st_gid
+                        } else {
+                            parent_resugid.rgid
+                        }),
                         sgid: None,
                     },
                     Some(proc_fd.as_raw_fd()),
                 )?;
             }
 
-            // todo: if set-uid bit is set, euid must be owner id
-            // todo: if set-gid bit is set, egid is file's gid
-
             if flags.contains(Flags::POSIX_SPAWN_SETSIGMASK) {
                 extra_info.sigprocmask = attr.sigmask;
             }
 
-            if flags.contains(Flags::POSIX_SPAWN_SETSIGDEF) {
-                todo!()
-            }
+            // if POSIX_SPAWN_SETSIGDEF flag is set, the signals specified in
+            // sigdefault must have default actions
         }
 
         if let Some(redox_rt::proc::FexecResult::Interp {
             path: interp_path,
             interp_override,
         }) = redox_rt::proc::fexec_impl(
-            FdGuard::new(executable.fd as usize).to_upper().unwrap(),
+            executable,
             &child.thr_fd,
             &proc_fd,
             program.to_bytes(),
