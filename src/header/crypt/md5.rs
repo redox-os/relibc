@@ -27,7 +27,7 @@ fn encode_md5(source: &[c_uchar]) -> Option<[c_uchar; PW_SIZE_MD5]> {
 
 /// Function taken from PR: https://github.com/RustCrypto/password-hashes/pull/351
 /// This won't be needed once the PR is merged
-fn inner_md5(passw: &str, setting: &str) -> Option<String> {
+fn inner_md5(passw: &[u8], setting: &str) -> Option<String> {
     let mut digest_b = Md5::default();
     digest_b.update(passw);
     digest_b.update(setting);
@@ -124,7 +124,7 @@ fn inner_md5(passw: &str, setting: &str) -> Option<String> {
 /// # Note
 /// The `crypt_md5` function uses the MD5 hashing algorithm for hashing.
 /// The output of the MD5 operation is base64-encoded using the BCrypt variant of base64.
-pub fn crypt_md5(passw: &str, setting: &str) -> Option<String> {
+pub fn crypt_md5(passw: &[u8], setting: &str) -> Option<String> {
     /* reject large keys */
     if passw.len() > KEY_MAX {
         return None;
