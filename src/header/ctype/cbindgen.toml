@@ -9,7 +9,11 @@ include_guard = "_RELIBC_CTYPE_H"
 after_includes = """
 #include <bits/locale-t.h> // for locale_t
 
+// TODO introduce include guard or remove these
+// forwards obsolete POSIX fuctions to replacements
+// https://pubs.opengroup.org/onlinepubs/9699919799/functions/_tolower.html
 #define _tolower(c) tolower(c)
+// https://pubs.opengroup.org/onlinepubs/9699919799/functions/_toupper.html
 #define _toupper(c) toupper(c)
 """
 language = "C"
