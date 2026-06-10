@@ -1,4 +1,4 @@
-sys_includes = ["sched.h", "bits/sigset-t.h", "bits/mode-t.h"]
+sys_includes = ["sched.h", "bits/sigset-t.h", "bits/mode-t.h", "bits/size-t.h"]
 include_guard = "_RELIBC_SPAWN_H"
 language = "C"
 cpp_compat = true

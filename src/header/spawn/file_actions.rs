@@ -3,7 +3,7 @@ use core::ptr;
 
 use crate::{
     header::errno::EBADF,
-    platform::types::{c_char, c_int, mode_t, size_t},
+    platform::types::{c_char, c_int, c_uchar, mode_t, size_t},
 };
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ struct FileActions(Vec<Action>);
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct posix_spawn_file_actions_t {
-    __relibc_internal_size: [u8; 24],
+    __relibc_internal_size: [c_uchar; 24],
     __relibc_internal_align: size_t,
 }
 
@@ -124,9 +124,6 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
     mode: mode_t,
 ) -> c_int {
     let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    if path.is_null() {
-        panic!("path cannot be NULL");
-    }
     if fd < 0 {
         return EBADF;
     }
@@ -174,9 +171,6 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
     path: *const c_char,
 ) -> c_int {
     let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    if path.is_null() {
-        panic!("path cannot be NULL");
-    }
     file_actions.add_action(Action::Chdir(unsafe {
         if path.is_null() {
             CString::new("").unwrap()
