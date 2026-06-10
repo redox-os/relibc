@@ -115,6 +115,14 @@ unsafe fn spawn(
     Ok(())
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn.html>
+///
+/// `argv` must **not** be `NULL` and must contain atleast the program name. `path` must also be **not** `NULL`. Failure to ensure any of this will result in a panic.
+///
+/// # Safety:
+/// `file_actions` and `attrp` must either be `NULL` or be pointers to properly initialised objects. Doing otherwise is undefined behaviour.
+///
+/// `path` and the elements in `argv` must be a pointers to valid null-terminated character arrays. Failure to ensure any of this will result in undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn(
     pid: *mut pid_t,
@@ -158,6 +166,14 @@ pub unsafe extern "C" fn posix_spawn(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnp.html>
+///
+/// `argv` must **not** be `NULL` and must contain atleast the program name. `path` must also be **not** `NULL`. Failure to ensure any of this will result in a panic.
+///
+/// # Safety:
+/// `file_actions` and `attrp` must either be `NULL` or be pointers to properly initialised objects. Doing otherwise is undefined behaviour.
+///
+/// `path` and the elements in `argv` must be a pointers to valid null-terminated character arrays. Failure to ensure any of this will result in undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnp(
     pid: *mut pid_t,

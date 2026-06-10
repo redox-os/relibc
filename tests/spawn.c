@@ -1,4 +1,4 @@
-#include "../test_helpers.h"
+#include "./test_helpers.h"
 #include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 static const char buf[] = "#include <unistd.h>\nint main()\n{\nwrite(900, "
-                          "\"HELLO REDOX\\n\", 12);\n}";
+                          "\"hello_spawn REDOX\\n\", 12);\n}";
 
 #define OPTIONALLY_ERROR(function, args, cond)                                 \
   {                                                                            \
@@ -34,17 +34,17 @@ int main() {
   ERROR_IF(getcwd, __cwd, == NULL);
   char target[PATH_MAX];
   strcpy(target, cwd);
-  strcat(target, "/hello");
+  strcat(target, "/hello_spawn");
 
   // TEST: chdir and open
   char *argv1[] = {"ls", target, NULL};
   posix_spawn_file_actions_t fa;
   posix_spawn_file_actions_init(&fa);
-  status = mkdir("./hello", S_IRUSR | S_IWUSR);
+  status = mkdir("./hello_spawn", S_IRUSR | S_IWUSR);
   ERROR_IF(mkdir, status, != 0);
-  OPTIONALLY_ERROR(posix_spawn_file_actions_addchdir, (&fa, "./hello"), == 0);
+  OPTIONALLY_ERROR(posix_spawn_file_actions_addchdir, (&fa, "./hello_spawn"), == 0);
   OPTIONALLY_ERROR(posix_spawn_file_actions_addopen,
-                   (&fa, 2, "./hello.txt", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR),
+                   (&fa, 2, "./hello_spawn.txt", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR),
                    == 0);
   OPTIONALLY_ERROR(posix_spawnp, (&pid, "ls", &fa, NULL, argv1, environ), == 0);
   assert(pid != 0);
@@ -62,9 +62,9 @@ int main() {
   assert(pid != 0);
   waitpid(pid, NULL, 0);
   OPTIONALLY_ERROR(posix_spawn_file_actions_destroy, (&fa), == 0);
-  status = unlink("./hello/hello.txt");
+  status = unlink("./hello_spawn/hello_spawn.txt");
   ERROR_IF(unlink, status, != 0);
-  status = rmdir("./hello");
+  status = rmdir("./hello_spawn");
   ERROR_IF(rmdir, status, != 0);
 
   // TEST: dup2

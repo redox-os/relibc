@@ -72,8 +72,11 @@ impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_init.html>
+///
+/// Panics if `file_actions` is `NULL`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn posix_spawn_file_actions_init(
+pub extern "C" fn posix_spawn_file_actions_init(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
     if file_actions.is_null() {
@@ -87,6 +90,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_init(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_destroy.html>
+///
+/// Panics if `file_actions` is `NULL`.
+///
+/// # Safety:
+/// If `file_actions` is not `NULL`, then it must be a pointer to a `file_actions` object that was initialised by calling `posix_spawn_file_actions_init`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     file_actions: *mut posix_spawn_file_actions_t,
@@ -100,6 +109,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addopen.html>
+///
+/// Panics if `file_actions` is `NULL`.
+///
+/// # Safety:
+/// `path` must be a valid null-terminated C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
     file_actions: *mut posix_spawn_file_actions_t,
@@ -128,6 +143,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addclose.html>
+///
+/// Panics if `file_actions` is `NULL`.
+///
+/// # Safety:
+/// `file_actions` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
     file_actions: *mut posix_spawn_file_actions_t,
@@ -141,6 +162,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addchdir.html>
+///
+/// Panics if `file_actions` is `NULL`.
+///
+/// # Safety:
+/// `file_actions` must be initialised and `path` must be a valid null-terminated C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
     file_actions: *mut posix_spawn_file_actions_t,
@@ -160,6 +187,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addfchdir.html>
+///
+/// Panics if `file_actions` is `NULL`.
+///
+/// # Safety:
+/// `file_actions` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
     file_actions: *mut posix_spawn_file_actions_t,
@@ -173,6 +206,12 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_adddup2.html>
+///
+/// Panics if `file_actions` is `NULL`.
+///
+/// # Safety:
+/// `file_actions` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_adddup2(
     file_actions: *mut posix_spawn_file_actions_t,

@@ -41,41 +41,79 @@ pub struct posix_spawnattr_t {
     pub sigmask: sigset_t,
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_init.html>
+///
+/// Panics is `attr` is `NULL`.
 #[unsafe(no_mangle)]
-pub extern "C" fn posix_spawnattr_init(attr: &mut posix_spawnattr_t) -> c_int {
-    *attr = unsafe { zeroed() };
+pub extern "C" fn posix_spawnattr_init(attr: *mut posix_spawnattr_t) -> c_int {
+    unsafe {
+        let attr = attr.as_mut().expect("posix_spawnattr_t cannot be NULL");
+        *attr = zeroed();
+    }
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_destroy.html>
+///
+/// Panics is `attr` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be a pointer to `posix_spawnattr_t` and must at least be initialised.
 #[unsafe(no_mangle)]
-pub extern "C" fn posix_spawnattr_destroy(attr: &mut posix_spawnattr_t) -> c_int {
-    *attr = unsafe { zeroed() };
+pub unsafe extern "C" fn posix_spawnattr_destroy(attr: *mut posix_spawnattr_t) -> c_int {
+    unsafe {
+        let attr = attr.as_mut().expect("posix_spawnattr_t cannot be NULL");
+        *attr = zeroed();
+    }
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setschedparam.html>
+///
+/// Panics if `attr` or `schedparam` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setschedparam(
-    attr: &mut posix_spawnattr_t,
-    schedparam: &sched_param,
+    attr: *mut posix_spawnattr_t,
+    schedparam: *const sched_param,
 ) -> c_int {
+    let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
+    let schedparam = unsafe { schedparam.as_ref().expect("schedparam cannot be NULL") };
     (*attr).param = *schedparam;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getschedparam.html>
+///
+/// Panics if `attr` or `schedparam` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getschedparam(
-    attr: &posix_spawnattr_t,
-    schedparam: &mut sched_param,
+    attr: *const posix_spawnattr_t,
+    schedparam: *mut sched_param,
 ) -> c_int {
+    let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
+    let schedparam = unsafe { schedparam.as_mut().expect("schedparam cannot be NULL") };
     *schedparam = (*attr).param;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setschedpolicy.html>
+///
+/// Panics if `attr` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setschedpolicy(
-    attr: &mut posix_spawnattr_t,
+    attr: *mut posix_spawnattr_t,
     schedpolicy: c_int,
 ) -> c_int {
+    let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     match schedpolicy {
         SCHED_FIFO | SCHED_RR | SCHED_OTHER => (*attr).policy = schedpolicy,
         _ => return EINVAL,
@@ -84,56 +122,103 @@ pub unsafe extern "C" fn posix_spawnattr_setschedpolicy(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getschedpolicy.html>
+///
+/// Panics if `attr` or `schedpolicy` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getschedpolicy(
-    attr: &posix_spawnattr_t,
-    schedpolicy: &mut c_int,
+    attr: *const posix_spawnattr_t,
+    schedpolicy: *mut c_int,
 ) -> c_int {
+    let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
+    let schedpolicy = unsafe { schedpolicy.as_mut().expect("schedpolicy cannot be NULL") };
     *schedpolicy = (*attr).policy;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setsigdefault.html>
+///
+/// Panics if `attr` or `sigdefault` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setsigdefault(
-    attr: &mut posix_spawnattr_t,
-    sigdefault: &sigset_t,
+    attr: *mut posix_spawnattr_t,
+    sigdefault: *const sigset_t,
 ) -> c_int {
+    let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
+    let sigdefault = unsafe { sigdefault.as_ref().expect("sigdefault cannot be NULL") };
     (*attr).sigdefault = *sigdefault;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getsigdefault.html>
+///
+/// Panics if `attr` or `sigdefault` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getsigdefault(
-    attr: &posix_spawnattr_t,
-    sigdefault: &mut sigset_t,
+    attr: *const posix_spawnattr_t,
+    sigdefault: *mut sigset_t,
 ) -> c_int {
+    let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
+    let sigdefault = unsafe { sigdefault.as_mut().expect("sigdefault cannot be NULL") };
     *sigdefault = (*attr).sigdefault;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setsigmask.html>
+///
+/// Panics if `attr` or `sigmask` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setsigmask(
-    attr: &mut posix_spawnattr_t,
-    sigmask: &sigset_t,
+    attr: *mut posix_spawnattr_t,
+    sigmask: *const sigset_t,
 ) -> c_int {
+    let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
+    let sigmask = unsafe { sigmask.as_ref().expect("sigmask cannot be NULL") };
     (*attr).sigmask = *sigmask;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getsigmask.html>
+///
+/// Panics if `attr` or `sigmask` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getsigmask(
-    attr: &posix_spawnattr_t,
-    sigmask: &mut sigset_t,
+    attr: *const posix_spawnattr_t,
+    sigmask: *mut sigset_t,
 ) -> c_int {
+    let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
+    let sigmask = unsafe { sigmask.as_mut().expect("sigmask cannot be NULL") };
     *sigmask = (*attr).sigmask;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setflags.html>
+///
+/// Panics if `attr` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setflags(
-    attr: &mut posix_spawnattr_t,
+    attr: *mut posix_spawnattr_t,
     flags: c_short,
 ) -> c_int {
+    let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     match Flags::from_bits(flags) {
         Some(v) => (*attr).flags = v.bits(),
         None => {
@@ -144,29 +229,53 @@ pub unsafe extern "C" fn posix_spawnattr_setflags(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getflags.html>
+///
+/// Panics if `attr` or `flags` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getflags(
-    attr: &posix_spawnattr_t,
-    flags: &mut c_short,
+    attr: *const posix_spawnattr_t,
+    flags: *mut c_short,
 ) -> c_int {
+    let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
+    let flags = unsafe { flags.as_mut().expect("flags cannot be NULL") };
+
     *flags = (*attr).flags;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setpgroup.html>
+///
+/// Panics if `attr` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setpgroup(
-    attr: &mut posix_spawnattr_t,
+    attr: *mut posix_spawnattr_t,
     pgroup: pid_t,
 ) -> c_int {
+    let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     (*attr).pgroup = pgroup;
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getpgroup.html>
+///
+/// Panics if `attr` or `pgroup` is `NULL`.
+///
+/// # Safety:
+/// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getpgroup(
-    attr: &posix_spawnattr_t,
-    pgroup: &mut pid_t,
+    attr: *const posix_spawnattr_t,
+    pgroup: *mut pid_t,
 ) -> c_int {
+    let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
+    let pgroup = unsafe { pgroup.as_mut().expect("pgroup cannot be NULL") };
     *pgroup = (*attr).pgroup;
     0
 }
