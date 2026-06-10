@@ -12,8 +12,11 @@ use crate::{
     header::{
         bits_arpainet::ntohl,
         errno::{EAFNOSUPPORT, ENOSPC},
-        netinet_in::{INADDR_NONE, in_addr, in_addr_t},
-        sys_socket::{constants::AF_INET, socklen_t},
+        netinet_in::{INADDR_NONE, in_addr, in_addr_t, in6_addr},
+        sys_socket::{
+            constants::{AF_INET, AF_INET6},
+            socklen_t,
+        },
     },
     io::Write,
     platform::{
@@ -260,10 +263,7 @@ pub unsafe extern "C" fn inet_ntop(
 /// numeric binary form.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_void) -> c_int {
-    if af != AF_INET {
-        platform::ERRNO.set(EAFNOSUPPORT);
-        -1
-    } else {
+    if af == AF_INET {
         let s_addr = unsafe {
             slice::from_raw_parts_mut(
                 ptr::from_mut(&mut (*dst.cast::<in_addr>()).s_addr).cast::<u8>(),
@@ -288,5 +288,92 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
         } else {
             0
         }
+    } else if af == AF_INET6 {
+        let src_str = unsafe { str::from_utf8_unchecked(CStr::from_ptr(src).to_bytes()) };
+        let mut chunks = vec![src_str];
+        let colons = src_str.bytes().filter(|&c| c == ':' as u8).count();
+        if colons > 7 || colons < 2 {
+            return 0;
+        }
+        let dots = src_str.bytes().filter(|&c| c == '.' as u8).count();
+        if dots != 0 && dots != 3 {
+            return 0;
+        }
+        let double_colon = src_str.find("::");
+        if colons < 2
+            || double_colon.is_some() && ((dots == 0 && colons > 7) || (dots == 3 && colons > 6))
+            || double_colon.is_none() && ((dots == 0 && colons != 7) || (dots == 3 && colons != 6))
+        {
+            return 0;
+        }
+        if dots == 3
+            && let Some(first_dot) = src_str.find('.')
+            && let Some(last_colon) = src_str.find(':')
+        {
+            if last_colon > first_dot {
+                return 0;
+            }
+        }
+        if let Some(first) = src_str.find("::")
+            && let Some(last) = src_str.rfind("::")
+        {
+            // :: is allowed only once
+            if first != last {
+                return 0;
+            }
+            chunks = vec![&src_str[..first], &src_str[(first + 2)..]]
+        }
+
+        let s6_addr = unsafe {
+            slice::from_raw_parts_mut(
+                ptr::from_mut(&mut (*dst.cast::<in6_addr>()).s6_addr).cast::<u16>(),
+                8,
+            )
+        };
+        s6_addr.iter_mut().for_each(|w| *w = 0);
+
+        for (count, &chunk) in chunks
+            .iter()
+            .enumerate()
+            .filter(|&(_, &chunk)| !chunk.is_empty())
+        {
+            let mut parts = s6_addr
+                .iter_mut()
+                .skip(count * (8 - chunk.split(':').count() - dots / 3));
+            let mut words = chunk.split(':');
+            while let Some(word) = words.next()
+                && let Some(part) = parts.next()
+            {
+                if word.is_empty() {
+                    break;
+                } else if word.len() <= 4
+                    && let Some(n) = u16::from_str_radix(word, 16).ok()
+                {
+                    *part = n.to_be();
+                } else if word.contains('.') {
+                    let bytes =
+                        unsafe { slice::from_raw_parts_mut(ptr::from_mut(part).cast::<u8>(), 4) };
+                    let mut octets = word.split('.');
+                    for byte in bytes {
+                        if let Some(octet) = octets.next() {
+                            if octet.len() > 1 && octet.starts_with('0') {
+                                return 0;
+                            }
+                            if let Ok(value) = u8::from_str(octet) {
+                                *byte = value
+                            } else {
+                                return 0;
+                            }
+                        }
+                    }
+                } else {
+                    return 0;
+                }
+            }
+        }
+        1 // Success
+    } else {
+        platform::ERRNO.set(EAFNOSUPPORT);
+        -1
     }
 }
