@@ -8,7 +8,9 @@ use crate::platform::types::{c_void, size_t};
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
 pub struct iovec {
+    /// Base address of a memory region for input or output.
     pub iov_base: *mut c_void,
+    /// The size of the memory pointed to by `iov_base`.
     pub iov_len: size_t,
 }
 

@@ -1,6 +1,6 @@
 # POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html
 #
-# This type is split out to prevent importing all of sys/socket.h to other headers.
+# This type is split out to prevent importing all of sys/socket.h into other headers.
 #
 # POSIX headers that require socklen_t:
 # - arpa/inet.h
@@ -12,7 +12,6 @@
 sys_includes = ["stdint.h"]
 include_guard = "_RELIBC_BITS_SOCKLEN_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]

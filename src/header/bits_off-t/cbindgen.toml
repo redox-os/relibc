@@ -9,10 +9,8 @@
 # - sys/stat.h
 # - sys/types.h (where it should be defined)
 # - unistd.h
-sys_includes = []
 include_guard = "_RELIBC_BITS_OFF_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]

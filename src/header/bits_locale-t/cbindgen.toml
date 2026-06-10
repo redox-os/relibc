@@ -1,29 +1,23 @@
 # POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html
 #
-# The locale header should define this type but multiple headers make use of it.
-# This type is split out from the locale header to avoid including all of locale in the other headers.
+# This type is split out to prevent importing all of locale.h into other headers.
 #
 # POSIX headers that require locale_t:
 # - ctype.h
 # - langinfo.h
-# - libintl.h (Redox does not have this header, it seems to be supplied externally)
-# - monetary.h (TODO note exists, not currently imported)
+# - libintl.h (relibc does not define this header, supplied externally by gettext > libint)
+# - locale.h (where it should be defined)
+# - monetary.h
 # - string.h
-# - strings.h (TODO note exists, not currently imported)
-# - time.h (TODO note exists, not currently imported)
-# - wchar.h (required by *_l functions, no TODO note present)
-# - wctype.h (required by *_l functions, TODO note exists, not currently imported)
-sys_includes = []
+# - strings.h
+# - time.h
+# - wchar.h
+# - wctype.h
 include_guard = "_RELIBC_BITS_LOCALE_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
-
 [export]
-include = [
-  "locale_t"
-]
-
+include = ["locale_t"]
 [enum]
 prefix_with_name = true

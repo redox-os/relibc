@@ -8,17 +8,15 @@
 # - spawn.h (TODO not present in relibc)
 # - sys/msg.h (TODO not present in relibc)
 # - sys/sem.h (TODO not present in relibc)
-# - sys/shm.h (TODO not present in relibc)
+# - sys/shm.h
 # - sys/types.h (where it should be defined)
 # - sys/wait.h
 # - termios.h
 # - time.h
 # - unistd.h
 # - utmpx.h (TODO not present in relibc)
-sys_includes = []
 include_guard = "_RELIBC_BITS_PID_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]

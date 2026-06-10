@@ -1,4 +1,14 @@
-sys_includes = []
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html
+#
+# These types are split out to prevent importing all of sys/types.h into other headers.
+#
+# POSIX headers that require them:
+# - aio.h (pthread_attr_t only)
+# - pthread.h (all of them)
+# - signal (pthread_t and pthread_attr_t only)
+# - sys/types.h (where they should be defined)
+#
+# TODO split out pthread_t and pthread_attr_t
 include_guard = "_RELIBC_BITS_PTHREAD_H"
 language = "C"
 style = "type"

@@ -10,6 +10,8 @@ use crate::platform::types::{suseconds_t, time_t};
 #[allow(non_camel_case_types)]
 #[derive(Default)]
 pub struct timeval {
+    /// Seconds.
     pub tv_sec: time_t,
+    /// Microseconds.
     pub tv_usec: suseconds_t,
 }

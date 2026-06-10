@@ -6,10 +6,8 @@
 # - poll.h
 # - signal.h (where it should be defined)
 # - sys/select.h
-sys_includes = []
 include_guard = "_RELIBC_BITS_SIGSET_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]

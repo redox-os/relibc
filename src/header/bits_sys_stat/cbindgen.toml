@@ -5,10 +5,8 @@
 # POSIX headers that require blkcnt_t and blksize_t:
 # - sys/stat.h
 # - sys/types.h (where they should be defined)
-sys_includes = []
 include_guard = "_RELIBC_BITS_SYS_STAT_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]
