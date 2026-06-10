@@ -13,10 +13,8 @@
 # - sys/types.h (where it should be defined)
 # - sys/uio.h
 # - unistd.h
-sys_includes = []
 include_guard = "_RELIBC_BITS_SSIZE_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]

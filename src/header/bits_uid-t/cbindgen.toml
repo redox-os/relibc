@@ -5,14 +5,12 @@
 # POSIX headers that require uid_t:
 # - pwd.h
 # - signal.h
-# - sys/ipc.h (TODO not present in relibc)
+# - sys/ipc.h
 # - sys/stat.h
 # - sys/types.h (where it should be defined)
 # - unistd.h
-sys_includes = []
 include_guard = "_RELIBC_BITS_UID_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]

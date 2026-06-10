@@ -5,7 +5,6 @@
 # POSIX headers that require iovec:
 # - sys/socket.h
 # - sys/uio.h (where it should be defined)
-sys_includes = []
 after_includes = """
 #include <bits/size-t.h> // for size_t from sys/types.h
 """

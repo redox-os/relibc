@@ -3,7 +3,7 @@
 # This type is split out to avoid including all of time.h in the other headers.
 #
 # POSIX headers that require timespec:
-# - aio.h (all functions currently unimplemented but timespec imported)
+# - aio.h
 # - poll.h
 # - sched.h
 # - semaphore.h
@@ -20,9 +20,7 @@ language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
-
-[enum]
-prefix_with_name = true
-
 [export]
 include = ["timespec"]
+[enum]
+prefix_with_name = true
