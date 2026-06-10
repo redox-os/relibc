@@ -16,9 +16,7 @@ language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
-
-[enum]
-prefix_with_name = true
-
 [export]
 include = ["timeval"]
+[enum]
+prefix_with_name = true

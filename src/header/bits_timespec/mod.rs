@@ -8,7 +8,9 @@ use crate::{
 #[repr(C)]
 #[derive(Clone, Default, Debug)]
 pub struct timespec {
+    /// Whole seconds.
     pub tv_sec: time_t,
+    /// Nanoseconds.
     pub tv_nsec: c_long,
 }
 

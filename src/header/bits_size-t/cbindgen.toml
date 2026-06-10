@@ -16,6 +16,7 @@
 # - regex.h
 # - search.h (TODO not present in relibc)
 # - signal.h
+# - stddef.h (where it should be defined)
 # - stdio.h
 # - stdlib.h
 # - string.h
@@ -23,19 +24,17 @@
 # - sys/mman.h
 # - sys/msg.h (TODO not present in relibc)
 # - sys/sem.h (TODO not present in relibc)
-# - sys/shm.h (TODO not present in relibc)
+# - sys/shm.h
 # - sys/socket.h
-# - sys/types.h (should be re-exported)
+# - sys/types.h (where it should be re-exported)
 # - sys/uio.h
 # - time.h
 # - uchar.h (TODO not present in relibc)
 # - unistd.h
 # - wchar.h
 # - wordexp.h (TODO not present in relibc)
-sys_includes = []
 include_guard = "_RELIBC_BITS_SIZE_T_H"
 language = "C"
-style = "type"
 no_includes = true
 cpp_compat = true
 [export]
