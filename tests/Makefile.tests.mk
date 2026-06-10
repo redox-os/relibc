@@ -77,8 +77,6 @@ EXPECT_NAMES=\
 	sigaltstack \
 	signal \
 	sigsetjmp \
-	spawn/file_actions \
-	spawn/spawn_attr \
 	stdio/all \
 	stdio/buffer \
 	stdio/dprintf \
@@ -288,6 +286,7 @@ VARIED_NAMES=\
 	signals/sigset-4 \
 	signals/sigset-5 \
 	signals/sigset-9 \
+	spawn \
 	stdio/ctermid \
 	stdio/tempnam \
 	stdio/tmpnam \

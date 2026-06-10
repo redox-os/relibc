@@ -1226,8 +1226,10 @@ impl Pal for Sys {
             .dup(b"filetable")?
             .dup(b"copy")?;
 
-        let new_file_table = child.thr_fd.dup(b"current-filetable")?;
-        new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
+        {
+            let new_file_table = child.thr_fd.dup(b"current-filetable")?;
+            new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
+        }
 
         let mut args = Vec::new();
         let mut envs = Vec::new();
@@ -1360,7 +1362,7 @@ impl Pal for Sys {
                 todo!()
             }
 
-            if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
+            let set_resugid = || -> Result<()> {
                 let parent_resugid = redox_rt::sys::posix_getresugid();
 
                 redox_rt::sys::posix_setresugid(
@@ -1368,21 +1370,29 @@ impl Pal for Sys {
                         ruid: None,
                         euid: Some(if executable_stat.st_mode as mode_t & S_ISUID == S_ISUID {
                             executable_stat.st_uid
-                        } else {
+                        } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
                             parent_resugid.ruid
+                        } else {
+                            return Ok(());
                         }),
                         suid: None,
                         rgid: None,
                         egid: Some(if executable_stat.st_mode as mode_t & S_ISGID == S_ISGID {
                             executable_stat.st_gid
-                        } else {
+                        } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
                             parent_resugid.rgid
+                        } else {
+                            return Ok(());
                         }),
                         sgid: None,
                     },
                     Some(proc_fd.as_raw_fd()),
                 )?;
-            }
+
+                Ok(())
+            };
+
+            set_resugid()?;
 
             if flags.contains(Flags::POSIX_SPAWN_SETSIGMASK) {
                 extra_info.sigprocmask = attr.sigmask;
