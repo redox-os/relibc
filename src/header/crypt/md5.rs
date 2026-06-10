@@ -135,8 +135,9 @@ pub fn crypt_md5(passw: &[u8], setting: &str) -> Option<String> {
     }
 
     let cursor = 3;
+    let end = setting.len().min(cursor + SALT_MAX);
     let slen = cursor
-        + setting[cursor..cursor + SALT_MAX]
+        + setting[cursor..end]
             .chars()
             .take_while(|c| *c != '$')
             .count();
