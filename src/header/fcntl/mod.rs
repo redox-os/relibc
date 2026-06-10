@@ -14,6 +14,7 @@ use crate::{
 };
 
 pub use self::sys::*;
+pub use crate::header::bits_open_flags::*;
 
 use super::errno::EINVAL;
 

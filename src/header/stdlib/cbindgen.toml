@@ -12,8 +12,11 @@
 # stdint.h needed for unintptr_t for __stack_chk_guard
 # sys/wait.h brings in signal.h which brings in features.h
 # features required for deprecated and no return annotations
-sys_includes = ["stddef.h", "sys/wait.h", "fcntl.h", "stdint.h"]
+sys_includes = ["stddef.h", "sys/wait.h", "stdint.h"]
 include_guard = "_RELIBC_STDLIB_H"
+after_includes = """
+#include <bits/open-flags.h> // for O_* constants, shared with fcntl.h
+"""
 trailer = """
 #ifndef _RELIBC_STDLIB_EXTRA_H
 #define _RELIBC_STDLIB_EXTRA_H

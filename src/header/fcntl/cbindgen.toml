@@ -18,6 +18,7 @@ include_guard = "_RELIBC_FCNTL_H"
 after_includes = """
 #include <bits/pid-t.h> // for pid_t from sys/types.h
 #include <bits/fcntl.h> // for SEEK_CUR, SEEK_END and SEEK_SET from stdio.h
+#include <bits/open-flags.h> // for O_* constants, shared with stdlib.h
 """
 language = "C"
 style = "Tag"
