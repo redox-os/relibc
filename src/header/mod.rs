@@ -30,6 +30,8 @@ pub mod bits_nlink_t;
 pub mod bits_null;
 #[path = "bits_off-t/mod.rs"]
 pub mod bits_off_t;
+#[path = "bits_open-flags/mod.rs"]
+pub mod bits_open_flags;
 #[path = "bits_pid-t/mod.rs"]
 pub mod bits_pid_t;
 pub mod bits_pthread;
