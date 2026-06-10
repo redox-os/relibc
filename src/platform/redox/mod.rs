@@ -44,7 +44,7 @@ use crate::{
         sys_file,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
-        sys_resource::{RLIM_INFINITY, rlimit, rusage},
+        sys_resource::{PRIO_PROCESS, RLIM_INFINITY, rlimit, rusage, setpriority},
         sys_select::timeval,
         sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
         sys_statvfs::statvfs,
@@ -60,7 +60,7 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
     platform::{
-        free,
+        ERRNO, free,
         sys::timer::{TIMERS, timer_routine, timer_update_wake_time},
     },
     sync::rwlock::RwLock,
@@ -1358,8 +1358,27 @@ impl Pal for Sys {
                 }
             }
 
-            if flags.contains(Flags::POSIX_SPAWN_SETSCHEDPARAM) {
-                todo!()
+            let set_schedparam = || -> Result<()> {
+                if setpriority(
+                    PRIO_PROCESS,
+                    proc_fd.as_raw_fd() as id_t,
+                    attr.param.sched_priority,
+                ) as usize
+                    != 0
+                {
+                    Err(Errno(ERRNO.get()))
+                } else {
+                    Ok(())
+                }
+            };
+            let set_scheduler = || -> Result<()> { todo!() };
+
+            // scheduling paramters must be set regardless of whether the flag POSIX_SPAWN_SETSCHEDPARAM is set
+            if flags.contains(Flags::POSIX_SPAWN_SETSCHEDULER) {
+                set_schedparam()?;
+                set_scheduler()?;
+            } else if flags.contains(Flags::POSIX_SPAWN_SETSCHEDPARAM) {
+                set_schedparam()?;
             }
 
             let set_resugid = || -> Result<()> {

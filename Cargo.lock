@@ -462,7 +462,8 @@ dependencies = [
 [[package]]
 name = "redox_event"
 version = "0.4.7"
-source = "git+https://gitlab.redox-os.org/EuclidDivisionLemma/event?branch=spawn#9126b9b1166e4633877feacf109720481e814e2e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c07d0d6d291e3a951bd847b1cd4af32fc6243d64116cf7702838c02797688b7"
 dependencies = [
  "bitflags",
  "libredox",
@@ -472,7 +473,8 @@ dependencies = [
 [[package]]
 name = "redox_syscall"
 version = "0.8.1"
-source = "git+https://gitlab.redox-os.org/redox-os/syscall/#79cb6d9057642be31623677458a93aa88145864f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b44b894f2a6e36457d665d1e08c3866add6ed5e70050c1b4ba8a8ddedb02ce7"
 dependencies = [
  "bitflags",
 ]
