@@ -15,6 +15,7 @@
    License along with the GNU C Library; if not, see
    <https://www.gnu.org/licenses/>.  */
 
+#include <assert.h>
 #include <crypt.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +33,17 @@ int main () {
         result |= strcmp ("$1$saltstri$YMyguxXMBpd2TEZ.vS/3q1", cp);
         if (!result)
             printf("Success!\n");
+    }
+
+    /* short salt must not panic (index out of bounds) */
+    cp = crypt("test", "$1$ab");
+    if (cp) {
+        assert(strncmp(cp, "$1$ab$", 6) == 0);
+    }
+
+    cp = crypt("test", "$1$");
+    if (cp) {
+        assert(strncmp(cp, "$1$$", 4) == 0);
     }
 
     return result;
