@@ -12,14 +12,6 @@ use crate::{
     },
 };
 
-// TODO why are these numbered differently to linux?
-pub const _SC_NPROCESSORS_CONF: c_int = 57;
-pub const _SC_NPROCESSORS_ONLN: c_int = 58;
-pub const _SC_PHYS_PAGES: c_int = 59;
-pub const _SC_AVPHYS_PAGES: c_int = 60;
-pub const _SC_SIGQUEUE_MAX: c_int = 190;
-pub const _SC_REALTIME_SIGNALS: c_int = 191;
-
 pub(super) fn sysconf_impl(name: c_int) -> c_long {
     //TODO: Real values
     match name {
