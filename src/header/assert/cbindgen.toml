@@ -12,6 +12,8 @@ trailer = """
 #undef assert
 #endif
 
+// _Static_assert in C23 (202311L) is considered deprecated but kept for comaptibility.
+// static_assert in C23 is considered a key word.
 #if __STDC_VERSION__ >= 201112L && !defined(__cplusplus)
 #define static_assert _Static_assert
 #endif
