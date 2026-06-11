@@ -1,5 +1,17 @@
-# Open flags are defined by fcntl.h: https://pubs.opengroup.org/onlinepubs/007904975/basedefs/fcntl.h.html
-# And must be included in stdlib.h: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdlib.h.html
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fcntl.h.html
+#
+# These constants are split out to prevent including all of fcntl.h into stdlib.h
+#
+# POSIX headers that require some/all of these constants:
+# - fcntl.h (where they should be defined)
+# - mqueue.h (TODO not present in relibc)
+# - semaphore.h
+# - stdlib.h (uses these bits to avoid fcntl.h `open` conflicting with prboom)
+# - sys/mman.h
+# - unistd.h
+#
+# The POSIX spec states that in all of the above headers all of the symbols from
+# fcntl.h may be included fully.
 include_guard = "_RELIBC_BITS_OPEN_FLAGS_H"
 language = "C"
 no_includes = true
