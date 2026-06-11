@@ -236,7 +236,7 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
         ),
     );
     match write_result {
-        Ok(_) => buf,
+        Ok(()) => buf,
         Err(_) => {
             /* asctime()/asctime_r() or the equivalent sprintf() call
              * have no defined errno setting */

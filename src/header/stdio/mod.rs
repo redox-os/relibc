@@ -206,15 +206,13 @@ impl Write for FILE {
 
 impl WriteFmt for FILE {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_all(s.as_bytes())
-            .map(|_| ())
-            .map_err(|_| fmt::Error)
+        self.write_all(s.as_bytes()).map_err(|_| fmt::Error)
     }
 }
 
 impl WriteByte for FILE {
     fn write_u8(&mut self, c: u8) -> fmt::Result {
-        self.write_all(&[c]).map(|_| ()).map_err(|_| fmt::Error)
+        self.write_all(&[c]).map_err(|_| fmt::Error)
     }
 }
 

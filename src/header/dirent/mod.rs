@@ -140,7 +140,7 @@ impl DIR {
         Ok(dent_ptr)
     }
     fn seek(&mut self, off: u64) {
-        let Ok(_) = Sys::dir_seek(*self.file, off) else {
+        let Ok(()) = Sys::dir_seek(*self.file, off) else {
             return;
         };
         self.buf.clear();
@@ -149,7 +149,7 @@ impl DIR {
     }
     fn rewind(&mut self) {
         self.opaque_offset = 0;
-        let Ok(_) = Sys::dir_seek(*self.file, 0) else {
+        let Ok(()) = Sys::dir_seek(*self.file, 0) else {
             return;
         };
         self.buf.clear();
