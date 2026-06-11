@@ -30,6 +30,7 @@ macro_rules! wc_as_char {
     };
 }
 
+#[expect(clippy::cast_lossless)] // not all users of `parse_type!` are lossless
 pub unsafe fn inner_scanf<T: Kind>(
     mut r: Reader<T>,
     format: Reader<T>,

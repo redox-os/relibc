@@ -1473,6 +1473,7 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtod.html>.
+#[expect(clippy::cast_lossless)] // not all users of `strto_float_impl!` are lossless
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c_double {
     strto_float_impl!(c_double, s, endptr)
