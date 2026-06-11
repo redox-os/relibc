@@ -505,7 +505,7 @@ impl<W: Write + Seek> Seek for BufWriter<W> {
     ///
     /// Seeking always writes out the internal buffer before seeking.
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.flush_buf().and_then(|_| self.get_mut().seek(pos))
+        self.flush_buf().and_then(|()| self.get_mut().seek(pos))
     }
 }
 

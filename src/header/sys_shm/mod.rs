@@ -135,7 +135,7 @@ pub unsafe extern "C" fn shmdt(shmaddr: *const c_void) -> c_int {
     let total_size = unsafe { (*header).total_size };
 
     unsafe { Sys::munmap(base_ptr.cast::<c_void>(), total_size) }
-        .map(|_| 0)
+        .map(|()| 0)
         .or_minus_one_errno()
 }
 
@@ -143,7 +143,7 @@ pub unsafe extern "C" fn shmdt(shmaddr: *const c_void) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn shmctl(shmid: c_int, cmd: c_int, buf: *mut shmid_ds) -> c_int {
     match cmd {
-        IPC_RMID => Sys::close(shmid).map(|_| 0).or_minus_one_errno(),
+        IPC_RMID => Sys::close(shmid).map(|()| 0).or_minus_one_errno(),
         IPC_STAT => {
             if buf.is_null() {
                 ERRNO.set(EINVAL);
