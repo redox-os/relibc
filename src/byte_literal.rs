@@ -3,7 +3,7 @@ use crate::platform::types::c_char;
 pub struct ByteLiteral;
 
 impl ByteLiteral {
-    pub const fn cast_unchecked(input: u8) -> c_char {
+    pub fn cast_unchecked(input: u8) -> c_char {
         match input {
             b' '..=b'~' => {
                 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
