@@ -73,6 +73,7 @@ pub unsafe extern "C" fn strtoumax(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
+#[expect(clippy::cast_lossless)] // not all users of `wcsto_impl!` are lossless
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoimax(
     mut ptr: *const wchar_t,
