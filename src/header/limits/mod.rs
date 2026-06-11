@@ -12,6 +12,13 @@ pub const PASS_MAX: usize = 128;
 pub const PATH_MAX: usize = 4096;
 pub const NGROUPS_MAX: usize = 65536;
 
+/// Maximum number of `iovec` structures that one process has available for
+/// use with `readv()` or `writev()`.
+pub const IOV_MAX: c_int = 1024;
+
+/// Minimum required value for `IOV_MAX`.
+pub const _XOPEN_IOV_MAX: c_int = 16;
+
 pub const CHAR_BIT: u32 = 8;
 pub const WORD_BIT: u32 = 32;
 #[cfg(target_pointer_width = "32")]
