@@ -5,7 +5,7 @@
 use core::slice;
 
 use crate::{
-    header::{errno, unistd},
+    header::{errno, limits::IOV_MAX, unistd},
     platform::{
         self,
         types::{c_int, c_void, off_t, ssize_t},
@@ -13,8 +13,6 @@ use crate::{
 };
 
 pub use crate::header::bits_iovec::{gather, iovec, scatter};
-
-pub const IOV_MAX: c_int = 1024;
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/readv.2.html>.
 #[unsafe(no_mangle)]

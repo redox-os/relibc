@@ -10,7 +10,6 @@ use crate::{
     platform,
 };
 
-pub const _XOPEN_IOV_MAX: c_long = 16;
 pub const _XOPEN_NAME_MAX: c_long = 255;
 pub const _XOPEN_PATH_MAX: c_long = 1024;
 
@@ -192,7 +191,7 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_2_FORT_RUN => -1,
         _SC_2_SW_DEV => -1,
         _SC_2_LOCALEDEF => -1,
-        _SC_IOV_MAX => _XOPEN_IOV_MAX,
+        _SC_IOV_MAX => _XOPEN_IOV_MAX.into(),
         _SC_THREADS => _POSIX_VERSION,
         _SC_THREAD_SAFE_FUNCTIONS => _POSIX_VERSION,
         _SC_GETGR_R_SIZE_MAX => -1,
