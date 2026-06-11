@@ -17,6 +17,7 @@ use core::{
 };
 
 use crate::{
+    byte_literal::ByteLiteral,
     c_str::{CStr, Thin},
     c_vec::CVec,
     error::{ResultExt, ResultExtPtrMut},
@@ -553,9 +554,9 @@ pub unsafe extern "C" fn flockfile(file: *mut FILE) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FILE {
     let initial_mode = unsafe { *mode };
-    if initial_mode != b'r'.cast_signed()
-        && initial_mode != b'w'.cast_signed()
-        && initial_mode != b'a'.cast_signed()
+    if initial_mode != ByteLiteral::cast_unchecked(b'r')
+        && initial_mode != ByteLiteral::cast_unchecked(b'w')
+        && initial_mode != ByteLiteral::cast_unchecked(b'a')
     {
         platform::ERRNO.set(errno::EINVAL);
         return ptr::null_mut();
@@ -1291,7 +1292,7 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
     if !out_buf.is_null() {
         // copy the directory name and prefix into the allocated buffer
         unsafe { out_buf.copy_from_nonoverlapping(dirname, dirname_len) };
-        unsafe { *out_buf.add(dirname_len) = b'/'.cast_signed() };
+        unsafe { *out_buf.add(dirname_len) = ByteLiteral::cast_unchecked(b'/') };
         unsafe {
             out_buf
                 .add(dirname_len + 1)
@@ -1350,7 +1351,7 @@ pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
         s
     };
 
-    unsafe { *buf = b'/'.cast_signed() };
+    unsafe { *buf = ByteLiteral::cast_unchecked(b'/') };
     unsafe {
         #[allow(deprecated)]
         tmpnam_inner(buf, 1)
