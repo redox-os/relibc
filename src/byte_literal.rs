@@ -14,7 +14,7 @@ impl ByteLiteral {
                 {
                     input.cast_unsigned()
                 }
-            },
+            }
             _ => panic!("Not a printable ascii character!"),
         }
     }
