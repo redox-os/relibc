@@ -177,8 +177,18 @@ pub const PRIO_PGRP: c_int = 1;
 pub const PRIO_USER: c_int = 2;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpriority.html>.
+///
+/// Obtains the nice value of a process, process group or user.
+///
+/// A value of `0` for `who` indicates the current process, process group or
+/// user.
+///
+/// A return value of `-1` can either be a valid nice value or indicate that
+/// an error occurred. To distinguish between them, first set `errno` to `0`
+/// before calling `getpriority()`, then check the value of `errno` after the
+/// call to `getpriority()`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
+pub extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
     let r = Sys::getpriority(which, who).or_minus_one_errno();
     if r < 0 {
         return r;
@@ -187,24 +197,39 @@ pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setpriority.html>.
+///
+/// Sets the nice value of a process, process group or user.
+///
+/// A value of `0` for `who` indicates the current process, process group or
+/// user.
+///
+/// A return value of `0` indicates success, `-1` indicates error.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
+pub extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
     Sys::setpriority(which, who, nice)
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getrlimit.html>.
+///
+/// Stores the value of the limit indicated by `resource` into the `rlimit`
+/// struct pointed to by `rlp`.
+///
+/// A return value of `0` indicates success, `-1` indicates error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
-    let rlp = unsafe { Out::nonnull(rlp) };
-
-    Sys::getrlimit(resource, rlp)
+    Sys::getrlimit(resource, unsafe { Out::nonnull(rlp) })
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setrlimit.html>.
+///
+/// Sets the value of the limit indicated by `resource` to the value specified
+/// in the `rlimit` struct pointed to by `rlp`.
+///
+/// A return value of `0` indicates success, `-1` indicates error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
     unsafe { Sys::setrlimit(resource, rlp) }
@@ -213,6 +238,12 @@ pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getrusage.html>.
+///
+/// Stores the measures of the resources used by the current process or its
+/// terminated and waited-for child processes in the `rusage` struct pointed
+/// to by `r_usage`.
+///
+/// A return value of `0` indicates success, `-1` indicates error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
     Sys::getrusage(who, unsafe { Out::nonnull(r_usage) })
