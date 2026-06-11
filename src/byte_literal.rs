@@ -12,7 +12,7 @@ impl ByteLiteral {
                 }
                 #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
                 {
-                    input.cast_unsigned()
+                    input.into()
                 }
             }
             _ => panic!("Not a printable ascii character!"),
