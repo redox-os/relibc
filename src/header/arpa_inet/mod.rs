@@ -291,11 +291,11 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
     } else if af == AF_INET6 {
         let src_str = unsafe { str::from_utf8_unchecked(CStr::from_ptr(src).to_bytes()) };
         let mut chunks = vec![src_str];
-        let colons = src_str.bytes().filter(|&c| c == ':' as u8).count();
-        if colons > 7 || colons < 2 {
+        let colons = src_str.bytes().filter(|&c| c == b':').count();
+        if !(2..=7).contains(&colons) {
             return 0;
         }
-        let dots = src_str.bytes().filter(|&c| c == '.' as u8).count();
+        let dots = src_str.bytes().filter(|&c| c == b'.').count();
         if dots != 0 && dots != 3 {
             return 0;
         }
@@ -309,10 +309,9 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
         if dots == 3
             && let Some(first_dot) = src_str.find('.')
             && let Some(last_colon) = src_str.find(':')
+            && last_colon > first_dot
         {
-            if last_colon > first_dot {
-                return 0;
-            }
+            return 0;
         }
         if let Some(first) = src_str.find("::")
             && let Some(last) = src_str.rfind("::")
