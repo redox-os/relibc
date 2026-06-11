@@ -112,7 +112,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         }
 
         match unsafe { Sys::epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(Errno(EBADF)) => {
                 pfd.revents |= POLLNVAL;
                 closed += 1;

@@ -93,7 +93,7 @@ pub unsafe extern "C" fn sem_unlink(name: *const c_char) -> c_int {
 pub unsafe extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
     unsafe { get(sem) }
         .wait(None, time::CLOCK_MONOTONIC)
-        .map(|_| 0)
+        .map(|()| 0)
         .or_minus_one_errno()
 }
 
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn sem_clockwait(
 ) -> c_int {
     unsafe { get(sem) }
         .wait(Some(&unsafe { (*abstime).clone() }), clock_id)
-        .map(|_| 0)
+        .map(|()| 0)
         .or_minus_one_errno()
 }
 
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn sem_clockwait(
 pub unsafe extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec) -> c_int {
     unsafe { get(sem) }
         .wait(Some(&unsafe { (*abstime).clone() }), time::CLOCK_REALTIME)
-        .map(|_| 0)
+        .map(|()| 0)
         .or_minus_one_errno()
 }
 
