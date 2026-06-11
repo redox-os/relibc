@@ -13,14 +13,14 @@ pub unsafe extern "C" fn basename(str: *mut c_char) -> *mut c_char {
         return c".".as_ptr().cast_mut();
     }
     let mut end = unsafe { strlen(str) as isize - 1 };
-    while end >= 0 && unsafe { *str.offset(end) == b'/' as c_char } {
+    while end >= 0 && unsafe { *str.offset(end) == b'/'.cast_signed() } {
         end -= 1;
     }
     if end == -1 {
         return c"/".as_ptr().cast_mut();
     }
     let mut begin = end;
-    while begin >= 0 && unsafe { *str.offset(begin) != b'/' as c_char } {
+    while begin >= 0 && unsafe { *str.offset(begin) != b'/'.cast_signed() } {
         begin -= 1;
     }
     unsafe {
@@ -36,13 +36,13 @@ pub unsafe extern "C" fn dirname(str: *mut c_char) -> *mut c_char {
         return c".".as_ptr().cast_mut();
     }
     let mut end = unsafe { strlen(str) as isize - 1 };
-    while end > 0 && unsafe { *str.offset(end) == b'/' as c_char } {
+    while end > 0 && unsafe { *str.offset(end) == b'/'.cast_signed() } {
         end -= 1;
     }
-    while end >= 0 && unsafe { *str.offset(end) != b'/' as c_char } {
+    while end >= 0 && unsafe { *str.offset(end) != b'/'.cast_signed() } {
         end -= 1;
     }
-    while end > 0 && unsafe { *str.offset(end) == b'/' as c_char } {
+    while end > 0 && unsafe { *str.offset(end) == b'/'.cast_signed() } {
         end -= 1;
     }
     if end == -1 {

@@ -553,9 +553,9 @@ pub unsafe extern "C" fn flockfile(file: *mut FILE) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FILE {
     let initial_mode = unsafe { *mode };
-    if initial_mode != b'r' as c_char
-        && initial_mode != b'w' as c_char
-        && initial_mode != b'a' as c_char
+    if initial_mode != b'r'.cast_signed()
+        && initial_mode != b'w'.cast_signed()
+        && initial_mode != b'a'.cast_signed()
     {
         platform::ERRNO.set(errno::EINVAL);
         return ptr::null_mut();
@@ -1291,7 +1291,7 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
     if !out_buf.is_null() {
         // copy the directory name and prefix into the allocated buffer
         unsafe { out_buf.copy_from_nonoverlapping(dirname, dirname_len) };
-        unsafe { *out_buf.add(dirname_len) = b'/' as _ };
+        unsafe { *out_buf.add(dirname_len) = b'/'.cast_signed() };
         unsafe {
             out_buf
                 .add(dirname_len + 1)
@@ -1350,7 +1350,7 @@ pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
         s
     };
 
-    unsafe { *buf = b'/' as _ };
+    unsafe { *buf = b'/'.cast_signed() };
     unsafe {
         #[allow(deprecated)]
         tmpnam_inner(buf, 1)

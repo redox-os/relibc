@@ -421,13 +421,13 @@ unsafe fn find_env(search: *const c_char) -> Option<(usize, *mut c_char)> {
     for (i, mut item) in platform::environ_iter().enumerate() {
         let mut search = search;
         loop {
-            let end_of_query = unsafe { *search } == 0 || unsafe { *search } == b'=' as c_char;
+            let end_of_query = unsafe { *search } == 0 || unsafe { *search } == b'='.cast_signed();
             if unsafe { *item } == 0 {
                 //TODO: environ has an item without value, is this a problem?
                 break;
             }
-            if unsafe { *item } == b'=' as c_char || end_of_query {
-                if unsafe { *item } == b'=' as c_char && end_of_query {
+            if unsafe { *item } == b'='.cast_signed() || end_of_query {
+                if unsafe { *item } == b'='.cast_signed() && end_of_query {
                     // Both keys env here
                     return Some((i, unsafe { item.add(1) }));
                 } else {
@@ -475,7 +475,7 @@ pub unsafe extern "C" fn getsubopt(
     let mut found_comma = false;
 
     while unsafe { *cursor } != 0 {
-        if unsafe { *cursor } == b',' as c_char {
+        if unsafe { *cursor } == b','.cast_signed() {
             unsafe { *cursor = 0 };
             unsafe { *optionp = cursor.add(1) };
             found_comma = true;
@@ -496,7 +496,7 @@ pub unsafe extern "C" fn getsubopt(
         if unsafe { strncmp(start, token, token_len) } == 0 {
             let suffix_char = unsafe { *start.add(token_len) };
 
-            if suffix_char == b'=' as c_char {
+            if suffix_char == b'='.cast_signed() {
                 unsafe { *valuep = start.add(token_len + 1) };
                 return i as c_int;
             } else if suffix_char == 0 {
@@ -754,7 +754,7 @@ where
     }
 
     for i in (len - suffix_len - 6)..(len - suffix_len) {
-        if unsafe { *name.offset(i as isize) } != b'X' as c_char {
+        if unsafe { *name.offset(i as isize) } != b'X'.cast_signed() {
             platform::ERRNO.set(errno::EINVAL);
             return None;
         }
@@ -1258,7 +1258,7 @@ unsafe fn copy_kv(
     value_len: usize,
 ) {
     unsafe { core::ptr::copy_nonoverlapping(key, existing, key_len) };
-    unsafe { core::ptr::write(existing.add(key_len), b'=' as c_char) };
+    unsafe { core::ptr::write(existing.add(key_len), b'='.cast_signed()) };
     unsafe { core::ptr::copy_nonoverlapping(value, existing.add(key_len + 1), value_len) };
     unsafe { core::ptr::write(existing.add(key_len + 1 + value_len), 0) };
 }
@@ -1365,8 +1365,8 @@ pub unsafe extern "C" fn srandom(seed: c_uint) {
 pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
     match ch {
         0 => None,
-        ch if ch == b'+' as c_char => Some((true, 1)),
-        ch if ch == b'-' as c_char => Some((false, 1)),
+        ch if ch == b'+'.cast_signed() => Some((true, 1)),
+        ch if ch == b'-'.cast_signed() => Some((false, 1)),
         _ => Some((true, 0)),
     }
 }
@@ -1391,7 +1391,7 @@ pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
 }
 
 pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if unsafe { *s } != 0 && unsafe { *s } == b'0' as c_char {
+    if unsafe { *s } != 0 && unsafe { *s } == b'0'.cast_signed() {
         if let Some((val, idx, overflow)) = unsafe { convert_integer(s.offset(1), 8) } {
             Some((val, idx + 1, overflow))
         } else {
@@ -1404,10 +1404,10 @@ pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> 
 }
 
 pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if (unsafe { *s } != 0 && unsafe { *s } == b'0' as c_char)
+    if (unsafe { *s } != 0 && unsafe { *s } == b'0'.cast_signed())
         && (unsafe { *s.offset(1) } != 0
-            && (unsafe { *s.offset(1) } == b'x' as c_char
-                || unsafe { *s.offset(1) } == b'X' as c_char))
+            && (unsafe { *s.offset(1) } == b'x'.cast_signed()
+                || unsafe { *s.offset(1) } == b'X'.cast_signed()))
     {
         unsafe { convert_integer(s.offset(2), 16) }
             .map(|(val, idx, overflow)| (val, idx + 2, overflow))

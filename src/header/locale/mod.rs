@@ -15,7 +15,7 @@ use crate::{
 };
 
 // Can't use &str because of the mutability
-static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
+static mut C_LOCALE: [c_char; 2] = [b'C'.cast_signed(), 0];
 
 mod constants;
 use constants::*;
