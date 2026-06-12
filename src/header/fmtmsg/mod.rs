@@ -6,6 +6,7 @@
 //! See <https://github.com/kraj/musl/blob/kraj/master/src/misc/fmtmsg.c>
 
 use crate::{
+    byte_literal::ByteLiteral,
     header::{
         fcntl::{O_WRONLY, open},
         pthread::{PTHREAD_CANCEL_DISABLE, pthread_setcancelstate},
@@ -77,7 +78,7 @@ unsafe fn strcolcmp(mut lstr: *const c_char, mut bstr: *const c_char) -> c_int {
             lstr = lstr.add(1);
             bstr = bstr.add(1);
         }
-        if *lstr != 0 || (*bstr != 0 && *bstr != b':' as c_char) {
+        if *lstr != 0 || (*bstr != 0 && *bstr != ByteLiteral::cast_cchar(b':')) {
             1
         } else {
             0
