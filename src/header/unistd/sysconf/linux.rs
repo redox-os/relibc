@@ -10,9 +10,6 @@ use crate::{
     platform,
 };
 
-pub const _XOPEN_NAME_MAX: c_long = 255;
-pub const _XOPEN_PATH_MAX: c_long = 1024;
-
 pub const _SC_JOB_CONTROL: c_int = 7;
 pub const _SC_SAVED_IDS: c_int = 8;
 pub const _SC_PRIORITY_SCHEDULING: c_int = 10;
