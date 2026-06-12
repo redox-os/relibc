@@ -78,7 +78,7 @@ unsafe fn strcolcmp(mut lstr: *const c_char, mut bstr: *const c_char) -> c_int {
             lstr = lstr.add(1);
             bstr = bstr.add(1);
         }
-        if *lstr != 0 || (*bstr != 0 && *bstr != ByteLiteral::cast_unchecked(b':')) {
+        if *lstr != 0 || (*bstr != 0 && *bstr != ByteLiteral::cast_cchar(b':')) {
             1
         } else {
             0
