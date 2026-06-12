@@ -7,17 +7,26 @@ use crate::platform::types::{
     c_ushort, ssize_t,
 };
 
+/// Maximum number of bytes in a filename (not including the terminating null
+/// of a filename string).
 pub const NAME_MAX: usize = 255;
 pub const PASS_MAX: usize = 128;
+/// Maximum number of bytes the implementation stores as a pathname in a
+/// user-supplied buffer of unspecified size, including the terminating null
+/// character.
 pub const PATH_MAX: usize = 4096;
+/// Maximum number of simultaneous supplementary group IDs per process.
 pub const NGROUPS_MAX: usize = 65536;
-
 /// Maximum number of `iovec` structures that one process has available for
 /// use with `readv()` or `writev()`.
 pub const IOV_MAX: c_int = 1024;
 
 /// Minimum required value for `IOV_MAX`.
 pub const _XOPEN_IOV_MAX: c_int = 16;
+/// Minimum required value for `NAME_MAX`.
+pub const _XOPEN_NAME_MAX: c_long = 255;
+/// Minimum required value for `PATH_MAX`.
+pub const _XOPEN_PATH_MAX: c_long = 1024;
 
 pub const CHAR_BIT: u32 = 8;
 pub const WORD_BIT: u32 = 32;
