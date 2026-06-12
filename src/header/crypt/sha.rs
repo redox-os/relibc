@@ -80,15 +80,14 @@ pub fn crypt_sha(passw: &[u8], setting: &str, cipher: ShaType) -> Option<String>
     if setting.get(cursor..cursor + 7) == Some(RSTRING) {
         cursor += 7;
         has_round = true;
-        if let Some(c_end) = setting[cursor..].chars().position(|r| r == '$') {
+        {
+            let c_end = setting[cursor..].chars().position(|r| r == '$')?;
             if let Ok(u) = setting[cursor..cursor + c_end].parse::<c_ulong>() {
                 cursor += c_end + 1;
                 rounds = u.min(ROUNDS_MAX as c_ulong).max(ROUNDS_MIN as c_ulong);
             } else {
                 return None;
             }
-        } else {
-            return None;
         }
     } else {
         has_round = false;
