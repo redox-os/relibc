@@ -14,6 +14,7 @@ use crate::{
 
 pub use crate::header::bits_iovec::{gather, iovec, scatter};
 
+// TODO should be guarded by _DEFAULT_SOURCE or _BSD_SOURCE
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/readv.2.html>.
 ///
 /// Combines the functionality of `readv()` and `pread()`.
@@ -42,6 +43,7 @@ pub unsafe extern "C" fn preadv(
     ret
 }
 
+// TODO should be guarded by _DEFAULT_SOURCE or _BSD_SOURCE
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/readv.2.html>.
 ///
 /// Combined the functionality of `writev()` and `pwrite()`.
