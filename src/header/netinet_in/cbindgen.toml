@@ -14,9 +14,9 @@
 # - splitting out functions (htonl, htons, ntohl, ntohs) into bits/arpainet.h
 #
 # bits/arpainet.h brings in inttypes.h
-sys_includes = ["sys/socket.h"]
 after_includes = """
-#include <bits/arpainet.h> // for htonl, htons, ntohl, ntohs
+#include <bits/safamily-t.h> // for sa_family_t from sys/socket.h
+#include <bits/arpainet.h>   // for htonl, htons, ntohl, ntohs from arpa/inet.h
 """
 include_guard = "_RELIBC_NETINET_IN_H"
 trailer = """

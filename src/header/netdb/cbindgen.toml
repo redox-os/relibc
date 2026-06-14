@@ -5,9 +5,12 @@
 # - "The <netdb.h> header shall define the socklen_t type through typedef, as described in <sys/socket.h>."
 # - "Inclusion of the <netdb.h> header may also make visible all symbols from <netinet/in.h>, <sys/socket.h>, and <inttypes.h>."
 #
-# netinet/in.h brings in sys/socket.h
+# netinet/in.h brings in bis/arpainet.h which brings in inttypes.h
 # features.h needed for deprecated annotations
-sys_includes = ["inttypes.h", "netinet/in.h", "features.h"]
+sys_includes = ["netinet/in.h", "features.h"]
+after_includes = """
+#include <bits/socklen-t.h> // for socklen_t from sys/socket.h
+"""
 include_guard = "_RELIBC_NETDB_H"
 trailer = """
 #ifndef _RELIBC_BITS_NETDB_H
