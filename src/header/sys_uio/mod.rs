@@ -14,7 +14,13 @@ use crate::{
 
 pub use crate::header::bits_iovec::{gather, iovec, scatter};
 
+// TODO should be guarded by _DEFAULT_SOURCE or _BSD_SOURCE
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/readv.2.html>.
+///
+/// Combines the functionality of `readv()` and `pread()`.
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually read. Upon failure, returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn preadv(
     fd: c_int,
@@ -37,7 +43,13 @@ pub unsafe extern "C" fn preadv(
     ret
 }
 
+// TODO should be guarded by _DEFAULT_SOURCE or _BSD_SOURCE
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/readv.2.html>.
+///
+/// Combined the functionality of `writev()` and `pwrite()`.
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually written. Upon failure, returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pwritev(
     fd: c_int,
@@ -57,6 +69,12 @@ pub unsafe extern "C" fn pwritev(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readv.html>.
+///
+/// Equivalent to `read()` but places the input data into the `iovcnt` buffers
+/// specified by the members of the `iov` array.
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually read. Upon failure, returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if !(0..=IOV_MAX).contains(&iovcnt) {
@@ -75,6 +93,13 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/writev.html>.
+///
+/// Equivalent to `write()` but shall gather output data from the `iovcnt`
+/// buffers specified by the members of the `iov` array.
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually written to the file associated with `fildes`. Upon failure,
+/// returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn writev(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if !(0..=IOV_MAX).contains(&iovcnt) {
