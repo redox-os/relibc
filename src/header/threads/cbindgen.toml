@@ -12,7 +12,6 @@ style = "tag"
 no_includes = true
 cpp_compat = true
 after_includes = """
-#include <bits/timespec.h> // for timespec
 #include <bits/pthread.h> // for pthread-related types
 
 #ifndef __cplusplus
