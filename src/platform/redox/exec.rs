@@ -38,7 +38,8 @@ fn fexec_impl(
         envs,
         extrainfo,
         interp_override,
-    )?;
+    )?
+    .unwrap();
 
     // According to elf(5), PT_INTERP requires that the interpreter path be
     // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
@@ -238,6 +239,7 @@ pub fn execve(
         cwd_fd: super::path::current_dir()
             .ok()
             .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
+        same_process: true,
     };
 
     fexec_impl(

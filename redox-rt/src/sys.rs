@@ -340,7 +340,7 @@ pub struct Resugid<T> {
 }
 
 /// Sets [res][ug]id, fields that are None will be unchanged.
-pub fn posix_setresugid(ids: &Resugid<Option<u32>>) -> Result<()> {
+pub fn posix_setresugid(ids: &Resugid<Option<u32>>, pid: Option<usize>) -> Result<()> {
     // TODO: not sure how "tmp" an IPC call is?
     let _sig_guard = tmp_disable_signals();
     let mut guard = DYNAMIC_PROC_INFO.lock();
@@ -357,7 +357,16 @@ pub fn posix_setresugid(ids: &Resugid<Option<u32>>) -> Result<()> {
             ids.sgid.unwrap_or(u32::MAX),
         ]);
 
-    this_proc_call(&mut buf, CallFlags::empty(), &[ProcCall::SetResugid as u64])?;
+    if let Some(pid) = pid {
+        proc_call(
+            pid,
+            &mut buf,
+            CallFlags::empty(),
+            &[ProcCall::SetResugid as u64],
+        )?;
+    } else {
+        this_proc_call(&mut buf, CallFlags::empty(), &[ProcCall::SetResugid as u64])?;
+    }
 
     if let Some(ruid) = ids.ruid {
         guard.ruid = ruid;
