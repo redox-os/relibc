@@ -1,3 +1,13 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/spawn.h.html
+#
+# Spec quotations relating to includes:
+# - "The <spawn.h> header shall define the mode_t and pid_t types as described in <sys/types.h>."
+# - "The <spawn.h> header shall define the sigset_t type as described in <signal.h>."
+# - "The tag sched_param shall be declared as naming an incomplete structure type, the contents of which are described in the <sched.h> header."
+# - "Inclusion of the <spawn.h> header may make visible symbols defined in the <sched.h> and <signal.h> headers."
+#
+# shed.h brings in pid_t
+# size_t would have been brought in by signal.h so we can include it here directly
 sys_includes = ["sched.h", "bits/sigset-t.h", "bits/mode-t.h", "bits/size-t.h"]
 include_guard = "_RELIBC_SPAWN_H"
 language = "C"
