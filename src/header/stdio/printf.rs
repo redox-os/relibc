@@ -724,10 +724,8 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
         // "For b, B, d, i, o, u, x, and X conversions,
         // if a precision is specified, the 0 flag is ignored."
         match fmt {
-            'b' | 'B' | 'd' | 'i' | 'o' | 'u' | 'x' | 'X' => {
-                if precision.is_some() {
-                    zero = false;
-                }
+            'b' | 'B' | 'd' | 'i' | 'o' | 'u' | 'x' | 'X' if precision.is_some() => {
+                zero = false;
             }
             _ => (),
         }
