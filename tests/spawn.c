@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 static const char buf[] = "#include <unistd.h>\nint main()\n{\nwrite(900, "
-                          "\"hello_spawn REDOX\\n\", 12);\n}";
+                          "\"hello_spawn REDOX\\n\", 18);\n}";
 
 #define OPTIONALLY_ERROR(function, args, cond)                                 \
   {                                                                            \
@@ -42,10 +42,11 @@ int main() {
   posix_spawn_file_actions_init(&fa);
   status = mkdir("./hello_spawn", S_IRUSR | S_IWUSR);
   ERROR_IF(mkdir, status, != 0);
-  OPTIONALLY_ERROR(posix_spawn_file_actions_addchdir, (&fa, "./hello_spawn"), == 0);
-  OPTIONALLY_ERROR(posix_spawn_file_actions_addopen,
-                   (&fa, 2, "./hello_spawn.txt", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR),
+  OPTIONALLY_ERROR(posix_spawn_file_actions_addchdir, (&fa, "./hello_spawn"),
                    == 0);
+  OPTIONALLY_ERROR(
+      posix_spawn_file_actions_addopen,
+      (&fa, 2, "./hello_spawn.txt", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR), == 0);
   OPTIONALLY_ERROR(posix_spawnp, (&pid, "ls", &fa, NULL, argv1, environ), == 0);
   assert(pid != 0);
   waitpid(pid, NULL, 0);
@@ -77,7 +78,7 @@ int main() {
     printf("Failed to create dup2_check.c\n");
     exit(EXIT_FAILURE);
   }
-  OPTIONALLY_ERROR(fwrite, (buf, sizeof(char), 67, f), == 67);
+  OPTIONALLY_ERROR(fwrite, (buf, sizeof(char), 74, f), == 74);
   fclose(f);
   char *argv2[] = {"gcc", "./dup2_check.c", "-o", "d.out", NULL};
   OPTIONALLY_ERROR(posix_spawnp, (&pid, "gcc", NULL, NULL, argv2, environ),
