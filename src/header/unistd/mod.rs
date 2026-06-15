@@ -864,6 +864,12 @@ pub extern "C" fn posix_close(fildes: c_int, flag: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
+///
+/// Equivalent to `read()`, except that it shall read from a given position in
+/// the file without changing the file offset.
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually read. Upon failure, returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pread(
     fildes: c_int,
@@ -881,6 +887,13 @@ pub unsafe extern "C" fn pread(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.
+///
+/// Equivalent to `write()`, except that it writes into a given position and
+/// does not change the file offset (regardless of whether `O_APPEND` is set).
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually written to the file associated with `fildes`. Upon failure,
+/// returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pwrite(
     fildes: c_int,
@@ -898,6 +911,12 @@ pub unsafe extern "C" fn pwrite(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
+///
+/// Attempts to read `nbyte` bytes from the file associated with the open file
+/// descriptor, `fildes`, into the buffer pointed to by `buf`.
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually read. Upon failure, returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn read(fildes: c_int, buf: *mut c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), nbyte) };
@@ -1295,6 +1314,13 @@ unsafe fn with_argv(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.
+///
+/// Attempts to write `nbyte` bytes from the buffer pointed to by `buf` to the
+/// file associated with the open file descriptor, `fildes`.
+///
+/// When successful, returns a non-negative number indicating the number of
+/// bytes actually written to the file associated with `fildes`. Upon failure,
+/// returns `-1`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts(buf.cast::<u8>(), nbyte) };
