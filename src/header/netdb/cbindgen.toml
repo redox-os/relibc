@@ -6,8 +6,9 @@
 # - "Inclusion of the <netdb.h> header may also make visible all symbols from <netinet/in.h>, <sys/socket.h>, and <inttypes.h>."
 #
 # netinet/in.h brings in sys/socket.h
+# netinet/in.h brings in bits/arpainet.h bringing in inttypes.h
 # features.h needed for deprecated annotations
-sys_includes = ["inttypes.h", "netinet/in.h", "features.h"]
+sys_includes = ["netinet/in.h", "features.h"]
 include_guard = "_RELIBC_NETDB_H"
 trailer = """
 #ifndef _RELIBC_BITS_NETDB_H
