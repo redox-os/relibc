@@ -156,7 +156,7 @@ fn resolve_path_name(
             format!("{}/{}", part, name_or_path)
         };
         if accessible(&path, unistd::F_OK).is_ok() {
-            return Some((path.to_string(), name_or_path.to_string()));
+            return Some((path.clone(), name_or_path.to_string()));
         }
     }
     None
@@ -394,9 +394,9 @@ fn stage2(
             unistd::_exit(1);
         }
         unsafe { adjust_stack(sp) };
-        argv[1].to_string()
+        argv[1].clone()
     } else {
-        argv[0].to_string()
+        argv[0].clone()
     };
 
     // TODO: Fix memory leak, although minimal.
