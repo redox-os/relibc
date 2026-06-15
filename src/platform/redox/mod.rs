@@ -1320,7 +1320,7 @@ impl Pal for Sys {
             &[syscall::flag::FileTableVerb::CloseCloExec as u64],
         )?;
 
-        let mut extra_info = redox_rt::proc::ExtraInfo {
+        let extra_info = redox_rt::proc::ExtraInfo {
             cwd: Some(cwd.as_bytes()),
             // Signals set to be ignored by the calling process
             // must also be ignored by the child process
@@ -1347,15 +1347,16 @@ impl Pal for Sys {
         if let Some(attr) = fat {
             let flags = Flags::from_bits(attr.flags).ok_or(Errno(EINVAL))?;
 
-            if flags.contains(Flags::POSIX_SPAWN_SETPGROUP) {
-                if attr.pgroup != 0 {
-                    redox_rt::sys::posix_setpgid(
-                        proc_fd.as_raw_fd(),
-                        usize::try_from(attr.pgroup).map_err(|_| Errno(EINVAL))?,
-                    )?;
-                } else {
-                    redox_rt::sys::posix_setpgid(proc_fd.as_raw_fd(), proc_fd.as_raw_fd())?;
-                }
+            if flags.contains(Flags::POSIX_SPAWN_SETPGROUP) && attr.pgroup != 0 {
+                redox_rt::sys::posix_setpgid(
+                    proc_fd.as_raw_fd(),
+                    usize::try_from(attr.pgroup).map_err(|_| Errno(EINVAL))?,
+                )?;
+            } else {
+                redox_rt::sys::posix_setpgid(
+                    proc_fd.as_raw_fd(),
+                    redox_rt::sys::posix_getpgid(proc_fd.as_raw_fd())?,
+                )?;
             }
 
             let set_schedparam = || -> Result<()> {
@@ -1381,41 +1382,31 @@ impl Pal for Sys {
                 set_schedparam()?;
             }
 
-            let set_resugid = || -> Result<()> {
-                let parent_resugid = redox_rt::sys::posix_getresugid();
+            let parent_resugid = redox_rt::sys::posix_getresugid();
 
-                redox_rt::sys::posix_setresugid(
-                    &Resugid {
-                        ruid: None,
-                        euid: Some(if executable_stat.st_mode as mode_t & S_ISUID == S_ISUID {
-                            executable_stat.st_uid
-                        } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
-                            parent_resugid.ruid
-                        } else {
-                            return Ok(());
-                        }),
-                        suid: None,
-                        rgid: None,
-                        egid: Some(if executable_stat.st_mode as mode_t & S_ISGID == S_ISGID {
-                            executable_stat.st_gid
-                        } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
-                            parent_resugid.rgid
-                        } else {
-                            return Ok(());
-                        }),
-                        sgid: None,
-                    },
-                    Some(proc_fd.as_raw_fd()),
-                )?;
-
-                Ok(())
-            };
-
-            set_resugid()?;
-
-            if flags.contains(Flags::POSIX_SPAWN_SETSIGMASK) {
-                extra_info.sigprocmask = attr.sigmask;
-            }
+            redox_rt::sys::posix_setresugid(
+                &Resugid {
+                    ruid: None,
+                    euid: Some(if executable_stat.st_mode as mode_t & S_ISUID == S_ISUID {
+                        executable_stat.st_uid
+                    } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
+                        parent_resugid.ruid
+                    } else {
+                        parent_resugid.euid
+                    }),
+                    suid: None,
+                    rgid: None,
+                    egid: Some(if executable_stat.st_mode as mode_t & S_ISGID == S_ISGID {
+                        executable_stat.st_gid
+                    } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
+                        parent_resugid.rgid
+                    } else {
+                        parent_resugid.egid
+                    }),
+                    sgid: None,
+                },
+                Some(proc_fd.as_raw_fd()),
+            )?;
 
             // if POSIX_SPAWN_SETSIGDEF flag is set, the signals specified in
             // sigdefault must have default actions
