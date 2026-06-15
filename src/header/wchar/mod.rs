@@ -848,62 +848,86 @@ pub unsafe extern "C" fn wcstok(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstol.html>.
+///
+/// Converts the initial portion of the wide-character string pointed to by
+/// `nptr` to a type `long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstol(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
+    mut nptr: *const wchar_t,
+    endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_long {
-    skipws!(ptr);
-    let result = wcsto_impl!(c_long, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
+    skipws!(nptr);
+    let result = wcsto_impl!(c_long, nptr, base);
+    if !endptr.is_null() {
+        unsafe { *endptr = nptr.cast_mut() };
     }
     result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoll.html>.
+///
+/// Converts the initial portion of the wide-character string pointed to by
+/// `nptr` to a type `long long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed, returns `0`.
 #[expect(clippy::cast_lossless)] // not all users of `wcsto_impl!` are lossless
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoll(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
+    mut nptr: *const wchar_t,
+    endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_longlong {
-    skipws!(ptr);
-    let result = wcsto_impl!(c_longlong, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
+    skipws!(nptr);
+    let result = wcsto_impl!(c_longlong, nptr, base);
+    if !endptr.is_null() {
+        unsafe { *endptr = nptr.cast_mut() };
     }
     result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoul.html>.
+///
+/// Converts the initial portion of the wide-character string pointed to by
+/// `nptr` to a type `unsigned long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoul(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
+    mut nptr: *const wchar_t,
+    endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_ulong {
-    skipws!(ptr);
-    let result = wcsto_impl!(c_ulong, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
+    skipws!(nptr);
+    let result = wcsto_impl!(c_ulong, nptr, base);
+    if !endptr.is_null() {
+        unsafe { *endptr = nptr.cast_mut() };
     }
     result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoull.html>.
+///
+/// Converts the initial portion of the wide-character string pointed to by
+/// `nptr` to a type `unsigned long long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoull(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
+    mut nptr: *const wchar_t,
+    endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_ulonglong {
-    skipws!(ptr);
-    let result = wcsto_impl!(c_ulonglong, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
+    skipws!(nptr);
+    let result = wcsto_impl!(c_ulonglong, nptr, base);
+    if !endptr.is_null() {
+        unsafe { *endptr = nptr.cast_mut() };
     }
     result
 }

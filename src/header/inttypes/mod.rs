@@ -15,31 +15,48 @@ use crate::{
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/imaxabs.html>.
+///
+/// Computes the absolute value of the integer `j`.
 #[unsafe(no_mangle)]
-pub extern "C" fn imaxabs(i: intmax_t) -> intmax_t {
-    i.abs()
+pub extern "C" fn imaxabs(j: intmax_t) -> intmax_t {
+    j.abs()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/inttypes.h.html>.
+///
+/// Structure type that is the type of the value returned by the `imaxdiv()`
+/// function.
 #[repr(C)]
 pub struct imaxdiv_t {
+    /// The quotient.
     quot: intmax_t,
+    /// The remainder.
     rem: intmax_t,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/imaxdiv.html>.
+///
+/// Computes `numer` / `denom` and `numer` % `denom` in a single operation.
+///
+/// Returns the struct `imaxdiv_t`, comprising both the quotient and remainder.
 #[unsafe(no_mangle)]
-pub extern "C" fn imaxdiv(i: intmax_t, j: intmax_t) -> imaxdiv_t {
+pub extern "C" fn imaxdiv(numer: intmax_t, denom: intmax_t) -> imaxdiv_t {
     imaxdiv_t {
-        quot: i / j,
-        rem: i % j,
+        quot: numer / denom,
+        rem: numer % denom,
     }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoimax.html>.
+///
+/// Equivalent to `strtol()` and `strtoll()`, except that the initial portion
+/// of the string shall be converted to `intmax_t`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed or the value of `base` is not supported, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtoimax(
-    s: *const c_char,
+    nptr: *const c_char,
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> intmax_t {
@@ -48,16 +65,22 @@ pub unsafe extern "C" fn strtoimax(
         false,
         intmax_t::MAX,
         intmax_t::MIN,
-        s,
+        nptr,
         endptr,
         base
     )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoimax.html>.
+///
+/// Equivalent to `strtoul()` and `strtoull()`, except that the initial portion
+/// of the string shall be converted to `uintmax_t`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed or the value of `base` is not supported, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtoumax(
-    s: *const c_char,
+    nptr: *const c_char,
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> uintmax_t {
@@ -66,39 +89,51 @@ pub unsafe extern "C" fn strtoumax(
         false,
         uintmax_t::MAX,
         uintmax_t::MIN,
-        s,
+        nptr,
         endptr,
         base
     )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
+///
+/// Equivalent to `wctol()` and `wctoll()`, except that the initial portion
+/// of the wide string shall be converted to `intmax_t`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed, returns `0`.
 #[expect(clippy::cast_lossless)] // not all users of `wcsto_impl!` are lossless
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoimax(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
+    mut nptr: *const wchar_t,
+    endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> intmax_t {
-    skipws!(ptr);
-    let result = wcsto_impl!(intmax_t, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
+    skipws!(nptr);
+    let result = wcsto_impl!(intmax_t, nptr, base);
+    if !endptr.is_null() {
+        unsafe { *endptr = nptr.cast_mut() };
     }
     result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
+///
+/// Equivalent to `wctoul()` and `wctoull()`, except that the initial portion
+/// of the wide string shall be converted to `uintmax_t`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoumax(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
+    mut nptr: *const wchar_t,
+    endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> uintmax_t {
-    skipws!(ptr);
-    let result = wcsto_impl!(uintmax_t, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
+    skipws!(nptr);
+    let result = wcsto_impl!(uintmax_t, nptr, base);
+    if !endptr.is_null() {
+        unsafe { *endptr = nptr.cast_mut() };
     }
     result
 }

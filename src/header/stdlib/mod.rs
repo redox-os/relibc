@@ -1488,17 +1488,29 @@ pub unsafe extern "C" fn strtof(s: *const c_char, endptr: *mut *mut c_char) -> c
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtol.html>.
+///
+/// Converts the initial portion of the string pointed to by `nptr` to a type
+/// `long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed or the value of `base` is not supported, returns `0`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
-    strto_impl!(c_long, true, c_long::MAX, c_long::MIN, s, endptr, base)
+pub unsafe extern "C" fn strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
+    strto_impl!(c_long, true, c_long::MAX, c_long::MIN, nptr, endptr, base)
 }
 
 // TODO: strtold(), when long double is available
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtol.html>.
+///
+/// Converts the initial portion of the string pointed to by `nptr` to a type
+/// `long long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed or the value of `base` is not supported, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtoll(
-    s: *const c_char,
+    nptr: *const c_char,
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_longlong {
@@ -1507,26 +1519,38 @@ pub unsafe extern "C" fn strtoll(
         true,
         c_longlong::MAX,
         c_longlong::MIN,
-        s,
+        nptr,
         endptr,
         base
     )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoul.html>.
+///
+/// Converts the initial portion of the string pointed to by `str` to a type
+/// `unsigned long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed or the value of `base` is not supported, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtoul(
-    s: *const c_char,
+    str: *const c_char,
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_ulong {
-    strto_impl!(c_ulong, false, c_ulong::MAX, c_ulong::MIN, s, endptr, base)
+    strto_impl!(c_ulong, false, c_ulong::MAX, c_ulong::MIN, str, endptr, base)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoul.html>.
+///
+/// Converts the initial portion of the string pointed to by `str` to a type
+/// `unsigned long long`.
+///
+/// Upon success, returns the converted value. If no conversion could be
+/// performed or the value of `base` is not supported, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtoull(
-    s: *const c_char,
+    str: *const c_char,
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_ulonglong {
@@ -1535,7 +1559,7 @@ pub unsafe extern "C" fn strtoull(
         false,
         c_ulonglong::MAX,
         c_ulonglong::MIN,
-        s,
+        str,
         endptr,
         base
     )
