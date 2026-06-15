@@ -12,10 +12,7 @@ use core::{
     ptr, slice,
 };
 
-use alloc::{
-    borrow::ToOwned,
-    string::{FromUtf8Error, String},
-};
+use alloc::string::{FromUtf8Error, String};
 
 use crate::{
     error::ResultExt,
@@ -28,7 +25,10 @@ use crate::{
     },
 };
 
-use super::{errno::*, string::strncmp};
+use super::{
+    errno::{EINVAL, EIO, ENOENT, ERANGE},
+    string::strncmp,
+};
 
 /// cbindgen:ignore
 #[cfg(target_os = "linux")]
@@ -170,12 +170,12 @@ fn split(buf: &mut [u8]) -> Option<group> {
 }
 
 fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Error> {
-    let buffer = line.to_owned().into_bytes();
+    let buffer = line.clone().into_bytes();
 
     let mut buffer = buffer
         .into_iter()
         .map(|i| if i == SEPARATOR as u8 { b'\0' } else { i })
-        .chain([b'\0'])
+        .chain(*b"\0")
         .collect::<Vec<_>>();
     let mut buffer = buffer.split_mut(|i| *i == b'\0');
 

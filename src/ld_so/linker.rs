@@ -504,7 +504,7 @@ impl Linker {
                     let parent_runpath = &self
                         .objects
                         .get(&ROOT_ID)
-                        .and_then(|parent| parent.runpath().map(|path| path.to_string()));
+                        .and_then(|parent| parent.runpath().cloned());
 
                     Ok(ObjectHandle::new(self.load_object(
                         name,
@@ -862,7 +862,7 @@ impl Linker {
             self.next_tls_module_id += 1;
         }
 
-        let runpath = obj.runpath().map(|rpath| rpath.to_string());
+        let runpath = obj.runpath().cloned();
         let dependencies = obj
             .dependencies()
             .iter()

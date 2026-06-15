@@ -217,6 +217,7 @@ pub unsafe extern "C" fn thrd_create(
         pthread_create(
             thrd,
             core::ptr::null(),
+            #[expect(clippy::missing_transmute_annotations)] // too verbose
             core::mem::transmute::<_, extern "C" fn(*mut c_void) -> *mut c_void>(start),
             arg,
         )
