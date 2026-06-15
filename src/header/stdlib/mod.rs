@@ -1495,7 +1495,11 @@ pub unsafe extern "C" fn strtof(s: *const c_char, endptr: *mut *mut c_char) -> c
 /// Upon success, returns the converted value. If no conversion could be
 /// performed or the value of `base` is not supported, returns `0`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
+pub unsafe extern "C" fn strtol(
+    nptr: *const c_char,
+    endptr: *mut *mut c_char,
+    base: c_int,
+) -> c_long {
     strto_impl!(c_long, true, c_long::MAX, c_long::MIN, nptr, endptr, base)
 }
 
@@ -1538,7 +1542,15 @@ pub unsafe extern "C" fn strtoul(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_ulong {
-    strto_impl!(c_ulong, false, c_ulong::MAX, c_ulong::MIN, str, endptr, base)
+    strto_impl!(
+        c_ulong,
+        false,
+        c_ulong::MAX,
+        c_ulong::MIN,
+        str,
+        endptr,
+        base
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoul.html>.
