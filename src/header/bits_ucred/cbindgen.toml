@@ -1,0 +1,17 @@
+# Non-POSIX spec: https://www.man7.org/linux/man-pages/man7/unix.7.html
+#
+# This type is split out to avoid namespace pollution in sys/socket.h.
+after_includes = """
+#include <bits/gid-t.h> // for gid_t from sys/types.h
+#include <bits/pid-t.h> // for pid_t from sys/types.h
+#include <bits/uid-t.h> // for uid_t from sys/types.h
+"""
+include_guard = "_RELIBC_BITS_UCRED_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+[export]
+include = ["ucred"]
+[enum]
+prefix_with_name = true

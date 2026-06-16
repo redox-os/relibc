@@ -16,10 +16,9 @@ after_includes = """
 #include <bits/socklen-t.h>  // for socklen_t
 #include <bits/ssize-t.h>    // for ssize_t from sys/types.h
 
-// Below required for Non-POSIX ucred struct
-#include <bits/gid-t.h> // for gid_t from sys/types.h
-#include <bits/pid-t.h> // for pid_t from sys/types.h
-#include <bits/uid-t.h> // for uid_t from sys/types.h
+#if defined(_GNU_SOURCE)
+#include <bits/ucred.h>      // for Non-POSIX ucred struct
+#endif
 """
 trailer = """
 #ifndef _RELIBC_BITS_SYS_SOCKET_H
@@ -61,7 +60,6 @@ prefix_with_name = true
 include = [
     "linger",
     "cmsghdr",
-    "ucred"
 ]
 
 [export.rename]
