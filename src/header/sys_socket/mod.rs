@@ -9,9 +9,7 @@ use crate::{
     header::{bits_safamily_t::sa_family_t, sys_uio::iovec},
     platform::{
         PalSocket, Sys,
-        types::{
-            c_char, c_int, c_long, c_uchar, c_uint, c_void, gid_t, pid_t, size_t, ssize_t, uid_t,
-        },
+        types::{c_char, c_int, c_long, c_uchar, c_uint, c_void, size_t, ssize_t},
     },
 };
 
@@ -59,22 +57,6 @@ pub struct cmsghdr {
     pub cmsg_level: c_int,
     /// Protocol-specific type.
     pub cmsg_type: c_int,
-}
-
-// TODO: `ucred` should be behind _GNU_SOURCE include guard
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/unix.7.html>.
-///
-/// Represents UNIX credentials.
-#[repr(C)]
-#[derive(Clone, Debug)]
-// FIXME: CheckVsLibcCrate
-pub struct ucred {
-    /// Process ID of the sending process.
-    pub pid: pid_t,
-    /// User ID of the sending process.
-    pub uid: uid_t,
-    /// Group ID of the sending process.
-    pub gid: gid_t,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.

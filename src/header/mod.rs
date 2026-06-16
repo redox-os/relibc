@@ -57,6 +57,7 @@ pub mod bits_time_t;
 pub mod bits_timer_t;
 pub mod bits_timespec;
 pub mod bits_timeval;
+pub mod bits_ucred;
 #[path = "bits_uid-t/mod.rs"]
 pub mod bits_uid_t;
 #[path = "bits_useconds-t/mod.rs"]
