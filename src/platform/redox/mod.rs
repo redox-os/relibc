@@ -1,3 +1,4 @@
+use alloc::string::String;
 use core::{
     convert::TryFrom,
     mem::{self, size_of},
@@ -22,19 +23,20 @@ use self::{
 };
 use super::{Pal, Read, types::*};
 use crate::{
+    alloc::string::ToString,
     c_str::{CStr, CString},
     error::{Errno, Result},
     fs::File,
     header::{
         errno::{
-            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM,
-            ENOSYS, EOPNOTSUPP, EPERM,
+            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
+            ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
             self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
             F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
-        limits,
+        limits::{self},
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
@@ -42,9 +44,9 @@ use crate::{
         sys_file,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
-        sys_resource::{RLIM_INFINITY, rlimit, rusage},
+        sys_resource::{PRIO_PROCESS, RLIM_INFINITY, rlimit, rusage, setpriority},
         sys_select::timeval,
-        sys_stat::{S_ISVTX, stat},
+        sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
@@ -54,10 +56,11 @@ use crate::{
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
+    iter::NulTerminated,
     ld_so::tcb::OsSpecific,
     out::Out,
     platform::{
-        free,
+        ERRNO, free,
         sys::timer::{TIMERS, timer_routine, timer_update_wake_time},
     },
     sync::rwlock::RwLock,
@@ -67,7 +70,7 @@ pub use redox_rt::proc::FdGuard;
 
 mod epoll;
 mod event;
-mod exec;
+pub(crate) mod exec;
 mod extra;
 mod libcscheme;
 mod libredox;
@@ -1169,27 +1172,284 @@ impl Pal for Sys {
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        redox_rt::sys::posix_setresugid(&Resugid {
-            ruid: None,
-            euid: None,
-            suid: None,
-            rgid: cvt_uid(rgid)?,
-            egid: cvt_uid(egid)?,
-            sgid: cvt_uid(sgid)?,
-        })?;
+        redox_rt::sys::posix_setresugid(
+            &Resugid {
+                ruid: None,
+                euid: None,
+                suid: None,
+                rgid: cvt_uid(rgid)?,
+                egid: cvt_uid(egid)?,
+                sgid: cvt_uid(sgid)?,
+            },
+            None,
+        )?;
         Ok(())
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        redox_rt::sys::posix_setresugid(&Resugid {
-            ruid: cvt_uid(ruid)?,
-            euid: cvt_uid(euid)?,
-            suid: cvt_uid(suid)?,
-            rgid: None,
-            egid: None,
-            sgid: None,
-        })?;
+        redox_rt::sys::posix_setresugid(
+            &Resugid {
+                ruid: cvt_uid(ruid)?,
+                euid: cvt_uid(euid)?,
+                suid: cvt_uid(suid)?,
+                rgid: None,
+                egid: None,
+                sgid: None,
+            },
+            None,
+        )?;
         Ok(())
+    }
+
+    unsafe fn spawn(
+        program: CStr,
+        fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
+        fat: Option<&crate::header::spawn::posix_spawnattr_t>,
+        argv: NulTerminated<*mut c_char>,
+        envp: Option<NulTerminated<*mut c_char>>,
+        dir_ent_name: Option<String>,
+    ) -> Result<pid_t> {
+        use crate::header::spawn::Flags;
+
+        let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
+        let executable = FdGuard::new(File::open(program, fcntl::O_RDONLY)?.fd as usize)
+            .to_upper()
+            .unwrap();
+        let mut executable_stat = syscall::Stat::default();
+        executable.fstat(&mut executable_stat)?;
+        let original_cwd = path::clone_cwd().unwrap().to_string();
+        let mut cwd = original_cwd.clone();
+        let proc_fd = child.proc_fd.unwrap();
+        let curr_proc_fd = redox_rt::current_proc_fd();
+        let file_table = RtTcb::current()
+            .thread_fd()
+            .dup(b"filetable")?
+            .dup(b"copy")?;
+
+        {
+            let new_file_table = child.thr_fd.dup(b"current-filetable")?;
+            new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
+        }
+
+        let mut args = Vec::new();
+        let mut envs = Vec::new();
+
+        for arg in argv {
+            args.push(unsafe { CStr::from_ptr(*arg).to_chars() });
+        }
+
+        if let Some(envp) = envp {
+            for env in envp {
+                envs.push(unsafe { CStr::from_ptr(*env).to_chars() });
+            }
+        }
+
+        let program_name: String = if let Some(ent) = dir_ent_name {
+            let mut binary = str::from_utf8(args[0]).unwrap().to_string();
+            binary.insert_str(0, "./");
+
+            redox_path::canonicalize_using_cwd(Some(ent.as_str()), binary.as_str())
+                .ok_or(Errno(ENOENT))?
+        } else {
+            redox_path::canonicalize_using_cwd(
+                Some(original_cwd.as_str()),
+                str::from_utf8(args[0]).unwrap(),
+            )
+            .ok_or(Errno(ENOENT))?
+        };
+
+        args[0] = program_name.as_bytes();
+
+        let new_file_table = child.thr_fd.dup(b"filetable")?;
+
+        if let Some(fac) = fac {
+            for action in fac {
+                match action {
+                    crate::header::spawn::Action::Open {
+                        fd,
+                        path,
+                        flag,
+                        mode,
+                    } => {
+                        let src_fd = Sys::open(
+                            CStr::from_bytes_with_nul(path.as_bytes_with_nul()).unwrap(),
+                            flag,
+                            mode,
+                        )? as usize;
+                        syscall::sendfd(
+                            new_file_table.as_raw_fd(),
+                            src_fd,
+                            0,
+                            u64::try_from(fd).map_err(|_| Errno(EBADFD))?,
+                        )?;
+                    }
+                    crate::header::spawn::Action::Close(fd) => {
+                        new_file_table.call_wo(
+                            &(fd as usize).to_ne_bytes(),
+                            syscall::CallFlags::empty(),
+                            &[syscall::flag::FileTableVerb::Close as u64],
+                        )?;
+                    }
+                    crate::header::spawn::Action::Chdir(path) => {
+                        cwd = path.to_str().unwrap().to_string();
+
+                        path::chdir(path.to_str().unwrap())?;
+                    }
+                    crate::header::spawn::Action::FChdir(fd) => {
+                        path::fchdir(fd)?;
+                        path::getcwd(Out::from_mut(unsafe { cwd.as_bytes_mut() }))?;
+                    }
+                    crate::header::spawn::Action::Dup2(old, new) => {
+                        new_file_table.call_wo(
+                            [(old as usize).to_ne_bytes(), (new as usize).to_ne_bytes()]
+                                .into_iter()
+                                .flatten()
+                                .collect::<Vec<u8>>()
+                                .as_slice(),
+                            syscall::CallFlags::empty(),
+                            &[syscall::flag::FileTableVerb::Dup2 as u64],
+                        )?;
+                    }
+                }
+            }
+        }
+
+        new_file_table.call_wo(
+            &[],
+            syscall::CallFlags::empty(),
+            &[syscall::flag::FileTableVerb::CloseCloExec as u64],
+        )?;
+
+        let extra_info = redox_rt::proc::ExtraInfo {
+            cwd: Some(cwd.as_bytes()),
+            // Signals set to be ignored by the calling process
+            // must also be ignored by the child process
+            sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
+            sigprocmask: if let Some(fat) = fat
+                && Flags::from_bits(fat.flags)
+                    .unwrap()
+                    .contains(Flags::POSIX_SPAWN_SETSIGMASK)
+            {
+                fat.sigmask
+            } else {
+                redox_rt::signal::get_sigmask().unwrap()
+            },
+            umask: redox_rt::sys::get_umask(),
+            thr_fd: child.thr_fd.as_raw_fd(),
+            proc_fd: proc_fd.as_raw_fd(),
+            ns_fd: redox_rt::current_namespace_fd().ok(),
+            cwd_fd: path::current_dir()
+                .ok()
+                .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
+            same_process: false,
+        };
+
+        if let Some(attr) = fat {
+            let flags = Flags::from_bits(attr.flags).ok_or(Errno(EINVAL))?;
+
+            if flags.contains(Flags::POSIX_SPAWN_SETPGROUP) && attr.pgroup != 0 {
+                redox_rt::sys::posix_setpgid(
+                    proc_fd.as_raw_fd(),
+                    usize::try_from(attr.pgroup).map_err(|_| Errno(EINVAL))?,
+                )?;
+            } else {
+                redox_rt::sys::posix_setpgid(
+                    proc_fd.as_raw_fd(),
+                    redox_rt::sys::posix_getpgid(proc_fd.as_raw_fd())?,
+                )?;
+            }
+
+            let set_schedparam = || -> Result<()> {
+                if setpriority(
+                    PRIO_PROCESS,
+                    proc_fd.as_raw_fd() as id_t,
+                    attr.param.sched_priority,
+                ) as usize
+                    != 0
+                {
+                    Err(Errno(ERRNO.get()))
+                } else {
+                    Ok(())
+                }
+            };
+            let set_scheduler = || -> Result<()> { todo!() };
+
+            // scheduling paramters must be set regardless of whether the flag POSIX_SPAWN_SETSCHEDPARAM is set
+            if flags.contains(Flags::POSIX_SPAWN_SETSCHEDULER) {
+                set_schedparam()?;
+                set_scheduler()?;
+            } else if flags.contains(Flags::POSIX_SPAWN_SETSCHEDPARAM) {
+                set_schedparam()?;
+            }
+
+            let parent_resugid = redox_rt::sys::posix_getresugid();
+
+            redox_rt::sys::posix_setresugid(
+                &Resugid {
+                    ruid: None,
+                    euid: Some(if executable_stat.st_mode as mode_t & S_ISUID == S_ISUID {
+                        executable_stat.st_uid
+                    } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
+                        parent_resugid.ruid
+                    } else {
+                        parent_resugid.euid
+                    }),
+                    suid: None,
+                    rgid: None,
+                    egid: Some(if executable_stat.st_mode as mode_t & S_ISGID == S_ISGID {
+                        executable_stat.st_gid
+                    } else if flags.contains(Flags::POSIX_SPAWN_RESETIDS) {
+                        parent_resugid.rgid
+                    } else {
+                        parent_resugid.egid
+                    }),
+                    sgid: None,
+                },
+                Some(proc_fd.as_raw_fd()),
+            )?;
+
+            // if POSIX_SPAWN_SETSIGDEF flag is set, the signals specified in
+            // sigdefault must have default actions
+        }
+
+        if let Some(redox_rt::proc::FexecResult::Interp {
+            path: interp_path,
+            interp_override,
+        }) = redox_rt::proc::fexec_impl(
+            executable,
+            &child.thr_fd,
+            &proc_fd,
+            program.to_bytes(),
+            args.as_slice(),
+            envs.as_slice(),
+            &extra_info,
+            None,
+        )? {
+            let interp_path =
+                CStr::from_bytes_with_nul(&interp_path).map_err(|_| Errno(ENOEXEC))?;
+
+            let interpreter = File::open(interp_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC)
+                .map_err(|_| Errno(ENOENT))?;
+
+            redox_rt::proc::fexec_impl(
+                FdGuard::new(interpreter.fd as usize).to_upper().unwrap(),
+                &child.thr_fd,
+                &proc_fd,
+                program.to_bytes(),
+                args.as_slice(),
+                envs.as_slice(),
+                &extra_info,
+                Some(interp_override),
+            )
+            .unwrap();
+        }
+
+        path::chdir(original_cwd.as_str())?;
+
+        let start_fd = child.thr_fd.dup(b"start")?;
+        start_fd.write(&[0])?;
+
+        Ok(pid_t::try_from(child.pid).unwrap())
     }
 
     fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {

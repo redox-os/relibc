@@ -11,7 +11,7 @@ FAILING_TESTS += malloc/usable_size
 FAILING_TESTS += mkfifo
 # Waitpid had EINTR
 FAILING_TESTS += sigchld
-# not triggering ERANGE 
+# not triggering ERANGE
 FAILING_TESTS += stdlib/ptsname
 # Hang
 FAILING_TESTS += sys_epoll/epollet
@@ -286,6 +286,7 @@ VARIED_NAMES=\
 	signals/sigset-4 \
 	signals/sigset-5 \
 	signals/sigset-9 \
+	spawn \
 	stdio/ctermid \
 	stdio/tempnam \
 	stdio/tmpnam \

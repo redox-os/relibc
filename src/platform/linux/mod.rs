@@ -1,6 +1,8 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
+use alloc::string::String;
+
 use super::{Pal, types::*};
 use crate::{
     c_str::CStr,
@@ -792,5 +794,16 @@ impl Pal for Sys {
     fn verify() -> bool {
         // GETPID on Linux is 39, which does not exist on Redox
         e_raw(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }).is_ok()
+    }
+
+    unsafe fn spawn(
+        program: CStr,
+        fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
+        fat: Option<&crate::header::spawn::posix_spawnattr_t>,
+        argv: crate::iter::NulTerminated<*mut c_char>,
+        envp: Option<crate::iter::NulTerminated<*mut c_char>>,
+        dir_ent_name: Option<String>,
+    ) -> Result<pid_t> {
+        todo!()
     }
 }
