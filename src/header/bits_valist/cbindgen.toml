@@ -1,0 +1,18 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdarg.h.html
+#
+# This type is split out to prevent importing all of stdarg.h into other headers.
+#
+# POSIX headers that require va_list:
+# - fcntl.h (not mentioned in spec but has ... in some functions)
+# - stdarg.h (where it should be defined)
+# - stdio.h
+# - wchar.h (all of stdarg.h permitted)
+include_guard = "_RELIBC_BITS_VALIST_T_H"
+after_includes = """
+typedef __builtin_va_list va_list;
+"""
+language = "C"
+no_includes = true
+cpp_compat = true
+[enum]
+prefix_with_name = true

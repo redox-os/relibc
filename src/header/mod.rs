@@ -62,6 +62,7 @@ pub mod bits_ucred;
 pub mod bits_uid_t;
 #[path = "bits_useconds-t/mod.rs"]
 pub mod bits_useconds_t;
+pub mod bits_valist;
 #[path = "bits_wchar-t/mod.rs"]
 pub mod bits_wchar_t;
 pub mod bits_winsize;
@@ -127,7 +128,7 @@ pub mod shadow;
 pub mod signal;
 // TODO: spawn.h
 // TODO: stdalign.h (likely C implementation)
-// stdarg.h implemented in C
+pub mod stdarg;
 // stdatomic.h implemented in C
 // stdbool.h implemented in C
 // stddef.h implemented in C
