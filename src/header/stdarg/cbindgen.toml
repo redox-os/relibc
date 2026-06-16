@@ -1,0 +1,17 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdarg.h.html
+#
+# There are no spec quotations relating to includes
+include_guard = "_RELIBC_STDARG_H"
+after_includes = """
+#include <bits/valist.h> // for va_list
+
+#define va_start(v,l)   __builtin_va_start(v,l)
+#define va_end(v)       __builtin_va_end(v)
+#define va_arg(v,l)     __builtin_va_arg(v,l)
+#define va_copy(d,s)    __builtin_va_copy(d,s)
+"""
+language = "C"
+no_includes = true
+cpp_compat = true
+[enum]
+prefix_with_name = true
