@@ -8,14 +8,14 @@
 # - "The <stdio.h> header shall define NULL as described in <stddef.h>."
 # - "Inclusion of the <stdio.h> header may also make visible all symbols from <stddef.h>."
 #
-# stdarg.h brings in va_list (TODO split out)
 # stddef.h brings in size_t and NULL
 # features.h required for deprecated annotations
-sys_includes = ["stdarg.h", "stddef.h", "features.h"]
+sys_includes = ["stddef.h", "features.h"]
 after_includes = """
 #include <bits/off-t.h>   // for off_t from sys/types.h
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
 #include <bits/fcntl.h>   // for SEEK_CUR, SEEK_END and SEEK_SET
+#include <bits/valist.h>  // for va_list from stdarg.h
 """
 include_guard = "_RELIBC_STDIO_H"
 trailer = """
