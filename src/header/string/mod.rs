@@ -447,6 +447,11 @@ pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, dstsize: 
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlen.html>.
+///
+/// Returns the number of bytes in the string to which `s` points, not
+/// including the `NUL` character.
+///
+/// Always successful. The return value never represents an error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
     unsafe { NulTerminated::new(s) }
