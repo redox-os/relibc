@@ -15,7 +15,7 @@ impl ByteLiteral {
     /// - Octal: `040`..=`176`
     /// - Decimal: `30`..=`126`
     /// - Hexadecimal: `20`..=`7E`
-    /// - Byte literals: b` `..=b`~`
+    /// - Byte literals: The space character (` `) upto and including tilde (`~`)
     pub fn cast_cchar(input: u8) -> c_char {
         match input {
             b' '..=b'~' => {
