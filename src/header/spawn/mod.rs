@@ -42,7 +42,7 @@ unsafe fn spawn(
 ) -> Result<()> {
     let mut original_cwd = [0 as c_char; PATH_MAX];
     assert!(
-        unsafe { !getcwd(original_cwd.as_mut_ptr() as *mut c_char, PATH_MAX).is_null() },
+        unsafe { !getcwd(original_cwd.as_mut_ptr().cast::<c_char>(), PATH_MAX).is_null() },
         "Error getting cwd: {}",
         ERRNO.get()
     );
@@ -57,7 +57,7 @@ unsafe fn spawn(
         'a: for path_element in path_elements {
             let pe = CString::from_str(path_element).unwrap();
             let dir = if let Some(dir) =
-                unsafe { opendir(pe.as_bytes_with_nul().as_ptr() as *const c_char).as_mut() }
+                unsafe { opendir(pe.as_bytes_with_nul().as_ptr().cast::<c_char>()).as_mut() }
             {
                 dir
             } else if ERRNO.get() == 0 || ERRNO.get() == ENOTDIR || ERRNO.get() == ENOENT {
@@ -68,7 +68,7 @@ unsafe fn spawn(
 
             while let Some(dir_ent) = unsafe { readdir(dir).as_ref() } {
                 let dir_ent_name = unsafe {
-                    CStr::from_ptr(dir_ent.d_name.as_ptr() as *const c_char)
+                    CStr::from_ptr(dir_ent.d_name.as_ptr().cast::<c_char>())
                         .to_str()
                         .unwrap()
                         .to_string()
@@ -103,12 +103,11 @@ unsafe fn spawn(
                 *pid = v;
             }
         })
-        .map_err(|e| {
-            let status = chdir(original_cwd.as_ptr() as *const c_char);
+        .inspect_err(|e| {
+            let status = chdir(original_cwd.as_ptr().cast::<c_char>());
             if status != 0 {
                 panic!("Error switching back to original cwd: {}", ERRNO.get());
             }
-            e
         })?;
     }
 
@@ -209,7 +208,7 @@ pub unsafe extern "C" fn posix_spawnp(
             attrp.as_ref(),
             argv,
             envp,
-            if program.contains('/') { false } else { true },
+            !program.contains('/'),
         )
     } {
         return e.0;
