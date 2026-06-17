@@ -15,6 +15,7 @@ use syscall::Sigcontrol;
 use self::{
     proc::{FdGuard, FdGuardUpper, STATIC_PROC_INFO},
     sync::Mutex,
+    sys::FdTbl,
 };
 
 extern crate alloc;
@@ -67,6 +68,9 @@ impl RtTcb {
 
 pub type Tcb = GenericTcb<RtTcb>;
 
+pub static TLS_ACTIVATED: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
 /// OS and architecture specific code to activate TLS - Redox aarch64
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "aarch64")]
@@ -78,6 +82,7 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
         "msr tpidr_el0, {}",
         in(reg) abi_ptr,
     );
+    TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
 }
 
 /// OS and architecture specific code to activate TLS - Redox x86
@@ -86,16 +91,18 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = tcb
-        .thread_fd()
-        .dup(b"regs/env")
+    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env", 0)
         .expect_notls("failed to open handle for process registers");
 
-    file.read(&mut env).expect_notls("failed to read gsbase");
+    syscall::read(file_fd, &mut env).expect_notls("failed to read gsbase");
 
     env.gsbase = tls_end as u32;
 
-    file.write(&env).expect_notls("failed to write gsbase");
+    syscall::write(file_fd, &env).expect_notls("failed to write gsbase");
+
+    let _ = crate::sys::close_raw(file_fd);
+
+    TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
 }
 
 /// OS and architecture specific code to activate TLS - Redox x86_64
@@ -104,16 +111,18 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = tcb
-        .thread_fd()
-        .dup(b"regs/env")
+    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env", 0)
         .expect_notls("failed to open handle for process registers");
 
-    file.read(&mut env).expect_notls("failed to read fsbase");
+    syscall::read(file_fd, &mut env).expect_notls("failed to read fsbase");
 
     env.fsbase = tls_end_and_tcb_start as u64;
 
-    file.write(&env).expect_notls("failed to write fsbase");
+    syscall::write(file_fd, &env).expect_notls("failed to write fsbase");
+
+    let _ = crate::sys::close_raw(file_fd);
+
+    TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
 }
 
 /// OS and architecture specific code to activate TLS - Redox riscv64
@@ -129,6 +138,7 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
         "mv tp, {}",
         in(reg) tls_start
     );
+    TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
 }
 
 /// Initialize redox-rt in situations where relibc is not used
@@ -158,6 +168,17 @@ pub unsafe fn initialize_freestanding(this_thr_fd: FdGuardUpper) -> &'static FdG
     page.tcb_len = syscall::PAGE_SIZE;
     page.tls_end = (page as *mut Tcb).cast();
 
+    let cur_filetable_fd = syscall::dup_into(
+        this_thr_fd.as_raw_fd(),
+        this_thr_fd.as_raw_fd() + 1,
+        b"filetable-binary",
+    )
+    .expect("failed to open filetable-binary");
+
+    *current_filetable() =
+        FdTbl::from_binary_fd(FdGuard::new(cur_filetable_fd).to_upper().unwrap())
+            .expect("failed to populate fds");
+
     // Make sure to use ptr::write to prevent dropping the existing FdGuard
     page.os_specific.thr_fd.get().write(Some(this_thr_fd));
 
@@ -176,6 +197,8 @@ pub unsafe fn initialize_freestanding(this_thr_fd: FdGuardUpper) -> &'static FdG
         let abi_ptr = core::ptr::addr_of_mut!(page.tcb_ptr) as usize;
         core::arch::asm!("mv tp, {}", in(reg) (abi_ptr + 8));
     }
+    TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
+
     initialize();
 
     (*page.os_specific.thr_fd.get()).as_ref().unwrap()
@@ -275,9 +298,30 @@ pub fn current_namespace_fd() -> syscall::Result<usize> {
 struct ChildHookCommonArgs {
     new_thr_fd: FdGuard,
     new_proc_fd: Option<FdGuard>,
+    new_filetable_fd: FdGuardUpper,
 }
 
 unsafe fn child_hook_common(args: ChildHookCommonArgs) {
+    let new_filetable_fd = args.new_filetable_fd;
+
+    let old_filetable_fd;
+    {
+        let mut guard = current_filetable();
+        old_filetable_fd = guard.take();
+        guard.set_fd(new_filetable_fd);
+        guard
+            .override_at(args.new_thr_fd.as_raw_fd(), args.new_thr_fd.as_raw_fd())
+            .expect("failed to add new_thr_fd");
+        if let Some(new_proc_fd) = args.new_proc_fd.as_ref() {
+            guard
+                .override_at(new_proc_fd.as_raw_fd(), new_proc_fd.as_raw_fd())
+                .expect("failed to add new_proc_fd");
+        }
+        if let Some(ref old) = old_filetable_fd {
+            let _ = guard.remove(old.as_raw_fd());
+        }
+    }
+
     let new_thr_fd = args.new_thr_fd.to_upper().unwrap();
     let new_proc_fd = args.new_proc_fd.map(|x| x.to_upper().unwrap());
 
@@ -310,4 +354,13 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
 
     let old_thr_fd = unsafe { RtTcb::current().thr_fd.get().replace(Some(new_thr_fd)) };
     drop(old_thr_fd);
+
+    drop(old_filetable_fd);
+}
+
+static FILETABLE: Mutex<FdTbl> = Mutex::new(FdTbl::new());
+
+#[inline]
+pub fn current_filetable() -> crate::sync::MutexGuard<'static, FdTbl> {
+    FILETABLE.lock()
 }
