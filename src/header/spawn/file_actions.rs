@@ -59,14 +59,14 @@ impl Iterator for FileActionsIter {
     }
 }
 
-impl<'a> IntoIterator for &'a posix_spawn_file_actions_t {
+impl IntoIterator for &posix_spawn_file_actions_t {
     type Item = Action;
 
     type IntoIter = FileActionsIter;
 
     fn into_iter(self) -> Self::IntoIter {
         FileActionsIter {
-            actions: (*self).clone(),
+            actions: (*self),
             curr: 0,
         }
     }
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
         path: if path.is_null() {
             CString::new("").unwrap()
         } else {
-            unsafe { CString::from_raw(path as *mut c_char) }
+            unsafe { CString::from_raw(path.cast_mut()) }
         },
         flag: oflag,
         mode,
@@ -175,7 +175,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
         if path.is_null() {
             CString::new("").unwrap()
         } else {
-            CString::from_raw(path as *mut c_char)
+            CString::from_raw(path.cast_mut())
         }
     }));
     0

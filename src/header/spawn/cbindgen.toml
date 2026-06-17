@@ -11,6 +11,8 @@
 sys_includes = ["sched.h", "bits/sigset-t.h", "bits/mode-t.h", "bits/size-t.h"]
 include_guard = "_RELIBC_SPAWN_H"
 language = "C"
+style = "Tag"
+no_includes = true
 cpp_compat = true
 
 [enum]

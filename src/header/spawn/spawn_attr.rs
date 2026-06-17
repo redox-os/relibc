@@ -81,7 +81,7 @@ pub unsafe extern "C" fn posix_spawnattr_setschedparam(
 ) -> c_int {
     let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     let schedparam = unsafe { schedparam.as_ref().expect("schedparam cannot be NULL") };
-    (*attr).param = *schedparam;
+    attr.param = *schedparam;
     0
 }
 
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn posix_spawnattr_getschedparam(
 ) -> c_int {
     let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
     let schedparam = unsafe { schedparam.as_mut().expect("schedparam cannot be NULL") };
-    *schedparam = (*attr).param;
+    *schedparam = attr.param;
     0
 }
 
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn posix_spawnattr_setschedpolicy(
 ) -> c_int {
     let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     match schedpolicy {
-        SCHED_FIFO | SCHED_RR | SCHED_OTHER => (*attr).policy = schedpolicy,
+        SCHED_FIFO | SCHED_RR | SCHED_OTHER => attr.policy = schedpolicy,
         _ => return EINVAL,
     }
 
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn posix_spawnattr_getschedpolicy(
 ) -> c_int {
     let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
     let schedpolicy = unsafe { schedpolicy.as_mut().expect("schedpolicy cannot be NULL") };
-    *schedpolicy = (*attr).policy;
+    *schedpolicy = attr.policy;
     0
 }
 
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn posix_spawnattr_setsigdefault(
 ) -> c_int {
     let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     let sigdefault = unsafe { sigdefault.as_ref().expect("sigdefault cannot be NULL") };
-    (*attr).sigdefault = *sigdefault;
+    attr.sigdefault = *sigdefault;
     0
 }
 
@@ -169,7 +169,7 @@ pub unsafe extern "C" fn posix_spawnattr_getsigdefault(
 ) -> c_int {
     let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
     let sigdefault = unsafe { sigdefault.as_mut().expect("sigdefault cannot be NULL") };
-    *sigdefault = (*attr).sigdefault;
+    *sigdefault = attr.sigdefault;
     0
 }
 
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn posix_spawnattr_setsigmask(
 ) -> c_int {
     let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     let sigmask = unsafe { sigmask.as_ref().expect("sigmask cannot be NULL") };
-    (*attr).sigmask = *sigmask;
+    attr.sigmask = *sigmask;
     0
 }
 
@@ -203,7 +203,7 @@ pub unsafe extern "C" fn posix_spawnattr_getsigmask(
 ) -> c_int {
     let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
     let sigmask = unsafe { sigmask.as_mut().expect("sigmask cannot be NULL") };
-    *sigmask = (*attr).sigmask;
+    *sigmask = attr.sigmask;
     0
 }
 
@@ -220,7 +220,7 @@ pub unsafe extern "C" fn posix_spawnattr_setflags(
 ) -> c_int {
     let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     match Flags::from_bits(flags) {
-        Some(v) => (*attr).flags = v.bits(),
+        Some(v) => attr.flags = v.bits(),
         None => {
             return EINVAL;
         }
@@ -243,7 +243,7 @@ pub unsafe extern "C" fn posix_spawnattr_getflags(
     let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
     let flags = unsafe { flags.as_mut().expect("flags cannot be NULL") };
 
-    *flags = (*attr).flags;
+    *flags = attr.flags;
     0
 }
 
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn posix_spawnattr_setpgroup(
     pgroup: pid_t,
 ) -> c_int {
     let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
-    (*attr).pgroup = pgroup;
+    attr.pgroup = pgroup;
     0
 }
 
@@ -276,6 +276,6 @@ pub unsafe extern "C" fn posix_spawnattr_getpgroup(
 ) -> c_int {
     let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
     let pgroup = unsafe { pgroup.as_mut().expect("pgroup cannot be NULL") };
-    *pgroup = (*attr).pgroup;
+    *pgroup = attr.pgroup;
     0
 }
