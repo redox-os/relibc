@@ -32,7 +32,7 @@ pub fn openat(dirfd: c_int, path: &str, oflag: c_int, mode: mode_t) -> Result<us
 
     c_int::try_from(usize_fd)
         .map_err(|_| {
-            let _ = syscall::close(usize_fd);
+            let _ = redox_rt::sys::close(usize_fd);
             Error::new(EMFILE)
         })
         .map(|f| f as usize)
@@ -241,7 +241,7 @@ pub unsafe extern "C" fn redox_openat_v1(
     flags: u32,
     fcntl_flags: u32,
 ) -> RawResult {
-    Error::mux(syscall::openat(
+    Error::mux(redox_rt::sys::openat(
         fd,
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) },
         flags as usize,
@@ -250,7 +250,7 @@ pub unsafe extern "C" fn redox_openat_v1(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_dup_v1(fd: usize, buf: *const u8, len: usize) -> RawResult {
-    Error::mux(syscall::dup(fd, unsafe {
+    Error::mux(redox_rt::sys::dup(fd, unsafe {
         core::slice::from_raw_parts(buf, len)
     }))
 }
@@ -261,7 +261,7 @@ pub unsafe extern "C" fn redox_dup2_v1(
     buf: *const u8,
     len: usize,
 ) -> RawResult {
-    Error::mux(syscall::dup2(old_fd, new_fd, unsafe {
+    Error::mux(redox_rt::sys::dup2(old_fd, new_fd, unsafe {
         core::slice::from_raw_parts(buf, len)
     }))
 }
@@ -359,7 +359,7 @@ pub unsafe extern "C" fn redox_fpath_v1(fd: usize, dst_base: *mut u8, dst_len: u
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_close_v1(fd: usize) -> RawResult {
-    Error::mux(syscall::close(fd))
+    Error::mux(redox_rt::sys::close(fd))
 }
 
 #[unsafe(no_mangle)]
@@ -629,4 +629,9 @@ pub unsafe extern "C" fn redox_relpathat_v0(
         unsafe { slice::from_raw_parts_mut(dst_base, dst_len) },
         &StdFsCallMeta::new(StdFsCallKind::Relpathat, 0, 0),
     ))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_fcntl_v0(fd: usize, cmd: usize, arg: usize) -> RawResult {
+    Error::mux(redox_rt::sys::fcntl(fd, cmd, arg))
 }

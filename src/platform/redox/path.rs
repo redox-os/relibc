@@ -97,9 +97,7 @@ pub fn chdir(path: &str) -> Result<()> {
             .as_ref()
             .unwrap()
             .fd
-            .openat(&path, O_STAT, 0)?
-            .to_upper()
-            .unwrap();
+            .openat_into_upper(&path, O_STAT, 0)?;
         let mut stat = Stat::default();
         if fd.fstat(&mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
             return Err(Error::new(ENOTDIR));
@@ -138,7 +136,7 @@ pub fn fchdir(fd: c_int) -> Result<()> {
         let res = Sys::fpath(fd, buf.as_bytes_mut())?;
         buf.set_len(res);
     }
-    let fd = FdGuard::new(syscall::fcntl(
+    let fd = FdGuard::new(redox_rt::sys::fcntl(
         fd as usize,
         syscall::F_DUPFD,
         syscall::UPPER_FDTBL_TAG,

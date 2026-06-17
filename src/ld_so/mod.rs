@@ -159,7 +159,7 @@ pub unsafe fn init(
 
         {
             let file = thr_fd
-                .dup(b"regs/env")
+                .dup_into_upper(b"regs/env")
                 .expect_notls("failed to open handle for process registers");
 
             file.read(&mut env).expect_notls("failed to read gsbase");
@@ -173,10 +173,10 @@ pub unsafe fn init(
 
         {
             let file = thr_fd
-                .dup(b"regs/env")
+                .dup_into_upper(b"regs/env")
                 .expect_notls("failed to open handle for process registers");
 
-            file.read(&mut env).expect_notls("failed to read fsbase");
+            file.read(&mut env).expect_notls("failed to read gsbase");
         }
 
         tp = env.fsbase as usize;

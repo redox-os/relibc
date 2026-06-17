@@ -239,12 +239,12 @@ impl Pal for Sys {
     }
 
     fn close(fd: c_int) -> Result<()> {
-        syscall::close(fd as usize)?;
+        redox_rt::sys::close(fd as usize)?;
         Ok(())
     }
 
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
-        Ok(syscall::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
+        Ok(redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
     }
 
     fn exit(status: c_int) -> ! {
@@ -442,7 +442,7 @@ impl Pal for Sys {
             _ => {}
         }
 
-        Ok(syscall::fcntl(fd as usize, cmd as usize, args as usize)? as c_int)
+        Ok(redox_rt::sys::fcntl(fd as usize, cmd as usize, args as usize)? as c_int)
     }
 
     fn fdatasync(fd: c_int) -> Result<()> {
@@ -484,7 +484,7 @@ impl Pal for Sys {
         let file = openat2(dirfd, path, flags, fcntl::O_PATH)?;
         // Close the file descriptor after fstat(2) regardless of success or failure.
         let fstat_res = unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr()) };
-        let close_res = syscall::close(*file as usize);
+        let close_res = redox_rt::sys::close(*file as usize);
         if let Err(err) = fstat_res {
             return Err(err.into());
         }
@@ -1507,7 +1507,7 @@ impl Pal for Sys {
             CLOCK_MONOTONIC => "/scheme/time/4",
             _ => return Err(Errno(EINVAL)),
         };
-        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?.to_upper()?;
+        let timerfd = FdGuard::open_into_upper(&path, syscall::O_RDWR)?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)
         })?)
@@ -1561,8 +1561,8 @@ impl Pal for Sys {
             return Err(Errno(EINVAL));
         }
         let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
-        let _ = syscall::close(timer_st.timerfd);
-        let _ = syscall::close(timer_st.eventfd);
+        let _ = redox_rt::sys::close(timer_st.timerfd);
+        let _ = redox_rt::sys::close(timer_st.eventfd);
         if !timer_st.thread.is_null() {
             let _ = unsafe { pthread_cancel(timer_st.thread) };
         }

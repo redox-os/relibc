@@ -18,7 +18,7 @@ mod drm;
 // TODO: some of the structs passed as T have padding bytes, so casting to a byte slice is UB
 
 fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
-    let dup = FdGuard::new(syscall::dup(fd as usize, name.as_bytes())?);
+    let dup = FdGuard::new(redox_rt::sys::dup(fd as usize, name.as_bytes())?);
 
     let size = mem::size_of::<T>();
 
@@ -29,7 +29,7 @@ fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
 
 // FIXME: unsound
 fn dup_write<T>(fd: c_int, name: &str, t: &T) -> Result<usize> {
-    let dup = FdGuard::new(syscall::dup(fd as usize, name.as_bytes())?);
+    let dup = FdGuard::new(redox_rt::sys::dup(fd as usize, name.as_bytes())?);
 
     let size = mem::size_of::<T>();
 
