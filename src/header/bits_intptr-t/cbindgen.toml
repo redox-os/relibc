@@ -1,0 +1,19 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdint.h.html
+#
+# This type is split out to prevent importing all of stdint.h in other headers.
+#
+# POSIX headers that require intptr_t:
+# - stdint.h (where it should be defined)
+# - sys/shm.h
+# - unistd.h (permitted to include all of stdint.h)
+include_guard = "_RELIBC_BITS_INTPTR_T_H"
+after_includes = """
+#ifdef __INTPTR_TYPE__
+typedef __INTPTR_TYPE__ intptr_t;
+#endif
+"""
+language = "C"
+no_includes = true
+cpp_compat = true
+[enum]
+prefix_with_name = true

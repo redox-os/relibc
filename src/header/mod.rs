@@ -18,6 +18,8 @@ pub mod bits_gid_t;
 pub mod bits_id_t;
 #[path = "bits_ino-t/mod.rs"]
 pub mod bits_ino_t;
+#[path = "bits_intptr-t/mod.rs"]
+pub mod bits_intptr_t;
 pub mod bits_iovec;
 #[path = "bits_key-t/mod.rs"]
 pub mod bits_key_t;
