@@ -355,12 +355,12 @@ unsafe extern "C" {
     fn __relibc_internal_sigentry_crit_third();
 }
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
-    if stack.regs.eip == __relibc_internal_sigentry_crit_first as usize {
+    if stack.regs.eip == __relibc_internal_sigentry_crit_first as *const () as usize {
         let stack_ptr = stack.regs.esp as *const usize;
         stack.regs.esp = unsafe { stack_ptr.read() };
         stack.regs.eip = unsafe { stack_ptr.sub(1).read() };
-    } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize
-        || stack.regs.eip == __relibc_internal_sigentry_crit_third as usize
+    } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as *const () as usize
+        || stack.regs.eip == __relibc_internal_sigentry_crit_third as *const () as usize
     {
         stack.regs.eip = area.tmp_eip;
     }
@@ -371,7 +371,10 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     }
 }
 pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
-    let orig_eip = core::mem::replace(&mut stack.regs.eip, __relibc_internal_sigentry as usize);
+    let orig_eip = core::mem::replace(
+        &mut stack.regs.eip,
+        __relibc_internal_sigentry as *const () as usize,
+    );
     control.saved_ip.set(orig_eip);
     control.saved_archdep_reg.set(stack.regs.eflags);
 }
