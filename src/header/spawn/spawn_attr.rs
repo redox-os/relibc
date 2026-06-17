@@ -31,6 +31,7 @@ pub const POSIX_SPAWN_SETSIGMASK: c_short = 4;
 pub const POSIX_SPAWN_SETSCHEDPARAM: c_short = 5;
 pub const POSIX_SPAWN_SETSCHEDULER: c_short = 6;
 
+/// A spawn attributes object.
 #[repr(C)]
 pub struct posix_spawnattr_t {
     pub param: sched_param,
@@ -41,9 +42,15 @@ pub struct posix_spawnattr_t {
     pub sigmask: sigset_t,
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_init.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_init.html>.
 ///
-/// Panics is `attr` is `NULL`.
+/// Initializes a spawn attributes object `attr` with a default value for all
+/// the individual attributes used by the implementation.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
+/// Panics if `attr` is `NULL`.
 #[unsafe(no_mangle)]
 pub extern "C" fn posix_spawnattr_init(attr: *mut posix_spawnattr_t) -> c_int {
     unsafe {
@@ -53,60 +60,89 @@ pub extern "C" fn posix_spawnattr_init(attr: *mut posix_spawnattr_t) -> c_int {
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_destroy.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_destroy.html>.
 ///
-/// Panics is `attr` is `NULL`.
+/// Destroys a spawn attributes object.
 ///
-/// # Safety:
-/// `attr` must be a pointer to `posix_spawnattr_t` and must at least be initialised.
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
+/// Panics if `attr` is `NULL`.
+///
+/// # Safety
+/// `attr` must be a pointer to `posix_spawnattr_t` and must at least be
+/// initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_destroy(attr: *mut posix_spawnattr_t) -> c_int {
     unsafe {
+        // TODO should we be returning EINVAL when `attr` is invalid?
         let attr = attr.as_mut().expect("posix_spawnattr_t cannot be NULL");
         *attr = zeroed();
     }
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setschedparam.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setschedparam.html>.
 ///
+/// Sets the spawn-schedparam attribute in an initialized attributes object
+/// referenced by `attr`.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `schedparam` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setschedparam(
     attr: *mut posix_spawnattr_t,
     schedparam: *const sched_param,
 ) -> c_int {
+    // TODO should we be returning EINVAL when `attr` is invalid?
     let attr = unsafe { attr.as_mut().expect("posix_spawnattr_t cannot be NULL") };
     let schedparam = unsafe { schedparam.as_ref().expect("schedparam cannot be NULL") };
     attr.param = *schedparam;
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getschedparam.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getschedparam.html>.
 ///
+/// Obtains the value of the spawn-schedparam attribute from the attributes
+/// object referenced by `attr`.
+///
+/// Upon success, returns `0` and stores the value of the spawn-schedparam
+/// attribute of `attr` into the object referenced by `schedparam`. Upon
+/// failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `schedparam` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getschedparam(
     attr: *const posix_spawnattr_t,
     schedparam: *mut sched_param,
 ) -> c_int {
+    // TODO should we be returning EINVAL when `attr` is invalid?
     let attr = unsafe { attr.as_ref().expect("posix_spawnattr_t cannot be NULL") };
     let schedparam = unsafe { schedparam.as_mut().expect("schedparam cannot be NULL") };
     *schedparam = attr.param;
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setschedpolicy.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setschedpolicy.html>.
 ///
+/// Sets the spawn-schedpolicy attribute in an initialized attributes object
+/// referenced by `attr`.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setschedpolicy(
@@ -122,11 +158,19 @@ pub unsafe extern "C" fn posix_spawnattr_setschedpolicy(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getschedpolicy.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getschedpolicy.html>.
 ///
+/// Obtains the value of the spawn-schedpolicy attribute from the attributes
+/// object referenced by `attr`.
+///
+/// Upon success, returns `0` and stores the value of the spawn-schedpolicy
+/// attribute of `attr` into the object referenced by `schedpolicy`. Upon
+/// failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `schedpolicy` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getschedpolicy(
@@ -139,11 +183,17 @@ pub unsafe extern "C" fn posix_spawnattr_getschedpolicy(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setsigdefault.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setsigdefault.html>.
 ///
+/// Sets the spawn-sigdefault attribute in an initialized attributes object
+/// referenced by `attr`.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `sigdefault` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setsigdefault(
@@ -156,11 +206,19 @@ pub unsafe extern "C" fn posix_spawnattr_setsigdefault(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getsigdefault.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getsigdefault.html>.
 ///
+/// Obtains the value of the spawn-sigdefault attribute from the attributes
+/// object referenced by `attr`.
+///
+/// Upon success, returns `0` and stores the value of the spawn-sigdefault
+/// attribute of `attr` into the object referenced by `sigdefault`. Upon
+/// failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `sigdefault` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getsigdefault(
@@ -173,11 +231,17 @@ pub unsafe extern "C" fn posix_spawnattr_getsigdefault(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setsigmask.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setsigmask.html>.
 ///
+/// Sets the spawn-sigmask attribute in an initialized attributes object
+/// referenced by `attr`.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `sigmask` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setsigmask(
@@ -190,11 +254,19 @@ pub unsafe extern "C" fn posix_spawnattr_setsigmask(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getsigmask.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getsigmask.html>.
 ///
+/// Obtains the value of the spawn-sigmask attribute from the attributes
+/// object referenced by `attr`.
+///
+/// Upon success, returns `0` and stores the value of the spawn-sigmask
+/// attribute of `attr` into the object referenced by `sigmask`. Upon
+/// failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `sigmask` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getsigmask(
@@ -207,11 +279,17 @@ pub unsafe extern "C" fn posix_spawnattr_getsigmask(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setflags.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setflags.html>.
 ///
+/// Sets the spawn-flags attribute in an initialized attributes object
+/// referenced by `attr`.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setflags(
@@ -229,11 +307,19 @@ pub unsafe extern "C" fn posix_spawnattr_setflags(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getflags.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getflags.html>.
 ///
+/// Obtains the value of the spawn-flags attribute from the attributes
+/// object referenced by `attr`.
+///
+/// Upon success, returns `0` and stores the value of the spawn-flags
+/// attribute of `attr` into the object referenced by `flags`. Upon
+/// failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `flags` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getflags(
@@ -247,11 +333,17 @@ pub unsafe extern "C" fn posix_spawnattr_getflags(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setpgroup.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_setpgroup.html>.
 ///
+/// Sets the spawn-pgroup attribute in an initialized attributes object
+/// referenced by `attr`.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_setpgroup(
@@ -263,11 +355,19 @@ pub unsafe extern "C" fn posix_spawnattr_setpgroup(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getpgroup.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnattr_getpgroup.html>.
 ///
+/// Obtains the value of the spawn-pgroup attribute from the attributes
+/// object referenced by `attr`.
+///
+/// Upon success, returns `0` and stores the value of the spawn-pgroup
+/// attribute of `attr` into the object referenced by `pgroup`. Upon
+/// failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `attr` or `pgroup` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `attr` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnattr_getpgroup(

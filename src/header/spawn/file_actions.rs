@@ -22,6 +22,7 @@ pub enum Action {
 
 struct FileActions(Vec<Action>);
 
+/// A spawn file actions object.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct posix_spawn_file_actions_t {
@@ -30,6 +31,7 @@ pub struct posix_spawn_file_actions_t {
 }
 
 impl posix_spawn_file_actions_t {
+    /// Adds an `Action` to `posix_spawn_file_actions_t`.
     pub fn add_action(&mut self, action: Action) {
         let v = ptr::from_mut(self).cast::<FileActions>();
         unsafe {
@@ -72,8 +74,14 @@ impl IntoIterator for &posix_spawn_file_actions_t {
     }
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_init.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_init.html>.
 ///
+/// Initializes the object referenced by `file_actions` to contain no file
+/// actions for `posix_spawn()` or `posix_spawnp()` to perform.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `file_actions` is `NULL`.
 #[unsafe(no_mangle)]
 pub extern "C" fn posix_spawn_file_actions_init(
@@ -90,16 +98,25 @@ pub extern "C" fn posix_spawn_file_actions_init(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_destroy.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_destroy.html>.
 ///
+/// Destroys the object referenced by `file_actions`, effectively making it
+/// uninitialized.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `file_actions` is `NULL`.
 ///
-/// # Safety:
-/// If `file_actions` is not `NULL`, then it must be a pointer to a `file_actions` object that was initialised by calling `posix_spawn_file_actions_init`.
+/// # Safety
+/// If `file_actions` is not `NULL`, then it must be a pointer to a
+/// `file_actions` object that was initialised by calling
+/// `posix_spawn_file_actions_init()`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
+    // TODO should we be returning EINVAL when `file_actions` is invalid?
     if file_actions.is_null() {
         panic!("file_actions cannot be NULL");
     }
@@ -109,26 +126,31 @@ pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addopen.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addopen.html>.
 ///
+/// Adds an open action to a spawn file actions object.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `file_actions` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `path` must be a valid null-terminated C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
     file_actions: *mut posix_spawn_file_actions_t,
-    fd: c_int,
+    fildes: c_int,
     path: *const c_char,
     oflag: c_int,
     mode: mode_t,
 ) -> c_int {
     let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    if fd < 0 {
+    if fildes < 0 {
         return EBADF;
     }
     file_actions.add_action(Action::Open {
-        fd,
+        fd: fildes,
         path: if path.is_null() {
             CString::new("").unwrap()
         } else {
@@ -140,31 +162,44 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addopen(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addclose.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addclose.html>.
 ///
+/// Adds a close action to a spawn file actions object.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `file_actions` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `file_actions` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addclose(
     file_actions: *mut posix_spawn_file_actions_t,
-    fd: c_int,
+    fildes: c_int,
 ) -> c_int {
     let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    if fd < 0 {
+    if fildes < 0 {
         return EBADF;
     }
-    file_actions.add_action(Action::Close(fd));
+    file_actions.add_action(Action::Close(fildes));
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addchdir.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addchdir.html>.
 ///
+/// Adds a chdir action to the object referenced by `file_actions` that shall
+/// cause the working directory to be set to `path` (as if `chdir(path)` had
+/// been called) when a new process is spawned using this file actions object.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `file_actions` is `NULL`.
 ///
-/// # Safety:
-/// `file_actions` must be initialised and `path` must be a valid null-terminated C string.
+/// # Safety
+/// `file_actions` must be initialised and `path` must be a valid
+/// null-terminated C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
     file_actions: *mut posix_spawn_file_actions_t,
@@ -181,41 +216,57 @@ pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addfchdir.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_addfchdir.html>.
 ///
+/// Adds a fchdir action to the object referenced by `file_actions` that shall
+/// cause the working directory to be set to `fildes` (as if `fchdir(fildes)`
+/// had been called) when a new process is spawned using this file actions
+/// object.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `file_actions` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `file_actions` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_addfchdir(
     file_actions: *mut posix_spawn_file_actions_t,
-    fd: c_int,
+    fildes: c_int,
 ) -> c_int {
     let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    if fd < 0 {
+    if fildes < 0 {
         return EBADF;
     }
-    file_actions.add_action(Action::FChdir(fd));
+    file_actions.add_action(Action::FChdir(fildes));
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_adddup2.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn_file_actions_adddup2.html>.
 ///
+/// Adds a dup2 action to the object referenced by `file_actions` that shall
+/// cause the file descriptor `fildes` to be duplicated as `newfildes` (as if
+/// `dup2(fildes, newfildes)` had been called) when a new process is spawned
+/// using this file actions object.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned.
+///
+/// # Panics
 /// Panics if `file_actions` is `NULL`.
 ///
-/// # Safety:
+/// # Safety
 /// `file_actions` must be initialised.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn_file_actions_adddup2(
     file_actions: *mut posix_spawn_file_actions_t,
-    fd: c_int,
-    new: c_int,
+    fildes: c_int,
+    newfildes: c_int,
 ) -> c_int {
     let file_actions = unsafe { file_actions.as_mut().expect("file_actions cannot be NULL") };
-    if fd < 0 || new < 0 {
+    if fildes < 0 || newfildes < 0 {
         return EBADF;
     }
-    file_actions.add_action(Action::Dup2(fd, new));
+    file_actions.add_action(Action::Dup2(fildes, newfildes));
     0
 }
