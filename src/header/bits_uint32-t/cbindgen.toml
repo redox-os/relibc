@@ -1,0 +1,19 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdint.h.html
+#
+# This type is split out to prevent importing all of stdint.h in other headers.
+#
+# socklen_t from sys/socket.h requires a 32bit integer even though the spec doesn't state uint32_t specifically
+include_guard = "_RELIBC_BITS_UINT32_T_H"
+after_includes = """
+#ifdef __UINT32_TYPE__
+typedef __UINT32_TYPE__ uint32_t;
+typedef __UINT32_TYPE__ u_int32_t;
+// Required by openlibm
+typedef __UINT32_TYPE__ __uint32_t;
+#endif
+"""
+language = "C"
+no_includes = true
+cpp_compat = true
+[enum]
+prefix_with_name = true

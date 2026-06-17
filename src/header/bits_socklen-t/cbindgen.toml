@@ -7,9 +7,9 @@
 # - netdb.h
 # - sys/socket.h (where it should be defined)
 #
-# TODO split out uint32_t to prevent including all of stdint.h
-# stdint needed for uint32_t for socklen_t
-sys_includes = ["stdint.h"]
+# sys/socket.h spec states socklen_t must be at least 32bit wide.
+# Application usage section recommends socklen_t value should not be larger than 2^31 -1.
+sys_includes = ["bits/uint32-t.h"]
 include_guard = "_RELIBC_BITS_SOCKLEN_T_H"
 language = "C"
 no_includes = true
