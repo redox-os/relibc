@@ -87,9 +87,7 @@ typedef __UINT_FAST64_TYPE__ uint_fast64_t;
 
 /* 7.8.1.4 Integer types capable of holding object pointers */
 
-#ifdef __INTPTR_TYPE__
-typedef __INTPTR_TYPE__ intptr_t;
-#endif
+#include <bits/intptr-t.h> // for intptr_t
 #ifdef __UINTPTR_TYPE__
 typedef __UINTPTR_TYPE__ uintptr_t;
 #endif
