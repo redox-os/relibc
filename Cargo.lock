@@ -478,9 +478,7 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b44b894f2a6e36457d665d1e08c3866add6ed5e70050c1b4ba8a8ddedb02ce7"
+version = "0.8.2"
 dependencies = [
  "bitflags",
 ]
