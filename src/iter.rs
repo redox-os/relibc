@@ -30,6 +30,12 @@ unsafe impl Zero for wchar_t {
     }
 }
 
+unsafe impl Zero for *mut c_char {
+    fn is_zero(&self) -> bool {
+        self.is_null()
+    }
+}
+
 /// An iterator over a nul-terminated buffer.
 ///
 /// This is intended to allow safe, ergonomic iteration over C-style byte and

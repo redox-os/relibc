@@ -1,5 +1,7 @@
 use core::num::NonZeroU64;
 
+use alloc::string::String;
+
 use super::types::*;
 use crate::{
     c_str::CStr,
@@ -15,6 +17,7 @@ use crate::{
         sys_utsname::utsname,
         time::{itimerspec, timespec},
     },
+    iter::NulTerminated,
     ld_so::tcb::OsSpecific,
     out::Out,
     pthread,
@@ -432,6 +435,15 @@ pub trait Pal {
 
     /// Platform implementation of [`setsid()`](crate::header::unistd::setsid) from [`unistd.h`](crate::header::unistd).
     fn setsid() -> Result<c_int>;
+
+    unsafe fn spawn(
+        program: CStr,
+        fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
+        fat: Option<&crate::header::spawn::posix_spawnattr_t>,
+        argv: NulTerminated<*mut c_char>,
+        envp: Option<NulTerminated<*mut c_char>>,
+        dir_ent_name: Option<String>,
+    ) -> Result<pid_t>;
 
     /// Platform implementation of [`symlink()`](crate::header::unistd::symlink) from [`unistd.h`](crate::header::unistd).
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {
