@@ -24,9 +24,14 @@ after_includes = """
 #include <bits/sigset-t.h> // for sigset_t
 #include <bits/timespec.h> // for timespec from time.h
 
+// Request for default signal handling.
 #define SIG_DFL ((void (*)(int))0)
+// Request that signal be ignored.
 #define SIG_IGN ((void (*)(int))1)
+// Return value of signal() in case of error.
 #define SIG_ERR ((void (*)(int))-1)
+// Obsolete in issue 7, removed in issue 8.
+// Request that signal be held.
 #define SIG_HOLD ((void (*)(int))2)
 
 typedef struct siginfo siginfo_t;
