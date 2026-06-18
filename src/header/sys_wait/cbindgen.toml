@@ -10,13 +10,21 @@ after_includes = """
 #include <bits/id-t.h>  // for id_t from sys/types.h
 #include <bits/pid-t.h> // for pid_t from sys/types.h
 
+// Return exit status.
 #define WEXITSTATUS(s) (((s) >> 8) & 0xff)
+// Return signal number that caused process to terminate.
 #define WTERMSIG(s) ((s) & 0x7f)
+// Return signal number that caused process to stop.
 #define WSTOPSIG(s) WEXITSTATUS(s)
+// True if WIFSIGNALED was true and creation of a core image was attempted.
 #define WCOREDUMP(s) (((s) & 0x80) != 0)
+// True if child exited normally.
 #define WIFEXITED(s) (((s) & 0x7f) == 0)
+// True if child stopped due to uncaught signal.
 #define WIFSTOPPED(s) (((s) & 0xff) == 0x7f)
+// True if child exited due to uncaught signal.
 #define WIFSIGNALED(s) (((((s) & 0x7f) + 1U) & 0x7f) >= 2) // Ends with 1111111 or 10000000
+// True if child has been continued.
 #define WIFCONTINUED(s) ((s) == 0xffff)
 """
 language = "C"
