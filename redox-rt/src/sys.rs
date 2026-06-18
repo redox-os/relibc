@@ -11,6 +11,8 @@ use syscall::{
     error::{self, EBADF, EEXIST, EINTR, EMFILE, ENODEV, ESRCH, Error, Result},
 };
 
+pub use redox_path::RedoxPath;
+
 use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, FILETABLE, RtTcb, Tcb,
     arch::manually_enter_trampoline,
@@ -582,8 +584,17 @@ pub fn getns() -> Result<usize> {
 }
 
 pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let _siglock = tmp_disable_signals();
     let fcntl_flags = flags & syscall::O_FCNTL_MASK;
-    openat_into_posix(crate::current_namespace_fd()?, path, flags, fcntl_flags)
+    let redox_path = RedoxPath::from_absolute(path.as_ref()).ok_or(Error::new(EINVAL))?;
+    let (_, reference) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
+    let root_fd = FdGuard::new(openat_into_upper(
+        crate::current_namespace_fd()?,
+        path.as_ref(),
+        syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+        0,
+    )?);
+    openat_into_posix(root_fd.as_raw_fd(), reference.as_ref(), flags, fcntl_flags)
 }
 pub fn openat<T: AsRef<str>>(
     fd: usize,
@@ -628,8 +639,17 @@ fn openat_into_posix<T: AsRef<str>>(
     Ok(out)
 }
 pub fn open_into_upper<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let _siglock = tmp_disable_signals();
     let fcntl_flags = flags & syscall::O_FCNTL_MASK;
-    openat_into_upper(crate::current_namespace_fd()?, path, flags, fcntl_flags)
+    let redox_path = RedoxPath::from_absolute(path.as_ref()).ok_or(Error::new(EINVAL))?;
+    let (_, reference) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
+    let root_fd = FdGuard::new(openat_into_upper(
+        crate::current_namespace_fd()?,
+        path.as_ref(),
+        syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+        0,
+    )?);
+    openat_into_upper(root_fd.as_raw_fd(), reference.as_ref(), flags, fcntl_flags)
 }
 pub fn dup(fd: usize, buf: &[u8]) -> Result<usize> {
     let _siglock = tmp_disable_signals();
@@ -686,11 +706,21 @@ pub fn dup2(fd: usize, newfd: usize, buf: &[u8]) -> Result<usize> {
 }
 
 pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let _siglock = tmp_disable_signals();
     let path = path.as_ref();
+    let fcntl_flags = flags & syscall::O_FCNTL_MASK;
+    let redox_path = RedoxPath::from_absolute(path).ok_or(Error::new(EINVAL))?;
+    let (_, reference) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
+    let root_fd = FdGuard::new(openat_into_upper(
+        crate::current_namespace_fd()?,
+        path,
+        syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+        0,
+    )?);
     unsafe {
         syscall::syscall4(
             syscall::SYS_UNLINKAT,
-            crate::current_namespace_fd()?,
+            root_fd.as_raw_fd(),
             path.as_ptr() as usize,
             path.len(),
             flags,
