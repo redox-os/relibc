@@ -35,38 +35,71 @@ pub mod sys;
 type SigSet = BitSet<[u64; 1]>;
 
 /// cbindgen:ignore
+/// Request for default signal handling.
 pub(crate) const SIG_DFL: usize = 0;
 /// cbindgen:ignore
+/// Request that signal be ignored.
 pub(crate) const SIG_IGN: usize = 1;
 /// cbindgen:ignore
+/// Return value of `signal()` in case of error.
 pub(crate) const SIG_ERR: isize = -1;
 /// cbindgen:ignore
+/// Obsolete in issue 7, removed in issue 8.
+/// Request that signal be held.
 pub(crate) const SIG_HOLD: isize = 2;
 
+/// The resulting set is the union of the current set and the signal set
+/// pointed to by the argument `set`.
 pub const SIG_BLOCK: c_int = 0;
+/// The resulting set is the intersection of the current set and the compliment
+/// of the signal set pointed to by the argument `set`.
 pub const SIG_UNBLOCK: c_int = 1;
+/// The resulting set is the signal set pointed to by the argument `set`.
 pub const SIG_SETMASK: c_int = 2;
 
+/// A queued signal, with an application-defined value, is generated when the
+/// event of interest occurs.
 pub const SIGEV_SIGNAL: c_int = 0;
+/// No asynchronous notification is delivered when the event of interest
+/// occurs.
 pub const SIGEV_NONE: c_int = 1;
+/// A notification function is called to perform notification.
 pub const SIGEV_THREAD: c_int = 2;
 
+/// cbindgen:ignore
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
+///
+/// # Implementation
+/// This struct in Rust is missing the `sa_sigaction` field. The stucture in
+/// cbindgen uses a union to combine `sa_handler` and `sa_sigaction`. POSIX
+/// states that both fields shall not be used simultaneously.
 #[repr(C)]
 #[derive(Clone, Debug)]
-/// cbindgen:ignore
 pub struct sigaction {
+    /// Pointer to a signal-catching function or one of the `SIG_IGN` or
+    /// `SIG_DFL`.
     pub sa_handler: Option<extern "C" fn(c_int)>,
+    /// Special flags.
     pub sa_flags: c_int,
+    /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/sigaction.2.html>.
+    ///
+    /// Not intended for application use. A sigaction wrapper function is
+    /// intended to use this to store the location of the trampoline code and
+    /// setting the `SA_RESTORER` flag in `sa_flags`.
     pub sa_restorer: Option<unsafe extern "C" fn()>,
+    /// Set of signals to be blocked during execution of the signal handling
+    /// function.
     pub sa_mask: sigset_t,
 }
 
 #[repr(C)]
 #[derive(Clone)]
 pub struct sigaltstack {
+    /// Stack base or pointer.
     pub ss_sp: *mut c_void,
+    /// Flags,
     pub ss_flags: c_int,
+    /// Stack size.
     pub ss_size: size_t,
 }
 
@@ -75,21 +108,32 @@ pub struct sigaltstack {
 #[derive(Clone)]
 #[cfg(not(target_os = "linux"))]
 pub struct sigevent {
+    /// Signal value.
     pub sigev_value: sigval,
+    /// Signal number.
     pub sigev_signo: c_int,
+    /// Notification type.
     pub sigev_notify: c_int,
+    /// Notification function.
     pub sigev_notify_function: Option<extern "C" fn(sigval)>,
+    /// Notification attributes.
     pub sigev_notify_attributes: *mut pthread_attr_t,
 }
 
-// must match with signature from libc
-// https://docs.rs/libc/0.2.186/src/libc/unix/linux_like/mod.rs.html#300-322
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
+///
+/// # Implementation
+/// Must match with signature from libc.
+/// See <https://docs.rs/libc/0.2.186/src/libc/unix/linux_like/mod.rs.html#300-322>.
 #[repr(C)]
 #[derive(Clone)]
 #[cfg(target_os = "linux")]
 pub struct sigevent {
+    /// Signal value.
     pub sigev_value: sigval,
+    /// Signal number.
     pub sigev_signo: c_int,
+    /// Notification type.
     pub sigev_notify: c_int,
     // Actually a union.  We only expose sigev_notify_thread_id because it's
     // the most useful member
@@ -104,26 +148,38 @@ pub struct sigevent {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct siginfo {
+    /// Signal number.
     pub si_signo: c_int,
+    /// If non-zero, an errno value associated with this signal.
     pub si_errno: c_int,
+    /// Signal code.
     pub si_code: c_int,
+    /// Sending process ID.
     pub si_pid: pid_t,
+    /// Real user ID of sending process.
     pub si_uid: uid_t,
+    /// Address that caused fault.
     pub si_addr: *mut c_void,
+    /// Exit value or signal.
     pub si_status: c_int,
+    /// Signal value.
     pub si_value: sigval,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
+///
+/// Signal value.
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub union sigval {
+    /// Integer signal value.
     pub sival_int: c_int,
+    /// Pointer signal value.
     pub sival_ptr: *mut c_void,
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 /// cbindgen:ignore
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 pub type siginfo_t = siginfo;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>
