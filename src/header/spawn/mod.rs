@@ -114,14 +114,29 @@ unsafe fn spawn(
     Ok(())
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn.html>.
 ///
-/// `argv` must **not** be `NULL` and must contain atleast the program name. `path` must also be **not** `NULL`. Failure to ensure any of this will result in a panic.
+/// Creates a new process (child process) from the specified process image. The
+/// `path` argument is a pathname that identifies the new process image file to
+/// execute.
 ///
-/// # Safety:
-/// `file_actions` and `attrp` must either be `NULL` or be pointers to properly initialised objects. Doing otherwise is undefined behaviour.
+/// Returns the process ID of the child process to the parent process, in the
+/// variable pointed to by a non-null `pid` argument, and shall return `0` as
+/// the function return value. Upon error, an error number shall be returned
+/// as the function return value.
 ///
-/// `path` and the elements in `argv` must be a pointers to valid null-terminated character arrays. Failure to ensure any of this will result in undefined behaviour.
+/// # Panics
+/// `argv` must **not** be `NULL` and must contain atleast the program name.
+/// `path` must also **not** be `NULL`. Failure to ensure any of this will
+/// result in a panic.
+///
+/// # Safety
+/// `file_actions` and `attrp` must either be `NULL` or be pointers to properly
+/// initialised objects. Doing otherwise is undefined behaviour.
+///
+/// `path` and the elements in `argv` must be a pointers to valid
+/// null-terminated character arrays. Failure to ensure any of this will result
+/// in undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawn(
     pid: *mut pid_t,
@@ -165,18 +180,33 @@ pub unsafe extern "C" fn posix_spawn(
     0
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnp.html>
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawnp.html>.
 ///
-/// `argv` must **not** be `NULL` and must contain atleast the program name. `path` must also be **not** `NULL`. Failure to ensure any of this will result in a panic.
+/// Creates a new process (child process) from the specified process image. The
+/// `file` argument is used to construct a pathname that identifies the new
+/// process image file.
 ///
-/// # Safety:
-/// `file_actions` and `attrp` must either be `NULL` or be pointers to properly initialised objects. Doing otherwise is undefined behaviour.
+/// Returns the process ID of the child process to the parent process, in the
+/// variable pointed to by a non-null `pid` argument, and shall return `0` as
+/// the function return value. Upon error, an error number shall be returned
+/// as the function return value.
 ///
-/// `path` and the elements in `argv` must be a pointers to valid null-terminated character arrays. Failure to ensure any of this will result in undefined behaviour.
+/// # Panics
+/// `argv` must **not** be `NULL` and must contain atleast the program name.
+/// `file` must also **not** be `NULL`. Failure to ensure any of this will
+/// result in a panic.
+///
+/// # Safety
+/// `file_actions` and `attrp` must either be `NULL` or be pointers to properly
+/// initialised objects. Doing otherwise is undefined behaviour.
+///
+/// `file` and the elements in `argv` must be a pointers to valid
+/// null-terminated character arrays. Failure to ensure any of this will result
+/// in undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_spawnp(
     pid: *mut pid_t,
-    path: *const c_char,
+    file: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
     attrp: *const posix_spawnattr_t,
     argv: *const *mut c_char,
@@ -194,9 +224,9 @@ pub unsafe extern "C" fn posix_spawnp(
     };
     let envp = unsafe { NulTerminated::new(envp) };
     let program = unsafe {
-        CStr::from_ptr(path)
+        CStr::from_ptr(file)
             .to_str()
-            .expect("path cannot be NULL")
+            .expect("file cannot be NULL")
             .to_string()
     };
 
