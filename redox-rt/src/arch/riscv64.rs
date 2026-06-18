@@ -616,25 +616,25 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     // atomicity inside the critical section, consisting of one instruction at 'crit_first', and
     // one at 'crit_second', see asm.
 
-    if stack.regs.pc == __relibc_internal_sigentry_crit_first as u64 {
+    if stack.regs.pc == __relibc_internal_sigentry_crit_first as *const () as u64 {
         // Reexecute 'ld sp, (1 * 8)(sp)'
         let stack_ptr = stack.regs.int_regs[1] as *const u64; // x2
         stack.regs.int_regs[1] = unsafe { stack_ptr.add(1).read() };
         // and 'jr gp' steps.
         stack.regs.pc = stack.regs.int_regs[2];
-    } else if stack.regs.pc == __relibc_internal_sigentry_crit_second as u64
-        || stack.regs.pc == __relibc_internal_sigentry_crit_fifth as u64
+    } else if stack.regs.pc == __relibc_internal_sigentry_crit_second as *const () as u64
+        || stack.regs.pc == __relibc_internal_sigentry_crit_fifth as *const () as u64
     {
         // just reexecute the jump
         stack.regs.pc = stack.regs.int_regs[2];
-    } else if stack.regs.pc == __relibc_internal_sigentry_crit_third as u64 {
+    } else if stack.regs.pc == __relibc_internal_sigentry_crit_third as *const () as u64 {
         // ld   gp, ({tcb_sa_off} + {sa_tmp_ip})(t1)
         stack.regs.int_regs[2] = area.tmp_ip;
         // ld   t1, ({tcb_sa_off} + {sa_tmp_t1})(t1)
         stack.regs.int_regs[5] = area.tmp_t1;
         // j    gp
         stack.regs.pc = stack.regs.int_regs[2];
-    } else if stack.regs.pc == __relibc_internal_sigentry_crit_fourth as u64 {
+    } else if stack.regs.pc == __relibc_internal_sigentry_crit_fourth as *const () as u64 {
         // ld   t1, ({tcb_sa_off} + {sa_tmp_t1})(t1)
         stack.regs.int_regs[5] = area.tmp_t1;
         // jr   gp
@@ -644,7 +644,10 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     get_sigaltstack(area, stack.regs.int_regs[1] as usize).into()
 }
 pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
-    let orig_pc = core::mem::replace(&mut stack.regs.pc, __relibc_internal_sigentry as u64);
+    let orig_pc = core::mem::replace(
+        &mut stack.regs.pc,
+        __relibc_internal_sigentry as *const () as u64,
+    );
     control.saved_ip.set(orig_pc as usize);
     control
         .saved_archdep_reg
