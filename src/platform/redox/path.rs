@@ -273,7 +273,7 @@ fn calc_next_abs_path(current_abs: &str, link_target: &str) -> Result<String> {
 
 fn resolve_sym_links(mut current_path_string: String, flags: usize) -> Result<usize> {
     // Sym reolve loop
-    for _ in 0..=limits::SYMLOOP_MAX {
+    for _ in 0..(limits::SYMLOOP_MAX - 1) {
         match open_absolute(&current_path_string, flags) {
             Ok(fd) => return Ok(fd),
             Err(e) if e == Error::new(EXDEV) => {
