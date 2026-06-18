@@ -569,12 +569,18 @@ pub unsafe extern "C" fn redox_sys_call_v0(
     metadata: *const u64,
     metadata_len: usize,
 ) -> RawResult {
-    Error::mux(redox_rt::sys::sys_call(
-        fd,
-        unsafe { slice::from_raw_parts_mut(payload, payload_len) },
-        syscall::CallFlags::from_bits_retain(flags),
-        unsafe { slice::from_raw_parts(metadata, metadata_len) },
-    ))
+    let flags = syscall::CallFlags::from_bits_retain(flags);
+    let read = flags.contains(syscall::CallFlags::READ);
+    let write = flags.contains(syscall::CallFlags::WRITE);
+    let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
+    let metadata = unsafe { slice::from_raw_parts(metadata, metadata_len) };
+
+    Error::mux(match (read, write) {
+        (true, true) => redox_rt::sys::sys_call_rw(fd, payload, flags, metadata),
+        (true, false) => redox_rt::sys::sys_call_ro(fd, payload, flags, metadata),
+        (false, true) => redox_rt::sys::sys_call_wo(fd, payload, flags, metadata),
+        (false, false) => redox_rt::sys::sys_call(fd, payload, flags, metadata),
+    })
 }
 
 #[unsafe(no_mangle)]
