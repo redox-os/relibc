@@ -101,6 +101,7 @@ pub const _POSIX_SIGQUEUE_MAX: c_long = 32;
 pub const _POSIX_SSIZE_MAX: c_long = 32767;
 pub const _POSIX_STREAM_MAX: c_long = 8;
 pub const _POSIX_SYMLINK_MAX: c_long = 255;
+/// Minimum required value for `SYMLOOP_MAX`.
 pub const _POSIX_SYMLOOP_MAX: c_long = 8;
 pub const _POSIX_THREAD_DESTRUCTOR_ITERATIONS: c_long = 4;
 pub const _POSIX_THREAD_KEYS_MAX: c_long = 128;
@@ -145,5 +146,7 @@ pub const PTHREAD_DESTRUCTOR_ITERATIONS: c_long = _POSIX_THREAD_DESTRUCTOR_ITERA
 // TODO: What should this limit be? Both glibc and musl have it as 1024
 pub const PTHREAD_KEYS_MAX: c_long = 4096 * 32;
 pub const PTHREAD_STACK_MIN: c_long = 65536;
+/// Maximum number of symbolic links that can be reliably traversed in the
+/// resolution of a pathname in the absence of a loop.
 pub const SYMLOOP_MAX: c_long = 64;
 pub const TTY_NAME_MAX: c_long = 32; // "/scheme/pty/".len() + size of usize::MAX as string + 1
