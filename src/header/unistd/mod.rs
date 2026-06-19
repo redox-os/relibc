@@ -71,9 +71,13 @@ pub const SEEK_SET: c_int = 0;
 pub const SEEK_CUR: c_int = 1;
 pub const SEEK_END: c_int = 2;
 
+/// Unlock locked sections.
 pub const F_ULOCK: c_int = 0;
+/// Lock a section for exclusive use.
 pub const F_LOCK: c_int = 1;
+/// Test and lock a section for exclusive use.
 pub const F_TLOCK: c_int = 2;
+/// Test section for locks by other processes.
 pub const F_TEST: c_int = 3;
 
 pub const STDIN_FILENO: c_int = 0;
@@ -774,7 +778,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
     };
 
     match function {
-        fcntl::F_TEST => {
+        F_TEST => {
             fl.l_type = fcntl::F_RDLCK as c_short;
             if unsafe { fcntl::fcntl(fildes, fcntl::F_GETLK, &raw mut fl as c_ulonglong) } < 0 {
                 return -1;
@@ -785,16 +789,12 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
             platform::ERRNO.set(errno::EACCES);
             -1
         }
-        fcntl::F_ULOCK => {
+        F_ULOCK => {
             fl.l_type = fcntl::F_UNLCK as c_short;
             unsafe { fcntl::fcntl(fildes, fcntl::F_SETLK, &raw mut fl as c_ulonglong) }
         }
-        fcntl::F_TLOCK => unsafe {
-            fcntl::fcntl(fildes, fcntl::F_SETLK, &raw mut fl as c_ulonglong)
-        },
-        fcntl::F_LOCK => unsafe {
-            fcntl::fcntl(fildes, fcntl::F_SETLKW, &raw mut fl as c_ulonglong)
-        },
+        F_TLOCK => unsafe { fcntl::fcntl(fildes, fcntl::F_SETLK, &raw mut fl as c_ulonglong) },
+        F_LOCK => unsafe { fcntl::fcntl(fildes, fcntl::F_SETLKW, &raw mut fl as c_ulonglong) },
         _ => {
             platform::ERRNO.set(errno::EINVAL);
             -1
