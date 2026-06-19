@@ -34,102 +34,29 @@ global_asm!(
 "
 );
 
-pub const SIGHUP: usize = 1;
-pub const SIGINT: usize = 2;
-pub const SIGQUIT: usize = 3;
-pub const SIGILL: usize = 4;
-pub const SIGTRAP: usize = 5;
-pub const SIGABRT: usize = 6;
-pub const SIGIOT: usize = SIGABRT;
-pub const SIGBUS: usize = 7;
-pub const SIGFPE: usize = 8;
-pub const SIGKILL: usize = 9;
-pub const SIGUSR1: usize = 10;
-pub const SIGSEGV: usize = 11;
-pub const SIGUSR2: usize = 12;
-pub const SIGPIPE: usize = 13;
-pub const SIGALRM: usize = 14;
-pub const SIGTERM: usize = 15;
-pub const SIGSTKFLT: usize = 16;
-pub const SIGCHLD: usize = 17;
-pub const SIGCONT: usize = 18;
-pub const SIGSTOP: usize = 19;
-pub const SIGTSTP: usize = 20;
-pub const SIGTTIN: usize = 21;
-pub const SIGTTOU: usize = 22;
-pub const SIGURG: usize = 23;
-pub const SIGXCPU: usize = 24;
-pub const SIGXFSZ: usize = 25;
-pub const SIGVTALRM: usize = 26;
-pub const SIGPROF: usize = 27;
-pub const SIGWINCH: usize = 28;
-pub const SIGIO: usize = 29;
-pub const SIGPOLL: usize = SIGIO;
-pub const SIGPWR: usize = 30;
-pub const SIGSYS: usize = 31;
-pub const SIGUNUSED: usize = SIGSYS;
-pub const NSIG: usize = 32;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/signal.7.html>.
+///
+/// IOT trap. A synonym for `SIGABRT`.
+pub const SIGIOT: usize = super::constants::SIGABRT;
+// TODO mark #[deprecated]?
+/// Obsolete in issue 7, removed in issue 8.
+///
+/// Pollable event.
+/// Default action: T
+pub const SIGPOLL: usize = super::constants::SIGIO;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/signal.7.html>.
+///
+/// Synonymous with `SIGSYS`.
+pub const SIGUNUSED: usize = super::constants::SIGSYS;
 
-pub const SIGRTMIN: usize = 35; // TODO: decrease to 34
-pub const SIGRTMAX: usize = 64;
-
+// TODO why are these SA_* constants different to Redox?
 pub const SA_NOCLDSTOP: usize = 1;
-pub const SA_NOCLDWAIT: usize = 2;
 pub const SA_SIGINFO: usize = 4;
 pub const SA_ONSTACK: usize = 0x0800_0000;
 pub const SA_RESTART: usize = 0x1000_0000;
 pub const SA_NODEFER: usize = 0x4000_0000;
 pub const SA_RESETHAND: usize = 0x8000_0000;
 pub const SA_RESTORER: usize = 0x0400_0000;
-
-pub const SS_ONSTACK: usize = 1;
-pub const SS_DISABLE: usize = 2;
-
-// Those two should be updated from kernel headers
-pub const MINSIGSTKSZ: usize = 2048;
-pub const SIGSTKSZ: usize = 8096;
-
-pub const SI_QUEUE: i32 = -1;
-pub const SI_USER: i32 = 0;
-pub const SI_TIMER: i32 = 1;
-pub const SI_ASYNCIO: i32 = 2;
-pub const SI_MESGQ: i32 = 3;
-
-// si_code values (signal-specific)
-pub const ILL_ILLOPC: i32 = 1;
-pub const ILL_ILLOPN: i32 = 2;
-pub const ILL_ILLADR: i32 = 3;
-pub const ILL_ILLTRP: i32 = 4;
-pub const ILL_PRVOPC: i32 = 5;
-pub const ILL_PRVREG: i32 = 6;
-pub const ILL_COPROC: i32 = 7;
-pub const ILL_BADSTK: i32 = 8;
-
-pub const FPE_INTDIV: i32 = 1;
-pub const FPE_INTOVF: i32 = 2;
-pub const FPE_FLTDIV: i32 = 3;
-pub const FPE_FLTOVF: i32 = 4;
-pub const FPE_FLTUND: i32 = 5;
-pub const FPE_FLTRES: i32 = 6;
-pub const FPE_FLTINV: i32 = 7;
-pub const FPE_FLTSUB: i32 = 8;
-
-pub const SEGV_MAPERR: i32 = 1;
-pub const SEGV_ACCERR: i32 = 2;
-
-pub const BUS_ADRALN: i32 = 1;
-pub const BUS_ADRERR: i32 = 2;
-pub const BUS_OBJERR: i32 = 3;
-
-pub const TRAP_BRKPT: i32 = 1;
-pub const TRAP_TRACE: i32 = 2;
-
-pub const CLD_EXITED: i32 = 1;
-pub const CLD_KILLED: i32 = 2;
-pub const CLD_DUMPED: i32 = 3;
-pub const CLD_TRAPPED: i32 = 4;
-pub const CLD_STOPPED: i32 = 5;
-pub const CLD_CONTINUED: i32 = 6;
 
 // Mirrors the ucontext_t struct from the libc crate on Linux.
 
