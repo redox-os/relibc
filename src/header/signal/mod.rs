@@ -18,8 +18,8 @@ use crate::{
 };
 
 pub mod constants;
-pub use constants::*;
 pub use self::sys::*;
+pub use constants::*;
 
 use super::{
     errno::EFAULT,
