@@ -60,11 +60,6 @@ pub const F_WRLCK: c_int = 1;
 pub const F_UNLCK: c_int = 2;
 // }
 
-pub const F_ULOCK: c_int = 0;
-pub const F_LOCK: c_int = 1;
-pub const F_TLOCK: c_int = 2;
-pub const F_TEST: c_int = 3;
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/creat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
@@ -75,14 +70,47 @@ pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct flock {
+    /// Type of lock; `F_RDLCK`, `F_WRLCK`, `F_UNLCK`.
     pub l_type: c_short,
+    /// Flag for starting offset.
     pub l_whence: c_short,
+    /// Relative offset in bytes.
     pub l_start: off_t,
+    /// Size; if `0` then until EOF.
     pub l_len: off_t,
+    /// For a process-owned file lock, ignored on input or the process ID of
+    /// the owning process on output; for an OFD-owned file lock, zero on input
+    /// or `(pid_t) - 1` on output.
     pub l_pid: pid_t,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fcntl.html>.
+///
+/// Performs the operation specified by `cmd` on open files pointed to by the
+/// file descriptor `fildes`.
+///
+/// The return value depends on the value of `cmd`:
+/// - `F_DUPFD`: A new file descriptor.
+/// - `F_DUPFD_CLOEXEC`: A new file descriptor.
+/// - `F_DUPFD_CLOFORK`: A new file descriptor.
+/// - `F_GETFD`: Value of flags. The return value shall not be negative.
+/// - `F_SETFD`: Value other than `-1`.
+/// - `F_GETFL`: Value of file status flags and access modes. The return value
+///    shall not be negative.
+/// - `F_SETFL`: Value other than `-1`.
+/// - `F_GETLK`: Value other than `-1`.
+/// - `F_SETLK`: Value other than `-1`.
+/// - `F_SETLKW`: Value other than `-1`.
+/// - `F_OFD_GETLK`: Value other than `-1`.
+/// - `F_OFD_SETLK`: Value other than `-1`.
+/// - `F_OFD_SETLKW`: Value other than `-1`.
+/// - `F_GETOWN`: Value of the socket owner process or process group; this
+///    shall not be `-1`.
+/// - `F_SETOWN`: Value other than `-1`.
+/// - `F_GETOWN_EX`: Value other than `-1`.
+/// - `F_SETOWN_EX`: Value other than `-1`.
+///
+/// Otherwise, `-1` shall be returned and errno set to indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> c_int {
     // c_ulonglong
@@ -96,6 +124,13 @@ pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> 
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html>.
+///
+/// Establishes a connection between a file and a file descriptor.
+///
+/// Upon success, opens the file and returns a non-negative integer
+/// representing the file descriptor. Upon failure, returns `-1` and sets errno
+/// to indicate the error. If `-1` is returned, no files shall be created or
+/// modified.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: ...) -> c_int {
     let mode = if oflag & O_CREAT == O_CREAT
@@ -111,6 +146,16 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/openat.html>.
+///
+/// Establishes a connection between a file and a file descriptor. Equivalent
+/// to `open()` except in the case where `path` specifies a relative path (the
+/// file to be opened is determined relative to the directory associated with
+/// the file descriptor `fd` instead of the current working directory).
+///
+/// Upon success, opens the file and returns a non-negative integer
+/// representing the file descriptor. Upon failure, returns `-1` and sets errno
+/// to indicate the error. If `-1` is returned, no files shall be created or
+/// modified.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openat(
     fd: c_int,
@@ -131,18 +176,23 @@ pub unsafe extern "C" fn openat(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_fallocate.html>.
+///
+/// Ensures that any required storage for regular file data starting at
+/// `offset` and continuing for `len` bytes is allocated on the file system
+/// storage media.
+///
+/// Upon success, returns `0`. Upon failure, returns error number.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, length: off_t) -> c_int {
+pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, len: off_t) -> c_int {
     // Length can't be zero and offset must be positive.
     let Ok(offset) = offset.try_into() else {
         return EINVAL;
     };
-    let Some(length) = length.try_into().ok().and_then(NonZeroU64::new) else {
+    let Some(len) = len.try_into().ok().and_then(NonZeroU64::new) else {
         return EINVAL;
     };
 
-    // posix_fallocate does not set errno but instead returns it.
-    Sys::posix_fallocate(fd, offset, length)
+    Sys::posix_fallocate(fd, offset, len)
         .err()
         .map(|e| e.0)
         .unwrap_or_default()
