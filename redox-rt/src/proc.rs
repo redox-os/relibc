@@ -488,15 +488,11 @@ pub fn fexec_impl(
                 let _ = syscall::close(fd);
             }
         }
-    }
 
-    unsafe {
-        deactivate_tcb(&thread_fd)?;
-    }
-
-    // Dropping this FD will cause the address space switch.
-
-    if extrainfo.same_process {
+        unsafe {
+            deactivate_tcb(&thread_fd)?;
+        }
+        // Dropping this FD will cause the address space switch.
         drop(addrspace_selection_fd);
         unreachable!();
     } else {

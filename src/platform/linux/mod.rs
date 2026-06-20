@@ -797,12 +797,11 @@ impl Pal for Sys {
     }
 
     unsafe fn spawn(
-        program: CStr,
+        program: String,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: crate::iter::NulTerminated<*mut c_char>,
         envp: Option<crate::iter::NulTerminated<*mut c_char>>,
-        dir_ent_name: Option<String>,
     ) -> Result<pid_t> {
         todo!()
     }

@@ -23,7 +23,6 @@ use self::{
 };
 use super::{Pal, Read, types::*};
 use crate::{
-    alloc::string::ToString,
     c_str::{CStr, CString},
     error::{Errno, Result},
     fs::File,
@@ -1202,23 +1201,25 @@ impl Pal for Sys {
     }
 
     unsafe fn spawn(
-        program: CStr,
+        program: String,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: NulTerminated<*mut c_char>,
         envp: Option<NulTerminated<*mut c_char>>,
-        dir_ent_name: Option<String>,
     ) -> Result<pid_t> {
         use crate::header::spawn::Flags;
 
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
-        let executable = FdGuard::new(File::open(program, fcntl::O_RDONLY)?.fd as usize)
+        let executable = FdGuard::open(&program, syscall::O_RDONLY)?
             .to_upper()
             .unwrap();
         let mut executable_stat = syscall::Stat::default();
         executable.fstat(&mut executable_stat)?;
-        let original_cwd = path::clone_cwd().unwrap().to_string();
-        let mut cwd = original_cwd.clone();
+        let mut cwd: Box<[u8]> = path::clone_cwd().unwrap_or_default().into();
+        let mut cwd_fd = {
+            let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
+            FdGuard::open(cwd_str, syscall::O_STAT)?.to_upper()?
+        };
         let proc_fd = child.proc_fd.unwrap();
         let curr_proc_fd = redox_rt::current_proc_fd();
         let file_table = RtTcb::current()
@@ -1244,21 +1245,7 @@ impl Pal for Sys {
             }
         }
 
-        let program_name: String = if let Some(ent) = dir_ent_name {
-            let mut binary = str::from_utf8(args[0]).unwrap().to_string();
-            binary.insert_str(0, "./");
-
-            redox_path::canonicalize_using_cwd(Some(ent.as_str()), binary.as_str())
-                .ok_or(Errno(ENOENT))?
-        } else {
-            redox_path::canonicalize_using_cwd(
-                Some(original_cwd.as_str()),
-                str::from_utf8(args[0]).unwrap(),
-            )
-            .ok_or(Errno(ENOENT))?
-        };
-
-        args[0] = program_name.as_bytes();
+        args[0] = &program.as_bytes();
 
         let new_file_table = child.thr_fd.dup(b"filetable")?;
 
@@ -1271,8 +1258,9 @@ impl Pal for Sys {
                         flag,
                         mode,
                     } => {
-                        let src_fd = Sys::open(
-                            CStr::from_bytes_with_nul(path.as_bytes_with_nul()).unwrap(),
+                        let src_fd = Sys::openat(
+                            cwd_fd.as_raw_fd() as c_int,
+                            CStr::borrow(&path),
                             flag,
                             mode,
                         )? as usize;
@@ -1291,13 +1279,18 @@ impl Pal for Sys {
                         )?;
                     }
                     crate::header::spawn::Action::Chdir(path) => {
-                        cwd = path.to_str().unwrap().to_string();
-
-                        path::chdir(path.to_str().unwrap())?;
+                        cwd = Box::from(path.as_bytes());
+                        let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
+                        let fd = FdGuard::open(cwd_str, syscall::O_STAT)?.to_upper()?;
+                        cwd_fd = fd;
                     }
                     crate::header::spawn::Action::FChdir(fd) => {
-                        path::fchdir(fd)?;
-                        path::getcwd(Out::from_mut(unsafe { cwd.as_bytes_mut() }))?;
+                        let mut buf = [0_u8; limits::PATH_MAX];
+                        let res = Sys::fpath(fd, &mut buf)?;
+                        cwd = Box::from(&buf[..res]);
+                        let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
+                        let fd = FdGuard::open(cwd_str, syscall::O_STAT)?.to_upper()?;
+                        cwd_fd = fd;
                     }
                     crate::header::spawn::Action::Dup2(old, new) => {
                         new_file_table.call_wo(
@@ -1321,7 +1314,7 @@ impl Pal for Sys {
         )?;
 
         let extra_info = redox_rt::proc::ExtraInfo {
-            cwd: Some(cwd.as_bytes()),
+            cwd: Some(&cwd),
             // Signals set to be ignored by the calling process
             // must also be ignored by the child process
             sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
@@ -1338,9 +1331,7 @@ impl Pal for Sys {
             thr_fd: child.thr_fd.as_raw_fd(),
             proc_fd: proc_fd.as_raw_fd(),
             ns_fd: redox_rt::current_namespace_fd().ok(),
-            cwd_fd: path::current_dir()
-                .ok()
-                .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
+            cwd_fd: Some(cwd_fd.as_raw_fd()),
             same_process: false,
         };
 
@@ -1351,11 +1342,6 @@ impl Pal for Sys {
                 redox_rt::sys::posix_setpgid(
                     proc_fd.as_raw_fd(),
                     usize::try_from(attr.pgroup).map_err(|_| Errno(EINVAL))?,
-                )?;
-            } else {
-                redox_rt::sys::posix_setpgid(
-                    proc_fd.as_raw_fd(),
-                    redox_rt::sys::posix_getpgid(proc_fd.as_raw_fd())?,
                 )?;
             }
 
@@ -1412,6 +1398,8 @@ impl Pal for Sys {
             // sigdefault must have default actions
         }
 
+        let program = program.as_bytes();
+
         if let Some(redox_rt::proc::FexecResult::Interp {
             path: interp_path,
             interp_override,
@@ -1419,7 +1407,7 @@ impl Pal for Sys {
             executable,
             &child.thr_fd,
             &proc_fd,
-            program.to_bytes(),
+            program,
             args.as_slice(),
             envs.as_slice(),
             &extra_info,
@@ -1435,7 +1423,7 @@ impl Pal for Sys {
                 FdGuard::new(interpreter.fd as usize).to_upper().unwrap(),
                 &child.thr_fd,
                 &proc_fd,
-                program.to_bytes(),
+                program,
                 args.as_slice(),
                 envs.as_slice(),
                 &extra_info,
@@ -1443,8 +1431,6 @@ impl Pal for Sys {
             )
             .unwrap();
         }
-
-        path::chdir(original_cwd.as_str())?;
 
         let start_fd = child.thr_fd.dup(b"start")?;
         start_fd.write(&[0])?;
