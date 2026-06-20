@@ -1,8 +1,6 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
-use alloc::string::String;
-
 use super::{Pal, types::*};
 use crate::{
     c_str::CStr,
@@ -797,7 +795,7 @@ impl Pal for Sys {
     }
 
     unsafe fn spawn(
-        program: String,
+        program: CStr,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: crate::iter::NulTerminated<*mut c_char>,

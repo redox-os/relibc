@@ -1,7 +1,5 @@
 use core::num::NonZeroU64;
 
-use alloc::string::String;
-
 use super::types::*;
 use crate::{
     c_str::CStr,
@@ -437,7 +435,7 @@ pub trait Pal {
     fn setsid() -> Result<c_int>;
 
     unsafe fn spawn(
-        program: String,
+        program: CStr,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: NulTerminated<*mut c_char>,

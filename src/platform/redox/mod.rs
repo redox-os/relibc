@@ -1,4 +1,3 @@
-use alloc::string::String;
 use core::{
     convert::TryFrom,
     mem::{self, size_of},
@@ -1201,7 +1200,7 @@ impl Pal for Sys {
     }
 
     unsafe fn spawn(
-        program: String,
+        program: CStr,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,
         fat: Option<&crate::header::spawn::posix_spawnattr_t>,
         argv: NulTerminated<*mut c_char>,
@@ -1210,9 +1209,12 @@ impl Pal for Sys {
         use crate::header::spawn::Flags;
 
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
-        let executable = FdGuard::open(&program, syscall::O_RDONLY)?
-            .to_upper()
-            .unwrap();
+        let executable = FdGuard::open(
+            &program.to_str().map_err(|_| Errno(EINVAL))?,
+            syscall::O_RDONLY,
+        )?
+        .to_upper()
+        .unwrap();
         let mut executable_stat = syscall::Stat::default();
         executable.fstat(&mut executable_stat)?;
         let mut cwd: Box<[u8]> = path::clone_cwd().unwrap_or_default().into();
@@ -1245,7 +1247,7 @@ impl Pal for Sys {
             }
         }
 
-        args[0] = &program.as_bytes();
+        args[0] = &program.to_bytes();
 
         let new_file_table = child.thr_fd.dup(b"filetable")?;
 
@@ -1398,7 +1400,7 @@ impl Pal for Sys {
             // sigdefault must have default actions
         }
 
-        let program = program.as_bytes();
+        let program = program.to_bytes();
 
         if let Some(redox_rt::proc::FexecResult::Interp {
             path: interp_path,
