@@ -25,7 +25,7 @@ use crate::{
         sys_select::timeval,
         sys_time, sys_utsname, termios,
         time::timespec,
-        unistd::alarm::alarm_timespec,
+        unistd::{alarm::alarm_timespec, path::PathSearchIter},
     },
     out::Out,
     platform::{
@@ -57,6 +57,7 @@ mod alarm;
 mod brk;
 mod getopt;
 mod getpass;
+pub mod path;
 mod pathconf;
 #[cfg(target_os = "linux")]
 pub mod syscall;
@@ -369,16 +370,13 @@ pub unsafe extern "C" fn fexecve(
         .or_minus_one_errno()
 }
 
-const PATH_SEPARATOR: u8 = b':';
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -> c_int {
     let file = unsafe { CStr::from_ptr(file) };
+    let file_bytes = file.to_bytes();
 
-    if file.to_bytes().contains(&b'/')
-        || (cfg!(target_os = "redox") && file.to_bytes().contains(&b':'))
-    {
+    if file_bytes.contains(&b'/') || (cfg!(target_os = "redox") && file_bytes.contains(&b':')) {
         unsafe { execv(file.as_ptr(), argv) }
     } else {
         let mut error = errno::ENOENT;
@@ -386,16 +384,10 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
         let path_env = unsafe { getenv(c"PATH".as_ptr()) };
         if !path_env.is_null() {
             let path_env = unsafe { CStr::from_ptr(path_env) };
-            for path in path_env.to_bytes().split(|&b| b == PATH_SEPARATOR) {
-                let file = file.to_bytes();
-                let length = file.len() + path.len() + 2;
-                let mut program = alloc::vec::Vec::with_capacity(length);
-                program.extend_from_slice(path);
-                program.push(b'/');
-                program.extend_from_slice(file);
-                program.push(b'\0');
-
-                let program_c = CStr::from_bytes_with_nul(&program).unwrap();
+            for program_buf in PathSearchIter::new(&file.to_bytes(), &path_env) {
+                // SAFETY: CStr::from_ptr().to_bytes() always stop at null, no need to check again
+                let program_c =
+                    unsafe { CStr::from_bytes_with_nul_unchecked(program_buf.as_slice()) };
                 unsafe { execv(program_c.as_ptr(), argv) };
 
                 match platform::ERRNO.get() {

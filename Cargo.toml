@@ -76,6 +76,7 @@ cc = "1"
 
 [dependencies]
 bitflags.workspace = true
+arrayvec = { version = "0.7.6", default-features = false }
 cbitset = "0.2"
 posix-regex = { version = "0.1.4", features = ["no_std"] }
 
