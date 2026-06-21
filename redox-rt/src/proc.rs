@@ -480,10 +480,9 @@ pub fn fexec_impl(
         // threads, it could still be allowed by keeping certain file descriptors and instead
         // set the active file table.
         let _siglock = crate::signal::tmp_disable_signals();
-        let (fds_to_close, upper_reserve_needed) = {
+        let fds_to_close = {
             let guard = crate::current_filetable();
             let mut fds = alloc::vec::Vec::new();
-            let mut closed_upper = 0;
             for (fd, flags) in guard.iter() {
                 if fd == addrspace_selection_fd.as_raw_fd()
                     || fd == thread_fd.as_raw_fd()
@@ -494,18 +493,10 @@ pub fn fexec_impl(
 
                 if flags & O_CLOEXEC == O_CLOEXEC {
                     fds.push(fd);
-                    if (fd & syscall::UPPER_FDTBL_TAG) != 0 {
-                        closed_upper += 1;
-                    }
                 }
             }
 
-            let parent_upper_capacity = guard.upper_capacity();
-            let parent_upper_len = guard.upper_len();
-            let child_upper_len = parent_upper_len.saturating_sub(closed_upper);
-            let available_in_child = parent_upper_capacity.saturating_sub(child_upper_len);
-            let needed = 8usize.saturating_sub(available_in_child);
-            (fds, needed)
+            fds
         };
 
         let fds_to_close_bytes: &[u8] = unsafe {
@@ -516,18 +507,6 @@ pub fn fexec_impl(
         };
 
         let filetable_fd = thread_fd.dup_into_upper(b"filetable")?;
-
-        if upper_reserve_needed > 0 {
-            let _ = filetable_fd.call_wo(
-                &[],
-                CallFlags::empty(),
-                &[
-                    syscall::FileTableVerb::Reserve as u64,
-                    syscall::UPPER_FDTBL_TAG as u64,
-                    upper_reserve_needed as u64,
-                ],
-            );
-        }
 
         let _ = filetable_fd.call_wo(
             fds_to_close_bytes,

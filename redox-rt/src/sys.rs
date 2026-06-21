@@ -968,7 +968,7 @@ impl FdTbl {
         let files_reader_fd = filetable_fd.as_raw_fd();
         let _ = filetable_fd.lseek(0, syscall::flag::SEEK_SET);
         fdtbl.set_fd(filetable_fd);
-        fdtbl.reserve(Self::DEFAULT_CAPACITY);
+        fdtbl.resize(Self::DEFAULT_CAPACITY);
 
         let mut reader = crate::proc::FileBufReader::from_fd(files_reader_fd);
         fdtbl.populate(&mut reader)?;
@@ -1000,9 +1000,9 @@ impl FdTbl {
         self.fd = Some(fd);
     }
 
-    pub fn reserve(&mut self, additional: usize) {
-        self.posix_fdtbl.reserve(additional);
-        self.upper_fdtbl.reserve(additional);
+    pub fn resize(&mut self, size: usize) {
+        self.posix_fdtbl.resize(size);
+        self.upper_fdtbl.resize(size);
     }
 
     pub fn upper_capacity(&self) -> usize {
@@ -1065,31 +1065,17 @@ impl FdTbl {
         Ok(())
     }
 
-    fn sync_capacity(&self, old_capacity: usize, tag: usize) -> Result<()> {
-        let (new_capacity, current_len, tag) = if tag & syscall::UPPER_FDTBL_TAG == 0 {
-            (self.posix_fdtbl.capacity(), self.posix_fdtbl.len(), 0)
-        } else {
-            (
-                self.upper_fdtbl.capacity(),
-                self.upper_fdtbl.len(),
-                syscall::UPPER_FDTBL_TAG,
-            )
-        };
-
-        if old_capacity != new_capacity {
-            let available_slots = new_capacity - current_len;
-
-            if let Some(ref fd) = self.fd {
-                let _ = fd.call_wo(
-                    &[],
-                    CallFlags::empty(),
-                    &[
-                        syscall::FileTableVerb::Reserve as u64,
-                        tag as u64,
-                        available_slots as u64,
-                    ],
-                )?;
-            }
+    fn sync_size(fd: Option<&FdGuardUpper>, new_size: usize, tag: usize) -> Result<()> {
+        if let Some(ref fd) = fd {
+            fd.call_wo(
+                &[],
+                CallFlags::empty(),
+                &[
+                    syscall::FileTableVerb::Resize as u64,
+                    tag as u64,
+                    new_size as u64,
+                ],
+            )?;
         }
         Ok(())
     }
@@ -1099,11 +1085,17 @@ impl FdTbl {
 
         if Self::is_upper(new_fd) {
             let handle = Self::strip_tags(new_fd);
-            self.upper_fdtbl
-                .insert_at(handle, UpperFdTbl::flags_into_entry(0))?;
+            self.upper_fdtbl.insert_at(
+                handle,
+                UpperFdTbl::flags_into_entry(0),
+                self.fd.as_ref(),
+            )?;
         } else {
-            self.posix_fdtbl
-                .insert_at(new_fd, PosixFdTbl::flags_into_entry(0))?;
+            self.posix_fdtbl.insert_at(
+                new_fd,
+                PosixFdTbl::flags_into_entry(0),
+                self.fd.as_ref(),
+            )?;
         }
 
         if !existed {
@@ -1116,12 +1108,10 @@ impl FdTbl {
             return Err(Error::new(EMFILE));
         }
 
-        let old_capacity = self.posix_fdtbl.capacity();
-
-        let out_idx = self.posix_fdtbl.add(PosixFdTbl::flags_into_entry(entry))?;
+        let out_idx = self
+            .posix_fdtbl
+            .add(PosixFdTbl::flags_into_entry(entry), self.fd.as_ref())?;
         self.active_count += 1;
-
-        self.sync_capacity(old_capacity, 0)?;
 
         Ok(out_idx)
     }
@@ -1135,10 +1125,8 @@ impl FdTbl {
 
         let out_idx = self
             .upper_fdtbl
-            .insert(UpperFdTbl::flags_into_entry(entry))?;
+            .insert(UpperFdTbl::flags_into_entry(entry), self.fd.as_ref())?;
         self.active_count += 1;
-
-        self.sync_capacity(old_capacity, syscall::UPPER_FDTBL_TAG)?;
 
         Ok(out_idx)
     }
@@ -1154,12 +1142,12 @@ impl FdTbl {
         }
         let handle = Self::strip_tags(new_fd);
 
-        let out_idx = self
-            .upper_fdtbl
-            .insert_at(handle, UpperFdTbl::flags_into_entry(entry))?;
+        let out_idx = self.upper_fdtbl.insert_at(
+            handle,
+            UpperFdTbl::flags_into_entry(entry),
+            self.fd.as_ref(),
+        )?;
         self.active_count += 1;
-
-        self.sync_capacity(old_capacity, syscall::UPPER_FDTBL_TAG)?;
 
         Ok(out_idx)
     }
@@ -1185,10 +1173,8 @@ impl FdTbl {
             let initial_flag = PosixFdTbl::flags_into_entry(flags);
             let entries = alloc::vec![initial_flag; cnt];
 
-            let handles = self.posix_fdtbl.bulk_add_posix(entries)?;
+            let handles = self.posix_fdtbl.bulk_add_posix(entries, self.fd.as_ref())?;
             self.active_count += cnt;
-
-            self.sync_capacity(old_capacity, 0)?;
 
             for (i, &handle) in handles.iter().enumerate() {
                 fd_slice[i] = handle;
@@ -1197,10 +1183,8 @@ impl FdTbl {
             let old_capacity = self.upper_fdtbl.capacity();
 
             let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
-            let handles = self.upper_fdtbl.bulk_insert(entries)?;
+            let handles = self.upper_fdtbl.bulk_insert(entries, self.fd.as_ref())?;
             self.active_count += cnt;
-
-            self.sync_capacity(old_capacity, syscall::UPPER_FDTBL_TAG)?;
 
             for (i, &handle) in handles.iter().enumerate() {
                 fd_slice[i] = handle | syscall::UPPER_FDTBL_TAG;
@@ -1235,18 +1219,16 @@ impl FdTbl {
             let initial_flag = PosixFdTbl::flags_into_entry(flags);
             let entries = alloc::vec![initial_flag; cnt];
 
-            self.posix_fdtbl.bulk_insert_manual(entries, fd_slice)?;
+            self.posix_fdtbl
+                .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
             self.active_count += cnt;
-
-            self.sync_capacity(old_capacity, 0)?;
         } else {
             let old_capacity = self.upper_fdtbl.capacity();
 
             let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
-            self.upper_fdtbl.bulk_insert_manual(entries, fd_slice)?;
+            self.upper_fdtbl
+                .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
             self.active_count += cnt;
-
-            self.sync_capacity(old_capacity, syscall::UPPER_FDTBL_TAG)?;
         }
 
         Ok(cnt)
@@ -1344,8 +1326,8 @@ impl PosixFdTbl {
             .map_or(false, |&flags| flags.contains(FdFlags::OCCUPIED))
     }
 
-    pub fn reserve(&mut self, additional: usize) {
-        self.table.reserve(additional);
+    pub fn resize(&mut self, size: usize) {
+        self.table.resize(size, FdFlags::VACANT);
     }
 
     pub fn capacity(&self) -> usize {
@@ -1432,13 +1414,15 @@ impl PosixFdTbl {
         free_slots
     }
 
-    pub fn add(&mut self, flags: FdFlags) -> Result<usize> {
+    pub fn add(&mut self, flags: FdFlags, sync_fd: Option<&FdGuardUpper>) -> Result<usize> {
         let handle = self.lowest_idx as usize;
         let old_len = self.table.len();
         let entry_flags = flags | FdFlags::OCCUPIED;
 
         if handle >= old_len {
             self.with_transaction(old_len, |this| {
+                let new_len = handle + 1;
+                FdTbl::sync_size(sync_fd, new_len, 0)?;
                 this.table.push(entry_flags);
                 this.lowest_idx = (handle + 1) as u32;
                 Ok(handle)
@@ -1450,7 +1434,11 @@ impl PosixFdTbl {
         }
     }
 
-    pub fn bulk_add_posix(&mut self, entries: Vec<FdFlags>) -> Result<Vec<usize>> {
+    pub fn bulk_add_posix(
+        &mut self,
+        entries: Vec<FdFlags>,
+        sync_fd: Option<&FdGuardUpper>,
+    ) -> Result<Vec<usize>> {
         let count = entries.len();
         if count == 0 {
             return Ok(Vec::new());
@@ -1464,10 +1452,16 @@ impl PosixFdTbl {
         }
 
         let old_len = self.table.len();
+        let new_len = if old_len <= max_index {
+            max_index + 1
+        } else {
+            old_len
+        };
 
         self.with_transaction(old_len, |this| {
-            if old_len <= max_index {
-                this.table.resize(max_index + 1, FdFlags::VACANT);
+            if old_len != new_len {
+                FdTbl::sync_size(sync_fd, new_len, 0)?;
+                this.resize(new_len);
             }
 
             for (&handle, flags) in handles.iter().zip(entries) {
@@ -1484,16 +1478,27 @@ impl PosixFdTbl {
         })
     }
 
-    pub fn insert_at(&mut self, handle: usize, flags: FdFlags) -> Result<usize> {
+    pub fn insert_at(
+        &mut self,
+        handle: usize,
+        flags: FdFlags,
+        sync_fd: Option<&FdGuardUpper>,
+    ) -> Result<usize> {
         if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
         let old_len = self.table.len();
+        let new_len = if handle >= old_len {
+            handle + 1
+        } else {
+            old_len
+        };
         let entry_flags = flags | FdFlags::OCCUPIED;
 
         self.with_transaction(old_len, |this| {
             if handle >= old_len {
-                this.table.resize(handle + 1, FdFlags::VACANT);
+                FdTbl::sync_size(sync_fd, new_len, 0)?;
+                this.resize(handle + 1);
             }
             this.table[handle] = entry_flags;
 
@@ -1504,7 +1509,12 @@ impl PosixFdTbl {
         })
     }
 
-    pub fn bulk_insert_manual(&mut self, entries: Vec<FdFlags>, handles: &[usize]) -> Result<()> {
+    pub fn bulk_insert_manual(
+        &mut self,
+        entries: Vec<FdFlags>,
+        handles: &[usize],
+        sync_fd: Option<&FdGuardUpper>,
+    ) -> Result<()> {
         if handles.len() != entries.len() {
             return Err(Error::new(EINVAL));
         }
@@ -1517,10 +1527,16 @@ impl PosixFdTbl {
 
         let max_index = handles.iter().max().cloned().unwrap_or(0);
         let old_len = self.table.len();
+        let new_len = if old_len <= max_index {
+            max_index + 1
+        } else {
+            old_len
+        };
 
         self.with_transaction(old_len, |this| {
             if old_len <= max_index {
-                this.table.resize(max_index + 1, FdFlags::VACANT);
+                FdTbl::sync_size(sync_fd, new_len, 0)?;
+                this.resize(max_index + 1);
             }
 
             for (entry, &index) in entries.into_iter().zip(handles) {
@@ -1621,8 +1637,14 @@ impl UpperFdTbl {
         index & !syscall::UPPER_FDTBL_TAG
     }
 
-    pub fn reserve(&mut self, additional: usize) {
-        self.table.reserve(additional);
+    pub fn resize(&mut self, size: usize) {
+        self.table.resize(
+            size,
+            FdTblEntry::Vacant {
+                next_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
+            },
+        );
+        self.rebuild_free_list();
     }
 
     pub fn capacity(&self) -> usize {
@@ -1684,7 +1706,7 @@ impl UpperFdTbl {
         Ok(())
     }
 
-    fn find_free_block(&mut self, len: usize) -> usize {
+    fn find_free_block(&self, len: usize) -> usize {
         let mut start = 0;
         let mut count = 0;
 
@@ -1695,38 +1717,27 @@ impl UpperFdTbl {
                 }
                 count += 1;
                 if count == len {
-                    break;
+                    return start;
                 }
             } else {
                 count = 0;
             }
         }
 
-        if count < len {
-            if count == 0 {
-                start = self.table.len();
-            }
-            let needed = len - count;
-            self.table.resize(
-                self.table.len() + needed,
-                FdTblEntry::Vacant {
-                    next_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
-                },
-            );
-        }
-        start
+        if count == 0 { self.table.len() } else { start }
     }
 
-    pub fn insert(&mut self, entry: FdTblEntry) -> Result<usize> {
+    pub fn insert(&mut self, entry: FdTblEntry, sync_fd: Option<&FdGuardUpper>) -> Result<usize> {
         let handle = self.first_vacant_idx as usize;
 
         if self.first_vacant_idx == FdTbl::CONTEXT_MAX_FILES {
             let old_len = self.table.len();
+            let new_len = old_len + 1;
             self.with_transaction(old_len, |this| {
-                let handle = this.table.len();
+                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
                 this.table.push(entry);
                 this.len += 1;
-                Ok(handle)
+                Ok(old_len)
             })
         } else {
             if let FdTblEntry::Vacant { next_vacant_idx } = self.table[handle] {
@@ -1740,7 +1751,11 @@ impl UpperFdTbl {
         }
     }
 
-    pub fn bulk_insert(&mut self, entries: Vec<FdTblEntry>) -> Result<Vec<usize>> {
+    pub fn bulk_insert(
+        &mut self,
+        entries: Vec<FdTblEntry>,
+        sync_fd: Option<&FdGuardUpper>,
+    ) -> Result<Vec<usize>> {
         let count = entries.len();
         if count == 0 {
             return Ok(Vec::new());
@@ -1751,8 +1766,20 @@ impl UpperFdTbl {
 
         let old_len = self.table.len();
 
+        let start_index = self.find_free_block(count);
+        let needed_len = start_index + count;
+
+        let new_len = if old_len < needed_len {
+            needed_len
+        } else {
+            old_len
+        };
+
         self.with_transaction(old_len, |this| {
-            let start_index = this.find_free_block(count);
+            if old_len != new_len {
+                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                this.resize(new_len);
+            }
 
             let mut handles = Vec::with_capacity(count);
             for (i, entry) in entries.into_iter().enumerate() {
@@ -1762,32 +1789,42 @@ impl UpperFdTbl {
             }
 
             this.len += count as u32;
+
             this.rebuild_free_list();
 
             Ok(handles)
         })
     }
 
-    pub fn insert_at(&mut self, handle: usize, entry: FdTblEntry) -> Result<usize> {
+    pub fn insert_at(
+        &mut self,
+        handle: usize,
+        entry: FdTblEntry,
+        sync_fd: Option<&FdGuardUpper>,
+    ) -> Result<usize> {
         let old_len = self.table.len();
+        let new_len = if handle >= old_len {
+            handle + 1
+        } else {
+            old_len
+        };
 
         self.with_transaction(old_len, |this| {
             if handle >= old_len {
-                this.table.resize(
-                    handle + 1,
-                    FdTblEntry::Vacant {
-                        next_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
-                    },
-                );
+                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                this.resize(handle + 1);
             }
 
-            if matches!(this.table[handle], FdTblEntry::Vacant { .. }) {
+            let vacant = matches!(this.table[handle], FdTblEntry::Vacant { .. });
+            if vacant {
                 this.len += 1;
             }
 
             this.table[handle] = entry;
 
-            this.rebuild_free_list();
+            if vacant {
+                this.rebuild_free_list();
+            }
             Ok(handle)
         })
     }
@@ -1796,6 +1833,7 @@ impl UpperFdTbl {
         &mut self,
         entries: Vec<FdTblEntry>,
         handles: &[usize],
+        sync_fd: Option<&FdGuardUpper>,
     ) -> Result<()> {
         if handles.len() != entries.len() {
             return Err(Error::new(EINVAL));
@@ -1816,15 +1854,16 @@ impl UpperFdTbl {
             .max()
             .unwrap_or(0);
         let old_len = self.table.len();
+        let new_len = if old_len <= max_index {
+            max_index + 1
+        } else {
+            old_len
+        };
 
         self.with_transaction(old_len, |this| {
             if old_len <= max_index {
-                this.table.resize(
-                    max_index + 1,
-                    FdTblEntry::Vacant {
-                        next_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
-                    },
-                );
+                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                this.resize(max_index + 1);
             }
 
             for (entry, &index) in entries.into_iter().zip(handles) {
@@ -1832,6 +1871,7 @@ impl UpperFdTbl {
             }
 
             this.len += count as u32;
+
             this.rebuild_free_list();
 
             Ok(())
