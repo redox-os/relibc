@@ -7,7 +7,7 @@ use crate::{
     error::{Errno, Result},
     header::{
         dirent::dirent,
-        errno::{EINVAL, EIO},
+        errno::{EINVAL, EIO, ENOSYS},
         fcntl::AT_EMPTY_PATH,
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
@@ -801,6 +801,6 @@ impl Pal for Sys {
         argv: crate::iter::NulTerminated<*mut c_char>,
         envp: Option<crate::iter::NulTerminated<*mut c_char>>,
     ) -> Result<pid_t> {
-        todo!()
+        Err(Errno(ENOSYS))
     }
 }

@@ -35,6 +35,8 @@ FAILING_TESTS += sys_resource/getrusage
 #FAILING_TESTS += time/times
 # Outdated test
 #FAILING_TESTS += netdb/netdb
+# Incomplete in redox, ENOSYS in linux, EACCESS in glibc
+#FAILING_TESTS += spawn
 
 endif
 
@@ -286,7 +288,6 @@ VARIED_NAMES=\
 	signals/sigset-4 \
 	signals/sigset-5 \
 	signals/sigset-9 \
-	spawn \
 	stdio/ctermid \
 	stdio/tempnam \
 	stdio/tmpnam \
