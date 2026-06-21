@@ -27,7 +27,7 @@ use crate::{
     fs::File,
     header::{
         errno::{
-            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
+            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
             ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
@@ -1207,16 +1207,7 @@ impl Pal for Sys {
         envp: Option<NulTerminated<*mut c_char>>,
     ) -> Result<pid_t> {
         use crate::header::spawn::Flags;
-
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
-        let executable = FdGuard::open(
-            &program.to_str().map_err(|_| Errno(EINVAL))?,
-            syscall::O_RDONLY,
-        )?
-        .to_upper()
-        .unwrap();
-        let mut executable_stat = syscall::Stat::default();
-        executable.fstat(&mut executable_stat)?;
         let mut cwd: Box<[u8]> = path::clone_cwd().unwrap_or_default().into();
         let mut cwd_fd = {
             let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
@@ -1260,8 +1251,14 @@ impl Pal for Sys {
                         flag,
                         mode,
                     } => {
+                        let dirfd = {
+                            // TODO: Cannot use cwd_fd (being an upper fd), also
+                            // cannot set cwd_fd as regular fd then call to_upper later
+                            let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
+                            FdGuard::open(cwd_str, syscall::O_STAT)?
+                        };
                         let src_fd = Sys::openat(
-                            cwd_fd.as_raw_fd() as c_int,
+                            dirfd.as_c_fd().ok_or(Errno(EMFILE))?,
                             CStr::borrow(&path),
                             flag,
                             mode,
@@ -1308,6 +1305,33 @@ impl Pal for Sys {
                 }
             }
         }
+
+        let dirfd = {
+            // TODO: Cannot use cwd_fd (being an upper fd), also
+            // cannot set cwd_fd as regular fd then call to_upper later
+            let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
+            FdGuard::open(cwd_str, syscall::O_STAT)?
+        };
+
+        let executable = Sys::openat(
+            dirfd.as_c_fd().ok_or(Errno(EMFILE))?,
+            program,
+            fcntl::O_RDONLY,
+            0,
+        )?;
+        let executable = FdGuard::new(executable as usize).to_upper()?;
+        let mut executable_stat = syscall::Stat::default();
+        executable.fstat(&mut executable_stat)?;
+        drop(dirfd);
+
+        // println!(
+        //     "RELIBC: spawn {:?} at {:?}",
+        //     args.iter()
+        //         .map(|s| str::from_utf8(s).unwrap_or("???"))
+        //         .collect::<Vec<_>>()
+        //         .as_slice(),
+        //     str::from_utf8(&cwd).unwrap_or("???")
+        // );
 
         new_file_table.call_wo(
             &[],
