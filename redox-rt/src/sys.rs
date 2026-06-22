@@ -424,12 +424,18 @@ pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) ->
     )
 }
 pub fn posix_exit(status: i32) -> ! {
-    this_proc_call(
-        &mut [],
-        CallFlags::empty(),
-        &[ProcCall::Exit as u64, (status & 0xFF) as u64],
-    )
-    .expect("failed to call proc mgr with Exit");
+    // TODO: probably not correct place to handle EINTR
+    loop {
+        match this_proc_call(
+            &mut [],
+            CallFlags::empty(),
+            &[ProcCall::Exit as u64, (status & 0xFF) as u64],
+        ) {
+            Ok(_) => break,
+            Err(Error { errno: EINTR }) => continue,
+            Err(e) => panic!("failed to call proc mgr with Exit: {e}"),
+        }
+    }
     let _ = syscall::write(1, b"redox-rt: ProcCall::Exit FAILED, abort()ing!\n");
     core::intrinsics::abort();
 }
