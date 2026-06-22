@@ -59,7 +59,10 @@ use crate::{
     out::Out,
     platform::{
         ERRNO, free,
-        sys::timer::{TIMERS, timer_routine, timer_update_wake_time},
+        sys::{
+            path::{CwdPath, to_cwd_path},
+            timer::{TIMERS, timer_routine, timer_update_wake_time},
+        },
     },
     sync::rwlock::RwLock,
 };
@@ -1208,11 +1211,8 @@ impl Pal for Sys {
     ) -> Result<pid_t> {
         use crate::header::spawn::Flags;
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
-        let mut cwd: Box<[u8]> = path::clone_cwd().unwrap_or_default().into();
-        let mut cwd_fd = {
-            let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
-            FdGuard::open(cwd_str, syscall::O_STAT)?.to_upper()?
-        };
+        let mut cwd = path::clone_cwd().unwrap_or_default();
+        let mut cwd_fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
         let proc_fd = child.proc_fd.unwrap();
         let curr_proc_fd = redox_rt::current_proc_fd();
         let file_table = RtTcb::current()
@@ -1254,8 +1254,7 @@ impl Pal for Sys {
                         let dirfd = {
                             // TODO: Cannot use cwd_fd (being an upper fd), also
                             // cannot set cwd_fd as regular fd then call to_upper later
-                            let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
-                            FdGuard::open(cwd_str, syscall::O_STAT)?
+                            FdGuard::open(cwd.as_str(), syscall::O_STAT)?
                         };
                         let src_fd = Sys::openat(
                             dirfd.as_c_fd().ok_or(Errno(EMFILE))?,
@@ -1278,17 +1277,21 @@ impl Pal for Sys {
                         )?;
                     }
                     crate::header::spawn::Action::Chdir(path) => {
-                        cwd = Box::from(path.as_bytes());
-                        let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
-                        let fd = FdGuard::open(cwd_str, syscall::O_STAT)?.to_upper()?;
+                        let cwd_str =
+                            core::str::from_utf8(path.as_bytes()).map_err(|_| Errno(EINVAL))?;
+                        cwd = to_cwd_path(cwd_str)?;
+                        let fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
                         cwd_fd = fd;
                     }
                     crate::header::spawn::Action::FChdir(fd) => {
-                        let mut buf = [0_u8; limits::PATH_MAX];
-                        let res = Sys::fpath(fd, &mut buf)?;
-                        cwd = Box::from(&buf[..res]);
-                        let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
-                        let fd = FdGuard::open(cwd_str, syscall::O_STAT)?.to_upper()?;
+                        let mut buf = CwdPath::new();
+                        unsafe {
+                            // SAFETY: Sys::fpath is using str::from_utf8 already
+                            let res = Sys::fpath(fd, buf.as_bytes_mut())?;
+                            buf.set_len(res);
+                        }
+                        cwd = buf;
+                        let fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
                         cwd_fd = fd;
                     }
                     crate::header::spawn::Action::Dup2(old, new) => {
@@ -1309,8 +1312,7 @@ impl Pal for Sys {
         let dirfd = {
             // TODO: Cannot use cwd_fd (being an upper fd), also
             // cannot set cwd_fd as regular fd then call to_upper later
-            let cwd_str = core::str::from_utf8(&cwd).map_err(|_| Errno(EINVAL))?;
-            FdGuard::open(cwd_str, syscall::O_STAT)?
+            FdGuard::open(cwd.as_str(), syscall::O_STAT)?
         };
 
         let executable = Sys::openat(
@@ -1330,7 +1332,7 @@ impl Pal for Sys {
         //         .map(|s| str::from_utf8(s).unwrap_or("???"))
         //         .collect::<Vec<_>>()
         //         .as_slice(),
-        //     str::from_utf8(&cwd).unwrap_or("???")
+        //     cwd.as_bytes()
         // );
 
         new_file_table.call_wo(
@@ -1340,7 +1342,7 @@ impl Pal for Sys {
         )?;
 
         let extra_info = redox_rt::proc::ExtraInfo {
-            cwd: Some(&cwd),
+            cwd: Some(cwd.as_bytes()),
             // Signals set to be ignored by the calling process
             // must also be ignored by the child process
             sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
