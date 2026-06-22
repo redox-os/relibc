@@ -6,13 +6,25 @@ use crate::platform::types::{c_uint, c_ulong};
 
 use super::{siginfo_t, sigset_t, stack_t};
 
-// TODO why are these SA_* constants different to Linux?
+// The below SA_* constants are different to Linux for implementation reasons.
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/sigaction.2.html>.
+///
+/// Not intended for application use. Used by C libraries to indicate that the
+/// `sa_restorer` field contains the address of a "signal trampoline".
 pub const SA_RESTORER: usize = 0x0000_0004; // TODO: remove
+/// Causes extra information to be passed to signal handlers at the time of
+/// receipt of a signal.
 pub const SA_SIGINFO: usize = 0x0200_0000;
+/// Process is executing on an alternate signal stack.
 pub const SA_ONSTACK: usize = 0x0400_0000;
+/// Causes certain functions to become restartable.
 pub const SA_RESTART: usize = 0x0800_0000;
+/// Causes signal not to be automatically blocked on entry to signal handler.
 pub const SA_NODEFER: usize = 0x1000_0000;
+/// Causes signal dispositions to be set to `SIG_DFL` on entry to signal
+/// handlers.
 pub const SA_RESETHAND: usize = 0x2000_0000;
+/// Do not generate `SIGCHLD` when children stop or stopped children continue.
 pub const SA_NOCLDSTOP: usize = 0x4000_0000;
 
 const _: () = {
@@ -28,6 +40,7 @@ const _: () = {
 };
 
 pub(crate) type ucontext_t = ucontext;
+/// A machine-specific representation of the saved context.
 pub(crate) type mcontext_t = mcontext;
 
 //TODO: share definition with SigStack?
@@ -43,12 +56,16 @@ pub struct ucontext {
     #[cfg(target_arch = "x86")]
     _pad: [c_ulong; 3], // pad from 9*4 to 12*4
 
+    /// Pointer to the context that is resumed when this context returns.
     pub uc_link: *mut ucontext_t,
+    /// The stack used by this context.
     pub uc_stack: stack_t,
+    /// The set of signals that are blocked when this context is active.
     pub uc_sigmask: sigset_t,
     _sival: c_ulong,
     _sigcode: c_uint,
     _signum: c_uint,
+    /// A machine-specific representation of the saved context.
     pub uc_mcontext: mcontext_t,
 }
 
