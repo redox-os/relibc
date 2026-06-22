@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "test_helpers.h"
 
@@ -17,4 +18,9 @@ int main(void) {
     int c = close(fd);
     ERROR_IF(close, c, == -1);
     UNEXP_IF(close, c, != 0);
+
+    char cwd[PATH_MAX];
+    char* cw = getcwd(cwd, sizeof(cwd));
+    ERROR_IF(getcwd, cw, == NULL);
+    printf("getcwd: %s\n", cwd);
 }
