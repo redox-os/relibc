@@ -1,11 +1,14 @@
 use alloc::{
-    boxed::Box,
     collections::btree_set::BTreeSet,
     ffi::CString,
     string::{String, ToString},
     vec::Vec,
 };
-use core::{ffi::c_int, str};
+use arrayvec::ArrayString;
+use core::{
+    ffi::c_int,
+    str::{self, FromStr},
+};
 use redox_rt::{proc::FdGuardUpper, signal::tmp_disable_signals};
 use syscall::{data::Stat, error::*, flag::*};
 
@@ -105,7 +108,7 @@ pub fn chdir(path: &str) -> Result<()> {
         let canon = canonicalize_using_cwd(cwd_guard.as_ref().map(|c| c.path.as_ref()), &path)
             .ok_or(Error::new(ENOENT))?;
         *cwd_guard = Some(Cwd {
-            path: canon.into_boxed_str(),
+            path: to_cwd_path(&canon)?,
             fd,
         });
     } else {
@@ -120,7 +123,7 @@ pub fn chdir(path: &str) -> Result<()> {
         }
 
         *cwd_guard = Some(Cwd {
-            path: path.into_boxed_str(),
+            path: to_cwd_path(&path)?,
             fd,
         });
     }
@@ -129,12 +132,12 @@ pub fn chdir(path: &str) -> Result<()> {
 }
 
 pub fn fchdir(fd: c_int) -> Result<()> {
-    let mut buf = [0_u8; limits::PATH_MAX];
-    let res = Sys::fpath(fd, &mut buf)?;
-
-    let path = core::str::from_utf8(&buf[..res])
-        .map_err(|_| Errno(EINVAL))?
-        .to_string();
+    let mut buf = CwdPath::zero_filled();
+    unsafe {
+        // SAFETY: Sys::fpath is using str::from_utf8 already
+        let res = Sys::fpath(fd, buf.as_bytes_mut())?;
+        buf.set_len(res);
+    }
     let fd = FdGuard::new(syscall::fcntl(
         fd as usize,
         syscall::F_DUPFD,
@@ -142,7 +145,7 @@ pub fn fchdir(fd: c_int) -> Result<()> {
     )?)
     .to_upper()
     .unwrap();
-    set_cwd_manual(path.into_boxed_str(), fd);
+    set_cwd_manual(buf, fd);
     Ok(())
 }
 
@@ -209,20 +212,25 @@ pub fn canonicalize(path: &str) -> Result<String> {
     canonicalize_with_cwd_internal(cwd_guard.as_ref().map(|c| c.path.as_ref()), path)
 }
 
+pub type CwdPath = ArrayString<{ limits::PATH_MAX }>;
+
 pub struct Cwd {
-    pub path: Box<str>,
+    pub path: CwdPath,
     pub fd: FdGuardUpper,
 }
 
-// TODO: arraystring?
 static CWD: RwLock<Option<Cwd>> = RwLock::new(None);
 
-pub fn set_cwd_manual(path: Box<str>, fd: FdGuardUpper) {
+pub fn to_cwd_path(path: &str) -> Result<CwdPath> {
+    ArrayString::from_str(&path).or(Err(Error::new(ENAMETOOLONG)))
+}
+
+pub fn set_cwd_manual(path: CwdPath, fd: FdGuardUpper) {
     let _siglock = tmp_disable_signals();
     *CWD.write() = Some(Cwd { path, fd });
 }
 
-pub fn clone_cwd() -> Option<Box<str>> {
+pub fn clone_cwd() -> Option<CwdPath> {
     let _siglock = tmp_disable_signals();
     CWD.read().as_ref().map(|cwd| cwd.path.clone())
 }

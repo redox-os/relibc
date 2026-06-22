@@ -379,15 +379,15 @@ pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
     ) {
         let cwd_bytes: &'static [u8] =
             unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
-        if let (Ok(cwd_path), Some(cwd_fd)) = (
-            core::str::from_utf8(cwd_bytes),
+        if let (Ok(Ok(cwd_path)), Some(cwd_fd)) = (
+            core::str::from_utf8(cwd_bytes).map(self::sys::path::CwdPath::from),
             (cwd_fd != usize::MAX).then(|| {
                 FdGuard::new(cwd_fd)
                     .to_upper()
                     .expect("failed to move cwd fd to upper table")
             }),
         ) {
-            self::sys::path::set_cwd_manual(cwd_path.into(), cwd_fd);
+            self::sys::path::set_cwd_manual(cwd_path, cwd_fd);
         }
     }
 
