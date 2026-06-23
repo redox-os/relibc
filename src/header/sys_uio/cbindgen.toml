@@ -8,9 +8,9 @@ after_includes = """
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
 #include <bits/iovec.h>   // for iovec
 
-// TODO should be guarded by _DEFAULT_SOURCE or _BSD_SOURCE
-// for Non-POSIX functions preadv and pwritev
-#include <bits/off-t.h>   // for off_t from sys/types.h
+#if defined(_BSD_SOURCE) || defined(_DEFAULT_SOURCE)
+#include <bits/uio.h>     // for Non-POSIX functions preadv and pwritev
+#endif
 """
 include_guard = "_RELIBC_SYS_UIO_H"
 language = "C"
