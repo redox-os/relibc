@@ -49,26 +49,43 @@ pub const SIGPOLL: usize = super::constants::SIGIO;
 /// Synonymous with `SIGSYS`.
 pub const SIGUNUSED: usize = super::constants::SIGSYS;
 
-// TODO why are these SA_* constants different to Redox?
+// Below SA_* constants cannot share the same values as Redox for implementation reasons.
+/// Do not generate `SIGCHLD` when children stop or stopped children continue.
 pub const SA_NOCLDSTOP: usize = 1;
+/// Causes extra information to be passed to signal handlers at the time of
+/// receipt of a signal.
 pub const SA_SIGINFO: usize = 4;
+/// Process is executing on an alternate signal stack.
 pub const SA_ONSTACK: usize = 0x0800_0000;
+/// Causes certain functions to become restartable.
 pub const SA_RESTART: usize = 0x1000_0000;
+/// Causes signal not to be automatically blocked on entry to signal handler.
 pub const SA_NODEFER: usize = 0x4000_0000;
+/// Causes signal dispositions to be set to `SIG_DFL` on entry to signal
+/// handlers.
 pub const SA_RESETHAND: usize = 0x8000_0000;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/sigaction.2.html>.
+///
+/// Not intended for application use. Used by C libraries to indicate that the
+/// `sa_restorer` field contains the address of a "signal trampoline".
 pub const SA_RESTORER: usize = 0x0400_0000;
 
 // Mirrors the ucontext_t struct from the libc crate on Linux.
 
 pub(crate) type ucontext_t = ucontext;
+/// A machine-specific representation of the saved context.
 pub(crate) type mcontext_t = mcontext;
 
 #[repr(C)]
 pub struct ucontext {
     pub uc_flags: c_ulong,
+    /// Pointer to the context that is resumed when this context returns.
     pub uc_link: *mut ucontext_t,
+    /// The stack used by this context.
     pub uc_stack: stack_t,
+    /// A machine-specific representation of the saved context.
     pub uc_mcontext: mcontext_t,
+    /// The set of signals that are blocked when this context is active.
     pub uc_sigmask: sigset_t,
     __private: [c_uchar; 512],
 }
