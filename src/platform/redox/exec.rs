@@ -118,7 +118,7 @@ pub fn execve(
         return Err(Error::new(EPERM));
     }
 
-    let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
+    let cwd = super::path::clone_cwd().unwrap_or_default();
 
     // Path to interpreter binary and args if found
     let (interpreter_path, interpreter_args) = { parse_interpreter(&mut image_file)? };
@@ -229,7 +229,7 @@ pub fn execve(
     let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
     let extrainfo = ExtraInfo {
-        cwd: Some(&cwd),
+        cwd: Some(cwd.as_bytes()),
         sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
         sigprocmask,
         umask: redox_rt::sys::get_umask(),
