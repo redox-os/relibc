@@ -1332,7 +1332,7 @@ impl Pal for Sys {
         //         .map(|s| str::from_utf8(s).unwrap_or("???"))
         //         .collect::<Vec<_>>()
         //         .as_slice(),
-        //     cwd.as_bytes()
+        //     cwd.as_str()
         // );
 
         new_file_table.call_wo(
