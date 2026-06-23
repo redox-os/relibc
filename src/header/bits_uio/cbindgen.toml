@@ -1,0 +1,18 @@
+# Non-POSIX spec: https://man7.org/linux/man-pages/man2/readv.2.html
+#
+# These functions have been split out to prevent namespace pollution in sys/uio.h.
+after_includes = """
+#include <bits/off-t.h>   // for off_t from sys/types.h
+#include <bits/ssize-t.h> // for ssize_t from sys/types.h
+#include <bits/iovec.h>   // for iovec from sys/uio.h
+"""
+include_guard = "_RELIBC_BITS_SYS_UIO_H"
+language = "C"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
+
+[export.rename]
+"iovec" = "struct iovec"
