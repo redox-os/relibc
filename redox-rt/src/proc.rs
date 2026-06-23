@@ -85,6 +85,11 @@ pub fn fexec_impl(
     pread_all(&image_file, 0, &mut header_bytes)?;
     let header = Header::from_bytes(&header_bytes);
 
+    if header.e_ident[..4] != [0x7F, 0x45, 0x4C, 0x46] {
+        // Not an ELF, according to posix_spawn() just throw error here
+        return Err(Error::new(ENOEXEC));
+    }
+
     let grants_fd = if let Some(interp) = interp_override.as_ref() {
         FdGuard::new(interp.grants_fd).to_upper()?
     } else {
