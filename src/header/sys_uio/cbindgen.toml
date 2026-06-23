@@ -8,7 +8,7 @@ after_includes = """
 #include <bits/ssize-t.h> // for ssize_t from sys/types.h
 #include <bits/iovec.h>   // for iovec
 
-#if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
+#if defined(_BSD_SOURCE) || defined(_DEFAULT_SOURCE)
 #include <bits/uio.h>     // for Non-POSIX functions preadv and pwritev
 #endif
 """
