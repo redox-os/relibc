@@ -10,6 +10,9 @@ include_guard = "_RELIBC_BITS_NULL_T_H"
 language = "C"
 no_includes = true
 after_includes = """
+// Null pointer constant.
+// Any pointer object whose representation has all bits set to zero, perhaps by
+// memset() to 0 or by calloc(), shall be treated as a null pointer.
 #ifdef __cplusplus
 #if __cplusplus >= 201103L
   #define NULL nullptr
