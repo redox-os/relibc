@@ -21,6 +21,7 @@ bitflags::bitflags! {
         const POSIX_SPAWN_SETSIGMASK = 4;
         const POSIX_SPAWN_SETSCHEDPARAM = 5;
         const POSIX_SPAWN_SETSCHEDULER = 6;
+        const POSIX_SPAWN_SETSID = 7;
     }
 }
 
@@ -30,6 +31,7 @@ pub const POSIX_SPAWN_SETSIGDEF: c_short = 3;
 pub const POSIX_SPAWN_SETSIGMASK: c_short = 4;
 pub const POSIX_SPAWN_SETSCHEDPARAM: c_short = 5;
 pub const POSIX_SPAWN_SETSCHEDULER: c_short = 6;
+pub const POSIX_SPAWN_SETSID: c_short = 7;
 
 /// A spawn attributes object.
 #[repr(C)]
