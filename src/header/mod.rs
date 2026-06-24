@@ -136,7 +136,7 @@ pub mod spawn;
 pub mod stdarg;
 // stdatomic.h implemented in C
 // stdbool.h implemented in C
-// stddef.h implemented in C
+pub mod stddef;
 // stdint.h implemented in C
 pub mod stdio;
 pub mod stdlib;
