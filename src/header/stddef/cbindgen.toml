@@ -1,0 +1,29 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stddef.h.html
+#
+# There are no spec quotations relating to includes
+include_guard = "_RELIBC_STDDEF_H"
+after_includes = """
+// wchar_t should come before NULL and size_t
+// according to comment in wchar cbindgen
+#include <bits/wchar-t.h>
+#include <bits/size-t.h>
+#include <bits/null.h>
+
+#ifndef __PTRDIFF_TYPE__
+#define __PTRDIFF_TYPE__ long int
+#endif
+// Signed integer type of the result of subtracting two pointers.
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
+
+// Object type whose alignment is the greatest fundamental alignment.
+typedef struct { long long __ll; long double __ld; } max_align_t;
+
+// Integer constant expression of type size_t, the value of which is the offset
+// in bytes to the structure member from the beginning of its structure.
+#define offsetof(type, member) __builtin_offsetof(type, member)
+"""
+language = "C"
+no_includes = true
+cpp_compat = true
+[enum]
+prefix_with_name = true

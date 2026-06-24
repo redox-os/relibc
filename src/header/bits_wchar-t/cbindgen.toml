@@ -3,6 +3,9 @@
 # This type is split out to prevent importing all of stddef.h into inttypes.h
 include_guard = "_RELIBC_BITS_WCHAR_T_H"
 after_includes = """
+// Integer type whose range of values can represent distinct codes for all
+// members of the largest extended character set specified among the supported
+// locales; the null character shall have the code value zero.
 #ifndef _WCHAR_T
 #define _WCHAR_T
 #ifndef __cplusplus
