@@ -76,6 +76,9 @@ impl Default for epoll_data {
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
+///
+/// Specifies data that the kernel should save and return when the
+/// corresponding file descriptor becomes ready.
 #[cfg(all(target_os = "redox", target_pointer_width = "64"))]
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -83,29 +86,50 @@ impl Default for epoll_data {
 // systems) on redox. The `Default` trait is here so we don't need to
 // worry about the padding when using this type.
 pub struct epoll_event {
+    /// Epoll events.
     pub events: c_uint, // 4 bytes
     // 4 automatic alignment bytes
+    /// User data variable.
     pub data: epoll_data, // 8 bytes
 
     pub _pad: c_ulonglong, // 8 bytes
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
+///
+/// Specifies data that the kernel should save and return when the
+/// corresponding file descriptor becomes ready.
 #[cfg(not(all(target_os = "redox", target_pointer_width = "64")))]
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct epoll_event {
+    /// Epoll events.
     pub events: c_uint,
+    /// User data variable.
     pub data: epoll_data,
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_create.2.html>.
+///
+/// Creates a file descriptor referring to the new epoll instance.
+///
+/// Upon success, returns a file descriptor (a nonnegative integer). Upon
+/// error, `-1` is returned and errno set to indicate the error.
+///
+/// # Implementation
+/// The `_size` parameter is deliberately unused as it is no longer required.
+/// This function simply calls `epoll_create1`.
 #[unsafe(no_mangle)]
 pub extern "C" fn epoll_create(_size: c_int) -> c_int {
     epoll_create1(0)
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_create1.2.html>.
+///
+/// Creates a file descriptor referring to the new epoll instance.
+///
+/// Upon success, returns a file descriptor (a nonnegative integer). Upon
+/// error, `-1` is returned and errno set to indicate the error.
 #[unsafe(no_mangle)]
 pub extern "C" fn epoll_create1(flags: c_int) -> c_int {
     trace_expr!(
@@ -116,6 +140,12 @@ pub extern "C" fn epoll_create1(flags: c_int) -> c_int {
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_ctl.2.html>.
+///
+/// Add, modify, or remove entries in the interest list of the epoll instance
+/// referred to by the file descriptor `epfd`.
+///
+/// Upon success, returns `0`. Upon error, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn epoll_ctl(
     epfd: c_int,
@@ -136,6 +166,25 @@ pub unsafe extern "C" fn epoll_ctl(
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_wait.2.html>.
+///
+/// Waits for events on the epoll instance referred to by the file descriptor
+/// `epdf`.
+///
+/// `timeout` represents the number of milliseconds this function call will
+/// block.
+///
+/// Will block until either:
+/// - a file descriptor delivers an event
+/// - the call is interrupted by a signal handler
+/// - the `timeout` expires
+///
+/// A `timeout` of `-1` will block indefinitely. A `timeout` of `0` will return
+/// immediately, even if no events are available.
+///
+/// Upon success, returns the number of file descriptors ready for the
+/// requested I/O operation, or `0` if no file descriptor became ready during
+/// the requested `timeout`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn epoll_wait(
     epfd: c_int,
@@ -147,6 +196,17 @@ pub unsafe extern "C" fn epoll_wait(
 }
 
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_wait.2.html>.
+///
+/// Allows an application to safely wait until either a file descriptor becomes
+/// ready or a signal is caught.
+///
+/// If `sigmask` is NULL, calling this function is equivalent to
+/// `epoll_wait()`.
+///
+/// Upon success, returns the number of file descriptors ready for the
+/// requested I/O operation, or `0` if no file descriptor became ready during
+/// the requested `timeout`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn epoll_pwait(
     epfd: c_int,
