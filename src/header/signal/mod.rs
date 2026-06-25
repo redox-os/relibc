@@ -201,26 +201,49 @@ unsafe extern "C" fn __sigsetjmp_tail(jb: *mut c_ulonglong, ret: c_int) -> c_int
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/kill.html>.
+///
+/// Sends a signal to a process or a group of processes specified by `pid`.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error. No signal is sent if failed.
 #[unsafe(no_mangle)]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
     Sys::kill(pid, sig).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigqueue.html>.
+///
+/// Causes the signal specified by `signo` to be sent with the value specified
+/// by `value` to the process specified by `pid`.
+///
+/// Upon success, the specified signal shall have been queued, and returns `0`.
+/// Upon error, returns `-1` and sets errno to indicate the error.
 #[unsafe(no_mangle)]
-pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
-    Sys::sigqueue(pid, sig, val)
+pub extern "C" fn sigqueue(pid: pid_t, signo: c_int, value: sigval) -> c_int {
+    Sys::sigqueue(pid, signo, value)
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/killpg.html>.
+///
+/// Sends the signali specified by `sig` to the process group specified by
+/// `pgrp`.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error. No signal is sent if failed.
 #[unsafe(no_mangle)]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
     Sys::killpg(pgrp, sig).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_kill.html>.
+///
+/// Requests that a signal be delivered to the specified thread. It shall not
+/// be an error is `thread` is a zombie thread.
+///
+/// Upon success, returns `0`. Upon failure, returns an error number and does
+/// not send the signal.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
     let os_tid = {
@@ -231,6 +254,10 @@ pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_sigmask.html>.
+///
+/// Examines or changes (or both) the calling thread's signal mask.
+///
+/// Upon success, returns `0`. Upon failure, returns an error number.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_sigmask(
     how: c_int,
@@ -247,12 +274,25 @@ pub unsafe extern "C" fn pthread_sigmask(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/raise.html>.
+///
+/// Sends the signal `sig` to the executing thread or process. If a signal
+/// handler is called, this function shall not return until after the signal
+/// handler does.
+///
+/// Upon success, returns `0`. Upon failure, returns a non-zero value and sets
+/// errno to indicate the error.
 #[unsafe(no_mangle)]
 pub extern "C" fn raise(sig: c_int) -> c_int {
     Sys::raise(sig).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html>.
+///
+/// Allows the calling process to examine and/or specify the action to be
+/// associated with a specific signal.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1`, sets errno to
+/// indicate the error, and no new signal-catching function shall be installed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaction(
     sig: c_int,
@@ -265,6 +305,17 @@ pub unsafe extern "C" fn sigaction(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaddset.html>.
+///
+/// Adds the individual signal specified by `signo` to the signal set pointed
+/// to by `set`.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Safety
+/// The `sigset_t` pointed to by `set` must be initialized by `sigemptyset()`
+/// or `sigfillset()` before calling this function or undefined behaviour will
+/// occur.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
@@ -281,6 +332,16 @@ pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaltstack.html>.
+///
+/// Allows a process to define and examine the state of an alternate stack for
+/// signal handlers for the current thread.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Safety
+/// Use of this function by library threads that are not bound to
+/// kernel-scheduled entities results in undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
     unsafe {
@@ -291,6 +352,17 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigdelset.html>.
+///
+/// Deletes the individual signal specified by `signo` to the signal set
+/// pointed to by `set`.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Safety
+/// The `sigset_t` pointed to by `set` must be initialized by `sigemptyset()`
+/// or `sigfillset()` before calling this function or undefined behaviour will
+/// occur.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
@@ -307,6 +379,12 @@ pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigemptyset.html>.
+///
+/// Initializes the signal set pointed to by `set`, such that all signals
+/// defined in POSIX.1-2024 are excluded.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
     if let Some(set) = unsafe { (set.cast::<SigSet>()).as_mut() } {
@@ -316,6 +394,12 @@ pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigfillset.html>.
+///
+/// Initializes the signal set pointed to by `set`, such that all signals
+/// defined in POSIX.1-2024 are included.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     if let Some(set) = unsafe { (set.cast::<SigSet>()).as_mut() } {
@@ -326,9 +410,21 @@ pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
 ///
+/// Adds `sig` to the signal mask of the calling process.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Deprecated
 /// Present in issue 7. Removed in issue 8.
 ///
 /// Use of this function is unspecified in a multi-threaded process.
+///
+/// `pthread_sigmask()` or `sigprocmask()` should be used instead.
+///
+/// # Implementation
+/// Calls `sigprocmask()` internally.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
@@ -342,10 +438,22 @@ pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
 ///
+/// Sets the disposition of `sig` to `SIG_IGN`.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Deprecated
 /// Present in issue 7. Removed in issue 8.
 ///
 /// Use of this function is unspecified in a multi-threaded process.
-#[allow(clippy::missing_transmute_annotations)]
+///
+/// `sigaction()` should be used instead.
+///
+/// # Implementation
+/// Calls `sigaction()` internally.
+#[deprecated]
+#[expect(clippy::missing_transmute_annotations, reason = "too verbose")]
 #[unsafe(no_mangle)]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
@@ -358,7 +466,19 @@ pub extern "C" fn sigignore(sig: c_int) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/siginterrupt.html>.
 ///
+/// Changes the restart behaviour when a function is interrupted by the
+/// specified signal.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Deprecated
 /// Marked obsolescent in issue 7. Removed in issue 8.
+///
+/// Should use `sigaction()` with the `SA_RESTART` flag instead.
+///
+/// # Implementation
+/// Internally uses `sigaction()` with the `SA_RESTART` flag.
 #[deprecated]
 #[unsafe(no_mangle)]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
@@ -375,6 +495,18 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigismember.html>.
+///
+/// Tests whether the signal specified by `signo` is a member of the set
+/// pointed to by `set`.
+///
+/// Upon success, return `1` if the specified signal is a member of the
+/// specified set, or `0` if it is not. Upon failure, returns `-1` and sets
+/// errno to indicate the error.
+///
+/// # Safety
+/// The `sigset_t` pointed to by `set` must be initialized by `sigemptyset()`
+/// or `sigfillset()` before calling this function or undefined behaviour will
+/// occur.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
@@ -393,7 +525,14 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/signal.html>.
-#[allow(clippy::missing_transmute_annotations)]
+///
+/// Chooses one of three ways in which receipt of the signal number `sig` is to
+/// be subsequently handled.
+///
+/// Upon success, returns the value of `func` for the most recent call to
+/// `signal()` for the specified signal `sig`.Upon failure, returns `SIG_ERR`
+/// and a positive value shall be stored in errno.
+#[expect(clippy::missing_transmute_annotations, reason = "too verbose")]
 #[unsafe(no_mangle)]
 pub extern "C" fn signal(
     sig: c_int,
@@ -414,9 +553,22 @@ pub extern "C" fn signal(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
 ///
+/// Removes `sig` from the signal mask of the calling process and suspend the
+/// calling process until a signal is received.
+///
+/// Suspends execution of the thread until a signal is received, whereupon it
+/// shall return `-1` and set errno to `EINTR`.
+///
+/// # Deprecated
 /// Present in issue 7. Removed in issue 8.
 ///
 /// Use of this function is unspecified in a multi-threaded process.
+///
+/// `sigsuspend()` should be used instead.
+///
+/// # Implementation
+/// Calls `sigsuspend()` internally.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
@@ -429,6 +581,13 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigpending.html>.
+///
+/// Stores, in the location referenced by the `set` argument, the set of
+/// signals that are blocked from delivery to the calling thread and that are
+/// pending on the process or the calling thread.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     (|| Sys::sigpending(unsafe { set.as_mut().ok_or(Errno(EFAULT)) }?))()
