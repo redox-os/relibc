@@ -9,6 +9,7 @@ use core::{
     ffi::c_int,
     str::{self, FromStr},
 };
+use redox_protocols::protocol::O_CLOEXEC;
 use redox_rt::{proc::FdGuardUpper, signal::tmp_disable_signals};
 use syscall::{data::Stat, error::*, flag::*};
 

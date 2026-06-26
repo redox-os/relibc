@@ -266,8 +266,14 @@ version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f02ab6bace2054fb888a3c16f990117b579d14a3088e472d63c6011fa185c9d3"
 dependencies = [
- "bitflags",
  "libc",
+]
+
+[[package]]
+name = "libredox"
+version = "0.1.18"
+dependencies = [
+ "bitflags",
  "plain",
  "redox_syscall",
 ]
@@ -459,7 +465,7 @@ dependencies = [
  "generic-rt",
  "goblin",
  "ioslice",
- "libredox",
+ "libredox 0.1.18",
  "plain",
  "redox-path",
  "redox_syscall",
@@ -472,7 +478,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c07d0d6d291e3a951bd847b1cd4af32fc6243d64116cf7702838c02797688b7"
 dependencies = [
  "bitflags",
- "libredox",
+ "libredox 0.1.17",
  "redox_syscall",
 ]
 
@@ -501,7 +507,7 @@ dependencies = [
  "ioslice",
  "libc",
  "libm",
- "libredox",
+ "libredox 0.1.18",
  "log",
  "md-5",
  "memchr",

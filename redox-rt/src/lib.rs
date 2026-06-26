@@ -91,7 +91,7 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env", 0)
+    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env")
         .expect_notls("failed to open handle for process registers");
 
     syscall::read(file_fd, &mut env).expect_notls("failed to read gsbase");
@@ -111,7 +111,7 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env", 0)
+    let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env")
         .expect_notls("failed to open handle for process registers");
 
     syscall::read(file_fd, &mut env).expect_notls("failed to read fsbase");

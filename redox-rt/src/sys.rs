@@ -22,7 +22,7 @@ use crate::{
 };
 use alloc::{collections::btree_set::BTreeSet, vec::Vec};
 use redox_protocols::protocol::{
-    NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
+    F_DUPFD_CLOEXEC, NsDup, O_CLOEXEC, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
 };
 
 #[inline]
@@ -220,7 +220,7 @@ pub fn sys_call_ro<T: Call>(
         0
     };
     let entry_flags = if flags.contains(CallFlags::FD_CLOEXEC) {
-        syscall::O_CLOEXEC
+        O_CLOEXEC
     } else {
         0
     };
@@ -591,7 +591,7 @@ pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let root_fd = FdGuard::new(openat_into_upper(
         crate::current_namespace_fd()?,
         path.as_ref(),
-        syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+        syscall::O_DIRECTORY | O_CLOEXEC,
         0,
     )?);
     openat_into_posix(root_fd.as_raw_fd(), reference.as_ref(), flags, fcntl_flags)
@@ -646,7 +646,7 @@ pub fn open_into_upper<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let root_fd = FdGuard::new(openat_into_upper(
         crate::current_namespace_fd()?,
         path.as_ref(),
-        syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+        syscall::O_DIRECTORY | O_CLOEXEC,
         0,
     )?);
     openat_into_upper(root_fd.as_raw_fd(), reference.as_ref(), flags, fcntl_flags)
@@ -714,15 +714,16 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let root_fd = FdGuard::new(openat_into_upper(
         crate::current_namespace_fd()?,
         path,
-        syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+        syscall::O_DIRECTORY | O_CLOEXEC,
         0,
     )?);
+    let reference_str = reference.as_ref();
     unsafe {
         syscall::syscall4(
             syscall::SYS_UNLINKAT,
             root_fd.as_raw_fd(),
-            path.as_ptr() as usize,
-            path.len(),
+            reference_str.as_ptr() as usize,
+            reference_str.len(),
             flags,
         )
     }
@@ -736,7 +737,7 @@ pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
         buf.extend_from_slice(&len.to_ne_bytes());
         buf.extend_from_slice(name_bytes);
     }
-    FdGuard::new(dup_into_upper(crate::current_namespace_fd()?, &buf, 0)?).to_upper()
+    FdGuard::new(dup_into_upper(crate::current_namespace_fd()?, &buf)?).to_upper()
 }
 pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<()> {
     let mut buf = alloc::vec::Vec::from((NsDup::IssueRegister as usize).to_ne_bytes());
@@ -768,14 +769,10 @@ pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
 }
 
 pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
-    if cmd == syscall::F_DUPFD || cmd == syscall::F_DUPFD_CLOEXEC {
+    if cmd == syscall::F_DUPFD || cmd == F_DUPFD_CLOEXEC {
         let _siglock = tmp_disable_signals();
 
-        let cloexec_flag = if cmd == syscall::F_DUPFD_CLOEXEC {
-            syscall::O_CLOEXEC
-        } else {
-            0
-        };
+        let cloexec_flag = if cmd == F_DUPFD_CLOEXEC { O_CLOEXEC } else { 0 };
 
         let out = {
             let mut guard = FILETABLE.lock();
@@ -786,7 +783,7 @@ pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
             }
         };
 
-        let res = unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, cmd, out) };
+        let res = unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, syscall::F_DUPFD, out) };
 
         if res.is_err() {
             let mut guard = FILETABLE.lock();
@@ -863,12 +860,12 @@ pub fn openat_into_upper<T: AsRef<str>>(
     Ok(out)
 }
 
-pub fn dup_into_upper(fd: usize, buf: &[u8], flags: usize) -> Result<usize> {
+pub fn dup_into_upper(fd: usize, buf: &[u8]) -> Result<usize> {
     let _siglock = tmp_disable_signals();
 
     let out_idx = {
         let mut guard = FILETABLE.lock();
-        guard.insert_upper(flags)?
+        guard.insert_upper(0)?
     };
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
@@ -891,10 +888,10 @@ pub fn dup_into_upper(fd: usize, buf: &[u8], flags: usize) -> Result<usize> {
     Ok(out)
 }
 
-pub fn dup_into_upper_raw(fd: usize, buf: &[u8], flags: usize) -> Result<usize> {
+pub fn dup_into_upper_raw(fd: usize, buf: &[u8]) -> Result<usize> {
     let out_idx = {
         let mut guard = FILETABLE.lock();
-        guard.insert_upper(flags)?
+        guard.insert_upper(0)?
     };
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
@@ -1033,15 +1030,15 @@ impl FdTbl {
         if Self::is_upper(fd) {
             let flags = self.upper_fdtbl.get_flags(fd)?;
             let mut raw_flags = 0;
-            if flags & (syscall::O_CLOEXEC as u32) != 0 {
-                raw_flags |= syscall::O_CLOEXEC;
+            if flags & (O_CLOEXEC as u32) != 0 {
+                raw_flags |= O_CLOEXEC;
             }
             Ok(raw_flags)
         } else {
             let flags = self.posix_fdtbl.get_flags(fd)?;
             let mut raw_flags = 0;
             if flags.contains(FdFlags::CLOEXEC) {
-                raw_flags |= syscall::O_CLOEXEC;
+                raw_flags |= O_CLOEXEC;
             }
             Ok(raw_flags)
         }
@@ -1050,14 +1047,14 @@ impl FdTbl {
     pub fn set_fd_flags(&mut self, fd: usize, raw_flags: usize) -> Result<()> {
         if Self::is_upper(fd) {
             let old_flags = self.upper_fdtbl.get_flags(fd)?;
-            let mut new_flags = old_flags & !(syscall::O_CLOEXEC as u32);
-            if raw_flags & syscall::O_CLOEXEC != 0 {
-                new_flags |= syscall::O_CLOEXEC as u32;
+            let mut new_flags = old_flags & !(O_CLOEXEC as u32);
+            if raw_flags & O_CLOEXEC != 0 {
+                new_flags |= O_CLOEXEC as u32;
             }
             self.upper_fdtbl.set_flags(fd, new_flags)?;
         } else {
             let mut new_flags = FdFlags::empty();
-            if raw_flags & syscall::O_CLOEXEC != 0 {
+            if raw_flags & O_CLOEXEC != 0 {
                 new_flags.insert(FdFlags::CLOEXEC);
             }
             self.posix_fdtbl.set_flags(fd, new_flags)?;
@@ -1303,7 +1300,7 @@ impl PosixFdTbl {
 
     pub fn flags_into_entry(flags: usize) -> FdFlags {
         let mut new_entry = FdFlags::OCCUPIED;
-        if flags & syscall::O_CLOEXEC != 0 {
+        if flags & O_CLOEXEC != 0 {
             new_entry.insert(FdFlags::CLOEXEC);
         }
         /* TODO: Support O_CLOFORK
@@ -1950,7 +1947,7 @@ impl<'a> Iterator for FdTblIter<'a> {
                         if internal_flags.contains(FdFlags::OCCUPIED) {
                             let mut raw_flags = 0;
                             if internal_flags.contains(FdFlags::CLOEXEC) {
-                                raw_flags |= syscall::O_CLOEXEC;
+                                raw_flags |= O_CLOEXEC;
                             }
                             /*
                             if internal_flags.contains(FdFlags::CLOFORK) {

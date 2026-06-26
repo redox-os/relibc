@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use redox_protocols::protocol::{FsCall, SocketCall};
+use redox_protocols::protocol::{FsCall, O_CLOEXEC, SocketCall};
 use redox_rt::proc::FdGuard;
 use syscall::{self, flag::*};
 
@@ -588,10 +588,17 @@ impl PalSocket for Sys {
                 let fs_bind_result = (|| -> Result<()> {
                     let dirfd = FdGuard::open(
                         &dir_path,
-                        syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+                        syscall::O_RDONLY | syscall::O_DIRECTORY | O_CLOEXEC,
                     )?;
-                    let fd_to_send = FdGuard::new(redox_rt::sys::dup(socket as usize, &[])?);
-                    syscall::sendfd(dirfd.as_raw_fd(), fd_to_send.as_raw_fd(), 0, 0)?;
+                    let fd_to_send =
+                        FdGuard::new(redox_rt::sys::dup_into_upper(socket as usize, &[])?)
+                            .to_upper()
+                            .unwrap();
+                    dirfd.call_wo(
+                        &fd_to_send.as_raw_fd().to_ne_bytes(),
+                        syscall::CallFlags::FD,
+                        &[],
+                    )?;
                     Ok(())
                 })();
 

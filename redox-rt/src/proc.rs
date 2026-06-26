@@ -7,7 +7,7 @@ use crate::{
     read_proc_meta,
     sys::{fstat, open, proc_call, thread_call},
 };
-use redox_protocols::protocol::{ProcCall, ThreadCall};
+use redox_protocols::protocol::{O_CLOEXEC, ProcCall, ThreadCall};
 
 use alloc::{boxed::Box, vec};
 
@@ -25,8 +25,8 @@ use goblin::elf64::{
 };
 
 use syscall::{
-    CallFlags, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, O_CLOEXEC, PAGE_SIZE,
-    PROT_EXEC, PROT_READ, PROT_WRITE, SetSighandlerData,
+    CallFlags, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, PAGE_SIZE, PROT_EXEC,
+    PROT_READ, PROT_WRITE, SetSighandlerData,
     error::*,
     flag::{MapFlags, SEEK_SET},
 };
@@ -63,6 +63,8 @@ pub struct ExtraInfo<'a> {
     pub ns_fd: Option<usize>,
     /// CWD handle
     pub cwd_fd: Option<usize>,
+    /// Filetable handle
+    pub filetable_fd: Option<usize>,
     /// If the process for which the image is to be loaded the same as the currently running process
     pub same_process: bool,
 }
@@ -77,8 +79,6 @@ pub fn fexec_impl(
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Option<FexecResult>> {
-    let filetable_binary_fd = thread_fd.dup_into_upper(b"filetable-binary")?;
-
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
     // some misalignments, and then switch address space.
@@ -407,7 +407,7 @@ pub fn fexec_impl(
         push(AT_REDOX_NS_FD)?;
         push(extrainfo.cwd_fd.unwrap_or(usize::MAX))?;
         push(AT_REDOX_CWD_FD)?;
-        push(filetable_binary_fd.as_raw_fd())?;
+        push(extrainfo.filetable_fd.unwrap_or(usize::MAX))?;
         push(AT_REDOX_FILETABLE_FD)?;
 
         push(0)?;
@@ -491,7 +491,7 @@ pub fn fexec_impl(
                     continue; // Will be closed below
                 }
 
-                if flags & O_CLOEXEC == O_CLOEXEC {
+                if flags & O_CLOEXEC == O_CLOEXEC || fd == image_file.as_raw_fd() {
                     fds.push(fd);
                 }
             }
@@ -506,8 +506,7 @@ pub fn fexec_impl(
             )
         };
 
-        let filetable_fd = thread_fd.dup_into_upper(b"filetable")?;
-
+        let filetable_fd = thread_fd.dup_into_upper(b"filetable-binary")?;
         let _ = filetable_fd.call_wo(
             fds_to_close_bytes,
             CallFlags::empty(),
@@ -849,7 +848,7 @@ impl<const UPPER: bool> FdGuard<UPPER> {
 
     #[inline]
     pub fn dup_into_upper(&self, buf: &[u8]) -> Result<FdGuardUpper> {
-        crate::sys::dup_into_upper(self.fd, buf, 0)
+        crate::sys::dup_into_upper(self.fd, buf)
             .map(FdGuard::new)?
             .to_upper()
     }
@@ -1141,8 +1140,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         let new_filetable_sel_fd = new_thr_fd.dup_into_upper(b"current-filetable")?;
         new_filetable_sel_fd.write(&usize::to_ne_bytes(new_filetable_fd.as_raw_fd()))?;
     }
-    crate::sys::sys_call_wo(
-        new_filetable_fd.as_raw_fd(),
+    new_filetable_fd.call_wo(
         &new_filetable_fd.as_raw_fd().to_ne_bytes(),
         syscall::CallFlags::FD | syscall::CallFlags::FD_CLONE,
         &[new_filetable_fd.as_raw_fd() as u64],
