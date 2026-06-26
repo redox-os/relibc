@@ -604,6 +604,13 @@ pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
 const RLCT_SIGNAL_MASK: sigset_t = (1 << ((SIGRTMIN - 1) - 1)) | (1 << ((SIGRTMIN - 2) - 1));
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigprocmask.html>.
+///
+/// Examines or changes (or both) the calling thread's signal mask.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1`, sets errno to
+/// indicate the error, and does not change the signal mask.
+///
+/// Use of this function is unspecified in a multi-threaded process.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigprocmask(
     how: c_int,
@@ -631,9 +638,21 @@ pub unsafe extern "C" fn sigprocmask(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
 ///
+/// Removes `sig` from the signal mask of the calling process.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Deprecated
 /// Present in issue 7. Removed in issue 8.
 ///
 /// Use of this function is unspecified in a multi-threaded process.
+///
+/// `pthread_sigmask()` or `sigprocmask()` should be used instead.
+///
+/// # Implementation
+/// Calls `sigprocmask()` internally.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
@@ -647,9 +666,22 @@ pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
 ///
+/// Modifies signal dispositions.
+///
+/// Upon success, returns `SIG_HOLD` if the signal had been blocked and the
+/// signal's previous disposition if it had not been blocked. Upon failure,
+/// returns `SIG_ERR` and sets errno to indicate the error.
+///
+/// # Deprecated
 /// Present in issue 7. Removed in issue 8.
 ///
 /// Use of this function is unspecified in a multi-threaded process.
+///
+/// `sigaction()` should be used instead.
+///
+/// # Implementation
+/// Calls `sigaction()` internally.
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigset(
     sig: c_int,
@@ -699,12 +731,32 @@ pub unsafe extern "C" fn sigset(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigsuspend.html>.
+///
+/// Atomically both replace the current signal mask of the calling thread with
+/// the set of signals pointed to by `sigmask` and suspend the thread until
+/// delivery of a signal whose action is either to execute a signal-catching
+/// function or to terminate the process.
+///
+/// Upon success, suspends thread execution and does not return. If the action
+/// is to execute a signal-catching function, returns `-1` after the
+/// signal-catching function returns, and restores the signal mask back to the
+/// set that existed prior to calling this function, then sets errno to
+/// indicate the error. Upon failure, returns `-1` and sets errno to indicate
+/// the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
     Err(Sys::sigsuspend(unsafe { &*sigmask })).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigwait.html>.
+///
+/// Selects a pending signal from `set`, atomically clears it from the system's
+/// set of pending signals, and return that signal number in the location
+/// referenced by `sig`.
+///
+/// Upon success, stores the signal number of the received signal at the
+/// location referenced by `sig` and returns `0`. Upon failure, an error number
+/// is returned to indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
     let mut pinfo = mem::MaybeUninit::<siginfo_t>::uninit();
@@ -717,6 +769,18 @@ pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigtimedwait.html>.
+///
+/// Equivalent to `sigwaitinfo()` except that if none of the signals specified
+/// by `set` are pending, wait for the time interval specified in the
+/// `timespec` structure referenced by `timeout`. Shall return immediately with
+/// an error if `timeout` is zero-valued and none of the signals specified by
+/// `set` are pending.
+///
+/// Upon success, returns the selected signal number. Upon failure, returns
+/// `-1` and sets errno to indicate the error.
+///
+/// # Safety
+/// If `timeout` is the null pointer, behaviour is unspecified.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigtimedwait(
     set: *const sigset_t,
@@ -733,6 +797,11 @@ pub unsafe extern "C" fn sigtimedwait(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigwaitinfo.html>.
+///
+/// Selects the pending signal from the set specified by `set`.
+///
+/// Upon success, returns the selected signal number. Upon failure, returns
+/// `-1` and sets errno to indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigwaitinfo(set: *const sigset_t, sig: *mut siginfo_t) -> c_int {
     unsafe { sigtimedwait(set, sig, core::ptr::null()) }
@@ -774,6 +843,9 @@ pub(crate) const SIGNAL_STRINGS: [&str; 32] = [
 ];
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/psignal.html>.
+///
+/// Writes a language-dependent message associated with a signal number to the
+/// standard error stream.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
     let c_description = usize::try_from(sig)
@@ -798,6 +870,12 @@ pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/psiginfo.html>.
+///
+/// Writes a language-dependent message associated with a signal number to the
+/// standard error stream.
+///
+/// # Implementation
+/// Calls `psignal()` internally.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char) {
     unsafe {
