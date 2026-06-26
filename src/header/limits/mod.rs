@@ -7,6 +7,10 @@ use crate::platform::types::{
     c_ushort, ssize_t,
 };
 
+pub use crate::header::bits_limits_ptdi::{
+    _POSIX_THREAD_DESTRUCTOR_ITERATIONS, PTHREAD_DESTRUCTOR_ITERATIONS,
+};
+
 /// Maximum number of bytes in a filename (not including the terminating null
 /// of a filename string).
 pub const NAME_MAX: usize = 255;
@@ -103,7 +107,7 @@ pub const _POSIX_STREAM_MAX: c_long = 8;
 pub const _POSIX_SYMLINK_MAX: c_long = 255;
 /// Minimum required value for `SYMLOOP_MAX`.
 pub const _POSIX_SYMLOOP_MAX: c_long = 8;
-pub const _POSIX_THREAD_DESTRUCTOR_ITERATIONS: c_long = 4;
+// _POSIX_THREAD_DESTRUCTOR_ITERATIONS defined in bits file
 pub const _POSIX_THREAD_KEYS_MAX: c_long = 128;
 pub const _POSIX_THREAD_THREADS_MAX: c_long = 64;
 pub const _POSIX_TIMER_MAX: c_long = 32;
@@ -142,7 +146,7 @@ pub const MAX_INPUT: c_long = _POSIX_MAX_INPUT;
 pub const SYMLINK_MAX: c_long = _POSIX_SYMLINK_MAX;
 pub const POSIX_ALLOC_SIZE_MIN: c_long = 4096;
 
-pub const PTHREAD_DESTRUCTOR_ITERATIONS: c_long = _POSIX_THREAD_DESTRUCTOR_ITERATIONS;
+// PTHREAD_DESTRUCTOR_ITERATIONS defined in bits file
 // TODO: What should this limit be? Both glibc and musl have it as 1024
 pub const PTHREAD_KEYS_MAX: c_long = 4096 * 32;
 pub const PTHREAD_STACK_MIN: c_long = 65536;

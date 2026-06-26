@@ -23,6 +23,7 @@ pub mod bits_intptr_t;
 pub mod bits_iovec;
 #[path = "bits_key-t/mod.rs"]
 pub mod bits_key_t;
+pub mod bits_limits_ptdi;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
 #[path = "bits_mode-t/mod.rs"]
