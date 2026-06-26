@@ -1,0 +1,13 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/limits.h.html
+#
+# These types are split out to avoid importing all of limits.h into other headers.
+#
+# POSIX headers that require PTHREAD_DESTRUCTOR_ITERATIONS:
+# - limits.h (where it should be defined)
+# - threads.h (for TSS_DTOR_ITERATIONS)
+include_guard = "_RELIBC_BITS_LIMITS_PTDI_H"
+language = "C"
+no_includes = true
+cpp_compat = true
+[enum]
+prefix_with_name = true

@@ -5,9 +5,9 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 use super::{
+    bits_limits_ptdi::PTHREAD_DESTRUCTOR_ITERATIONS,
     bits_pthread::{self, pthread_cond_t, pthread_key_t, pthread_mutex_t, pthread_mutexattr_t},
     errno::{EBUSY, EINTR, ENOMEM, ETIMEDOUT},
-    limits,
     pthread::{
         self, PTHREAD_MUTEX_NORMAL, PTHREAD_MUTEX_RECURSIVE, RlctCond, pthread_cond_broadcast,
         pthread_cond_destroy, pthread_cond_signal, pthread_cond_timedwait, pthread_cond_wait,
@@ -45,7 +45,7 @@ pub const mtx_plain: c_int = 0;
 pub const mtx_recursive: c_int = 1;
 pub const mtx_timed: c_int = 2;
 
-pub const TSS_DTOR_ITERATIONS: c_long = limits::PTHREAD_DESTRUCTOR_ITERATIONS;
+pub const TSS_DTOR_ITERATIONS: c_long = PTHREAD_DESTRUCTOR_ITERATIONS;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/call_once.html>.
 #[unsafe(no_mangle)]
