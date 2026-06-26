@@ -3,6 +3,8 @@
 # Spec quotations relating to includes:
 # - "Inclusion of the <threads.h> header shall make symbols defined in the header <time.h> visible."
 #
+# TODO split out required pthread types
+#
 # time.h brings in features.h
 # features.h required for Rust never type (no return)
 sys_includes = ["time.h"]
@@ -12,7 +14,8 @@ style = "tag"
 no_includes = true
 cpp_compat = true
 after_includes = """
-#include <bits/pthread.h> // for pthread-related types
+#include <bits/pthread.h>     // for pthread-related types
+#include <bits/limits/ptdi.h> // for PTHREAD_DESTRUCTOR_ITERATIONS
 
 #ifndef __cplusplus
 #define thread_local _Thread_local
