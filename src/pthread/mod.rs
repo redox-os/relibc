@@ -397,7 +397,8 @@ pub fn get_cpu_clkid(thread: &Pthread) -> Result<clockid_t, Errno> {
     Err(Errno(ENOENT))
 }
 pub fn get_sched_param(thread: &Pthread) -> Result<(clockid_t, sched_param), Errno> {
-    todo!()
+    // TODO should be possible to return sched_param
+    Err(Errno(ENOSYS))
 }
 
 // TODO: Hash map?
