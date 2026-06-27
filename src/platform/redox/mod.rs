@@ -1238,6 +1238,8 @@ impl Pal for Sys {
 
         args[0] = &program.to_bytes();
 
+        let new_file_table = child.thr_fd.dup_into_upper(b"filetable-binary")?;
+
         if let Some(fac) = fac {
             for action in fac {
                 match action {
@@ -1330,7 +1332,6 @@ impl Pal for Sys {
         //     cwd.as_str()
         // );
 
-        let new_file_table = child.thr_fd.dup_into_upper(b"filetable-binary")?;
         new_file_table.call_wo(
             &new_file_table.as_raw_fd().to_ne_bytes(),
             syscall::CallFlags::FD | syscall::CallFlags::FD_CLONE,
