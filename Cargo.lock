@@ -268,7 +268,7 @@ dependencies = [
  "bitflags",
  "libc",
  "plain",
- "redox_syscall 0.9.0",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -441,7 +441,7 @@ name = "redox-ioctl"
 version = "0.1.0"
 dependencies = [
  "drm-sys",
- "redox_syscall 0.8.1",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -461,7 +461,7 @@ dependencies = [
  "libredox",
  "plain",
  "redox-path",
- "redox_syscall 0.9.0",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -471,16 +471,7 @@ source = "git+https://gitlab.redox-os.org/Ibuki.O/event.git?branch=update-redox-
 dependencies = [
  "bitflags",
  "libredox",
- "redox_syscall 0.9.0",
-]
-
-[[package]]
-name = "redox_syscall"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b44b894f2a6e36457d665d1e08c3866add6ed5e70050c1b4ba8a8ddedb02ce7"
-dependencies = [
- "bitflags",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -524,7 +515,7 @@ dependencies = [
  "redox-path",
  "redox-rt",
  "redox_event",
- "redox_syscall 0.9.0",
+ "redox_syscall",
  "sc",
  "scrypt",
  "sha-crypt",
@@ -741,7 +732,3 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
-
-[[patch.unused]]
-name = "redox_syscall"
-version = "0.9.0"
