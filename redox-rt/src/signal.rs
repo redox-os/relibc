@@ -538,10 +538,14 @@ fn current_sigctl() -> &'static Sigcontrol {
 }
 
 pub struct TmpDisableSignalsGuard {
-    _inner: (),
+    active: bool,
 }
 
 pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
+    if !crate::TLS_ACTIVATED.load(Ordering::Relaxed) {
+        return TmpDisableSignalsGuard { active: false };
+    }
+
     unsafe {
         let ctl = &current_sigctl().control_flags;
         ctl.store(
@@ -554,10 +558,13 @@ pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
         (*Tcb::current().unwrap().os_specific.arch.get()).disable_signals_depth += 1;
     }
 
-    TmpDisableSignalsGuard { _inner: () }
+    TmpDisableSignalsGuard { active: true }
 }
 impl Drop for TmpDisableSignalsGuard {
     fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
         unsafe {
             let depth =
                 &mut (*Tcb::current().unwrap().os_specific.arch.get()).disable_signals_depth;
@@ -666,7 +673,7 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
 
     let fd = tcb
         .thread_fd()
-        .dup(b"sighandler")
+        .dup_into_upper(b"sighandler")
         .expect("failed to open sighandler fd");
     fd.write(&data).expect("failed to write to sighandler fd");
     this_thread_call(

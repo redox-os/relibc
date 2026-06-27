@@ -41,6 +41,10 @@ fn fexec_impl(
     )?
     .unwrap();
 
+    if let Some(filetable_fd) = extrainfo.filetable_fd {
+        let _ = redox_rt::sys::close(filetable_fd);
+    }
+
     // According to elf(5), PT_INTERP requires that the interpreter path be
     // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
     let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
@@ -228,6 +232,9 @@ pub fn execve(
 
     let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
+    let filetable_binary_fd = RtTcb::current()
+        .thread_fd()
+        .dup_into_upper(b"filetable-binary")?;
     let extrainfo = ExtraInfo {
         cwd: Some(cwd.as_bytes()),
         sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
@@ -239,6 +246,7 @@ pub fn execve(
         cwd_fd: super::path::current_dir()
             .ok()
             .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
+        filetable_fd: Some(filetable_binary_fd.as_raw_fd()),
         same_process: true,
     };
 

@@ -239,12 +239,12 @@ impl Pal for Sys {
     }
 
     fn close(fd: c_int) -> Result<()> {
-        syscall::close(fd as usize)?;
+        redox_rt::sys::close(fd as usize)?;
         Ok(())
     }
 
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
-        Ok(syscall::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
+        Ok(redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
     }
 
     fn exit(status: c_int) -> ! {
@@ -442,7 +442,7 @@ impl Pal for Sys {
             _ => {}
         }
 
-        Ok(syscall::fcntl(fd as usize, cmd as usize, args as usize)? as c_int)
+        Ok(redox_rt::sys::fcntl(fd as usize, cmd as usize, args as usize)? as c_int)
     }
 
     fn fdatasync(fd: c_int) -> Result<()> {
@@ -484,7 +484,7 @@ impl Pal for Sys {
         let file = openat2(dirfd, path, flags, fcntl::O_PATH)?;
         // Close the file descriptor after fstat(2) regardless of success or failure.
         let fstat_res = unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr()) };
-        let close_res = syscall::close(*file as usize);
+        let close_res = redox_rt::sys::close(*file as usize);
         if let Err(err) = fstat_res {
             return Err(err.into());
         }
@@ -664,7 +664,7 @@ impl Pal for Sys {
             "/scheme/rand"
         };
 
-        let mut open_flags = syscall::O_RDONLY | syscall::O_CLOEXEC;
+        let mut open_flags = syscall::O_RDONLY | redox_protocols::protocol::O_CLOEXEC;
         if flags & sys_random::GRND_NONBLOCK != 0 {
             open_flags |= syscall::O_NONBLOCK;
         }
@@ -1215,13 +1215,11 @@ impl Pal for Sys {
         let mut cwd_fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
         let proc_fd = child.proc_fd.unwrap();
         let curr_proc_fd = redox_rt::current_proc_fd();
-        let file_table = RtTcb::current()
-            .thread_fd()
-            .dup(b"filetable")?
-            .dup(b"copy")?;
+        let cur_filetable_fd = RtTcb::current().thread_fd().dup_into_upper(b"filetable")?;
+        let file_table = cur_filetable_fd.dup_into_upper(b"copy")?;
 
         {
-            let new_file_table = child.thr_fd.dup(b"current-filetable")?;
+            let new_file_table = child.thr_fd.dup_into_upper(b"current-filetable")?;
             new_file_table.write(&file_table.as_raw_fd().to_ne_bytes())?;
         }
 
@@ -1240,7 +1238,7 @@ impl Pal for Sys {
 
         args[0] = &program.to_bytes();
 
-        let new_file_table = child.thr_fd.dup(b"filetable")?;
+        let new_file_table = child.thr_fd.dup_into_upper(b"filetable-binary")?;
 
         if let Some(fac) = fac {
             for action in fac {
@@ -1262,11 +1260,10 @@ impl Pal for Sys {
                             flag,
                             mode,
                         )? as usize;
-                        syscall::sendfd(
-                            new_file_table.as_raw_fd(),
-                            src_fd,
-                            0,
-                            u64::try_from(fd).map_err(|_| Errno(EBADFD))?,
+                        new_file_table.call_wo(
+                            &src_fd.to_ne_bytes(),
+                            syscall::CallFlags::FD,
+                            &[u64::try_from(fd).map_err(|_| Errno(EBADFD))?],
                         )?;
                     }
                     crate::header::spawn::Action::Close(fd) => {
@@ -1336,9 +1333,47 @@ impl Pal for Sys {
         // );
 
         new_file_table.call_wo(
-            &[],
-            syscall::CallFlags::empty(),
-            &[syscall::flag::FileTableVerb::CloseCloExec as u64],
+            &new_file_table.as_raw_fd().to_ne_bytes(),
+            syscall::CallFlags::FD | syscall::CallFlags::FD_CLONE,
+            &[new_file_table.as_raw_fd() as u64],
+        )?;
+
+        {
+            let fds_to_close = {
+                let guard = redox_rt::current_filetable();
+                let mut fds = alloc::vec::Vec::new();
+                for (fd, flags) in guard.iter() {
+                    if flags & redox_protocols::protocol::O_CLOEXEC
+                        == redox_protocols::protocol::O_CLOEXEC
+                        || fd == executable.as_raw_fd()
+                    {
+                        fds.push(fd);
+                    }
+                }
+
+                fds.push(cur_filetable_fd.as_raw_fd());
+
+                fds
+            };
+
+            let fds_to_close_bytes: &[u8] = unsafe {
+                core::slice::from_raw_parts(
+                    fds_to_close.as_ptr() as *mut u8,
+                    fds_to_close.len() * core::mem::size_of::<usize>(),
+                )
+            };
+
+            let _ = new_file_table.call_wo(
+                fds_to_close_bytes,
+                syscall::CallFlags::empty(),
+                &[syscall::FileTableVerb::Close as u64],
+            );
+        }
+
+        new_file_table.call_wo(
+            &cwd_fd.as_raw_fd().to_ne_bytes(),
+            syscall::CallFlags::FD | syscall::CallFlags::FD_CLONE,
+            &[cwd_fd.as_raw_fd() as u64],
         )?;
 
         let extra_info = redox_rt::proc::ExtraInfo {
@@ -1360,6 +1395,7 @@ impl Pal for Sys {
             proc_fd: proc_fd.as_raw_fd(),
             ns_fd: redox_rt::current_namespace_fd().ok(),
             cwd_fd: Some(cwd_fd.as_raw_fd()),
+            filetable_fd: Some(new_file_table.as_raw_fd()),
             same_process: false,
         };
 
@@ -1460,7 +1496,7 @@ impl Pal for Sys {
             .unwrap();
         }
 
-        let start_fd = child.thr_fd.dup(b"start")?;
+        let start_fd = child.thr_fd.dup_into_upper(b"start")?;
         start_fd.write(&[0])?;
 
         Ok(pid_t::try_from(child.pid).unwrap())
@@ -1507,7 +1543,7 @@ impl Pal for Sys {
             CLOCK_MONOTONIC => "/scheme/time/4",
             _ => return Err(Errno(EINVAL)),
         };
-        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?.to_upper()?;
+        let timerfd = FdGuard::open_into_upper(&path, syscall::O_RDWR)?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)
         })?)
@@ -1561,8 +1597,8 @@ impl Pal for Sys {
             return Err(Errno(EINVAL));
         }
         let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
-        let _ = syscall::close(timer_st.timerfd);
-        let _ = syscall::close(timer_st.eventfd);
+        let _ = redox_rt::sys::close(timer_st.timerfd);
+        let _ = redox_rt::sys::close(timer_st.eventfd);
         if !timer_st.thread.is_null() {
             let _ = unsafe { pthread_cancel(timer_st.thread) };
         }

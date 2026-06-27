@@ -69,8 +69,9 @@ bitflags = "2"
 ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.3"
-redox_protocols = { package = "libredox", version = "0.1.17", default-features = false, features = ["protocol"] }
-redox_syscall = "0.8.1"
+redox_protocols = { package = "libredox", git = "https://gitlab.redox-os.org/Ibuki.O/libredox.git", branch = "fcntl", default-features = false, features = ["protocol"] }
+redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "remove-fd-allocation" }
+
 [build-dependencies]
 cc = "1"
 
@@ -123,7 +124,7 @@ sc = "0.2.7"
 redox_syscall.workspace = true
 redox-rt = { path = "redox-rt" }
 redox-path.workspace = true
-redox_event = { version = "0.4.7", default-features = false, features = ["redox_syscall"] }
+redox_event = { git = "https://gitlab.redox-os.org/Ibuki.O/event.git", branch = "update-redox-crates", default-features = false, features = ["redox_syscall"] }
 ioslice.workspace = true
 redox-ioctl = { path = "redox-ioctl" }
 redox_protocols.workspace = true
