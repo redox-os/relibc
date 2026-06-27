@@ -526,7 +526,7 @@ pub fn fexec_impl(
             let mut guard = crate::current_filetable();
             guard.take()
         };
-        drop(old_filetable_fd)
+        drop(old_filetable_fd);
 
         // Dropping this FD will cause the address space switch.
         drop(addrspace_selection_fd);
