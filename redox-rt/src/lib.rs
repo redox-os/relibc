@@ -68,6 +68,8 @@ impl RtTcb {
 
 pub type Tcb = GenericTcb<RtTcb>;
 
+// TODO: Remove this by keeping the TCB initialized during exec
+// and informing ld.so through some other way.
 pub static TLS_ACTIVATED: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
