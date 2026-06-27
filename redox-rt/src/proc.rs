@@ -484,10 +484,7 @@ pub fn fexec_impl(
             let guard = crate::current_filetable();
             let mut fds = alloc::vec::Vec::new();
             for (fd, flags) in guard.iter() {
-                if fd == addrspace_selection_fd.as_raw_fd()
-                    || fd == thread_fd.as_raw_fd()
-                    || fd == proc_fd.as_raw_fd()
-                {
+                if fd == addrspace_selection_fd.as_raw_fd() {
                     continue; // Will be closed below
                 }
 
@@ -506,12 +503,15 @@ pub fn fexec_impl(
             )
         };
 
-        let filetable_fd = thread_fd.dup_into_upper(b"filetable-binary")?;
-        let _ = filetable_fd.call_wo(
-            fds_to_close_bytes,
-            CallFlags::empty(),
-            &[syscall::FileTableVerb::Close as u64],
-        );
+        {
+            let _ = syscall::write(1, b"removing this process fds");
+            let filetable_fd = thread_fd.dup_into_upper(b"filetable-binary")?;
+            let _ = filetable_fd.call_wo(
+                fds_to_close_bytes,
+                CallFlags::empty(),
+                &[syscall::FileTableVerb::Close as u64],
+            );
+        }
         {
             let mut guard = crate::current_filetable();
             for fd in fds_to_close {
@@ -523,10 +523,10 @@ pub fn fexec_impl(
             deactivate_tcb(&thread_fd)?;
         }
 
-        let _old_filetable_fd = {
+        {
             let mut guard = crate::current_filetable();
-            guard.take()
-        };
+            let _ = guard.take();
+        }
 
         // Dropping this FD will cause the address space switch.
         drop(addrspace_selection_fd);
