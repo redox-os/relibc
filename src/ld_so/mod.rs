@@ -176,7 +176,7 @@ pub unsafe fn init(
                 .dup_into_upper(b"regs/env")
                 .expect_notls("failed to open handle for process registers");
 
-            file.read(&mut env).expect_notls("failed to read gsbase");
+            file.read(&mut env).expect_notls("failed to read fsbase");
         }
 
         tp = env.fsbase as usize;
