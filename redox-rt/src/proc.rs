@@ -504,7 +504,6 @@ pub fn fexec_impl(
         };
 
         {
-            let _ = syscall::write(1, b"removing this process fds");
             let filetable_fd = thread_fd.dup_into_upper(b"filetable-binary")?;
             let _ = filetable_fd.call_wo(
                 fds_to_close_bytes,
@@ -523,10 +522,11 @@ pub fn fexec_impl(
             deactivate_tcb(&thread_fd)?;
         }
 
-        {
+        let old_filetable_fd = {
             let mut guard = crate::current_filetable();
-            let _ = guard.take();
-        }
+            guard.take()
+        };
+        drop(old_filetable_fd)
 
         // Dropping this FD will cause the address space switch.
         drop(addrspace_selection_fd);
