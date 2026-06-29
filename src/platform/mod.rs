@@ -387,7 +387,8 @@ pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
                     .expect("failed to move cwd fd to upper table")
             }),
         ) {
-            self::sys::path::set_cwd_manual(cwd_path, cwd_fd);
+            self::sys::path::set_cwd_manual(cwd_path, cwd_fd)
+                .expect("cwd_path is not valid redox path")
         }
     }
 

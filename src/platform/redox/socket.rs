@@ -1,5 +1,6 @@
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::{cmp, mem, ptr, slice, str};
+use redox_path::RedoxStr;
 use redox_protocols::protocol::{FsCall, SocketCall};
 use redox_rt::proc::FdGuard;
 use syscall::{self, flag::*};
@@ -573,18 +574,20 @@ impl PalSocket for Sys {
 
                 let addr =
                     unsafe { slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len) };
-                let path = format!("{}", str::from_utf8(addr).unwrap());
+                let path = str::from_utf8(addr).map_err(|_| Errno(EINVAL))?;
                 log::trace!("bind(): path: {:?}", path);
 
-                let (dir_path, fd_path) = dir_path_and_fd_path(&path)?;
+                let path = RedoxStr::new(path).ok_or(Errno(EINVAL))?;
+                let (dir_path, fd_path) = dir_path_and_fd_path(path)?;
 
                 redox_rt::sys::sys_call_wo(
                     socket as usize,
-                    fd_path.as_bytes(),
+                    fd_path.as_ref().as_bytes(),
                     CallFlags::empty(),
                     &[SocketCall::Bind as u64],
                 )?;
 
+                let dir_path: Cow<'_, str> = dir_path.into();
                 let fs_bind_result = (|| -> Result<()> {
                     let dirfd = FdGuard::open(
                         &dir_path,
@@ -650,12 +653,13 @@ impl PalSocket for Sys {
 
                 let addr =
                     unsafe { slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len) };
-                let path = format!("{}", str::from_utf8(addr).unwrap());
-                log::trace!("connect(): path: {:?}", path);
+                let path = str::from_utf8(addr).map_err(|_| Errno(EINVAL))?;
+                log::trace!("bind(): path: {:?}", path);
 
-                let (_, fd_path) = dir_path_and_fd_path(&path)?;
+                let path = RedoxStr::new(path).ok_or(Errno(EINVAL))?;
+                let (_, fd_path) = dir_path_and_fd_path(path)?;
 
-                let target_path = format!("/{fd_path}");
+                let target_path = format!("/{}", fd_path.as_ref());
                 let socket_file_fd = FdGuard::open(&target_path, syscall::O_RDWR)?;
 
                 const TOKEN_BUF_SIZE: usize = 16;

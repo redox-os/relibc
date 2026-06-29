@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use core::{
     convert::TryFrom,
     mem::{self, size_of},
@@ -5,6 +6,7 @@ use core::{
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
+use redox_path::RedoxStr;
 use redox_protocols::protocol::{WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
@@ -18,7 +20,7 @@ use syscall::{
 
 use self::{
     exec::Executable,
-    path::{FileLock, canonicalize, openat2, openat2_path},
+    path::{FileLock, openat2, openat2_path},
 };
 use super::{Pal, Read, types::*};
 use crate::{
@@ -185,7 +187,7 @@ impl Pal for Sys {
     }
 
     fn chdir(path: CStr) -> Result<()> {
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let path = RedoxStr::new_c(path.to_cstr()).ok_or_else(|| Errno(EINVAL))?;
         path::chdir(path)?;
         Ok(())
     }
@@ -774,7 +776,7 @@ impl Pal for Sys {
         if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
             return Err(Errno(EINVAL));
         }
-        let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
+        let newpath = RedoxStr::new_c(newpath.to_cstr()).ok_or_else(|| Errno(EINVAL))?;
 
         // By default, we don't follow the symlink if there is one.
         // We only follow it if AT_SYMLINK_FOLLOW is passed in flags.
@@ -786,7 +788,7 @@ impl Pal for Sys {
         }
 
         let file = File::openat(fd1, oldpath, oflags)?;
-        let newpath = openat2_path(fd2, newpath, 0)?;
+        let newpath: Cow<'_, str> = openat2_path(fd2, newpath, 0)?.into();
         syscall::flink(*file as usize, newpath)?;
         Ok(())
     }
@@ -954,7 +956,7 @@ impl Pal for Sys {
     }
 
     fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let path = RedoxStr::new_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
 
         // POSIX states that umask should affect the following:
         //
@@ -1121,12 +1123,16 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let new_path = new_path.to_str().map_err(|_| Errno(EINVAL))?;
+        let new_path = RedoxStr::new_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
         // Fail if the target exists with RENAME_NOREPLACE.
         if flags & RENAME_NOREPLACE != 0
-            && let Ok(fd) =
-                libredox::openat(new_dir, &new_path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)
-                    .map(FdGuard::new)
+            && let Ok(fd) = libredox::openat(
+                new_dir,
+                new_path.clone(),
+                fcntl::O_PATH | fcntl::O_CLOEXEC,
+                0,
+            )
+            .map(FdGuard::new)
         {
             return Err(Errno(EEXIST));
         }
@@ -1135,7 +1141,7 @@ impl Pal for Sys {
         // oflags are the same as Sys::rename above.
         let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
 
-        let target = openat2_path(new_dir, new_path, 0)?;
+        let target: Cow<'_, str> = openat2_path(new_dir, new_path, 0)?.into();
         // I'm avoiding Sys::rename to avoid reallocating a CString from a String.
         syscall::frename(*source as usize, target)
             .map(|_| ())
@@ -1759,10 +1765,10 @@ impl Pal for Sys {
         if (flags & !AT_REMOVEDIR) != 0 {
             return Err(Errno(EINVAL));
         }
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        let path = RedoxStr::new_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
         let path = openat2_path(fd, path, 0)?;
-        let canon = canonicalize(&path)?;
-        redox_rt::sys::unlink(&canon, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
+        let path: Cow<'_, str> = path.canonical().into();
+        redox_rt::sys::unlink(path, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
         Ok(())
     }
 

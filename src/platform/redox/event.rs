@@ -8,6 +8,7 @@ use crate::header::{
 
 use super::libredox::RawResult;
 
+use redox_path::RedoxStr;
 use syscall::{EINVAL, Error, Result};
 
 #[unsafe(no_mangle)]
@@ -18,7 +19,7 @@ pub unsafe extern "C" fn redox_event_queue_create_v1(flags: u32) -> RawResult {
         }
         Ok(super::libredox::openat(
             AT_FDCWD,
-            "/scheme/event",
+            RedoxStr::new_c(c"/scheme/event").unwrap(),
             O_CLOEXEC | O_CREAT | O_RDWR,
             0o700,
         )? as usize)
