@@ -1,6 +1,5 @@
 use alloc::{
     borrow::Cow,
-    ffi::CString,
     string::{String, ToString},
 };
 use arrayvec::ArrayString;
@@ -14,6 +13,7 @@ use syscall::{data::Stat, error::*, flag::*};
 
 use super::{FdGuard, Pal, Sys, libcscheme};
 use crate::{
+    c_str::CStr,
     error::Errno,
     fs::File,
     header::{fcntl, limits, sys_file},
@@ -422,12 +422,11 @@ fn at_flags_to_open_flags(at_flags: c_int) -> c_int {
 /// directory.
 pub(super) fn openat2(
     dirfd: c_int,
-    path: &str,
+    path: CStr,
     at_flags: c_int,
     oflags: c_int,
 ) -> Result<File, Errno> {
     // Translate at flags into open flags; openat will do this on its own most likely.
     let oflags = at_flags_to_open_flags(at_flags) | fcntl::O_CLOEXEC | oflags;
-    let c_path = CString::new(path).map_err(|_| Errno(EINVAL))?;
-    File::openat(dirfd, c_path.as_c_str().into(), oflags)
+    File::openat(dirfd, path, oflags)
 }

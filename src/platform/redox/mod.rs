@@ -13,7 +13,7 @@ use redox_rt::{
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, EILSEQ, ESRCH, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
+    self, ESRCH, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
     data::{Map, TimeSpec as redox_timespec},
     dirent::DirentHeader,
 };
@@ -288,14 +288,12 @@ impl Pal for Sys {
         if MASK & flags != 0 {
             return Err(Errno(EINVAL));
         }
-        let mut path = path
-            .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
-            .ok_or(Errno(ENOENT))?;
+        let mut path = path.ok_or(Errno(ENOENT))?;
 
         if path.is_empty() {
             if flags & AT_EMPTY_PATH == AT_EMPTY_PATH {
                 if dirfd == AT_FDCWD {
-                    path = ".";
+                    path = c".".into();
                 } else {
                     return Ok(libredox::fchmod(dirfd as usize, mode as u16)?);
                 }
@@ -315,11 +313,11 @@ impl Pal for Sys {
         if MASK & flags != 0 {
             return Err(Errno(EINVAL));
         }
-        let mut path = path.to_str().map_err(|_| Errno(ENOENT))?;
+        let mut path = path;
         if path.is_empty() {
             if flags & AT_EMPTY_PATH == AT_EMPTY_PATH {
                 if fildes == AT_FDCWD {
-                    path = ".";
+                    path = c".".into();
                 } else {
                     return Ok(libredox::fchown(fildes as usize, owner as _, group as _)?);
                 }
@@ -467,13 +465,12 @@ impl Pal for Sys {
 
     fn fstatat(dirfd: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
         // `path` should be non-null.
-        let path = path.ok_or(Errno(EFAULT))?;
-        let mut path = str::from_utf8(path.to_bytes()).ok().ok_or(Errno(EILSEQ))?;
+        let mut path = path.ok_or(Errno(EFAULT))?;
 
         if path.is_empty() {
             if flags & AT_EMPTY_PATH == AT_EMPTY_PATH {
                 if dirfd == AT_FDCWD {
-                    path = ".";
+                    path = c".".into();
                 } else {
                     return Ok(unsafe { libredox::fstat(dirfd as usize, buf.as_mut_ptr()) }?);
                 }
@@ -528,11 +525,11 @@ impl Pal for Sys {
         times: *const timespec,
         flag: c_int,
     ) -> Result<()> {
-        let mut path = path.to_str().map_err(|_| Errno(ENOENT))?;
+        let mut path = path;
         if path.is_empty() {
             if flag & AT_EMPTY_PATH == AT_EMPTY_PATH {
                 if dirfd == AT_FDCWD {
-                    path = ".";
+                    path = c".".into();
                 } else {
                     return Ok(unsafe { libredox::futimens(dirfd as usize, times) }?);
                 }
@@ -1101,7 +1098,7 @@ impl Pal for Sys {
     }
 
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
-        let path = str::from_utf8(path.to_bytes()).map_err(|_| Errno(ENOENT))?;
+        let path = path;
         let file = openat2(
             dirfd,
             path,
@@ -1137,7 +1134,6 @@ impl Pal for Sys {
             return Err(Errno(EEXIST));
         }
 
-        let old_path = old_path.to_str().map_err(|_| Errno(EINVAL))?;
         // oflags are the same as Sys::rename above.
         let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
 
