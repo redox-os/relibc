@@ -268,7 +268,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
 }
 impl<'a> CStr<'a> {
     pub fn to_owned_cstring(self) -> CString {
-        CString::from(unsafe { core::ffi::CStr::from_ptr(self.ptr.as_ptr()) })
+        CString::from(self.to_cstr())
     }
     pub fn borrow(string: &'a CString) -> Self {
         unsafe { Self::from_ptr(string.as_ptr()) }
@@ -283,6 +283,9 @@ impl<'a> CStr<'a> {
     }
     pub fn to_str(self) -> Result<&'a str, Utf8Error> {
         core::str::from_utf8(self.to_bytes())
+    }
+    pub fn to_cstr(self) -> &'a core::ffi::CStr {
+        unsafe { core::ffi::CStr::from_ptr(self.ptr.as_ptr()) }
     }
     pub fn to_string_lossy(self) -> Cow<'a, str> {
         String::from_utf8_lossy(self.to_bytes())

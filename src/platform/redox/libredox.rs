@@ -2,6 +2,7 @@ use core::{mem, slice, str};
 
 use alloc::vec::Vec;
 use ioslice::IoSlice;
+use redox_path::{RedoxReference, RedoxStr};
 use redox_protocols::protocol::{ProcKillTarget, SocketCall, WaitFlags};
 use redox_rt::sys::{WaitpidTarget, posix_read, posix_write, std_fs_call_ro, std_fs_call_wo};
 use syscall::{
@@ -23,7 +24,7 @@ use super::Sys;
 
 pub type RawResult = usize;
 
-pub fn openat(dirfd: c_int, path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
+pub fn openat(dirfd: c_int, path: RedoxStr<'_>, oflag: c_int, mode: mode_t) -> Result<usize> {
     let usize_fd = super::path::openat(
         dirfd,
         path,
@@ -226,12 +227,13 @@ pub unsafe extern "C" fn redox_open_v1(
     flags: u32,
     mode: u16,
 ) -> RawResult {
-    Error::mux(openat(
-        AT_FDCWD,
-        unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) },
-        flags as c_int,
-        mode as mode_t,
-    ))
+    let path = match RedoxStr::new(unsafe {
+        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len))
+    }) {
+        Some(path) => path,
+        None => return Error::mux(Err(Error { errno: EINVAL })),
+    };
+    Error::mux(openat(AT_FDCWD, path, flags as c_int, mode as mode_t))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_openat_v1(
@@ -241,9 +243,15 @@ pub unsafe extern "C" fn redox_openat_v1(
     flags: u32,
     fcntl_flags: u32,
 ) -> RawResult {
+    let path = match RedoxReference::new(unsafe {
+        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len))
+    }) {
+        Some(path) => path,
+        None => return Error::mux(Err(Error { errno: EINVAL })),
+    };
     Error::mux(syscall::openat(
         fd,
-        unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) },
+        path,
         flags as usize,
         fcntl_flags as usize,
     ))
