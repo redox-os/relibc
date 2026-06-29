@@ -1,21 +1,83 @@
 /* c_cc { */
+/// INTR character.
+/// Send a `SIGINT` signal.
+/// Canonical and Non-Canonical mode.
 pub const VINTR: usize = 0;
+/// QUIT character.
+/// Send a `SIGQUIT` signal.
+/// Canonical and Non-Canonical mode.
 pub const VQUIT: usize = 1;
+/// ERASE character.
+/// Erases the previous not-yet-erased character, but does not erase past `EOF`
+/// or beginning-of-line.
+/// Canonical mode only.
 pub const VERASE: usize = 2;
+/// KILL character.
+/// Erases the input since the last `EOF` or beginning-of-line.
+/// Canonical mode only.
 pub const VKILL: usize = 3;
+/// EOF character.
+/// End of file. Causes the pending tty buffer to be sent to the waiting user
+/// program without waiting for end-of-line.
+/// Canonical mode only.
 pub const VEOF: usize = 4;
+/// TIME value.
+/// Timeout in decideconds for noncanonical read.
+/// Non-Canonical mode only.
 pub const VTIME: usize = 5;
+/// MIN value.
+/// Minimum number of characters for noncanonical read.
+/// Non-Canonical mode only.
 pub const VMIN: usize = 6;
-pub const VSWTC: usize = 7;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// SWTCH character (not supported under Linux).
+/// Used in System V to switch shells in `shell layers`, a predecessor to shell
+/// job control.
+pub const VSWTCH: usize = 7;
+/// START character.
+/// Restarts output stopped by the STOP character.
+/// Canonical and Non-Canonical mode.
 pub const VSTART: usize = 8;
+/// STOP character.
+/// Stops the output until the START character is typed.
+/// Canonical and Non-Canonical mode.
 pub const VSTOP: usize = 9;
+/// SUSP character.
+/// Send `SIGTSTP` signal.
+/// Canonical and Non-Canonical mode.
 pub const VSUSP: usize = 10;
+/// EOL character.
+/// Additional end-of-line character.
+/// Canonical mode only.
 pub const VEOL: usize = 11;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// REPRINT character.
+/// Reprints unread characters.
 pub const VREPRINT: usize = 12;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// DISCARD character (not supported under Linux).
+/// Toggles discarding pending output.
 pub const VDISCARD: usize = 13;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// WERASE character.
+/// Word erase.
 pub const VWERASE: usize = 14;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// LNEXT character.
+/// Literal next. Quotes the next input character, depriving it of a possible
+/// special meaning.
 pub const VLNEXT: usize = 15;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// EOL2 character.
+/// Another end-of-line character.
 pub const VEOL2: usize = 16;
+/// Size of the array `c_cc` for control characters.
 pub const NCCS: usize = 32;
 /* } c_cc */
 
