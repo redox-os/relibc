@@ -1,7 +1,4 @@
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, string::ToString};
 use arrayvec::ArrayString;
 use core::{
     ffi::c_int,
@@ -34,42 +31,28 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
                 // actually unreachable
                 return Err(Error::new(EINVAL));
             };
-
-            let fd = FdGuard::open(&path, O_STAT)?.to_upper().unwrap();
-            let mut stat = Stat::default();
-            if fd.fstat(&mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
-                return Err(Error::new(ENOTDIR));
-            }
+            let fd = FdGuard::open(&path, O_STAT)?.to_upper()?;
             (RedoxPath::from_reference(path).unwrap(), fd)
         }
         RedoxStr::Relative(redox_reference) => {
-            let fd = cwd_guard
-                .as_ref()
-                .unwrap()
-                .fd
-                .openat(redox_reference.as_ref(), O_STAT, 0)?
-                .to_upper()
-                .unwrap();
-            let mut stat = Stat::default();
-            if fd.fstat(&mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
-                return Err(Error::new(ENOTDIR));
-            }
-
-            let canon = if let Some(cwd) = cwd_guard.as_ref() {
-                cwd.redox.canonicalize_as_cwd(redox_reference.into())
-            } else {
+            let Some(cwd) = cwd_guard.as_ref() else {
                 return Err(Error::new(ENOENT));
             };
-            (canon, fd)
+            let fd = cwd
+                .fd
+                .openat(redox_reference.as_ref(), O_STAT, 0)?
+                .to_upper()?;
+            (cwd.redox.canonicalize_as_cwd(redox_reference.into()), fd)
         }
     };
-    let path = RedoxPath::from_absolute(path.to_string()).unwrap();
-    let cow: Cow<'_, str> = path.clone().into();
-    *cwd_guard = Some(Cwd {
-        path: to_cwd_path(&cow)?,
-        redox: path,
-        fd,
-    });
+    let mut stat = Stat::default();
+    if fd.fstat(&mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
+        return Err(Error::new(ENOTDIR));
+    }
+    let cow: Cow<'_, str> = path.into();
+    let path = to_cwd_path(&cow)?;
+    let redox = RedoxPath::from_absolute(cow.into_owned()).unwrap();
+    *cwd_guard = Some(Cwd { path, redox, fd });
     Ok(())
 }
 
@@ -258,7 +241,7 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
 
     let is_relative = path.is_relative();
     let _siglock = tmp_disable_signals();
-    let path: Cow<'_, str> = path.canonical().into();
+    let path: Cow<'_, str> = path.into();
 
     // First try
     let initial_res = if is_relative {
@@ -284,31 +267,6 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
     }
 }
 
-fn get_parent_path(path: &str) -> Option<String> {
-    let path = path.strip_suffix('/').unwrap_or(path);
-    fn parent_opt(path: &str) -> Option<&str> {
-        path.rfind('/').map(|index| {
-            if index == 0 {
-                // Path is something like "/file.txt" or the root "/".
-                // The parent is the root directory "/".
-                "/"
-            } else {
-                // Path is something like "/a/b/c.txt".
-                // Take the slice from the beginning up to the last '/'.
-                &path[..index]
-            }
-        })
-    }
-    match RedoxPath::from_absolute(path) {
-        Some(path) => {
-            let (scheme, reference) = path.as_parts()?;
-            let parent_ref = parent_opt(reference.as_ref()).unwrap_or("");
-            Some(format!("/scheme/{}/{}", scheme.as_ref(), parent_ref))
-        }
-        None => parent_opt(path).map(String::from),
-    }
-}
-
 /// Return the directory (or scheme path) and the relative socket path to the scheme
 pub fn dir_path_and_fd_path(
     socket_path: RedoxStr<'_>,
@@ -316,7 +274,6 @@ pub fn dir_path_and_fd_path(
     let _siglock = tmp_disable_signals();
     let cwd_guard = CWD.read();
     let cwd_path = cwd_guard.as_ref().map(|c| &c.redox);
-
     let redox_path = openat2_path(fcntl::AT_FDCWD, socket_path, 0)?;
 
     let (scheme, ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
@@ -324,8 +281,7 @@ pub fn dir_path_and_fd_path(
         return Err(Error::new(EINVAL));
     }
     let ref_path = RedoxReference::new(ref_path.to_string()).unwrap();
-
-    let dir_to_open = ref_path.clone().canonical().dirname();
+    let dir_to_open = ref_path.clone().dirname();
     Ok((scheme.canonicalize_as_scheme(dir_to_open.into()), ref_path))
 }
 

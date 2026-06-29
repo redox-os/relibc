@@ -1098,7 +1098,6 @@ impl Pal for Sys {
     }
 
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
-        let path = path;
         let file = openat2(
             dirfd,
             path,
@@ -1763,7 +1762,7 @@ impl Pal for Sys {
         }
         let path = RedoxStr::new_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
         let path = openat2_path(fd, path, 0)?;
-        let path: Cow<'_, str> = path.canonical().into();
+        let path: Cow<'_, str> = path.into();
         redox_rt::sys::unlink(path, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
         Ok(())
     }
