@@ -921,7 +921,7 @@ pub fn close(fd: usize) -> Result<usize> {
 
     let res = unsafe { syscall::syscall1(syscall::SYS_CLOSE, fd) };
 
-    if res.is_ok() {
+    if res.is_ok() || res.err().map_or(false, |e| e.errno == EBADF) {
         let mut guard = FILETABLE.lock();
         let _ = guard.remove(fd);
     }
@@ -932,7 +932,7 @@ pub fn close(fd: usize) -> Result<usize> {
 pub fn close_raw(fd: usize) -> Result<usize> {
     let res = unsafe { syscall::syscall1(syscall::SYS_CLOSE, fd) };
 
-    if res.is_ok() {
+    if res.is_ok() || res.err().map_or(false, |e| e.errno == EBADF) {
         let mut guard = FILETABLE.lock();
         let _ = guard.remove(fd);
     }
