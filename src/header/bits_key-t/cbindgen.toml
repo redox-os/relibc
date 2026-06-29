@@ -4,6 +4,7 @@
 #
 # POSIX headers that require key_t:
 # - sys/ipc.h
+# - sys/shm.h
 # - sys/types (where it should be defined)
 include_guard = "_RELIBC_BITS_KEY_T_H"
 language = "C"
