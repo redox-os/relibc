@@ -62,6 +62,7 @@ EXPECT_NAMES=\
 	fcntl/create \
 	fcntl/fcntl \
 	fcntl/open \
+	fcntl/openat \
 	fcntl/posix_fallocate \
 	features \
 	fnmatch \
