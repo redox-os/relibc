@@ -1,3 +1,8 @@
+# POSIX header spec (obsolete): https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/utime.h.html
+#
+# Spec quotations relating to includes:
+# - "The <utime.h> header shall define the time_t type as described in <sys/types.h>."
+#
 # features included for deprecated annotations
 sys_includes = ["features.h"]
 after_includes = """
