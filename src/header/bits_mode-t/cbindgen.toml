@@ -5,7 +5,7 @@
 # POSIX headers that require mode_t:
 # - fcntl.h
 # - ndbm.h (TODO not present in relibc)
-# - spawn.h (TODO not present in relibc)
+# - spawn.h
 # - sys/ipc.h
 # - sys/mman.h
 # - sys/stat.h

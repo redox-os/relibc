@@ -96,7 +96,7 @@ pub struct flock {
 /// - `F_GETFD`: Value of flags. The return value shall not be negative.
 /// - `F_SETFD`: Value other than `-1`.
 /// - `F_GETFL`: Value of file status flags and access modes. The return value
-///    shall not be negative.
+///   shall not be negative.
 /// - `F_SETFL`: Value other than `-1`.
 /// - `F_GETLK`: Value other than `-1`.
 /// - `F_SETLK`: Value other than `-1`.
@@ -105,7 +105,7 @@ pub struct flock {
 /// - `F_OFD_SETLK`: Value other than `-1`.
 /// - `F_OFD_SETLKW`: Value other than `-1`.
 /// - `F_GETOWN`: Value of the socket owner process or process group; this
-///    shall not be `-1`.
+///   shall not be `-1`.
 /// - `F_SETOWN`: Value other than `-1`.
 /// - `F_GETOWN_EX`: Value other than `-1`.
 /// - `F_SETOWN_EX`: Value other than `-1`.
