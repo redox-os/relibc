@@ -7,7 +7,10 @@ use core::{iter::once, mem, ptr, slice};
 use cbitset::BitSet256;
 
 use crate::{
-    header::{errno::*, signal},
+    header::{
+        errno::{ENOMEM, ERANGE, STR_ERROR, STRERROR_MAX},
+        signal,
+    },
     iter::{NulTerminated, NulTerminatedInclusive, SrcDstPtrIter},
     platform::{
         self,
@@ -185,6 +188,14 @@ pub unsafe extern "C" fn memrchr(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memset.html>.
+///
+/// Copies `c` (converted to an unsigned char) into each of the first `n` bytes
+/// of the object pointed to by `s`.
+///
+/// Returns `s`.
+///
+/// # Implementation
+/// Casting of `c` may result in truncation.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
     for i in 0..n {
@@ -211,6 +222,21 @@ pub unsafe extern "C" fn stpcpy(mut s1: *mut c_char, mut s2: *const c_char) -> *
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
+///
+/// Copies not more than `n` bytes (bytes that follow a NUL character are not
+/// copied) from the array pointed to by `s2` to the array pointed to by `s1`.
+///
+/// If the array pointed to by `s2` is a string that is shorter than `n` bytes,
+/// NUL characters shall be appended to the copy in the array pointed to by
+/// `s1`, until `n` bytes in all are written.
+///
+/// If any NUL characters are written to the destination, returns the address
+/// of the first such NUL character. If no NUL characters are written to the
+/// destination, returns `&s1[n]`.
+///
+/// # Safety
+/// If copying takes place between objects that overlap, the behaviour is
+/// undefined.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn stpncpy(
     mut s1: *mut c_char,
@@ -494,6 +520,22 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
+///
+/// Copies not more than `n` bytes (bytes that follow a NUL character are not
+/// copied) from the array pointed to by `s2` to the array pointed to by `s1`.
+///
+/// If the array pointed to by `s2` is a string that is shorter than `n` bytes,
+/// NUL characters shall be appended to the copy in the array pointed to by
+/// `s1`, until `n` bytes in all are written.
+///
+/// Returns `s1`.
+///
+/// # Implementation
+/// Simply calls `stpncpy` and returns `s1`.
+///
+/// # Safety
+/// If copying takes place between objects that overlap, the behaviour is
+/// undefined.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
     unsafe { stpncpy(s1, s2, n) };
