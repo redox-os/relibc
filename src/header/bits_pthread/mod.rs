@@ -1,6 +1,8 @@
 #![allow(non_camel_case_types)]
 
-use crate::platform::types::{c_int, c_uchar, c_ulong, c_void, size_t};
+use crate::platform::types::{c_int, c_uchar, c_ulong, size_t};
+
+pub use crate::header::bits_pthread_t::pthread_t;
 
 // XXX: https://github.com/eqrion/cbindgen/issues/685
 //
@@ -117,7 +119,5 @@ assert_equal_size!(pthread_condattr_t, RlctCondAttr);
 assert_equal_size!(pthread_spinlock_t, RlctSpinlock);
 assert_equal_size!(pthread_once_t, RlctOnce);
 
-/// The `pthread_t` type provided in [`sys/types.h`](crate::header::sys_types).
-pub type pthread_t = *mut c_void;
 /// The `pthread_key_t` type provided in [`sys/types.h`](crate::header::sys_types).
 pub type pthread_key_t = c_ulong;

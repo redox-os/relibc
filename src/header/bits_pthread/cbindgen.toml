@@ -8,39 +8,19 @@
 # - signal (pthread_t and pthread_attr_t only)
 # - sys/types.h (where they should be defined)
 #
-# TODO split out pthread_t and pthread_attr_t
+# TODO split out pthread_attr_t
 include_guard = "_RELIBC_BITS_PTHREAD_H"
 language = "C"
 style = "type"
 no_includes = true
 cpp_compat = true
-# TODO: Any better way to implement pthread_cleanup_push/pthread_cleanup_pop?
+# TODO split out PTHREAD_ONCE_INIT for threads.h
 after_includes = """
-#define PTHREAD_COND_INITIALIZER {0}
-#define PTHREAD_MUTEX_INITIALIZER {0}
-#define PTHREAD_RWLOCK_INITIALIZER {0}
+#include <bits/pthread-t.h> // for pthread_t from sys/types.h
+
 #define PTHREAD_ONCE_INIT ((pthread_once_t){0})
 
-#define pthread_cleanup_push(ROUTINE, ARG) do { \\
-  struct { \\
-    void (*routine)(void *); \\
-    void *arg; \\
-    void *prev; \\
-  } __relibc_internal_pthread_ll_entry = { \\
-    .routine = (void (*)(void *))(ROUTINE), \\
-    .arg = (void *)(ARG), \\
-  }; \\
-  __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry);
-
-#define pthread_cleanup_pop(EXECUTE) \\
-  __relibc_internal_pthread_cleanup_pop((EXECUTE)); \\
-} while(0)
-
 """
-
-[export.rename]
-"AtomicInt" = "int"
-"AtomicUint" = "unsigned"
 
 [export]
 include = [
@@ -55,7 +35,6 @@ include = [
   "pthread_cond_t",
   "pthread_spinlock_t",
   "pthread_once_t",
-  "pthread_t",
   "pthread_key_t",
 ]
 

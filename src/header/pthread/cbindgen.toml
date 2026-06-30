@@ -7,6 +7,29 @@
 # bits/pthread.h bring in the types from sys/types.h
 # features.h needed for no return (Rust never type)
 sys_includes = ["sched.h", "time.h", "bits/pthread.h", "features.h"]
+# TODO: Any better way to implement pthread_cleanup_push/pthread_cleanup_pop?
+after_includes = """
+
+#define PTHREAD_COND_INITIALIZER {0}
+#define PTHREAD_MUTEX_INITIALIZER {0}
+#define PTHREAD_RWLOCK_INITIALIZER {0}
+
+#define pthread_cleanup_push(ROUTINE, ARG) do { \\
+  struct { \\
+    void (*routine)(void *); \\
+    void *arg; \\
+    void *prev; \\
+  } __relibc_internal_pthread_ll_entry = { \\
+    .routine = (void (*)(void *))(ROUTINE), \\
+    .arg = (void *)(ARG), \\
+  }; \\
+  __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry);
+
+#define pthread_cleanup_pop(EXECUTE) \\
+  __relibc_internal_pthread_cleanup_pop((EXECUTE)); \\
+} while(0)
+
+"""
 include_guard = "_RELIBC_PTHREAD_H"
 language = "C"
 style = "tag"
