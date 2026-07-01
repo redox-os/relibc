@@ -448,8 +448,7 @@ dependencies = [
 [[package]]
 name = "redox-path"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "436d45c2b6a5b159d43da708e62b25be3a4a3d5550d654b72216ade4c4bfd717"
+source = "git+https://gitlab.redox-os.org/willnode/redox-path#5dbe52fec4c7a6eb2e77027eafab28fa53b728bc"
 
 [[package]]
 name = "redox-rt"

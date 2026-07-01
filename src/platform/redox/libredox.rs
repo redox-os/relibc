@@ -2,6 +2,7 @@ use core::{mem, slice, str};
 
 use alloc::vec::Vec;
 use ioslice::IoSlice;
+use redox_path::RedoxStr;
 use redox_protocols::protocol::{ProcKillTarget, SocketCall, WaitFlags};
 use redox_rt::sys::{WaitpidTarget, posix_read, posix_write, std_fs_call_ro, std_fs_call_wo};
 use syscall::{
@@ -23,19 +24,18 @@ use super::Sys;
 
 pub type RawResult = usize;
 
-pub fn openat(dirfd: c_int, path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
+pub fn openat(dirfd: c_int, path: RedoxStr<'_>, oflag: c_int, mode: mode_t) -> Result<usize> {
     let usize_fd = super::path::openat(
         dirfd,
         path,
         ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
     )?;
 
-    c_int::try_from(usize_fd)
-        .map_err(|_| {
-            let _ = redox_rt::sys::close(usize_fd);
-            Error::new(EMFILE)
-        })
-        .map(|f| f as usize)
+    if let Err(_) = c_int::try_from(usize_fd) {
+        let _ = redox_rt::sys::close(usize_fd);
+        return Err(Error::new(EMFILE));
+    }
+    Ok(usize_fd)
 }
 pub fn fchmod(fd: usize, new_mode: u16) -> Result<()> {
     std_fs_call_wo(
@@ -226,12 +226,12 @@ pub unsafe extern "C" fn redox_open_v1(
     flags: u32,
     mode: u16,
 ) -> RawResult {
-    Error::mux(openat(
-        AT_FDCWD,
-        unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) },
-        flags as c_int,
-        mode as mode_t,
-    ))
+    let path = unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) };
+    let path = match RedoxStr::new(path) {
+        Some(path) => path,
+        None => return Error::mux(Err(Error::new(EINVAL))),
+    };
+    Error::mux(openat(AT_FDCWD, path, flags as c_int, mode as mode_t))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_openat_v1(
@@ -241,9 +241,11 @@ pub unsafe extern "C" fn redox_openat_v1(
     flags: u32,
     fcntl_flags: u32,
 ) -> RawResult {
+    // Goes straight to redox_rt, no need parsing RedoxStr
+    let path = unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) };
     Error::mux(redox_rt::sys::openat(
         fd,
-        unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) },
+        path,
         flags as usize,
         fcntl_flags as usize,
     ))
