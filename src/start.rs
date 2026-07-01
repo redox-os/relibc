@@ -174,6 +174,24 @@ pub unsafe extern "C" fn relibc_start_v1(
     .to_upper()
     .expect_notls("failed to move thread fd to upper table");
 
+    #[cfg(target_os = "redox")]
+    {
+        if redox_rt::current_filetable().fd().is_none() {
+            let filetable_fd = unsafe {
+                crate::platform::get_auxv_raw(
+                    sp.auxv().cast(),
+                    redox_rt::auxv_defs::AT_REDOX_FILETABLE_FD,
+                )
+            }
+            .expect_notls("no filetable fd present");
+            let filetable_guard = redox_rt::proc::FdGuard::new(filetable_fd)
+                .to_upper()
+                .expect_notls("failed to move filetable fd to upper table");
+            *redox_rt::current_filetable() = redox_rt::sys::FdTbl::from_binary_fd(filetable_guard)
+                .expect_notls("failed to initialize FILETABLE");
+        }
+    }
+
     // Initialize TLS, if necessary
     unsafe {
         ld_so::init(

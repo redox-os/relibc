@@ -10,12 +10,12 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
     let cur_proc_fd = proc_info.proc_fd.as_ref().unwrap();
 
     let cur_thr_fd = RtTcb::current().thread_fd();
-    let new_thr_fd = cur_proc_fd.dup(b"new-thread")?.to_upper().unwrap();
+    let new_thr_fd = cur_proc_fd.dup_into_upper(b"new-thread")?;
 
     // Inherit existing address space
     {
-        let cur_addr_space_fd = cur_thr_fd.dup(b"addrspace")?;
-        let new_addr_space_sel_fd = new_thr_fd.dup(b"current-addrspace")?;
+        let cur_addr_space_fd = cur_thr_fd.dup_into_upper(b"addrspace")?;
+        let new_addr_space_sel_fd = new_thr_fd.dup_into_upper(b"current-addrspace")?;
 
         let buf = create_set_addr_space_buf(
             cur_addr_space_fd.as_raw_fd(),
@@ -27,8 +27,8 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
 
     // Inherit reference to file table
     {
-        let cur_filetable_fd = cur_thr_fd.dup(b"filetable")?;
-        let new_filetable_sel_fd = new_thr_fd.dup(b"current-filetable")?;
+        let cur_filetable_fd = cur_thr_fd.dup_into_upper(b"filetable")?;
+        let new_filetable_sel_fd = new_thr_fd.dup_into_upper(b"current-filetable")?;
 
         new_filetable_sel_fd.write(&usize::to_ne_bytes(cur_filetable_fd.as_raw_fd()))?;
     }
@@ -38,7 +38,7 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
     // the same process) will be discarded. Process-specific signals will ignore this new thread,
     // until it has initialized its own signal handler.
 
-    let start_fd = new_thr_fd.dup(b"start")?;
+    let start_fd = new_thr_fd.dup_into_upper(b"start")?;
 
     let fd = new_thr_fd.as_raw_fd();
     unsafe {
@@ -56,9 +56,12 @@ pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
 
     let tcb = RtTcb::current();
     // TODO: modify interface so it writes directly to the thread fd?
-    let status_fd = tcb.thread_fd().dup(b"status").unwrap();
+    let status_fd = tcb.thread_fd().dup_into_upper(b"status").unwrap();
 
-    let _ = unsafe { syscall::funmap(tcb as *const RtTcb as usize, syscall::PAGE_SIZE) };
+    let tcb_ptr = unsafe { crate::Tcb::current_ptr() };
+    if let Some(tcb_ptr) = tcb_ptr {
+        let _ = unsafe { syscall::funmap(tcb_ptr as usize, syscall::PAGE_SIZE) };
+    }
 
     let mut buf = [0; size_of::<usize>() * 3];
     plain::slice_from_mut_bytes(&mut buf)

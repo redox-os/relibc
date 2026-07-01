@@ -38,9 +38,9 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
 
     // Linux seems to allow you to read from or write to any of /dev/{stdin,stderr,stdout}
     match basename {
-        "stderr" => syscall::dup(2, &[]),
-        "stdin" => syscall::dup(0, &[]),
-        "stdout" => syscall::dup(1, &[]),
+        "stderr" => redox_rt::sys::dup(2, &[]),
+        "stdin" => redox_rt::sys::dup(0, &[]),
+        "stdout" => redox_rt::sys::dup(1, &[]),
         "tty" => {
             if let Some(tty) = env_str!("TTY") {
                 return redox_rt::sys::open(tty, flags);
