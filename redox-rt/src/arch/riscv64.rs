@@ -55,11 +55,12 @@ pub struct ArchIntRegs {
 pub unsafe fn deactivate_tcb(open_via_dup: &FdGuardUpper) -> Result<()> {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = open_via_dup.dup(b"regs/env")?;
+    let file = open_via_dup.dup_into_upper(b"regs/env")?;
 
     env.tp = 0;
 
     file.write(&mut env)?;
+    crate::TLS_ACTIVATED.store(false, core::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
 
@@ -68,7 +69,7 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
 }
 
 unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
-    let _ = syscall::close(scratchpad.cur_filetable_fd);
+    let _ = crate::sys::close(scratchpad.cur_filetable_fd);
     unsafe {
         crate::child_hook_common(crate::ChildHookCommonArgs {
             new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
@@ -77,6 +78,9 @@ unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
             } else {
                 Some(FdGuard::new(scratchpad.new_proc_fd))
             },
+            new_filetable_fd: FdGuard::new(scratchpad.new_filetable_fd)
+                .to_upper()
+                .unwrap(),
         })
     };
 }

@@ -83,5 +83,5 @@ pub unsafe extern "C" fn redox_event_queue_ctl_v1(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_event_queue_destroy_v1(queue: usize) -> RawResult {
-    Error::mux(syscall::close(queue))
+    Error::mux(redox_rt::sys::close(queue))
 }
