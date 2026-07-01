@@ -317,6 +317,23 @@ fn stage2(
         let thr_fd = crate::platform::get_auxv_raw(auxv, redox_rt::auxv_defs::AT_REDOX_THR_FD)
             .expect_notls("no thread fd present");
 
+        #[cfg(target_os = "redox")]
+        {
+            if redox_rt::current_filetable().fd().is_none() {
+                let filetable_fd = crate::platform::get_auxv_raw(
+                    sp.auxv().cast(),
+                    redox_rt::auxv_defs::AT_REDOX_FILETABLE_FD,
+                )
+                .expect_notls("no filetable fd present");
+                let filetable_guard = redox_rt::proc::FdGuard::new(filetable_fd)
+                    .to_upper()
+                    .expect_notls("failed to move filetable fd to upper table");
+                *redox_rt::current_filetable() =
+                    redox_rt::sys::FdTbl::from_binary_fd(filetable_guard)
+                        .expect_notls("failed to initialize FILETABLE");
+            }
+        }
+
         let tcb = Tcb::new(0).expect_notls("[ld.so]: failed to allocate bootstrap TCB");
         tcb.activate(
             #[cfg(target_os = "redox")]

@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use redox_protocols::protocol::{FsCall, SocketCall};
+use redox_protocols::protocol::{FsCall, O_CLOEXEC, SocketCall};
 use redox_rt::proc::FdGuard;
 use syscall::{self, flag::*};
 
@@ -83,7 +83,7 @@ unsafe fn bind_or_connect(
         },
         _ => return Err(Errno(EAFNOSUPPORT)),
     };
-    let fd = syscall::dup(socket as usize, path.as_bytes())?;
+    let fd = redox_rt::sys::dup(socket as usize, path.as_bytes())?;
     Ok(fd)
 }
 
@@ -95,7 +95,7 @@ pub unsafe fn bind_or_connect_into(
 ) -> Result<c_int, Errno> {
     // Duplicate the socket, and then duplicate the copy back to the original fd
     let fd = FdGuard::new(unsafe { bind_or_connect(op, socket, address, address_len) }?);
-    syscall::dup2(fd.as_raw_fd(), socket as usize, &[])?;
+    redox_rt::sys::dup2(fd.as_raw_fd(), socket as usize, &[])?;
     Ok(0)
 }
 
@@ -537,10 +537,10 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<c_int> {
-        let stream = syscall::dup(socket as usize, b"listen")?;
+        let stream = redox_rt::sys::dup(socket as usize, b"listen")?;
         if address != ptr::null_mut() && address_len != ptr::null_mut() {
             if let Err(err) = unsafe { Self::getpeername(stream as c_int, address, address_len) } {
-                let _ = syscall::close(stream);
+                let _ = redox_rt::sys::close(stream);
                 return Err(err);
             }
         }
@@ -588,10 +588,17 @@ impl PalSocket for Sys {
                 let fs_bind_result = (|| -> Result<()> {
                     let dirfd = FdGuard::open(
                         &dir_path,
-                        syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+                        syscall::O_RDONLY | syscall::O_DIRECTORY | O_CLOEXEC,
                     )?;
-                    let fd_to_send = FdGuard::new(syscall::dup(socket as usize, &[])?);
-                    syscall::sendfd(dirfd.as_raw_fd(), fd_to_send.as_raw_fd(), 0, 0)?;
+                    let fd_to_send =
+                        FdGuard::new(redox_rt::sys::dup_into_upper(socket as usize, &[])?)
+                            .to_upper()
+                            .unwrap();
+                    dirfd.call_wo(
+                        &fd_to_send.as_raw_fd().to_ne_bytes(),
+                        syscall::CallFlags::FD,
+                        &[],
+                    )?;
                     Ok(())
                 })();
 
@@ -1027,7 +1034,7 @@ impl PalSocket for Sys {
 
             let timeval = unsafe { &*(option_value as *const timeval) };
 
-            let fd = FdGuard::new(syscall::dup(socket as usize, timeout_name)?);
+            let fd = FdGuard::new(redox_rt::sys::dup(socket as usize, timeout_name)?);
 
             let Some(tv_nsec) = timeval.tv_usec.checked_mul(1000) else {
                 return Err(Errno(EDOM));
