@@ -321,8 +321,7 @@ pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
 // TODO: Find an auxv replacement for Redox's execv protocol
 #[cold]
 pub unsafe fn get_auxv_raw(ptr: *const usize, requested_kind: usize) -> Option<usize> {
-    unsafe { auxv_iter(ptr) }
-        .find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
+    unsafe { auxv_iter(ptr) }.find_map(|[kind, value]| (kind == requested_kind).then_some(value))
 }
 pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
     auxvs

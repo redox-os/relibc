@@ -384,7 +384,7 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
         let path_env = unsafe { getenv(c"PATH".as_ptr()) };
         if !path_env.is_null() {
             let path_env = unsafe { CStr::from_ptr(path_env) };
-            for program_buf in PathSearchIter::new(&file.to_bytes(), &path_env) {
+            for program_buf in PathSearchIter::new(file.to_bytes(), &path_env) {
                 // SAFETY: CStr::from_ptr().to_bytes() always stop at null, no need to check again
                 let program_c =
                     unsafe { CStr::from_bytes_with_nul_unchecked(program_buf.as_slice()) };
