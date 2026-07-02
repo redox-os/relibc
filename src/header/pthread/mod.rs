@@ -8,14 +8,11 @@ use core::{cell::Cell, ptr::NonNull};
 use crate::{
     error::Errno,
     header::{sched::*, time::timespec},
-    platform::{
-        Pal, Sys,
-        types::{
-            c_int, c_uchar, c_uint, c_void, clockid_t, pthread_attr_t, pthread_barrier_t,
-            pthread_barrierattr_t, pthread_cond_t, pthread_condattr_t, pthread_key_t,
-            pthread_mutex_t, pthread_mutexattr_t, pthread_once_t, pthread_rwlock_t,
-            pthread_rwlockattr_t, pthread_t, size_t,
-        },
+    platform::types::{
+        c_int, c_uchar, c_uint, c_void, clockid_t, pthread_attr_t, pthread_barrier_t,
+        pthread_barrierattr_t, pthread_cond_t, pthread_condattr_t, pthread_key_t, pthread_mutex_t,
+        pthread_mutexattr_t, pthread_once_t, pthread_rwlock_t, pthread_rwlockattr_t, pthread_t,
+        size_t,
     },
     pthread,
 };
@@ -54,7 +51,12 @@ pub const PTHREAD_CANCELED: *mut c_void = (!0_usize) as *mut c_void;
 pub const PTHREAD_CREATE_DETACHED: c_int = 0;
 pub const PTHREAD_CREATE_JOINABLE: c_int = 1;
 
+/// Specifies that the thread scheduling attributes shall be set to the
+/// corresponding values from this attributes object.
 pub const PTHREAD_EXPLICIT_SCHED: c_int = 0;
+/// Specifies that the thread scheduling attributes shall be inherited from the
+/// creating thread, and the scheduling attributes in the `attr` argument shall
+/// be ignored.
 pub const PTHREAD_INHERIT_SCHED: c_int = 1;
 
 pub const PTHREAD_MUTEX_DEFAULT: c_int = 0;
@@ -74,7 +76,9 @@ pub const PTHREAD_PRIO_PROTECT: c_int = 0;
 pub const PTHREAD_PROCESS_SHARED: c_int = 0;
 pub const PTHREAD_PROCESS_PRIVATE: c_int = 1;
 
+/// Signifies process scheduling contention scope.
 pub const PTHREAD_SCOPE_PROCESS: c_int = 0;
+/// Signifies system scheduling contention scope.
 pub const PTHREAD_SCOPE_SYSTEM: c_int = 1;
 
 pub mod attr;
