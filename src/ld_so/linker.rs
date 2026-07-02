@@ -135,6 +135,7 @@ impl MmapFile {
         unsafe { core::slice::from_raw_parts(self.ptr.cast::<u8>(), self.size) }
     }
 
+    #[expect(clippy::mut_from_ref)]
     fn as_mut_slice(&self) -> &mut [u8] {
         unsafe { core::slice::from_raw_parts_mut(self.ptr.cast::<u8>(), self.size) }
     }

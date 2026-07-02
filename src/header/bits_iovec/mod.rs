@@ -15,6 +15,7 @@ pub struct iovec {
 }
 
 impl iovec {
+    #[expect(clippy::mut_from_ref)]
     unsafe fn to_slice(&self) -> &mut [u8] {
         unsafe { slice::from_raw_parts_mut(self.iov_base.cast::<u8>(), self.iov_len) }
     }
@@ -23,6 +24,7 @@ impl iovec {
 pub unsafe fn gather(iovs: &[iovec]) -> Vec<u8> {
     let mut vec = Vec::new();
     for iov in iovs.iter() {
+        // SAFETY: only a single mutable reference created
         vec.extend_from_slice(unsafe { iov.to_slice() });
     }
     vec
@@ -31,6 +33,7 @@ pub unsafe fn gather(iovs: &[iovec]) -> Vec<u8> {
 pub unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
     let mut i = 0;
     for iov in iovs.iter() {
+        // SAFETY: only a single mutable reference created
         let slice = unsafe { iov.to_slice() };
         slice.copy_from_slice(&vec[i..][..slice.len()]);
         i += slice.len();

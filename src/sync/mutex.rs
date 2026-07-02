@@ -75,6 +75,12 @@ impl<T> Mutex<T> {
     /// it's up to you to unlock it after mutex. Returns the last atomic value
     /// on failure. You should probably not worry about this, it's used for
     /// internal optimizations.
+    ///
+    /// # Safety
+    /// This allows creation of multiple mutable references from an immutable
+    /// reference. Caller must ensure this is not called on the same `Mutex`
+    /// multiple times.
+    #[expect(clippy::mut_from_ref, reason = "documented safety usage")]
     pub unsafe fn manual_try_lock(&self) -> Result<&mut T, c_int> {
         if unsafe { manual_try_lock_generic(&self.lock) } {
             Ok(unsafe { &mut *self.content.get() })
@@ -85,6 +91,12 @@ impl<T> Mutex<T> {
     /// Lock the mutex, returning the inner content. After doing this, it's
     /// your responsibility to unlock it after usage. Mostly useful for FFI:
     /// Prefer normal .lock() where possible.
+    ///
+    /// # Safety
+    /// This allows creation of multiple mutable references from an immutable
+    /// reference. Caller must ensure this is not called on the same `Mutex`
+    /// multiple times.
+    #[expect(clippy::mut_from_ref, reason = "documented safety usage")]
     pub unsafe fn manual_lock(&self) -> &mut T {
         unsafe { manual_lock_generic(&self.lock) };
         unsafe { &mut *self.content.get() }
