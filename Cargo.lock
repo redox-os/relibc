@@ -266,8 +266,15 @@ version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c943259e342f1e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"
 dependencies = [
- "bitflags",
  "libc",
+]
+
+[[package]]
+name = "libredox"
+version = "0.1.18"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/libredox.git?branch=fcntl-fd-flags#dd76eb2fcc93072c3a13e9cbe60f6398674ddd8e"
+dependencies = [
+ "bitflags",
  "plain",
  "redox_syscall",
 ]
@@ -459,7 +466,7 @@ dependencies = [
  "generic-rt",
  "goblin",
  "ioslice",
- "libredox",
+ "libredox 0.1.18 (git+https://gitlab.redox-os.org/Ibuki.O/libredox.git?branch=fcntl-fd-flags)",
  "plain",
  "redox-path",
  "redox_syscall",
@@ -468,19 +475,17 @@ dependencies = [
 [[package]]
 name = "redox_event"
 version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5018d583d6d2f5499352aea8d177e9067d1eb03ab17c78169d5ba7a30001b15"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/event.git?branch=update-redox-crates#5b897dc1c44bebf292a7d59d783b27dd3970e17d"
 dependencies = [
  "bitflags",
- "libredox",
+ "libredox 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall",
 ]
 
 [[package]]
 name = "redox_syscall"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5102a6aaa05aa011a238e178e6bca86d2cb56fc9f586d37cb80f5bca6e07759"
+version = "0.10.0"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=rm-fcntl-fd#d03bff5efc3004319976d7e5995bbaf1ab1adb51"
 dependencies = [
  "bitflags",
 ]
@@ -503,7 +508,7 @@ dependencies = [
  "ioslice",
  "libc",
  "libm",
- "libredox",
+ "libredox 0.1.18 (git+https://gitlab.redox-os.org/Ibuki.O/libredox.git?branch=fcntl-fd-flags)",
  "log",
  "md-5",
  "memchr",

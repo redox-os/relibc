@@ -6,7 +6,7 @@ use core::{
 
 use ioslice::IoSlice;
 use syscall::{
-    Call, CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
+    Call, CallFlags, EINVAL, ERESTART, FdCmd, StdFsCallKind, TimeSpec,
     data::StdFsCallMeta,
     error::{self, EBADF, EEXIST, EINTR, EMFILE, ENODEV, ESRCH, Error, Result},
 };
@@ -652,57 +652,10 @@ pub fn open_into_upper<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     openat_into_upper(root_fd.as_raw_fd(), reference.as_ref(), flags, fcntl_flags)
 }
 pub fn dup(fd: usize, buf: &[u8]) -> Result<usize> {
-    let _siglock = tmp_disable_signals();
-
-    let out = {
-        let mut guard = FILETABLE.lock();
-        guard.add_posix(0)?
-    };
-
-    let res = unsafe {
-        syscall::syscall4(
-            syscall::SYS_DUP_INTO,
-            fd,
-            buf.as_ptr() as usize,
-            buf.len(),
-            out,
-        )
-    };
-
-    if res.is_err() {
-        let mut guard = FILETABLE.lock();
-        let _ = guard.remove(out);
-        return res;
-    }
-
-    Ok(out)
+    dup_into_core(fd, None, buf, FdCmd::Dup, 0)
 }
-
 pub fn dup2(fd: usize, newfd: usize, buf: &[u8]) -> Result<usize> {
-    let _siglock = tmp_disable_signals();
-
-    let out = {
-        let mut guard = FILETABLE.lock();
-        guard.override_at(fd, newfd)?
-    };
-
-    let res = unsafe {
-        syscall::syscall4(
-            syscall::SYS_DUP2,
-            fd,
-            newfd,
-            buf.as_ptr() as usize,
-            buf.len(),
-        )
-    };
-
-    if res.is_err() {
-        let mut guard = FILETABLE.lock();
-        let _ = guard.remove(out);
-        return res;
-    }
-
-    Ok(out)
+    dup_into_core(fd, Some(newfd), buf, FdCmd::DupOver, 0)
 }
 
 pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
@@ -737,7 +690,12 @@ pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
         buf.extend_from_slice(&len.to_ne_bytes());
         buf.extend_from_slice(name_bytes);
     }
-    FdGuard::new(dup_into_upper(crate::current_namespace_fd()?, &buf)?).to_upper()
+    FdGuard::new(dup_into_upper(
+        crate::current_namespace_fd()?,
+        &buf,
+        syscall::FdCmd::Dup,
+    )?)
+    .to_upper()
 }
 pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<()> {
     let mut buf = alloc::vec::Vec::from((NsDup::IssueRegister as usize).to_ne_bytes());
@@ -769,7 +727,7 @@ pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
 }
 
 pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
-    if cmd == syscall::F_DUPFD || cmd == F_DUPFD_CLOEXEC {
+    if cmd == redox_protocols::protocol::F_DUPFD || cmd == F_DUPFD_CLOEXEC {
         let _siglock = tmp_disable_signals();
 
         let cloexec_flag = if cmd == F_DUPFD_CLOEXEC { O_CLOEXEC } else { 0 };
@@ -783,7 +741,16 @@ pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
             }
         };
 
-        let res = unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, syscall::F_DUPFD, out) };
+        let res = unsafe {
+            syscall::syscall5(
+                syscall::SYS_FDCNTL,
+                fd,
+                core::ptr::null::<u8>() as usize,
+                0,
+                FdCmd::Dup as usize,
+                out,
+            )
+        };
 
         if res.is_err() {
             let mut guard = FILETABLE.lock();
@@ -791,32 +758,16 @@ pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
             return res;
         }
 
-        let actual_fd = res.unwrap();
-        if actual_fd != out {
-            let mut guard = FILETABLE.lock();
-            let _ = guard.remove(out);
-            guard.override_at(actual_fd, actual_fd)?;
-            if cloexec_flag != 0 {
-                guard.set_fd_flags(actual_fd, cloexec_flag)?;
-            }
-        }
-
-        return Ok(actual_fd);
+        return Ok(out);
     }
 
-    if cmd == syscall::F_GETFD {
+    if cmd == redox_protocols::protocol::F_GETFD {
         let _siglock = tmp_disable_signals();
         return FILETABLE.lock().get_fd_flags(fd);
     }
 
-    if cmd == syscall::F_SETFD {
+    if cmd == redox_protocols::protocol::F_SETFD {
         let _siglock = tmp_disable_signals();
-
-        let res = unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, cmd, arg) };
-        if res.is_err() {
-            return res;
-        }
-
         FILETABLE.lock().set_fd_flags(fd, arg)?;
         return Ok(0);
     }
@@ -860,32 +811,106 @@ pub fn openat_into_upper<T: AsRef<str>>(
     Ok(out)
 }
 
-pub fn dup_into_upper(fd: usize, buf: &[u8]) -> Result<usize> {
+pub fn dup_into_core(
+    fd: usize,
+    new_fd: Option<usize>,
+    buf: &[u8],
+    cmd: FdCmd,
+    target: usize,
+) -> Result<usize> {
     let _siglock = tmp_disable_signals();
+    let mut old_flags = None;
+    let out;
 
-    let out_idx = {
+    {
         let mut guard = FILETABLE.lock();
-        guard.insert_upper(0)?
-    };
-    let out = out_idx | syscall::UPPER_FDTBL_TAG;
+
+        out = match cmd {
+            FdCmd::Dup => {
+                let target_fd = if let Some(fd) = new_fd {
+                    fd
+                } else {
+                    guard.get_lowest_available_slot(target)?
+                };
+
+                guard.insert_at(fd, target_fd)?;
+                guard.active_count += 1;
+                target_fd
+            }
+            FdCmd::DupOver | FdCmd::Move => {
+                let target_fd = if let Some(fd) = new_fd {
+                    fd
+                } else {
+                    guard.get_lowest_available_slot(target)?
+                };
+
+                old_flags = guard.get_fd_flags(target_fd).ok();
+                guard.override_at(fd, target_fd)?
+            }
+            FdCmd::Swap => {
+                let target_fd = if let Some(fd) = new_fd {
+                    fd
+                } else {
+                    guard.get_lowest_available_slot(target)?
+                };
+                let _ = guard.get_fd_flags(fd)?;
+                let _ = guard.get_fd_flags(target_fd)?;
+                target_fd
+            }
+        };
+    }
 
     let res = unsafe {
-        syscall::syscall4(
-            syscall::SYS_DUP_INTO,
+        syscall::syscall5(
+            syscall::SYS_FDCNTL,
             fd,
             buf.as_ptr() as usize,
             buf.len(),
+            cmd as usize,
             out,
         )
     };
 
+    let mut guard = FILETABLE.lock();
+
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
-        let _ = guard.remove(out);
+        match cmd {
+            FdCmd::Dup => {
+                let _ = guard.remove(out);
+            }
+            FdCmd::DupOver | FdCmd::Move => {
+                if let Some(old_flags) = old_flags {
+                    let _ = guard.insert_at(out, out);
+                    let _ = guard.set_fd_flags(out, old_flags);
+                } else {
+                    let _ = guard.remove(out);
+                }
+            }
+            FdCmd::Swap => {}
+        }
         return res;
     }
 
+    match cmd {
+        FdCmd::Swap => {
+            if let (Ok(fd_flags), Ok(target_flags)) =
+                (guard.get_fd_flags(fd), guard.get_fd_flags(out))
+            {
+                let _ = guard.set_fd_flags(fd, target_flags);
+                let _ = guard.set_fd_flags(out, fd_flags);
+            }
+        }
+        FdCmd::Move => {
+            let _ = guard.remove(fd);
+        }
+        _ => {}
+    }
+
     Ok(out)
+}
+
+pub fn dup_into_upper(fd: usize, buf: &[u8], cmd: FdCmd) -> Result<usize> {
+    dup_into_core(fd, None, buf, cmd, syscall::UPPER_FDTBL_TAG)
 }
 
 pub fn dup_into_upper_raw(fd: usize, buf: &[u8]) -> Result<usize> {
@@ -896,11 +921,12 @@ pub fn dup_into_upper_raw(fd: usize, buf: &[u8]) -> Result<usize> {
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
     let res = unsafe {
-        syscall::syscall4(
-            syscall::SYS_DUP_INTO,
+        syscall::syscall5(
+            syscall::SYS_FDCNTL,
             fd,
             buf.as_ptr() as usize,
             buf.len(),
+            FdCmd::Dup as usize,
             out,
         )
     };
@@ -1010,11 +1036,11 @@ impl FdTbl {
         self.upper_fdtbl.len()
     }
 
-    fn strip_tags(index: usize) -> usize {
+    pub fn strip_tags(index: usize) -> usize {
         index & !syscall::UPPER_FDTBL_TAG
     }
 
-    fn is_upper(index: usize) -> bool {
+    pub fn is_upper(index: usize) -> bool {
         (index & syscall::UPPER_FDTBL_TAG) != 0
     }
 
@@ -1077,9 +1103,7 @@ impl FdTbl {
         Ok(())
     }
 
-    pub fn override_at(&mut self, fd: usize, new_fd: usize) -> Result<usize> {
-        let existed = self.remove(new_fd).is_ok();
-
+    pub fn insert_at(&mut self, fd: usize, new_fd: usize) -> Result<usize> {
         if Self::is_upper(new_fd) {
             let handle = Self::strip_tags(new_fd);
             self.upper_fdtbl.insert_at(
@@ -1095,11 +1119,42 @@ impl FdTbl {
             )?;
         }
 
+        Ok(new_fd)
+    }
+
+    pub fn override_at(&mut self, fd: usize, new_fd: usize) -> Result<usize> {
+        let existed = self.remove(new_fd).is_ok();
+        self.insert_at(fd, new_fd)?;
+
         if !existed {
             self.active_count += 1;
         }
+
         Ok(new_fd)
     }
+
+    pub fn get_lowest_available_slot(&self, which: usize) -> Result<usize> {
+        if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        let raw_idx = if Self::is_upper(which) {
+            self.upper_fdtbl.next_available_index()
+        } else {
+            self.posix_fdtbl.next_available_index()
+        };
+
+        if raw_idx >= Self::CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        if Self::is_upper(which) {
+            Ok(raw_idx | syscall::UPPER_FDTBL_TAG)
+        } else {
+            Ok(raw_idx)
+        }
+    }
+
     pub fn add_posix(&mut self, entry: usize) -> Result<usize> {
         if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
@@ -1352,6 +1407,14 @@ impl PosixFdTbl {
                 Err(e)
             }
         }
+    }
+
+    pub fn next_available_index(&self) -> usize {
+        let mut idx = self.lowest_idx as usize;
+        while idx < self.table.len() && self.is_occupied(idx) {
+            idx += 1;
+        }
+        idx
     }
 
     fn update_lowest_idx(&mut self, start_from: usize) {
@@ -1666,6 +1729,14 @@ impl UpperFdTbl {
                 self.table.truncate(rollback_len);
                 Err(e)
             }
+        }
+    }
+
+    pub fn next_available_index(&self) -> usize {
+        if self.first_vacant_idx == FdTbl::CONTEXT_MAX_FILES {
+            self.table.len()
+        } else {
+            self.first_vacant_idx as usize
         }
     }
 

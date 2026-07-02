@@ -590,10 +590,13 @@ impl PalSocket for Sys {
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | O_CLOEXEC,
                     )?;
-                    let fd_to_send =
-                        FdGuard::new(redox_rt::sys::dup_into_upper(socket as usize, &[])?)
-                            .to_upper()
-                            .unwrap();
+                    let fd_to_send = FdGuard::new(redox_rt::sys::dup_into_upper(
+                        socket as usize,
+                        &[],
+                        syscall::FdCmd::Dup,
+                    )?)
+                    .to_upper()
+                    .unwrap();
                     dirfd.call_wo(
                         &fd_to_send.as_raw_fd().to_ne_bytes(),
                         syscall::CallFlags::FD,
