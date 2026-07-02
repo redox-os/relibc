@@ -98,7 +98,7 @@ pub fn fexec_impl(
         let current_addrspace_fd = thread_fd.dup_into_upper(b"addrspace")?;
         current_addrspace_fd.dup_into_upper(b"empty")?
     };
-    grants_fd.fcntl(syscall::F_SETFD, O_CLOEXEC)?;
+    grants_fd.fcntl(redox_protocols::protocol::F_SETFD, O_CLOEXEC)?;
 
     // Never allow more than 1 MiB of program headers.
     const MAX_PH_SIZE: usize = 1024 * 1024;
@@ -803,9 +803,8 @@ impl FdGuard<false> {
     pub fn to_upper(self) -> Result<FdGuardUpper> {
         // Move to upper table if necessary
         let fd = if self.fd & syscall::UPPER_FDTBL_TAG == 0 {
-            //TODO: use F_DUPFD_CLOEXEC?
-            let fd = crate::sys::fcntl(self.fd, syscall::F_DUPFD, syscall::UPPER_FDTBL_TAG)?;
-            drop(self);
+            let fd = crate::sys::dup_into_upper(self.fd, &[], syscall::FdCmd::Move)?;
+            self.take();
             fd
         } else {
             self.take()
@@ -848,7 +847,7 @@ impl<const UPPER: bool> FdGuard<UPPER> {
 
     #[inline]
     pub fn dup_into_upper(&self, buf: &[u8]) -> Result<FdGuardUpper> {
-        crate::sys::dup_into_upper(self.fd, buf)
+        crate::sys::dup_into_upper(self.fd, buf, syscall::FdCmd::Dup)
             .map(FdGuard::new)?
             .to_upper()
     }

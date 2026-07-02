@@ -137,10 +137,10 @@ pub fn fchdir(fd: c_int) -> Result<()> {
         let res = Sys::fpath(fd, buf.as_bytes_mut())?;
         buf.set_len(res);
     }
-    let fd = FdGuard::new(redox_rt::sys::fcntl(
+    let fd = FdGuard::new(redox_rt::sys::dup_into_upper(
         fd as usize,
-        syscall::F_DUPFD,
-        syscall::UPPER_FDTBL_TAG,
+        &[],
+        syscall::FdCmd::Dup,
     )?)
     .to_upper()
     .unwrap();

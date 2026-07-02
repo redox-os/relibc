@@ -170,10 +170,11 @@ pub unsafe fn initialize_freestanding(this_thr_fd: FdGuardUpper) -> &'static FdG
     page.tcb_len = syscall::PAGE_SIZE;
     page.tls_end = (page as *mut Tcb).cast();
 
-    let cur_filetable_fd = syscall::dup_into(
+    let cur_filetable_fd = syscall::fdcntl(
         this_thr_fd.as_raw_fd(),
         this_thr_fd.as_raw_fd() + 1,
         b"filetable-binary",
+        syscall::FdCmd::Dup,
     )
     .expect("failed to open filetable-binary");
 
