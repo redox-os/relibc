@@ -5,11 +5,13 @@ use core::{
 
 use bitflags;
 
-use crate::header::{
-    bits_sigset_t::sigset_t,
-    errno::EINVAL,
-    sched::{SCHED_FIFO, SCHED_OTHER, SCHED_RR, sched_param},
-    sys_types_internal::pid_t,
+use crate::{
+    header::{
+        bits_sigset_t::sigset_t,
+        errno::EINVAL,
+        sched::{SCHED_FIFO, SCHED_OTHER, SCHED_RR, sched_param},
+    },
+    platform::types::pid_t,
 };
 
 bitflags::bitflags! {

@@ -2,15 +2,41 @@
 #
 # There are no spec quotations relating to includes
 #
-# - sys/types/internal.h are fundamental C types
-# - sys/types/internal.h brings in features.h for deprecated annotations for useconds_t
-# - bits/pthread.h is separate for convenience
-sys_includes = [
-    # Import most necessary, internal types first
-    "sys/types/internal.h",
-    "bits/pthread.h",
-]
+# TODO figure out how to handle useconds namespace pollution
+#
+# bits/useconds-t.h brings in features.h for deprecated annotation
+# bits/pthread.h is separate for convenience
 include_guard = "_RELIBC_SYS_TYPES_H"
+after_includes = """
+#include <bits/clock-t.h>
+#include <bits/clockid-t.h>
+#include <bits/dev-t.h>
+#include <bits/gid-t.h>
+#include <bits/id-t.h>
+#include <bits/ino-t.h>
+#include <bits/key-t.h>
+#include <bits/mode-t.h>
+#include <bits/nlink-t.h>
+#include <bits/off-t.h>
+#include <bits/pid-t.h>
+#include <bits/reclen-t.h>
+#include <bits/size-t.h>      // for size_t from stddef.h
+#include <bits/ssize-t.h>
+#include <bits/suseconds-t.h>
+#include <bits/sys/stat.h>    // for blkcnt_t and blksize_t
+#include <bits/sys/statvfs.h> // for fsblkcnt_t and fsfilcnt_t
+#include <bits/time-t.h>
+#include <bits/timer-t.h>
+#include <bits/uid-t.h>
+#include <bits/useconds-t.h>  // from older POSIX
+
+// Non-POSIX extras musl has guarded
+#if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
+#include <sys/types/extra.h>
+#endif
+
+#include <bits/pthread.h>
+"""
 no_includes = true
 language = "C"
 
