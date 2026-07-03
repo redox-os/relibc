@@ -7,12 +7,11 @@ use core::{cell::Cell, ptr::NonNull};
 
 use crate::{
     error::Errno,
-    header::{sched::*, time::timespec},
+    header::{sched::sched_param, time::timespec},
     platform::types::{
         c_int, c_uchar, c_uint, c_void, clockid_t, pthread_attr_t, pthread_barrier_t,
-        pthread_barrierattr_t, pthread_cond_t, pthread_condattr_t, pthread_key_t, pthread_mutex_t,
-        pthread_mutexattr_t, pthread_once_t, pthread_rwlock_t, pthread_rwlockattr_t, pthread_t,
-        size_t,
+        pthread_barrierattr_t, pthread_key_t, pthread_mutex_t, pthread_mutexattr_t, pthread_once_t,
+        pthread_rwlock_t, pthread_rwlockattr_t, pthread_t, size_t,
     },
     pthread,
 };
@@ -73,6 +72,10 @@ pub const PTHREAD_PRIO_NONE: c_int = 0;
 
 pub const PTHREAD_PRIO_PROTECT: c_int = 0;
 
+/// Permits a condition variable to be operated upon by any thread that has
+/// access to the memory where the condition variable is allocated, even if the
+/// condition variable is allocated in memory that is shared by multiple
+/// processes.
 pub const PTHREAD_PROCESS_SHARED: c_int = 0;
 pub const PTHREAD_PROCESS_PRIVATE: c_int = 1;
 
