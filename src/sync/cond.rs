@@ -4,7 +4,7 @@ use crate::{
     error::Errno,
     header::{
         errno::{EINVAL, ETIMEDOUT},
-        pthread::*,
+        pthread::{PTHREAD_PROCESS_PRIVATE, RlctMutex},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     },
     platform::types::clockid_t,

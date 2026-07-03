@@ -10,6 +10,9 @@ sys_includes = ["sched.h", "time.h", "bits/pthread.h", "features.h"]
 # TODO: Any better way to implement pthread_cleanup_push/pthread_cleanup_pop?
 after_includes = """
 
+// A value that shall not compare equal to any exiting thread.
+#define PTHREAD_NULL (pthread_t(NULL))
+
 #define PTHREAD_COND_INITIALIZER {0}
 #define PTHREAD_MUTEX_INITIALIZER {0}
 #define PTHREAD_RWLOCK_INITIALIZER {0}
