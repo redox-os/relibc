@@ -14,7 +14,7 @@ TEST_RUNNER?=
 all: build
 
 clean:
-	rm -rf $(BUILD)/bins_* $(BUILD)/gen $(BUILD)/target
+	rm -rf $(wildcard ./build_*)
 
 build: $(BUILD)/bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS) support_build
 
