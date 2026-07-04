@@ -7,6 +7,8 @@ use core::{
 };
 
 use alloc::collections::BTreeMap;
+#[cfg(target_os = "redox")]
+use redox_rt::{RtTcb, proc::FdGuard};
 
 use crate::{
     error::Errno,
@@ -307,9 +309,22 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
     let stack_size = this.stack_size;
 
     if this.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
+        // dealloc_thread() unmaps the tcb so extract the thread_fd now
+        #[cfg(target_os = "redox")]
+        let status_fd = {
+            let _guard = redox_rt::signal::tmp_disable_signals();
+            let thread_fd = FdGuard::new(RtTcb::current().thread_fd().as_raw_fd());
+            thread_fd.dup_into_upper(b"status").unwrap()
+        };
+
         // When detached, the thread state no longer makes any sense, and can immediately be
         // deallocated.
         unsafe { dealloc_thread(this) };
+
+        #[cfg(target_os = "redox")]
+        unsafe {
+            redox_rt::thread::exit_this_thread_inner(stack_base.cast(), stack_size, status_fd)
+        }
     } else {
         // When joinable, the return value should be made available to other threads.
         unsafe { this.waitval.post(retval) };
@@ -327,7 +342,14 @@ unsafe fn dealloc_thread(thread: &Pthread) {
     unsafe {
         let tcb = thread.tcb_selfref.get().read();
         if !tcb.is_null() {
-            let _ = syscall::funmap(tcb as usize, syscall::PAGE_SIZE);
+            loop {
+                match syscall::funmap(tcb as usize, syscall::PAGE_SIZE) {
+                    Ok(_) => break,
+                    // might be not guarded by tmp_disable_signals()
+                    Err(syscall::Error { errno: EINTR }) => continue,
+                    Err(e) => log::warn!("Cannot dealloc_thread: {e:?}"),
+                }
+            }
         }
     }
 }

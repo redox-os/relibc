@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 use syscall::Result;
 
-use crate::{RtTcb, arch::*, proc::*, signal::tmp_disable_signals, static_proc_info};
+use crate::{RtTcb, arch::*, proc::*, static_proc_info};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
@@ -52,12 +52,20 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
 }
 
 pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
-    let _guard = tmp_disable_signals();
+    let _guard = crate::signal::tmp_disable_signals();
+    let thread_fd = RtTcb::current().thread_fd();
 
-    let tcb = RtTcb::current();
     // TODO: modify interface so it writes directly to the thread fd?
-    let status_fd = tcb.thread_fd().dup_into_upper(b"status").unwrap();
+    let status_fd = thread_fd.dup_into_upper(b"status").unwrap();
+    unsafe { exit_this_thread_inner(stack_base, stack_size, status_fd) }
+}
 
+/// exit_this_thread, but current thread_fd might has disappear
+pub unsafe fn exit_this_thread_inner(
+    stack_base: *mut (),
+    stack_size: usize,
+    status_fd: FdGuard<true>,
+) -> ! {
     let mut buf = [0; size_of::<usize>() * 3];
     plain::slice_from_mut_bytes(&mut buf)
         .unwrap()
