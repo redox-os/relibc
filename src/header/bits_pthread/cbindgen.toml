@@ -5,10 +5,8 @@
 # POSIX headers that require them:
 # - aio.h (pthread_attr_t only)
 # - pthread.h (all of them)
-# - signal (pthread_t and pthread_attr_t only)
+# - signal.h (pthread_t and pthread_attr_t only)
 # - sys/types.h (where they should be defined)
-#
-# TODO split out pthread_attr_t
 include_guard = "_RELIBC_BITS_PTHREAD_H"
 language = "C"
 style = "type"
@@ -16,7 +14,8 @@ no_includes = true
 cpp_compat = true
 # TODO split out PTHREAD_ONCE_INIT for threads.h
 after_includes = """
-#include <bits/pthread-t.h> // for pthread_t from sys/types.h
+#include <bits/pthread-t.h>     // for pthread_t from sys/types.h
+#include <bits/pthreadattr-t.h> // for pthread_attr_t from sys/types.h
 
 #define PTHREAD_ONCE_INIT ((pthread_once_t){0})
 
@@ -24,7 +23,6 @@ after_includes = """
 
 [export]
 include = [
-  "pthread_attr_t",
   "pthread_rwlockattr_t",
   "pthread_rwlock_t",
   "pthread_barrier_t",

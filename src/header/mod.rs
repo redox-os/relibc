@@ -40,6 +40,8 @@ pub mod bits_pid_t;
 pub mod bits_pthread;
 #[path = "bits_pthread-t/mod.rs"]
 pub mod bits_pthread_t;
+#[path = "bits_pthreadattr-t/mod.rs"]
+pub mod bits_pthreadattr_t;
 #[path = "bits_reclen-t/mod.rs"]
 pub mod bits_reclen_t;
 #[path = "bits_safamily-t/mod.rs"]
