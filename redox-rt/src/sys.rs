@@ -8,7 +8,7 @@ use ioslice::IoSlice;
 use syscall::{
     Call, CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
     data::StdFsCallMeta,
-    error::{self, EBADF, EEXIST, EINTR, EMFILE, ENODEV, ESRCH, Error, Result},
+    error::{self, EAGAIN, EBADF, EEXIST, EINTR, EMFILE, ENODEV, ESRCH, Error, Result},
 };
 
 pub use redox_path::RedoxPath;
@@ -520,7 +520,6 @@ pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) ->
     )
 }
 pub fn posix_exit(status: i32) -> ! {
-    // TODO: probably not correct place to handle EINTR
     loop {
         match this_proc_call(
             &mut [],
@@ -528,7 +527,8 @@ pub fn posix_exit(status: i32) -> ! {
             &[ProcCall::Exit as u64, (status & 0xFF) as u64],
         ) {
             Ok(_) => break,
-            Err(Error { errno: EINTR }) => continue,
+            // TODO: procmgr can sometimes send EAGAIN, but why EINTR needed?
+            Err(Error { errno: EINTR } | Error { errno: EAGAIN }) => continue,
             Err(e) => panic!("failed to call proc mgr with Exit: {e}"),
         }
     }
