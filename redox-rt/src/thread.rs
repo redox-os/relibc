@@ -58,11 +58,6 @@ pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
     // TODO: modify interface so it writes directly to the thread fd?
     let status_fd = tcb.thread_fd().dup_into_upper(b"status").unwrap();
 
-    let tcb_ptr = unsafe { crate::Tcb::current_ptr() };
-    if let Some(tcb_ptr) = tcb_ptr {
-        let _ = unsafe { syscall::funmap(tcb_ptr as usize, syscall::PAGE_SIZE) };
-    }
-
     let mut buf = [0; size_of::<usize>() * 3];
     plain::slice_from_mut_bytes(&mut buf)
         .unwrap()

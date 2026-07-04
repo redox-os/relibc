@@ -32,6 +32,8 @@ pub unsafe fn init() {
         stack_base: ptr::null_mut(),
         stack_size: 0,
 
+        tcb_selfref: UnsafeCell::new(core::ptr::null_mut()),
+
         os_tid: UnsafeCell::new(Sys::current_os_tid()),
     };
 
@@ -43,9 +45,11 @@ pub unsafe fn init() {
         thread.stack_size = STACK_SIZE;
     }
 
-    unsafe { Tcb::current() }
-        .expect_notls("no TCB present for main thread")
-        .pthread = thread;
+    let current_tcb = unsafe { Tcb::current() }.expect_notls("no TCB present for main thread");
+    current_tcb.pthread = thread;
+    unsafe {
+        current_tcb.pthread.tcb_selfref.get().write(current_tcb);
+    }
 }
 
 //static NEXT_INDEX: AtomicU32 = AtomicU32::new(FIRST_THREAD_IDX + 1);
@@ -72,6 +76,8 @@ pub struct Pthread {
 
     pub(crate) stack_base: *mut c_void,
     pub(crate) stack_size: usize,
+
+    pub(crate) tcb_selfref: UnsafeCell<*mut Tcb>,
 
     pub os_tid: UnsafeCell<OsTid>,
 }
@@ -316,6 +322,13 @@ unsafe fn dealloc_thread(thread: &Pthread) {
     // TODO: How should this be handled on Linux?
     unsafe {
         OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
+    }
+    #[cfg(target_os = "redox")]
+    unsafe {
+        let tcb = thread.tcb_selfref.get().read();
+        if !tcb.is_null() {
+            let _ = syscall::funmap(tcb as usize, syscall::PAGE_SIZE);
+        }
     }
 }
 pub const SIGRT_RLCT_CANCEL: usize = 33;
