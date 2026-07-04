@@ -107,6 +107,7 @@ impl Tcb {
                     stack_base: core::ptr::null_mut(),
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
+                    tcb_selfref: UnsafeCell::new(tcb_ptr),
                 },
 
                 dtv_ptr: ptr::null_mut(),
