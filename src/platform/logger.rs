@@ -227,13 +227,15 @@ impl RedoxLogger {
         self
     }
     pub fn enable(self) -> Result<&'static Self, log::SetLoggerError> {
-        let leak = Box::leak(Box::new(self));
-        log::set_logger(leak)?;
-        if let Some(max) = leak.max_level_in_use {
-            log::set_max_level(max);
-        } else {
-            log::set_max_level(DEFAULT_LOG_LEVEL);
+        let mut this = self;
+        if this.max_level_in_use.is_none() {
+            // to fix log::log_enabled! macro if
+            // DEFAULT_LOG_LEVEL changed to TRACE
+            this = this.with_max_level_override(DEFAULT_LOG_LEVEL);
         }
+        let leak = Box::leak(Box::new(this));
+        log::set_logger(leak)?;
+        log::set_max_level(leak.max_level_in_use.unwrap());
         Ok(leak)
     }
     fn write_record<W: fmt::Write + ?Sized>(

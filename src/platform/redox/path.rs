@@ -221,9 +221,10 @@ pub fn openat(dirfd: c_int, path: RedoxStr<'_>, flags: usize) -> Result<usize> {
         redox_rt::sys::openat(dirfd as usize, &path, flags, fcntl_flags)
     };
 
-    log::trace!(
-        "openat({dirfd:?}, {:?}, {flags:x}): {:?}",
+    trace_log!(
+        "openat({dirfd:?}, {:?}, {}): {:?}",
         &path,
+        decode_open_flags(flags),
         initial_res
     );
 
@@ -268,7 +269,12 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
         open_absolute(&path, flags)
     };
 
-    log::trace!("open({:?}, {flags:x}): {:?}", &path, initial_res);
+    trace_log!(
+        "open({:?}, {}): {:?}",
+        &path,
+        decode_open_flags(flags),
+        initial_res
+    );
 
     match initial_res {
         Ok(fd) => Ok(fd),
@@ -399,4 +405,61 @@ pub(super) fn openat2(
     // Translate at flags into open flags; openat will do this on its own most likely.
     let oflags = at_flags_to_open_flags(at_flags) | fcntl::O_CLOEXEC | oflags;
     File::openat(dirfd, path, oflags)
+}
+
+#[cfg(any(debug_assertions, not(feature = "no_trace")))]
+pub fn decode_open_flags(mut value: usize) -> alloc::string::String {
+    let flags = [
+        ("O_NONBLOCK", O_NONBLOCK),
+        ("O_APPEND", O_APPEND),
+        ("O_SHLOCK", O_SHLOCK),
+        ("O_EXLOCK", O_EXLOCK),
+        ("O_ASYNC", O_ASYNC),
+        ("O_FSYNC", O_FSYNC),
+        ("O_CLOEXEC", O_CLOEXEC),
+        ("O_CREAT", O_CREAT),
+        ("O_TRUNC", O_TRUNC),
+        ("O_EXCL", O_EXCL),
+        ("O_DIRECTORY", O_DIRECTORY),
+        ("O_STAT", O_STAT),
+        ("O_SYMLINK", O_SYMLINK),
+        ("O_NOFOLLOW", O_NOFOLLOW),
+    ];
+
+    let mut result = alloc::string::String::new();
+
+    let accmode = value & O_ACCMODE;
+    match accmode {
+        O_RDONLY => result.push_str("O_RDONLY"),
+        O_WRONLY => result.push_str("O_WRONLY"),
+        O_RDWR => result.push_str("O_RDWR"),
+        _ => {}
+    }
+    value &= !O_ACCMODE;
+    for (name, flag) in flags.iter() {
+        if (value & flag) == *flag {
+            if !result.is_empty() {
+                result.push_str(" | ");
+            }
+            result.push_str(name);
+            value &= !flag;
+        }
+    }
+
+    const PERM: usize = MODE_PERM as usize;
+    if (value & PERM) != 0 {
+        if !result.is_empty() {
+            result.push_str(" | ");
+        }
+        result.push_str(&format!("0o{:o}", value & PERM));
+    }
+    value &= !PERM;
+    if value != 0 {
+        if !result.is_empty() {
+            result.push_str(" | ");
+        }
+        result.push_str(&format!("0x{:x}", value));
+    }
+
+    result
 }
