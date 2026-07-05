@@ -93,8 +93,6 @@ macro_rules! trace_expr {
         use $crate::header::errno::STR_ERROR;
         use $crate::platform;
 
-        log::trace!("{}", format_args!($($arg)*));
-
         let trace_old_errno = platform::ERRNO.get();
         platform::ERRNO.set(0);
 

@@ -30,7 +30,7 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
         RedoxStr::Absolute(path) => {
             let path = path.to_standard_canon();
             let fd = FdGuard::open_into_upper(&path.as_reference(), O_STAT);
-            (path.into_owned(), fd?)
+            (path.into_owned(), fd)
         }
         RedoxStr::Relative(redox_reference) => {
             let Some(cwd) = cwd_guard.as_ref() else {
@@ -40,9 +40,11 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
                 .fd
                 .openat_into_upper(redox_reference.as_ref(), O_STAT, 0);
             let path = cwd.redox.canonicalize_as_cwd(redox_reference.into());
-            (path.into_owned(), fd?)
+            (path.into_owned(), fd)
         }
     };
+    log::trace!("chdir({:?}): {:?}", redox.as_reference().as_ref(), fd);
+    let fd = fd?;
     let mut stat = Stat::default();
     if fd.fstat(&mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
         return Err(Error::new(ENOTDIR));
@@ -143,17 +145,24 @@ fn read_link_content<'a, 'b>(
 ) -> Result<RedoxStr<'b>> {
     let resolve_flags = O_CLOEXEC | O_SYMLINK | O_RDONLY;
     let fd = match (is_relative, dirfd) {
-        (false, _) => FdGuard::open(path, resolve_flags)?,
+        (false, _) => FdGuard::open(path, resolve_flags),
         (true, None) => current_dir()?
             .as_ref()
             .unwrap()
             .fd
-            .openat(path, resolve_flags, 0)?,
-        (true, Some(dirfd)) => dirfd.openat(path, resolve_flags, 0)?,
+            .openat(path, resolve_flags, 0),
+        (true, Some(dirfd)) => dirfd.openat(path, resolve_flags, 0),
     };
+    log::trace!(
+        "read_link_content ({:?} {:?} {}): {:?}",
+        dirfd,
+        &path,
+        is_relative,
+        fd
+    );
 
     let mut resolve_buf = [0_u8; limits::PATH_MAX + 1];
-    let count = fd.read(&mut resolve_buf)?;
+    let count = fd?.read(&mut resolve_buf)?;
     if count == resolve_buf.len() {
         return Err(Error::new(ENAMETOOLONG));
     }
@@ -170,7 +179,9 @@ fn resolve_sym_links<'a>(mut current_path_string: RedoxPath<'a>, flags: usize) -
     for _ in 0..limits::SYMLOOP_MAX {
         let dirname = current_path_string.dirname();
         let cow: Cow<'_, str> = current_path_string.into();
-        match open_absolute(&cow, flags) {
+        let initial_res = open_absolute(&cow, flags);
+        log::trace!("resolve_sym_links({:?}): {:?}", &cow, initial_res);
+        match initial_res {
             Ok(fd) => return Ok(fd),
             Err(e) if e == Error::new(EXDEV) => {
                 // dirfd is None because it's canonicalized
@@ -209,6 +220,12 @@ pub fn openat(dirfd: c_int, path: RedoxStr<'_>, flags: usize) -> Result<usize> {
     } else {
         redox_rt::sys::openat(dirfd as usize, &path, flags, fcntl_flags)
     };
+
+    log::trace!(
+        "openat({dirfd:?}, {:?}, {flags:x}): {:?}",
+        &path,
+        initial_res
+    );
 
     match initial_res {
         Ok(fd) => Ok(fd),
@@ -250,6 +267,8 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
     } else {
         open_absolute(&path, flags)
     };
+
+    log::trace!("open({:?}, {flags:x}): {:?}", &path, initial_res);
 
     match initial_res {
         Ok(fd) => Ok(fd),

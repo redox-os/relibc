@@ -24,7 +24,7 @@ use self::{
 };
 use super::{Pal, Read, types::*};
 use crate::{
-    c_str::{CStr, CString},
+    c_str::CStr,
     error::{Errno, Result},
     fs::File,
     header::{
@@ -1754,13 +1754,12 @@ impl Pal for Sys {
         let mut lines = BufReader::new(&mut file).lines();
 
         let mut read_line = |mut dst: Out<[u8]>| {
-            // TODO: set nul byte without allocating CString
-            let line = match lines.next() {
-                Some(Ok(l)) => CString::new(l).map_err(|_| Errno(EIO))?,
+            let mut line = match lines.next() {
+                Some(Ok(l)) => l,
                 None | Some(Err(_)) => return Err(Errno(EIO)),
             };
-
-            let line_slice: &[u8] = line.as_bytes_with_nul();
+            line.push('\0');
+            let line_slice: &[u8] = line.as_bytes();
             if line_slice.len() > UTSLENGTH {
                 return Err(Errno(EIO));
             }
