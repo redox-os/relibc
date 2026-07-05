@@ -485,7 +485,21 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     timestamp
 }
 
+// FIXME seems redox-rt sys posix_nanosleep calls wrapper which disables signals
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nanosleep.html>.
+///
+/// Causes the current thread to be suspended from execution until either the
+/// time interval specified by `rqtp` has elapsed or a signal is delivered to
+/// the calling thread, and its action is to invoke a signal-catching function
+/// or to terminate the process.
+///
+/// Has no effect on the action or blockage of any signal.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error. If `rmtp` is non-NULL and `nanosleep()` is interrupted
+/// by a signal, returns `-1` and updates `rmtp` to contain the requested time
+/// minus the actually elapsed time. If `rmtp` is NULL the remaining time is
+/// not returned.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
     unsafe { Sys::nanosleep(rqtp, rmtp) }
