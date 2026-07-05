@@ -16,7 +16,7 @@ impl ByteLiteral {
     /// - Decimal: `30`..=`126`
     /// - Hexadecimal: `20`..=`7E`
     /// - Byte literals: The space character (` `) upto and including tilde (`~`)
-    pub fn cast_cchar(input: u8) -> c_char {
+    pub const fn cast_cchar(input: u8) -> c_char {
         match input {
             b' '..=b'~' => {
                 // `c_char` is an `i8` on these arches
@@ -27,7 +27,7 @@ impl ByteLiteral {
                 // `c_char` is already a `u8` on these arches
                 #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
                 {
-                    input.into()
+                    input
                 }
             }
             _ => panic!("Not a printable ascii character!"),
