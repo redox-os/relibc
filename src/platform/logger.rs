@@ -241,7 +241,7 @@ impl RedoxLogger {
         process_name: Option<&str>,
         writer: &mut W,
     ) -> fmt::Result {
-        let target = record.module_path().unwrap_or(record.target());
+        let target = record.file().unwrap_or("");
         let level = record.level();
         let message = record.args();
 
@@ -250,7 +250,7 @@ impl RedoxLogger {
 
         let process_name = process_name.unwrap_or("");
         let line = &LineFmt(line_number);
-        writeln!(writer, "[{process_name}@{target}{line} {level}] {message}",)
+        writeln!(writer, "[{level} {process_name}@{target}{line}] {message}",)
     }
 }
 
