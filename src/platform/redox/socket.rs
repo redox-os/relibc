@@ -985,6 +985,9 @@ impl PalSocket for Sys {
         dest_addr: *const sockaddr,
         dest_len: socklen_t,
     ) -> Result<usize> {
+        // TODO: Actually support MSG_NOSIGNAL
+        // TODO: TCP lacks `SocketCall::SendMsg` handling
+        let flags = flags & !MSG_NOSIGNAL;
         if flags != 0 {
             // Convert to sendmsg
             let mut iov = iovec {
