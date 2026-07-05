@@ -527,7 +527,8 @@ pub fn posix_exit(status: i32) -> ! {
             &[ProcCall::Exit as u64, (status & 0xFF) as u64],
         ) {
             Ok(_) => break,
-            // TODO: procmgr can sometimes send EAGAIN, but why EINTR needed?
+            // procmgr can sometimes send EAGAIN.
+            // cannot disable signals so kernel might send EINTR.
             Err(Error { errno: EINTR } | Error { errno: EAGAIN }) => continue,
             Err(e) => panic!("failed to call proc mgr with Exit: {e}"),
         }

@@ -541,6 +541,7 @@ pub struct TmpDisableSignalsGuard {
     active: bool,
 }
 
+/// Used to prevent EINTR from appearing across all syscall
 pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
     if !crate::TLS_ACTIVATED.load(Ordering::Relaxed) {
         return TmpDisableSignalsGuard { active: false };
