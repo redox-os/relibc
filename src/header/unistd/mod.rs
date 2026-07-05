@@ -1047,6 +1047,14 @@ pub extern "C" fn setuid(uid: uid_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sleep.html>.
+///
+/// Causes the calling thread to be suspended from execution until either the
+/// number of realtime seconds by the specified argument `seconds` has elapsed
+/// or a signal is delivered to the calling thread and its action is to invoke
+/// a signal-catching function or to terminate the process.
+///
+/// Upon success, returns `0`. Upon interruption by a signal, returns the
+/// unslept amount in seconds.
 #[unsafe(no_mangle)]
 pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     let rqtp = timespec {
@@ -1062,8 +1070,8 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     // If sleep() returns due to delivery of a signal, the return value shall be the "unslept" amount
     // (the requested time minus the time actually slept) in seconds.
     match unsafe { Sys::nanosleep(&raw const rqtp, &raw mut rmtp) } {
-        Err(Errno(EINTR)) => rmtp.tv_sec as c_uint,
-        r => 0,
+        Err(Errno(_)) => rmtp.tv_sec as c_uint,
+        _ => 0,
     }
 }
 
