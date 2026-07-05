@@ -1079,7 +1079,7 @@ impl FdTbl {
     }
 
     pub fn override_at(&mut self, fd: usize, new_fd: usize) -> Result<usize> {
-        let existed = self.remove(new_fd).is_ok();
+        let _ = self.remove(new_fd);
 
         if Self::is_upper(new_fd) {
             let handle = Self::strip_tags(new_fd);
@@ -1096,9 +1096,7 @@ impl FdTbl {
             )?;
         }
 
-        if !existed {
-            self.active_count += 1;
-        }
+        self.active_count += 1;
         Ok(new_fd)
     }
     pub fn add_posix(&mut self, entry: usize) -> Result<usize> {
