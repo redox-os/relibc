@@ -395,6 +395,8 @@ fn stage2(
         );
 
         crate::platform::environ = crate::platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
+
+        crate::platform::logger::init();
     }
 
     // we might need global lock for this kind of stuff
