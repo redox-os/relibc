@@ -1,0 +1,17 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html
+#
+# These types are split out to prevent importing all of sys/types.h into other headers.
+#
+# These particular pthread types are shared between both pthread.h and threads.h.
+include_guard = "_RELIBC_BITS_THREADS_H"
+language = "C"
+no_includes = true
+cpp_compat = true
+[export]
+include = [
+  "pthread_cond_t",
+  "pthread_key_t",
+  "pthread_mutex_t",
+]
+[enum]
+prefix_with_name = true

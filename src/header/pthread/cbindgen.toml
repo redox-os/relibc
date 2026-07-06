@@ -4,11 +4,14 @@
 # - "The <pthread.h> header shall define the pthread_attr_t, pthread_barrier_t, pthread_barrierattr_t, pthread_cond_t, pthread_condattr_t, pthread_key_t, pthread_mutex_t, pthread_mutexattr_t, pthread_once_t, pthread_rwlock_t, pthread_rwlockattr_t, pthread_spinlock_t, and pthread_t types as described in <sys/types.h>."
 # - "Inclusion of the <pthread.h> header shall make symbols defined in the headers <sched.h> and <time.h> visible."
 #
-# bits/pthread.h bring in the types from sys/types.h
+# time.h brings in NULL
 # features.h needed for no return (Rust never type)
-sys_includes = ["sched.h", "time.h", "bits/pthread.h", "features.h"]
+sys_includes = ["sched.h", "time.h", "features.h"]
 # TODO: Any better way to implement pthread_cleanup_push/pthread_cleanup_pop?
 after_includes = """
+#include <bits/pthread.h>   // for pthread types from sys/types.h
+#include <bits/pthreadoi.h> // for PTHREAD_ONCE_INIT
+
 
 // A value that shall not compare equal to any exiting thread.
 #define PTHREAD_NULL (pthread_t(NULL))
