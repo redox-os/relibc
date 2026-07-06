@@ -3,9 +3,6 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 
-#[cfg(target_os = "redox")]
-use generic_rt::ExpectTlsFree;
-
 use crate::{
     ALLOCATOR,
     header::{libgen, stdio, stdlib},
@@ -169,10 +166,10 @@ pub unsafe extern "C" fn relibc_start_v1(
         unsafe {
             crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
         }
-        .expect_notls("no thread fd present"),
+        .expect("no thread fd present"),
     )
     .to_upper()
-    .expect_notls("failed to move thread fd to upper table");
+    .expect("failed to move thread fd to upper table");
 
     #[cfg(target_os = "redox")]
     {
@@ -183,12 +180,12 @@ pub unsafe extern "C" fn relibc_start_v1(
                     redox_rt::auxv_defs::AT_REDOX_FILETABLE_FD,
                 )
             }
-            .expect_notls("no filetable fd present");
+            .expect("no filetable fd present");
             let filetable_guard = redox_rt::proc::FdGuard::new(filetable_fd)
                 .to_upper()
-                .expect_notls("failed to move filetable fd to upper table");
+                .expect("failed to move filetable fd to upper table");
             *redox_rt::current_filetable() = redox_rt::sys::FdTbl::from_binary_fd(filetable_guard)
-                .expect_notls("failed to initialize FILETABLE");
+                .expect("failed to initialize FILETABLE");
         }
     }
 

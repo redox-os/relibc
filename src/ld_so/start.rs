@@ -41,8 +41,6 @@ use super::{
     tcb::Tcb,
 };
 
-use generic_rt::ExpectTlsFree;
-
 #[cfg(target_pointer_width = "32")]
 pub const SIZEOF_EHDR: usize = 52;
 
@@ -192,13 +190,13 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
-    let at_phdr = at_phdr.expect_notls("`AT_PHDR` must be present");
-    let at_phnum = at_phnum.expect_notls("`AT_PHNUM` must be present if `AT_PHDR` is");
-    let at_phent = at_phent.expect_notls("`AT_PHENT` must be present if `AT_PHDR` is");
+    let at_phdr = at_phdr.expect("`AT_PHDR` must be present");
+    let at_phnum = at_phnum.expect("`AT_PHNUM` must be present if `AT_PHDR` is");
+    let at_phent = at_phent.expect("`AT_PHENT` must be present if `AT_PHDR` is");
     assert!(!at_phdr.is_null() && at_phnum != 0 && at_phent == size_of::<ProgramHeader>());
     let phdrs = unsafe { slice::from_raw_parts(at_phdr, at_phnum) };
 
-    let at_entry = at_entry.expect_notls("`AT_ENTRY` must be present");
+    let at_entry = at_entry.expect("`AT_ENTRY` must be present");
     let at_base = at_base.unwrap_or_default();
 
     let self_base = if at_base != 0 {
@@ -252,7 +250,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         base_addr: usize,
     ) -> &'a [T] {
         if let Some(ptr) = ptr {
-            let len = len.expect_notls("dynamic entry was present without it's corresponding size");
+            let len = len.expect("dynamic entry was present without it's corresponding size");
             unsafe { core::slice::from_raw_parts(ptr.byte_add(base_addr), len) }
         } else {
             &[]
@@ -315,7 +313,7 @@ fn stage2(
         let auxv = sp.auxv().cast();
         #[cfg(target_os = "redox")]
         let thr_fd = crate::platform::get_auxv_raw(auxv, redox_rt::auxv_defs::AT_REDOX_THR_FD)
-            .expect_notls("no thread fd present");
+            .expect("no thread fd present");
 
         #[cfg(target_os = "redox")]
         {
@@ -324,43 +322,43 @@ fn stage2(
                     sp.auxv().cast(),
                     redox_rt::auxv_defs::AT_REDOX_FILETABLE_FD,
                 )
-                .expect_notls("no filetable fd present");
+                .expect("no filetable fd present");
                 let filetable_guard = redox_rt::proc::FdGuard::new(filetable_fd)
                     .to_upper()
-                    .expect_notls("failed to move filetable fd to upper table");
+                    .expect("failed to move filetable fd to upper table");
                 *redox_rt::current_filetable() =
                     redox_rt::sys::FdTbl::from_binary_fd(filetable_guard)
-                        .expect_notls("failed to initialize FILETABLE");
+                        .expect("failed to initialize FILETABLE");
             }
         }
 
-        let tcb = Tcb::new(0).expect_notls("[ld.so]: failed to allocate bootstrap TCB");
+        let tcb = Tcb::new(0).expect("[ld.so]: failed to allocate bootstrap TCB");
         tcb.activate(
             #[cfg(target_os = "redox")]
             Some(
                 redox_rt::proc::FdGuard::new(thr_fd)
                     .to_upper()
-                    .expect_notls("failed to move thread fd to upper table"),
+                    .expect("failed to move thread fd to upper table"),
             ),
         );
         #[cfg(target_os = "redox")]
         {
             let proc_fd =
                 crate::platform::get_auxv_raw(auxv, redox_rt::auxv_defs::AT_REDOX_PROC_FD)
-                    .expect_notls("no proc fd present");
+                    .expect("no proc fd present");
 
             let ns_fd = crate::platform::get_auxv_raw(auxv, redox_rt::auxv_defs::AT_REDOX_NS_FD)
                 .filter(|&fd| fd != usize::MAX)
                 .map(|fd| {
                     redox_rt::proc::FdGuard::new(fd)
                         .to_upper()
-                        .expect_notls("failed to move ns fd to upper table")
+                        .expect("failed to move ns fd to upper table")
                 });
 
             redox_rt::initialize(
                 redox_rt::proc::FdGuard::new(proc_fd)
                     .to_upper()
-                    .expect_notls("failed to move proc fd to upper table"),
+                    .expect("failed to move proc fd to upper table"),
                 ns_fd,
             );
             redox_rt::signal::setup_sighandler(&tcb.os_specific, true);

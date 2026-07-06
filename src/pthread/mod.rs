@@ -13,7 +13,7 @@ use redox_rt::RtTcb;
 use crate::{
     error::Errno,
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
-    ld_so::{ExpectTlsFree, tcb::Tcb},
+    ld_so::tcb::Tcb,
     platform::{Pal, Sys, types::*},
 };
 
@@ -47,7 +47,7 @@ pub unsafe fn init() {
         thread.stack_size = STACK_SIZE;
     }
 
-    let current_tcb = unsafe { Tcb::current() }.expect_notls("no TCB present for main thread");
+    let current_tcb = unsafe { Tcb::current() }.expect("no TCB present for main thread");
     current_tcb.pthread = thread;
     unsafe {
         current_tcb.pthread.tcb_selfref.get().write(current_tcb);
@@ -221,7 +221,7 @@ unsafe extern "C" fn new_thread_shim(
     tcb: *mut Tcb,
     synchronization_mutex: *const Mutex<u64>,
 ) -> ! {
-    let tcb = unsafe { tcb.as_mut() }.expect_notls("non-null TLS is required");
+    let tcb = unsafe { tcb.as_mut() }.expect("non-null TLS is required");
 
     #[cfg(not(target_os = "redox"))]
     {

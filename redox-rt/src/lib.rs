@@ -6,8 +6,6 @@
 
 use core::cell::UnsafeCell;
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use generic_rt::ExpectTlsFree; // not used on aarch64 or riscv64
 use generic_rt::GenericTcb;
 use redox_protocols::protocol::ProcMeta;
 use syscall::Sigcontrol;
@@ -94,13 +92,13 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
     let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env")
-        .expect_notls("failed to open handle for process registers");
+        .expect("failed to open handle for process registers");
 
-    syscall::read(file_fd, &mut env).expect_notls("failed to read gsbase");
+    syscall::read(file_fd, &mut env).expect("failed to read gsbase");
 
     env.gsbase = tls_end as u32;
 
-    syscall::write(file_fd, &env).expect_notls("failed to write gsbase");
+    syscall::write(file_fd, &env).expect("failed to write gsbase");
 
     let _ = crate::sys::close_raw(file_fd);
 
@@ -114,13 +112,13 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: 
     let mut env = syscall::EnvRegisters::default();
 
     let file_fd = crate::sys::dup_into_upper_raw(tcb.thread_fd().as_raw_fd(), b"regs/env")
-        .expect_notls("failed to open handle for process registers");
+        .expect("failed to open handle for process registers");
 
-    syscall::read(file_fd, &mut env).expect_notls("failed to read fsbase");
+    syscall::read(file_fd, &mut env).expect("failed to read fsbase");
 
     env.fsbase = tls_end_and_tcb_start as u64;
 
-    syscall::write(file_fd, &env).expect_notls("failed to write fsbase");
+    syscall::write(file_fd, &env).expect("failed to write fsbase");
 
     let _ = crate::sys::close_raw(file_fd);
 

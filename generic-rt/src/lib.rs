@@ -98,29 +98,3 @@ impl<Os> GenericTcb<Os> {
         unsafe { Some(&mut *Self::current_ptr()?) }
     }
 }
-
-pub trait ExpectTlsFree {
-    type Unwrapped;
-
-    fn expect_notls(self, msg: &str) -> Self::Unwrapped;
-}
-impl<T, E: core::fmt::Debug> ExpectTlsFree for Result<T, E> {
-    type Unwrapped = T;
-
-    fn expect_notls(self, msg: &str) -> T {
-        match self {
-            Ok(t) => t,
-            Err(err) => panic!("{msg}: expect failed for Result with err: {err:?}",),
-        }
-    }
-}
-impl<T> ExpectTlsFree for Option<T> {
-    type Unwrapped = T;
-
-    fn expect_notls(self, msg: &str) -> T {
-        match self {
-            Some(t) => t,
-            None => panic!("{msg}: expect failed for Option"),
-        }
-    }
-}
