@@ -8,7 +8,7 @@ use core::{
 
 use alloc::collections::BTreeMap;
 #[cfg(target_os = "redox")]
-use redox_rt::{RtTcb, proc::FdGuard};
+use redox_rt::RtTcb;
 
 use crate::{
     error::Errno,
@@ -308,28 +308,27 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
     let stack_base = this.stack_base;
     let stack_size = this.stack_size;
 
-    if this.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
-        // dealloc_thread() unmaps the tcb so extract the thread_fd now
-        #[cfg(target_os = "redox")]
-        let status_fd = {
-            let _guard = redox_rt::signal::tmp_disable_signals();
-            let thread_fd = FdGuard::new(RtTcb::current().thread_fd().as_raw_fd());
-            thread_fd.dup_into_upper(b"status").unwrap()
-        };
+    // dealloc_thread() or waitval.post() might unmaps the tcb so extract the thread_fd now
+    #[cfg(target_os = "redox")]
+    let status_fd = {
+        let _guard = redox_rt::signal::tmp_disable_signals();
+        let thread_fd = RtTcb::current().thread_fd();
+        thread_fd.dup_into_upper(b"status").unwrap()
+    };
 
+    if this.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
         // When detached, the thread state no longer makes any sense, and can immediately be
         // deallocated.
         unsafe { dealloc_thread(this) };
-
-        #[cfg(target_os = "redox")]
-        unsafe {
-            redox_rt::thread::exit_this_thread_inner(stack_base.cast(), stack_size, status_fd)
-        }
     } else {
         // When joinable, the return value should be made available to other threads.
         unsafe { this.waitval.post(retval) };
     }
 
+    #[cfg(target_os = "redox")]
+    unsafe {
+        redox_rt::thread::exit_this_thread_inner(stack_base.cast(), stack_size, status_fd)
+    }
     unsafe { Sys::exit_thread(stack_base.cast(), stack_size) }
 }
 
