@@ -21,6 +21,13 @@ pub struct sgttyb {
     sg_flags: c_ushort,
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/ioctl.2.html>.
+///
+/// Manipulates the underlying device parameters of special files.
+///
+/// Upon success, usually returns `0`. A few operations use the return value
+/// as an output parameter and returns a nonnegative value on success. Upon
+/// failure, `-1` is returned and errno set to indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     // TODO: Somehow support varargs to syscall??

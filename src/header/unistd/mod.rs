@@ -715,10 +715,16 @@ pub unsafe extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isatty.html>.
+///
+/// Checks whether `fildes`, an open file descriptor, is associated with a
+/// terminal device.
+///
+/// Returns `1` to indicate `fildes` is associated with a terminal device or
+/// returns `0` to indicate it is not.
 #[unsafe(no_mangle)]
-pub extern "C" fn isatty(fd: c_int) -> c_int {
+pub extern "C" fn isatty(fildes: c_int) -> c_int {
     let mut t = termios::termios::default();
-    if unsafe { termios::tcgetattr(fd, &raw mut t) == 0 } {
+    if unsafe { termios::tcgetattr(fildes, &raw mut t) == 0 } {
         1
     } else {
         0
