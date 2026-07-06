@@ -471,7 +471,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                     {
                         if let Some(ref mut ptr) = ptr {
                             unsafe { **ptr = character as c_char };
-                            *ptr = unsafe { ptr.offset(1) };
+                            *ptr = unsafe { ptr.add(1) };
                             data_stored = true;
                         }
                         // Decrease the width, and read a new character unless the width is 0

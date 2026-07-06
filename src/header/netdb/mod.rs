@@ -269,7 +269,7 @@ pub unsafe extern "C" fn gethostbyaddr(
                 unsafe { sethostent(HOST_STAYOPEN) };
                 return p;
             }
-            cp = unsafe { cp.offset(1) };
+            cp = unsafe { cp.add(1) };
         }
     }
 
@@ -376,7 +376,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
                 unsafe { sethostent(HOST_STAYOPEN) };
                 return p;
             }
-            cp = unsafe { cp.offset(1) };
+            cp = unsafe { cp.add(1) };
         }
     }
 
@@ -542,7 +542,7 @@ pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *mut protoent {
                 unsafe { setprotoent(PROTO_STAYOPEN) };
                 return p;
             }
-            cp = unsafe { cp.offset(1) };
+            cp = unsafe { cp.add(1) };
         }
     }
     unsafe { setprotoent(PROTO_STAYOPEN) };

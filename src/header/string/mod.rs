@@ -82,8 +82,8 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
             }
             unreachable!()
         }
-        a = unsafe { a.offset(1) };
-        b = unsafe { b.offset(1) };
+        a = unsafe { a.add(1) };
+        b = unsafe { b.add(1) };
     }
 
     let mut a = a.cast::<u8>();
@@ -92,8 +92,8 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
         if unsafe { *a } != unsafe { *b } {
             return c_int::from(unsafe { *a }) - c_int::from(unsafe { *b });
         }
-        a = unsafe { a.offset(1) };
-        b = unsafe { b.offset(1) };
+        a = unsafe { a.add(1) };
+        b = unsafe { b.add(1) };
     }
     0
 }
@@ -354,7 +354,7 @@ pub unsafe fn inner_strspn(s1: *const c_char, s2: *const c_char, cmp: bool) -> s
 
     while unsafe { *s2 } != 0 {
         set.insert(unsafe { *s2 } as usize);
-        s2 = unsafe { s2.offset(1) };
+        s2 = unsafe { s2.add(1) };
     }
 
     let mut i = 0;
@@ -363,7 +363,7 @@ pub unsafe fn inner_strspn(s1: *const c_char, s2: *const c_char, cmp: bool) -> s
             break;
         }
         i += 1;
-        s1 = unsafe { s1.offset(1) };
+        s1 = unsafe { s1.add(1) };
     }
     i
 }
@@ -638,7 +638,7 @@ unsafe fn inner_strstr(
             i += 1;
         }
 
-        haystack = unsafe { haystack.offset(1) };
+        haystack = unsafe { haystack.add(1) };
     }
     ptr::null_mut()
 }

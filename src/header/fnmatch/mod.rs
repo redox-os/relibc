@@ -61,7 +61,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
         leading = false;
 
         let c = unsafe { *pattern };
-        pattern = unsafe { pattern.offset(1) };
+        pattern = unsafe { pattern.add(1) };
 
         match (c == b'*', need_collapsing) {
             (true, true) => continue,
@@ -76,7 +76,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
                     // Trailing backslash. Maybe error here?
                     break;
                 }
-                pattern = unsafe { pattern.offset(1) };
+                pattern = unsafe { pattern.add(1) };
                 leading = is_leading(flags, c);
                 (Token::Char(c), ONCE)
             }
@@ -85,7 +85,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
             b'[' => {
                 let mut list: Vec<Collation> = Vec::new();
                 let invert = if unsafe { *pattern == b'!' } {
-                    pattern = unsafe { pattern.offset(1) };
+                    pattern = unsafe { pattern.add(1) };
                     true
                 } else {
                     false
@@ -96,12 +96,12 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
                     if c == 0 {
                         break;
                     }
-                    pattern = unsafe { pattern.offset(1) };
+                    pattern = unsafe { pattern.add(1) };
                     match c {
                         b']' => break,
                         b'\\' => {
                             c = unsafe { *pattern };
-                            pattern = unsafe { pattern.offset(1) };
+                            pattern = unsafe { pattern.add(1) };
                             if c == 0 {
                                 // Trailing backslash. Maybe error?
                                 break;
@@ -109,9 +109,9 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
                         }
                         _ => (),
                     }
-                    if unsafe { *pattern == b'-' && *pattern.offset(1) != 0 } {
-                        let end = unsafe { *pattern.offset(1) };
-                        pattern = unsafe { pattern.offset(2) };
+                    if unsafe { *pattern == b'-' && *pattern.add(1) != 0 } {
+                        let end = unsafe { *pattern.add(1) };
+                        pattern = unsafe { pattern.add(2) };
                         for c in c..=end {
                             if can_push(was_leading, flags, c) {
                                 list.push(Collation::Char(c));

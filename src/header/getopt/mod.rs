@@ -63,7 +63,7 @@ pub unsafe extern "C" fn getopt_long(
             if unsafe {
                 current_arg.is_null()
                     || *current_arg != ByteLiteral::cast_cchar(b'-')
-                    || *current_arg.offset(1) == 0
+                    || *current_arg.add(1) == 0
             } {
                 -1
             } else if unsafe { string::strcmp(current_arg, c"--".as_ptr()) == 0 } {
@@ -73,10 +73,10 @@ pub unsafe extern "C" fn getopt_long(
                 -1
             } else {
                 // remove the '-'
-                let current_arg = unsafe { current_arg.offset(1) };
+                let current_arg = unsafe { current_arg.add(1) };
 
                 if unsafe { *current_arg == ByteLiteral::cast_cchar(b'-') } && !longopts.is_null() {
-                    let current_arg = unsafe { current_arg.offset(1) };
+                    let current_arg = unsafe { current_arg.add(1) };
                     // is a long option
                     for i in 0.. {
                         let opt = unsafe { &*longopts.offset(i) };
@@ -156,7 +156,7 @@ unsafe fn parse_arg(
     optstring: *const c_char,
 ) -> c_int {
     let update_current_opt = || unsafe {
-        CURRENT_OPT = current_arg.offset(1);
+        CURRENT_OPT = current_arg.add(1);
         if *CURRENT_OPT == 0 {
             optind += 1;
         }
@@ -178,7 +178,7 @@ unsafe fn parse_arg(
         }
         Some(GetoptOption::OptArg) => unsafe {
             CURRENT_OPT = c"".as_ptr().cast_mut();
-            if *current_arg.offset(1) == 0 {
+            if *current_arg.add(1) == 0 {
                 optind += 2;
                 if optind > argc {
                     CURRENT_OPT = ptr::null_mut();
@@ -200,7 +200,7 @@ unsafe fn parse_arg(
                     c_int::from(*current_arg)
                 }
             } else {
-                optarg = current_arg.offset(1);
+                optarg = current_arg.add(1);
                 optind += 1;
 
                 c_int::from(*current_arg)

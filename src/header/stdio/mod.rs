@@ -478,7 +478,7 @@ pub unsafe extern "C" fn fgets(
         let unget_read_size = cmp::min(left, stream.unget.len());
         for _ in 0..unget_read_size {
             unsafe { *out = stream.unget.pop().unwrap() as c_char };
-            out = unsafe { out.offset(1) };
+            out = unsafe { out.add(1) };
         }
         left -= unget_read_size;
     }
