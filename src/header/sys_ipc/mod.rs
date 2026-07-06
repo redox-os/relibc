@@ -35,15 +35,26 @@ pub const IPC_PRIVATE: key_t = 0;
 #[derive(Copy, Clone, Debug)]
 pub struct ipc_perm {
     pub __key: key_t,
+    /// Owner's user ID.
     pub uid: uid_t,
+    /// Owner's group ID.
     pub gid: gid_t,
+    /// Creator's user ID.
     pub cuid: uid_t,
+    /// Creator's group ID.
     pub cgid: gid_t,
+    /// Read/write permission.
     pub mode: mode_t,
     pub __seq: c_ushort,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ftok.html>.
+///
+/// Returns a key based on `path` and `id` that is usable in subsequent calls
+/// to `msgget()`, `semget()`, and `shmget()`.
+///
+/// Upon success, returns a key. Upon failure, returns `(key_t)-1` and sets
+/// errno to indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ftok(path: *const c_char, id: c_int) -> key_t {
     let path = unsafe { CStr::from_ptr(path) };
