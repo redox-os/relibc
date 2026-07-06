@@ -7,6 +7,7 @@
 # bits/useconds-t.h brings in features.h for deprecated annotation
 # bits/pthread.h is separate for convenience
 include_guard = "_RELIBC_SYS_TYPES_H"
+sys_includes = ["features.h"]
 after_includes = """
 #include <bits/clock-t.h>
 #include <bits/clockid-t.h>
