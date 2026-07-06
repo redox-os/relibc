@@ -45,6 +45,23 @@
    __has_cpp_attribute(x))
 #endif
 
+// From musl, license MIT {
+#if defined(_ALL_SOURCE) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE 1
+#endif
+
+#if defined(_DEFAULT_SOURCE) && !defined(_BSD_SOURCE)
+#define _BSD_SOURCE 1
+#endif
+
+#if !defined(_POSIX_SOURCE) && !defined(_POSIX_C_SOURCE) \
+ && !defined(_XOPEN_SOURCE) && !defined(_GNU_SOURCE) \
+ && !defined(_BSD_SOURCE) && !defined(__STRICT_ANSI__)
+#define _BSD_SOURCE 1
+#define _XOPEN_SOURCE 700
+#endif
+// } from musl
+
 // TODO: Not emitted with cbindgen
 #if __STDC_VERSION__ >= 199901L
     #define __restrict restrict
