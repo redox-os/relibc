@@ -48,6 +48,7 @@ pub mod io;
 pub mod iter;
 pub mod ld_so;
 pub mod out;
+pub mod panic;
 pub mod platform;
 pub mod pthread;
 pub mod raw_cell;
@@ -59,21 +60,11 @@ use crate::platform::{Allocator, NEWALLOCATOR};
 #[global_allocator]
 static ALLOCATOR: Allocator = NEWALLOCATOR;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
-    use core::fmt::Write;
-
-    let mut w = platform::FileWriter::new(2);
-    let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
-
-    core::intrinsics::abort();
-}
-
 #[cfg(not(test))]
 #[panic_handler]
 #[linkage = "weak"]
 pub fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
-    relibc_panic(pi)
+    crate::panic::relibc_panic(pi)
 }
 
 #[cfg(not(test))]
@@ -87,17 +78,11 @@ pub extern "C" fn rust_eh_personality() {}
 #[allow(improper_ctypes_definitions)]
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
-    // Layout not FFI-safe?
-    use core::fmt::Write;
-
-    let mut w = platform::FileWriter::new(2);
-    let _ = w.write_fmt(format_args!(
-        "RELIBC OOM: {} bytes aligned to {} bytes\n",
+    panic!(
+        "RELIBC OOM: {} bytes aligned to {} bytes",
         layout.size(),
         layout.align()
-    ));
-
-    core::intrinsics::abort();
+    );
 }
 
 #[cfg(not(test))]
@@ -105,10 +90,5 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
 #[linkage = "weak"]
 #[unsafe(no_mangle)]
 pub extern "C" fn _Unwind_Resume() -> ! {
-    use core::fmt::Write;
-
-    let mut w = platform::FileWriter::new(2);
-    let _ = w.write_str("_Unwind_Resume\n");
-
-    core::intrinsics::abort();
+    panic!("_Unwind_Resume")
 }

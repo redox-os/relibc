@@ -28,7 +28,7 @@ pub mod linker;
 pub mod start;
 pub mod tcb;
 
-pub use generic_rt::{ExpectTlsFree, panic_notls};
+pub use generic_rt::ExpectTlsFree;
 
 static mut STATIC_TCB_MASTER: Master = Master {
     ptr: ptr::null_mut(),
@@ -95,7 +95,7 @@ fn static_init(
                     ph.p_vaddr(endian) as usize,
                 )
             },
-            _ => panic_notls(format_args!("unknown AT_PHENT size {}", phent)),
+            _ => panic!("unknown AT_PHENT size {}", phent),
         };
 
         let page_size = Sys::getpagesize();
