@@ -29,12 +29,6 @@ pub const VTIME: usize = 5;
 /// Minimum number of characters for noncanonical read.
 /// Non-Canonical mode only.
 pub const VMIN: usize = 6;
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
-///
-/// SWTCH character (not supported under Linux).
-/// Used in System V to switch shells in `shell layers`, a predecessor to shell
-/// job control.
-pub const VSWTCH: usize = 7;
 /// START character.
 /// Restarts output stopped by the STOP character.
 /// Canonical and Non-Canonical mode.
@@ -43,10 +37,6 @@ pub const VSTART: usize = 8;
 /// Stops the output until the START character is typed.
 /// Canonical and Non-Canonical mode.
 pub const VSTOP: usize = 9;
-/// SUSP character.
-/// Send `SIGTSTP` signal.
-/// Canonical and Non-Canonical mode.
-pub const VSUSP: usize = 10;
 /// EOL character.
 /// Additional end-of-line character.
 /// Canonical mode only.
@@ -77,25 +67,28 @@ pub const VLNEXT: usize = 15;
 /// EOL2 character.
 /// Another end-of-line character.
 pub const VEOL2: usize = 16;
-/// Size of the array `c_cc` for control characters.
-pub const NCCS: usize = 32;
 /* } c_cc */
 
 /* c_iflag { */
-pub const IGNBRK: usize = 0o000_001;
-pub const BRKINT: usize = 0o000_002;
-pub const IGNPAR: usize = 0o000_004;
-pub const PARMRK: usize = 0o000_010;
-pub const INPCK: usize = 0o000_020;
-pub const ISTRIP: usize = 0o000_040;
-pub const INLCR: usize = 0o000_100;
-pub const IGNCR: usize = 0o000_200;
-pub const ICRNL: usize = 0o000_400;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// Map uppercase characters to lowercase on input.
 pub const IUCLC: usize = 0o001_000;
+/// Enable start/stop output control.
 pub const IXON: usize = 0o002_000;
-pub const IXANY: usize = 0o004_000;
+/// Enable start/stop input control.
 pub const IXOFF: usize = 0o010_000;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// Ring bell when input queue is full.
+///
+/// # Implemetation
+/// Linux acts as if this is always set.
 pub const IMAXBEL: usize = 0o020_000;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// Input is UTF8; this allows character-erase to be correctly performed in
+/// cooked mode.
 pub const IUTF8: usize = 0o040_000;
 /* } c_iflag */
 

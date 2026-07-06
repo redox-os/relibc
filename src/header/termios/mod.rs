@@ -14,6 +14,9 @@ pub use crate::header::bits_winsize::winsize;
 
 pub use self::sys::*;
 
+pub mod constants;
+pub use constants::*;
+
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
 pub mod sys;
