@@ -230,7 +230,7 @@ impl Read for UnsafeStringReader {
                 }
 
                 *inner = *self.0;
-                self.0 = self.0.offset(1);
+                self.0 = self.0.add(1);
             }
             Ok(buf.len())
         }

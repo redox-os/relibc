@@ -89,17 +89,17 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
             // If the character isn't '%', just copy it out.
             if unsafe { *format } as u8 != b'%' {
                 w!(byte unsafe { *format } as u8);
-                format = unsafe { format.offset(1) };
+                format = unsafe { format.add(1) };
                 continue;
             }
 
             // Skip '%'
-            format = unsafe { format.offset(1) };
+            format = unsafe { format.add(1) };
 
             // POSIX says '%E' and '%O' can modify numeric formats for locales,
             // but we ignore them in this minimal "C" locale approach.
             if unsafe { *format } as u8 == b'E' || unsafe { *format } as u8 == b'O' {
-                format = unsafe { format.offset(1) };
+                format = unsafe { format.add(1) };
             }
 
             match unsafe { *format } as u8 {
@@ -270,7 +270,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
             }
 
             // Move past the format specifier
-            format = unsafe { format.offset(1) };
+            format = unsafe { format.add(1) };
         }
         true
     }

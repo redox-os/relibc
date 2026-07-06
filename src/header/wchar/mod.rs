@@ -650,7 +650,7 @@ pub unsafe extern "C" fn wcsnlen(mut s: *const wchar_t, maxlen: size_t) -> size_
         }
 
         len += 1;
-        s = unsafe { s.offset(1) };
+        s = unsafe { s.add(1) };
     }
 
     len

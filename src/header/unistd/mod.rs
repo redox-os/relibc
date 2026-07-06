@@ -604,7 +604,7 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> 
             break;
         }
 
-        name = unsafe { name.offset(1) };
+        name = unsafe { name.add(1) };
     }
     0
 }

@@ -372,7 +372,7 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
     let mut f = core::ptr::from_ref(unsafe { &__fini_array_end });
     #[allow(clippy::op_ref)]
     while f > &raw const __fini_array_start {
-        f = unsafe { f.offset(-1) };
+        f = unsafe { f.sub(1) };
         (unsafe { *f })();
     }
 
@@ -538,7 +538,7 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
             _ => 63,
         };
 
-        random_state.x_ptr = unsafe { (state.cast::<[u8; 4]>()).offset(1) };
+        random_state.x_ptr = unsafe { (state.cast::<[u8; 4]>()).add(1) };
         unsafe { random_state.seed(seed) };
         unsafe { random_state.save() };
 
@@ -1378,7 +1378,7 @@ pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
     match first {
         0 => None,
         b'0' => {
-            let second = unsafe { *s.offset(1) } as u8;
+            let second = unsafe { *s.add(1) } as u8;
             if second == b'X' || second == b'x' {
                 Some((16, 2))
             } else if (b'0'..=b'7').contains(&second) {
@@ -1394,7 +1394,7 @@ pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
 
 pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if unsafe { *s } != 0 && unsafe { *s } == ByteLiteral::cast_cchar(b'0') {
-        if let Some((val, idx, overflow)) = unsafe { convert_integer(s.offset(1), 8) } {
+        if let Some((val, idx, overflow)) = unsafe { convert_integer(s.add(1), 8) } {
             Some((val, idx + 1, overflow))
         } else {
             // in case the prefix is not actually a prefix
@@ -1407,11 +1407,11 @@ pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> 
 
 pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if (unsafe { *s } != 0 && unsafe { *s } == ByteLiteral::cast_cchar(b'0'))
-        && (unsafe { *s.offset(1) } != 0
-            && (unsafe { *s.offset(1) } == ByteLiteral::cast_cchar(b'x')
-                || unsafe { *s.offset(1) } == ByteLiteral::cast_cchar(b'X')))
+        && (unsafe { *s.add(1) } != 0
+            && (unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'x')
+                || unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'X')))
     {
-        unsafe { convert_integer(s.offset(2), 16) }
+        unsafe { convert_integer(s.add(2), 16) }
             .map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
         unsafe { convert_integer(s, 16) }

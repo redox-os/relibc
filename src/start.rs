@@ -257,7 +257,7 @@ pub unsafe extern "C" fn relibc_start_v1(
         #[allow(clippy::op_ref)]
         while f < &raw const __preinit_array_end {
             (unsafe { *f })();
-            f = unsafe { f.offset(1) };
+            f = unsafe { f.add(1) };
         }
     }
 
@@ -267,7 +267,7 @@ pub unsafe extern "C" fn relibc_start_v1(
         #[allow(clippy::op_ref)]
         while f < &raw const __init_array_end {
             (unsafe { *f })();
-            f = unsafe { f.offset(1) };
+            f = unsafe { f.add(1) };
         }
     }
 

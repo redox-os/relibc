@@ -44,13 +44,13 @@ impl State {
 
         let stash_value: u32 =
             (u32::from(self.n) << 16) | (u32::from(self.i) << 8) | u32::from(self.j);
-        unsafe { *self.x_ptr.offset(-1) = stash_value.to_ne_bytes() };
-        unsafe { self.x_ptr.offset(-1) }
+        unsafe { *self.x_ptr.sub(1) = stash_value.to_ne_bytes() };
+        unsafe { self.x_ptr.sub(1) }
     }
 
     pub unsafe fn load(&mut self, state_ptr: *mut [u8; 4]) {
         let stash_value = u32::from_ne_bytes(unsafe { *state_ptr });
-        self.x_ptr = unsafe { state_ptr.offset(1) };
+        self.x_ptr = unsafe { state_ptr.add(1) };
 
         /* This calculation of n does not have a bit mask in the musl
          * original, in principle resulting in a u16, but obtaining a value
