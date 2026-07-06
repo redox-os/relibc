@@ -32,12 +32,6 @@ pub const VKILL: usize = 5;
 /// REPRINT character.
 /// Reprints unread characters.
 pub const VREPRINT: usize = 6;
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
-///
-/// SWTCH character (not supported under Linux).
-/// Used in System V to switch shells in `shell layers`, a predecessor to shell
-/// job control.
-pub const VSWTCH: usize = 7;
 /// INTR character.
 /// Send a `SIGINT` signal.
 /// Canonical and Non-Canonical mode.
@@ -46,10 +40,6 @@ pub const VINTR: usize = 8;
 /// Send a `SIGQUIT` signal.
 /// Canonical and Non-Canonical mode.
 pub const VQUIT: usize = 9;
-/// SUSP character.
-/// Send `SIGTSTP` signal.
-/// Canonical and Non-Canonical mode.
-pub const VSUSP: usize = 10;
 /// START character.
 /// Restarts output stopped by the STOP character.
 /// Canonical and Non-Canonical mode.
@@ -77,23 +67,13 @@ pub const VMIN: usize = 16;
 /// Timeout in decideconds for noncanonical read.
 /// Non-Canonical mode only.
 pub const VTIME: usize = 17;
-/// Size of the array `c_cc` for control characters.
-pub const NCCS: usize = 32;
 /* } c_cc */
 
 /* c_iflag { */
-pub const IGNBRK: usize = 0o000_001;
-pub const BRKINT: usize = 0o000_002;
-pub const IGNPAR: usize = 0o000_004;
-pub const PARMRK: usize = 0o000_010;
-pub const INPCK: usize = 0o000_020;
-pub const ISTRIP: usize = 0o000_040;
-pub const INLCR: usize = 0o000_100;
-pub const IGNCR: usize = 0o000_200;
-pub const ICRNL: usize = 0o000_400;
+/// Enable start/stop output control.
 pub const IXON: usize = 0o001_000;
+/// Enable start/stop input control.
 pub const IXOFF: usize = 0o002_000;
-pub const IXANY: usize = 0o004_000;
 /* } c_iflag */
 
 /* c_oflag { */
