@@ -1,8 +1,17 @@
+//! pthread types for `sys/types.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html>.
+
 #![allow(non_camel_case_types)]
 
-use crate::platform::types::{c_int, c_uchar, c_ulong};
+use crate::platform::types::{c_int, c_uchar};
 
-pub use crate::header::{bits_pthread_t::pthread_t, bits_pthreadattr_t::pthread_attr_t};
+pub use crate::header::{
+    bits_pthread_t::pthread_t,
+    bits_pthreadattr_t::pthread_attr_t,
+    bits_pthreadonce_t::pthread_once_t,
+    bits_threads::{pthread_cond_t, pthread_key_t, pthread_mutex_t},
+};
 
 // XXX: https://github.com/eqrion/cbindgen/issues/685
 //
@@ -10,63 +19,45 @@ pub use crate::header::{bits_pthread_t::pthread_t, bits_pthreadattr_t::pthread_a
 // expanding macros! Instead, we rely on checking that the lengths are correct, when these headers
 // are parsed in the regular compilation phase.
 
-/// The `pthread_rwlockattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
+/// Used for read/write lock attributes.
 #[repr(C)]
 pub union pthread_rwlockattr_t {
     __relibc_internal_size: [c_uchar; 1],
     __relibc_internal_align: c_uchar,
 }
-/// The `pthread_rwlock_t` type provided in [`sys/types.h`](crate::header::sys_types).
+/// Used for read-write locks.
 #[repr(C)]
 pub union pthread_rwlock_t {
     __relibc_internal_size: [c_uchar; 4],
     __relibc_internal_align: c_int,
 }
-/// The `pthread_barrier_t` type provided in [`sys/types.h`](crate::header::sys_types).
+/// Used to identify a barrier.
 #[repr(C)]
 pub union pthread_barrier_t {
     __relibc_internal_size: [c_uchar; 24],
     __relibc_internal_align: c_int,
 }
-/// The `pthread_barrierattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
+/// Used to define a barrier attributes object.
 #[repr(C)]
 pub union pthread_barrierattr_t {
     __relibc_internal_size: [c_uchar; 4],
     __relibc_internal_align: c_int,
 }
-/// The `pthread_mutex_t` type provided in [`sys/types.h`](crate::header::sys_types).
-#[repr(C)]
-pub union pthread_mutex_t {
-    __relibc_internal_size: [c_uchar; 12],
-    __relibc_internal_align: c_int,
-}
-/// The `pthread_mutexattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
+/// Used to identify a mutex attribute object.
 #[repr(C)]
 pub union pthread_mutexattr_t {
     __relibc_internal_size: [c_uchar; 20],
     __relibc_internal_align: c_int,
 }
-/// The `pthread_cond_t` type provided in [`sys/types.h`](crate::header::sys_types).
-#[repr(C)]
-pub union pthread_cond_t {
-    __relibc_internal_size: [c_uchar; 8],
-    __relibc_internal_align: c_int,
-}
-/// The `pthread_condattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
+/// Used to identify a condition attribute object.
 #[repr(C)]
 pub union pthread_condattr_t {
     __relibc_internal_size: [c_uchar; 8],
     __relibc_internal_align: c_int,
 }
-/// The `pthread_spinlock_t` type provided in [`sys/types.h`](crate::header::sys_types).
+/// Used to identify a spin lock.
 #[repr(C)]
 pub union pthread_spinlock_t {
-    __relibc_internal_size: [c_uchar; 4],
-    __relibc_internal_align: c_int,
-}
-/// The `pthread_once_t` type provided in [`sys/types.h`](crate::header::sys_types).
-#[repr(C)]
-pub union pthread_once_t {
     __relibc_internal_size: [c_uchar; 4],
     __relibc_internal_align: c_int,
 }
@@ -106,12 +97,6 @@ pthread_assert_equal_size!(pthread_rwlock_t, RlctRwlock);
 pthread_assert_equal_size!(pthread_rwlockattr_t, RlctRwlockAttr);
 pthread_assert_equal_size!(pthread_barrier_t, RlctBarrier);
 pthread_assert_equal_size!(pthread_barrierattr_t, RlctBarrierAttr);
-pthread_assert_equal_size!(pthread_mutex_t, RlctMutex);
 pthread_assert_equal_size!(pthread_mutexattr_t, RlctMutexAttr);
-pthread_assert_equal_size!(pthread_cond_t, RlctCond);
 pthread_assert_equal_size!(pthread_condattr_t, RlctCondAttr);
 pthread_assert_equal_size!(pthread_spinlock_t, RlctSpinlock);
-pthread_assert_equal_size!(pthread_once_t, RlctOnce);
-
-/// The `pthread_key_t` type provided in [`sys/types.h`](crate::header::sys_types).
-pub type pthread_key_t = c_ulong;

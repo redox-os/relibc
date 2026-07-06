@@ -42,6 +42,9 @@ pub mod bits_pthread;
 pub mod bits_pthread_t;
 #[path = "bits_pthreadattr-t/mod.rs"]
 pub mod bits_pthreadattr_t;
+pub mod bits_pthreadoi;
+#[path = "bits_pthreadonce-t/mod.rs"]
+pub mod bits_pthreadonce_t;
 #[path = "bits_reclen-t/mod.rs"]
 pub mod bits_reclen_t;
 #[path = "bits_safamily-t/mod.rs"]
@@ -58,6 +61,7 @@ pub mod bits_ssize_t;
 pub mod bits_suseconds_t;
 pub mod bits_sys_stat;
 pub mod bits_sys_statvfs;
+pub mod bits_threads;
 #[path = "bits_time-t/mod.rs"]
 pub mod bits_time_t;
 #[path = "bits_timer-t/mod.rs"]
