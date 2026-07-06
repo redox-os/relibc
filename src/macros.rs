@@ -115,6 +115,19 @@ macro_rules! trace_expr {
     });
 }
 
+// log::trace! but functions inside them will
+// not be evaluated or compiled unless enabled
+macro_rules! trace_log {
+    ($($arg:tt)+) => {
+        #[cfg(not(feature = "no_trace"))]
+        {
+            if log::log_enabled!(log::Level::Trace) {
+                log::trace!($($arg)+);
+            }
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! skipws {
     ($ptr:expr) => {
