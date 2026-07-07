@@ -98,36 +98,3 @@ impl<Os> GenericTcb<Os> {
         unsafe { Some(&mut *Self::current_ptr()?) }
     }
 }
-pub fn panic_notls(_msg: impl core::fmt::Display) -> ! {
-    // TODO: actually print _msg, perhaps by having panic_notls take a `T: DebugBackend` that can
-    // propagate until called by e.g. relibc start
-    core::intrinsics::abort();
-}
-
-pub trait ExpectTlsFree {
-    type Unwrapped;
-
-    fn expect_notls(self, msg: &str) -> Self::Unwrapped;
-}
-impl<T, E: core::fmt::Debug> ExpectTlsFree for Result<T, E> {
-    type Unwrapped = T;
-
-    fn expect_notls(self, msg: &str) -> T {
-        match self {
-            Ok(t) => t,
-            Err(err) => panic_notls(format_args!(
-                "{msg}: expect failed for Result with err: {err:?}",
-            )),
-        }
-    }
-}
-impl<T> ExpectTlsFree for Option<T> {
-    type Unwrapped = T;
-
-    fn expect_notls(self, msg: &str) -> T {
-        match self {
-            Some(t) => t,
-            None => panic_notls(format_args!("{msg}: expect failed for Option")),
-        }
-    }
-}

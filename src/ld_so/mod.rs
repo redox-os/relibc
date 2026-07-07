@@ -28,8 +28,6 @@ pub mod linker;
 pub mod start;
 pub mod tcb;
 
-pub use generic_rt::{ExpectTlsFree, panic_notls};
-
 static mut STATIC_TCB_MASTER: Master = Master {
     ptr: ptr::null_mut(),
     image_size: 0,
@@ -66,9 +64,9 @@ fn static_init(
         auxv = unsafe { auxv.add(1) };
     }
 
-    let phdr = phdr_opt.expect_notls("failed to find AT_PHDR");
-    let phent = phent_opt.expect_notls("failed to find AT_PHENT");
-    let phnum = phnum_opt.expect_notls("failed to find AT_PHNUM");
+    let phdr = phdr_opt.expect("failed to find AT_PHDR");
+    let phent = phent_opt.expect("failed to find AT_PHENT");
+    let phnum = phnum_opt.expect("failed to find AT_PHNUM");
 
     for i in 0..phnum {
         let ph_addr = phdr + phent * i;
@@ -95,7 +93,7 @@ fn static_init(
                     ph.p_vaddr(endian) as usize,
                 )
             },
-            _ => panic_notls(format_args!("unknown AT_PHENT size {}", phent)),
+            _ => panic!("unknown AT_PHENT size {}", phent),
         };
 
         let page_size = Sys::getpagesize();
@@ -115,11 +113,10 @@ fn static_init(
                 STATIC_TCB_MASTER.image_size = p_filesz;
                 STATIC_TCB_MASTER.offset = valign;
 
-                let tcb = Tcb::new(vsize).expect_notls("failed to allocate TCB");
+                let tcb = Tcb::new(vsize).expect("failed to allocate TCB");
                 tcb.masters_ptr = ptr::addr_of_mut!(STATIC_TCB_MASTER);
                 tcb.masters_len = mem::size_of::<Master>();
-                tcb.copy_masters()
-                    .expect_notls("failed to copy TLS master data");
+                tcb.copy_masters().expect("failed to copy TLS master data");
                 tcb.activate(
                     #[cfg(target_os = "redox")]
                     Some(thr_fd),
@@ -160,9 +157,9 @@ pub unsafe fn init(
         {
             let file = thr_fd
                 .dup_into_upper(b"regs/env")
-                .expect_notls("failed to open handle for process registers");
+                .expect("failed to open handle for process registers");
 
-            file.read(&mut env).expect_notls("failed to read gsbase");
+            file.read(&mut env).expect("failed to read gsbase");
         }
 
         tp = env.gsbase as usize;
@@ -174,9 +171,9 @@ pub unsafe fn init(
         {
             let file = thr_fd
                 .dup_into_upper(b"regs/env")
-                .expect_notls("failed to open handle for process registers");
+                .expect("failed to open handle for process registers");
 
-            file.read(&mut env).expect_notls("failed to read fsbase");
+            file.read(&mut env).expect("failed to read fsbase");
         }
 
         tp = env.fsbase as usize;
