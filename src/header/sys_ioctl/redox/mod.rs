@@ -103,6 +103,18 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             let queue = out as c_int;
             dup_write(fd, "flush", &queue)?;
         }
+        // tcsendbreak() and tcdrain()
+        TCSBRK => {
+            // tcsendbreak == ioctl(TCSBRK, 0)
+            // tcdrain == ioctl(TCSBRK, <nonzero>)
+            let duration = out as c_int;
+            dup_write(fd, "sendbreak", &duration)?;
+        }
+        // tcflow()
+        TCXONC => {
+            let arg = out as c_int;
+            dup_write(fd, "flow", &arg)?;
+        }
         TIOCSCTTY => {
             todo_skip!(0, "ioctl TIOCSCTTY");
         }
@@ -133,12 +145,6 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
         TIOCGPTN => {
             let name = unsafe { &mut *(out as *mut c_int) };
             dup_read(fd, "ptsname", name)?;
-        }
-        TCSBRK => {
-            todo_skip!(0, "ioctl TCSBRK");
-        }
-        TCXONC => {
-            todo_skip!(0, "ioctl TCXONC");
         }
         SIOCATMARK => {
             todo_skip!(0, "ioctl SIOCATMARK");
