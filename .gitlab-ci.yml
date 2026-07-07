@@ -22,10 +22,20 @@ fmt:
         - rustup component add rustfmt-preview
         - ./fmt.sh -- --check
 
+clippy:
+    stage: build
+    needs: []
+    # TODO: remove when passed
+    allow_failure: true
+    script:
+        - ./check.sh --clippy
+
 linux:
     stage: build
     script:
+        - rustup component add clippy
         - ./check.sh --host
+#        - ./check.sh --host --clippy
 
 x86_64:
     stage: build
@@ -36,17 +46,20 @@ i586:
     stage: cross-build
     script:
         - ./check.sh --arch=i586
+#        - ./check.sh --arch=i586 --clippy
 
 aarch64:
     stage: cross-build
     image: "redoxos/redoxer:aarch64"
     script:
         - ./check.sh --arch=aarch64
+#        - ./check.sh --arch=aarch64 --clippy
 
 riscv64gc:
     stage: cross-build
     script:
         - ./check.sh --arch=riscv64gc
+#        - ./check.sh --arch=riscv64gc --clippy
 
 test:linux:
     stage: test
@@ -67,6 +80,7 @@ test:aarch64:
     image: "redoxos/redoxer:aarch64"
     # many issues that not exist in x86_64, and lack of interest to fix so far
     allow_failure: true
+    when: manual
     script:
         - timeout -s KILL 9m ./check.sh --arch=aarch64 --test
 
