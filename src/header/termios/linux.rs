@@ -93,38 +93,21 @@ pub const IUTF8: usize = 0o040_000;
 /* } c_iflag */
 
 /* c_oflag { */
-pub const OPOST: usize = 0o000_001;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/termios.3.html>.
+///
+/// Map lowercase characters to uppercase on output.
 pub const OLCUC: usize = 0o000_002;
+/// Map NL to CR-NL on output.
 pub const ONLCR: usize = 0o000_004;
-pub const OCRNL: usize = 0o000_010;
-pub const ONOCR: usize = 0o000_020;
-pub const ONLRET: usize = 0o000_040;
-pub const OFILL: usize = 0o000_100;
-pub const OFDEL: usize = 0o000_200;
-
+/// Select vertical-tab delays.
 pub const VTDLY: usize = 0o040_000;
+/// Vertical-tab delay type 0.
 pub const VT0: usize = 0o000_000;
+/// Vertical-tab delay type 1.
 pub const VT1: usize = 0o040_000;
 /* } c_oflag */
 
 /* c_cflag { */
-pub const B0: usize = 0o000_000;
-pub const B50: usize = 0o000_001;
-pub const B75: usize = 0o000_002;
-pub const B110: usize = 0o000_003;
-pub const B134: usize = 0o000_004;
-pub const B150: usize = 0o000_005;
-pub const B200: usize = 0o000_006;
-pub const B300: usize = 0o000_007;
-pub const B600: usize = 0o000_010;
-pub const B1200: usize = 0o000_011;
-pub const B1800: usize = 0o000_012;
-pub const B2400: usize = 0o000_013;
-pub const B4800: usize = 0o000_014;
-pub const B9600: usize = 0o000_015;
-pub const B19200: usize = 0o000_016;
-pub const B38400: usize = 0o000_017;
-
 pub const B57600: usize = 0o010_001;
 pub const B115200: usize = 0o010_002;
 pub const B230400: usize = 0o010_003;
@@ -141,32 +124,44 @@ pub const B3000000: usize = 0o010_015;
 pub const B3500000: usize = 0o010_016;
 pub const B4000000: usize = 0o010_017;
 
+/// Character size.
 pub const CSIZE: usize = 0o000_060;
-pub const CS5: usize = 0o000_000;
+/// 6 bits.
 pub const CS6: usize = 0o000_020;
+/// 7 bits.
 pub const CS7: usize = 0o000_040;
+/// 8 bits.
 pub const CS8: usize = 0o000_060;
 
+/// Send two stop bits, else one.
 pub const CSTOPB: usize = 0o000_100;
+/// Enable receiver.
 pub const CREAD: usize = 0o000_200;
+/// Parity enable.
 pub const PARENB: usize = 0o000_400;
+/// Odd parity, else even.
 pub const PARODD: usize = 0o001_000;
+/// Hang up on last close.
 pub const HUPCL: usize = 0o002_000;
+/// Ignore modem status lines.
 pub const CLOCAL: usize = 0o004_000;
 /* } c_clfag */
 
 /* c_lflag { */
+/// Enable signals.
 pub const ISIG: usize = 0o000_001;
+/// Canoncal input (erase and kill processing).
 pub const ICANON: usize = 0o000_002;
-pub const ECHO: usize = 0o000_010;
+/// Echo erase character as error-correcting backspace.
 pub const ECHOE: usize = 0o000_020;
+/// Echo KILL.
 pub const ECHOK: usize = 0o000_040;
+/// Echo NL.
 pub const ECHONL: usize = 0o000_100;
+/// Disable flush after interrupt or quit.
 pub const NOFLSH: usize = 0o000_200;
+/// Send `SIGTTOU` for background output.
 pub const TOSTOP: usize = 0o000_400;
+/// Enable extended input character processing.
 pub const IEXTEN: usize = 0o100_000;
 /* } c_lflag */
-
-// POSIX extensions
-/// Sentinel value to disable a control char.
-pub const _POSIX_VDISABLE: u8 = 0;
