@@ -71,9 +71,8 @@ pub unsafe extern "C" fn openpty(
         &mut tmp_name
     };
 
-    let (master, slave) = match unsafe { openpty_inner(name) } {
-        Ok(ok) => ok,
-        Err(()) => return -1,
+    let Ok((master, slave)) = (unsafe { openpty_inner(name) }) else {
+        return -1;
     };
 
     if !termp.is_null() {

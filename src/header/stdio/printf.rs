@@ -1065,12 +1065,9 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         let mut string = String::new();
 
                         while unsafe { *ptr } != 0 {
-                            let c = match char::from_u32(unsafe { *ptr } as _) {
-                                Some(c) => c,
-                                None => {
-                                    platform::ERRNO.set(EILSEQ);
-                                    return Err(io::last_os_error());
-                                }
+                            let Some(c) = char::from_u32(unsafe { *ptr } as _) else {
+                                platform::ERRNO.set(EILSEQ);
+                                return Err(io::last_os_error());
                             };
                             if string.len() + c.len_utf8() >= max {
                                 break;
@@ -1102,12 +1099,9 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         pad(w, left, b' ', 1..pad_space)?;
                     }
                     VaArg::wint_t(c) => {
-                        let c = match char::from_u32(c as _) {
-                            Some(c) => c,
-                            None => {
-                                platform::ERRNO.set(EILSEQ);
-                                return Err(io::last_os_error());
-                            }
+                        let Some(c) = char::from_u32(c as _) else {
+                            platform::ERRNO.set(EILSEQ);
+                            return Err(io::last_os_error());
                         };
                         let mut buf = [0; 4];
 
@@ -1119,11 +1113,10 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 }
             }
             FmtKind::Pointer => {
-                let ptr = match unsafe {
-                    varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
-                } {
-                    VaArg::pointer(p) => p,
-                    _ => panic!("this should not be possible"),
+                let VaArg::pointer(ptr) =
+                    (unsafe { varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) })
+                else {
+                    panic!("this should not be possible");
                 };
 
                 let mut len = 1;
@@ -1146,11 +1139,10 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 pad(w, left, b' ', len..pad_space)?;
             }
             FmtKind::GetWritten => {
-                let ptr = match unsafe {
-                    varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
-                } {
-                    VaArg::pointer(p) => p,
-                    _ => panic!("this should not be possible"),
+                let VaArg::pointer(ptr) =
+                    (unsafe { varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) })
+                else {
+                    panic!("this should not be possible");
                 };
 
                 match intkind {

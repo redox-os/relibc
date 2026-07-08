@@ -57,18 +57,17 @@ pub unsafe extern "C" fn getdelim(
     delim: c_int,
     stream: *mut FILE,
 ) -> ssize_t {
-    let (lineptr, n, stream) = if let (Some(ptr), Some(n), Some(file)) =
+    let (Some(lineptr), Some(n), Some(stream)) =
         (unsafe { lineptr.as_mut() }, unsafe { n.as_mut() }, unsafe {
             stream.as_mut()
-        }) {
-        (ptr, n, file)
-    } else {
+        })
+    else {
         ERRNO.set(EINVAL);
-        return -1 as ssize_t;
+        return -1;
     };
 
     if unsafe { feof(stream) } != 0 || unsafe { ferror(stream) } != 0 {
-        return -1 as ssize_t;
+        return -1;
     }
 
     // POSIX specifies UB but we test anyway

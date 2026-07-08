@@ -280,12 +280,9 @@ macro_rules! strto_impl {
 
         // check for error parsing octal/hex prefix
         // also check to ensure a number was indeed parsed
-        let (num, i, overflow) = match res {
-            Some(res) => res,
-            None => {
-                invalid_input();
-                return 0;
-            }
+        let Some((num, i, overflow)) = res else {
+            invalid_input();
+            return 0;
         };
         idx += i;
 

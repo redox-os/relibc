@@ -441,14 +441,11 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     let minute = unsafe { (*timeptr).tm_min } as _;
     let second = unsafe { (*timeptr).tm_sec } as _;
 
-    let naive_local = match NaiveDate::from_ymd_opt(year, month, day)
+    let Some(naive_local) = NaiveDate::from_ymd_opt(year, month, day)
         .and_then(|date| date.and_hms_opt(hour, minute, second))
-    {
-        Some(datetime) => datetime,
-        None => {
-            platform::ERRNO.set(EOVERFLOW);
-            return -1;
-        }
+    else {
+        platform::ERRNO.set(EOVERFLOW);
+        return -1;
     };
 
     let tz = time_zone();
@@ -542,9 +539,8 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
     let tm_val = unsafe { &mut *tm };
-    let dt = match convert_tm_generic(&Utc, tm_val) {
-        Some(dt) => dt,
-        None => return -1,
+    let Some(dt) = convert_tm_generic(&Utc, tm_val) else {
+        return -1;
     };
 
     unsafe {
@@ -564,9 +560,8 @@ pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
 pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
     let tm_val = unsafe { &mut *tm };
     let tz = time_zone();
-    let dt = match convert_tm_generic(&tz, tm_val) {
-        Some(dt) => dt,
-        None => return -1,
+    let Some(dt) = convert_tm_generic(&tz, tm_val) else {
+        return -1;
     };
 
     let tz_name = CString::new(tz.name()).unwrap();
