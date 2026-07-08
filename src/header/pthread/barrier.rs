@@ -81,10 +81,6 @@ pub unsafe extern "C" fn pthread_barrier_init(
     0
 }
 
-fn unlikely(condition: bool) -> bool {
-    condition
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_barrier_wait.html>.
 ///
 /// Synchronizes participating threads at the barrier referenced by `barrier`.

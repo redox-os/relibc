@@ -422,12 +422,9 @@ fn stage2(
         crate::platform::init_inner(auxv);
     }
 
-    let (path, _name) = match resolve_path_name(&name_or_path, &envs) {
-        Some((p, n)) => (p, n),
-        None => {
-            eprintln!("[ld.so]: failed to locate '{name_or_path}'");
-            unistd::_exit(1);
-        }
+    let Some((path, _name)) = resolve_path_name(&name_or_path, &envs) else {
+        eprintln!("[ld.so]: failed to locate '{name_or_path}'");
+        unistd::_exit(1);
     };
 
     let config = Config::from_env(&envs);

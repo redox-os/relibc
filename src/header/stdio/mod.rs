@@ -490,9 +490,8 @@ pub unsafe extern "C" fn fgets(
 
         // TODO: When NLL is a thing, this block can be flattened out
         let (read, exit) = {
-            let buf = match stream.fill_buf() {
-                Ok(buf) => buf,
-                Err(_) => return ptr::null_mut(),
+            let Ok(buf) = stream.fill_buf() else {
+                return ptr::null_mut();
             };
             if buf.is_empty() {
                 break;
@@ -993,12 +992,9 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
         }
     }
 
-    let write = match write_opt {
-        Some(some) => some,
-        None => {
-            ERRNO.set(errno::EINVAL);
-            return ptr::null_mut();
-        }
+    let Some(write) = write_opt else {
+        ERRNO.set(errno::EINVAL);
+        return ptr::null_mut();
     };
 
     let mut pipes = [-1, -1];

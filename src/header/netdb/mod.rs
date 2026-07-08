@@ -387,12 +387,9 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
             return ptr::null_mut();
         }
     };
-    let host_addr = match host.into_iter().next() {
-        Some(result) => result,
-        None => {
-            H_ERRNO.set(HOST_NOT_FOUND);
-            return ptr::null_mut();
-        }
+    let Some(host_addr) = host.into_iter().next() else {
+        H_ERRNO.set(HOST_NOT_FOUND);
+        return ptr::null_mut();
     };
 
     let host_name: Vec<u8> = name_cstr.to_bytes().to_vec();
@@ -730,9 +727,8 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
             Some(serv_name) => serv_name.bytes().chain(Some(b'\0')).collect(),
             None => continue,
         };
-        let port_proto = match iter.next() {
-            Some(port_proto) => port_proto,
-            None => continue,
+        let Some(port_proto) = iter.next() else {
+            continue;
         };
         let mut split = port_proto.split('/');
         let mut port: Vec<u8> = match split.next() {

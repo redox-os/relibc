@@ -27,9 +27,8 @@ pub unsafe extern "C" fn strfmon(
     }
 
     // Convert the format string from C to string
-    let format_str = match unsafe { CStr::from_ptr(format) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return -1, // Invalid format string
+    let Ok(format_str) = unsafe { CStr::from_ptr(format) }.to_str() else {
+        return -1;
     };
 
     // Create a mutable slice for the output buffer

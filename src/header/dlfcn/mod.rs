@@ -38,7 +38,10 @@ pub const RTLD_LOCAL: c_int = 0x0000;
 /// The identifier lookup happens in the normal global scope; that is, a
 /// search for an identifier using `handle` would find the same definition
 /// as a direct use of this identifier in the program code.
-#[allow(clippy::zero_ptr)] // related cbindgen issue: https://github.com/mozilla/cbindgen/issues/948
+#[expect(
+    clippy::zero_ptr,
+    reason = "cbindgen issue: https://github.com/mozilla/cbindgen/issues/948"
+)]
 pub const RTLD_DEFAULT: *mut c_void = 0 as *mut c_void; // XXX: cbindgen doesn't like ptr::null_mut() for publically exported constants
 
 static ERROR_NOT_SUPPORTED: &core::ffi::CStr = c"dlfcn not supported";
@@ -108,12 +111,9 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
         }
     };
 
-    let tcb = match unsafe { Tcb::current() } {
-        Some(tcb) => tcb,
-        None => {
-            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-            return ptr::null_mut();
-        }
+    let Some(tcb) = (unsafe { Tcb::current() }) else {
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        return ptr::null_mut();
     };
 
     if tcb.linker_ptr.is_null() {
@@ -150,12 +150,9 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     // FIXME(andypython): just call obj.scope.get_sym() directly or search the
     // global scope.  The rest is unnecessary as Linker::get_sym() does not
     // depend on the Linker state.
-    let tcb = match unsafe { Tcb::current() } {
-        Some(tcb) => tcb,
-        None => {
-            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-            return ptr::null_mut();
-        }
+    let Some(tcb) = (unsafe { Tcb::current() }) else {
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        return ptr::null_mut();
     };
 
     if tcb.linker_ptr.is_null() {
@@ -178,12 +175,9 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlclose.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
-    let tcb = match unsafe { Tcb::current() } {
-        Some(tcb) => tcb,
-        None => {
-            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-            return -1;
-        }
+    let Some(tcb) = (unsafe { Tcb::current() }) else {
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        return -1;
     };
 
     if tcb.linker_ptr.is_null() {

@@ -73,12 +73,9 @@ pub unsafe extern "C" fn shmget(key: key_t, size: size_t, shmflg: c_int) -> c_in
     }
 
     if (oflag & O_CREAT) != 0 {
-        let total_size = match size.checked_add(mem::size_of::<ShmHeader>()) {
-            Some(s) => s,
-            None => {
-                ERRNO.set(EINVAL);
-                return -1;
-            }
+        let Some(total_size) = size.checked_add(mem::size_of::<ShmHeader>()) else {
+            ERRNO.set(EINVAL);
+            return -1;
         };
         if ftruncate(fd, total_size as i64) < 0 {
             return -1;
@@ -110,10 +107,7 @@ pub unsafe extern "C" fn shmat(
     }
 
     let res = unsafe { Sys::mmap(core::ptr::null_mut(), size, prot, MAP_SHARED, shmid, 0) };
-    let ptr = match res {
-        Ok(p) => p,
-        Err(_) => return SHM_FAILED,
-    };
+    let Ok(ptr) = res else { return SHM_FAILED };
 
     let header = ptr.cast::<ShmHeader>();
     unsafe {

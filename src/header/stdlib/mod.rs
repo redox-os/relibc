@@ -18,12 +18,12 @@ use crate::{
     header::{
         ctype,
         errno::{self, *},
-        fcntl::*,
+        fcntl::{O_ACCMODE, O_CLOEXEC, O_CREAT, O_EXCL, O_PATH, O_RDWR, open},
         limits,
         stdio::flush_io_streams,
         stdlib::sort::{QsortContext, QsortRContext},
-        string::*,
-        sys_ioctl::*,
+        string::{strlen, strncmp},
+        sys_ioctl::{TIOCGPTN, TIOCSPTLCK, ioctl},
         time::constants::CLOCK_MONOTONIC,
         unistd::{self, _SC_PAGESIZE, sysconf},
         wchar::*,
@@ -1194,9 +1194,8 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
 
     let out = unsafe { slice::from_raw_parts_mut(ptr.cast::<u8>(), limits::PATH_MAX) };
     {
-        let file = match File::open(unsafe { CStr::from_ptr(pathname) }, O_PATH | O_CLOEXEC) {
-            Ok(file) => file,
-            Err(_) => return ptr::null_mut(),
+        let Ok(file) = File::open(unsafe { CStr::from_ptr(pathname) }, O_PATH | O_CLOEXEC) else {
+            return ptr::null_mut();
         };
 
         let len = out.len();

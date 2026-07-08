@@ -74,12 +74,9 @@ pub unsafe extern "C" fn crypt_r(
     }
 
     let key = unsafe { CStr::from_ptr(key) }.to_bytes();
-    let setting = match unsafe { CStr::from_ptr(setting) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            platform::ERRNO.set(EINVAL);
-            return ptr::null_mut();
-        }
+    let Ok(setting) = unsafe { CStr::from_ptr(setting) }.to_str() else {
+        platform::ERRNO.set(EINVAL);
+        return ptr::null_mut();
     };
 
     let encoded = if setting.starts_with('$') {
