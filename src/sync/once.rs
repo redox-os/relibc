@@ -1,5 +1,5 @@
 use super::AttemptStatus;
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 use core::{
     cell::UnsafeCell,
     mem::MaybeUninit,
