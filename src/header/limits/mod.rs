@@ -88,14 +88,20 @@ pub const _POSIX_CHILD_MAX: c_long = 25;
 pub const _POSIX_CLOCKRES_MIN: c_long = 20000000;
 pub const _POSIX_DELAYTIMER_MAX: c_long = 32;
 pub const _POSIX_HOST_NAME_MAX: c_long = 255;
+/// Minimum required value for `LINK_MAX`.
 pub const _POSIX_LINK_MAX: c_long = 8;
 pub const _POSIX_LOGIN_NAME_MAX: c_long = 9;
+/// Minimum required value for `MAX_CANON`.
 pub const _POSIX_MAX_CANON: c_long = 255;
+/// Minimum required value for `MAX_INPUT`.
 pub const _POSIX_MAX_INPUT: c_long = 255;
+/// Minimum required value for `NAME_MAX`.
 pub const _POSIX_NAME_MAX: c_long = 14;
 pub const _POSIX_NGROUPS_MAX: c_long = 8;
 pub const _POSIX_OPEN_MAX: c_long = 20;
+/// Minimum required value for `PATH_MAX`.
 pub const _POSIX_PATH_MAX: c_long = 256;
+/// Minimum required value for `PIPE_BUF`.
 pub const _POSIX_PIPE_BUF: c_long = 512;
 pub const _POSIX_RE_DUP_MAX: c_long = 255;
 pub const _POSIX_RTSIG_MAX: c_long = 8;
@@ -104,6 +110,7 @@ pub const _POSIX_SEM_VALUE_MAX: c_long = 32767;
 pub const _POSIX_SIGQUEUE_MAX: c_long = 32;
 pub const _POSIX_SSIZE_MAX: c_long = 32767;
 pub const _POSIX_STREAM_MAX: c_long = 8;
+/// Minimum required value for `SYMLINK_MAX`.
 pub const _POSIX_SYMLINK_MAX: c_long = 255;
 /// Minimum required value for `SYMLOOP_MAX`.
 pub const _POSIX_SYMLOOP_MAX: c_long = 8;
@@ -138,12 +145,24 @@ pub const RE_DUP_MAX: c_long = _POSIX2_RE_DUP_MAX;
 pub const HOST_NAME_MAX: c_long = _POSIX_HOST_NAME_MAX;
 pub const LOGIN_NAME_MAX: c_long = 255;
 pub const GETENTROPY_MAX: c_long = 256;
+/// Maximum number of links to a single file.
 pub const LINK_MAX: c_long = 127;
+/// Maximum number of bytes that is guaranteed to be atomic when writing to a
+/// pipe.
 pub const PIPE_BUF: c_long = 4096;
+/// Minimum number of bits needed to represent, as a signed integer value, the
+/// maximum size of a regular file allowed in the specified directory.
 pub const FILESIZEBITS: c_long = 64;
+/// Maximum number of bytes in a terminal canonical input line.
 pub const MAX_CANON: c_long = _POSIX_MAX_CANON;
+/// Maximum number of bytes for which space is available in a terminal input
+/// queue; therefore, the maximum number of bytes a conforming application may
+/// require to be typed as input before reading them.
 pub const MAX_INPUT: c_long = _POSIX_MAX_INPUT;
+/// Maximum number of bytes in a symbolic link.
 pub const SYMLINK_MAX: c_long = _POSIX_SYMLINK_MAX;
+/// Minimum number of bytes of storage actually allocated for any portion of a
+/// file.
 pub const POSIX_ALLOC_SIZE_MIN: c_long = 4096;
 
 // PTHREAD_DESTRUCTOR_ITERATIONS defined in bits file
@@ -153,4 +172,5 @@ pub const PTHREAD_STACK_MIN: c_long = 65536;
 /// Maximum number of symbolic links that can be reliably traversed in the
 /// resolution of a pathname in the absence of a loop.
 pub const SYMLOOP_MAX: c_long = 64;
+/// Maximum length of terminal device name.
 pub const TTY_NAME_MAX: c_long = 32; // "/scheme/pty/".len() + size of usize::MAX as string + 1

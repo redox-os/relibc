@@ -300,6 +300,25 @@ pub unsafe extern "C" fn clearerr(stream: *mut FILE) {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ctermid.html>.
+///
+/// Generates a string that, when used as a pathname, refers to the current
+/// controlling terminal for the current process. If a pathname is returned,
+/// access to the file is not guaranteed.
+///
+/// If `s` is a null pointer, the string is generated in a static area, the
+/// address of which is returned. If `s` is not a null pointer, `s` is assumed
+/// to point to a character array of at least `L_ctermid` bytes; the string is
+/// placed in this array and the value of `s` shall be returned. An empty
+/// string shall be returned if the pathname that would refer to the
+/// controlling terminal cannot be determined, or if the function is
+/// unsuccessful.
+///
+/// # Safety
+/// - The application shall not modify the string returned.
+/// - The returned pointer might be invalidated or the string content might be
+///   overwritten by a subsequent call to `ctermid()`.
+/// - The returned pointer might be invalidated if the calling thread is
+///   terminated.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
     static mut TERMID: [u8; L_ctermid] = *b"/dev/tty\0";

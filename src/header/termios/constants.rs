@@ -95,7 +95,3 @@ pub const CS5: usize = 0o000_000;
 /// Enable echo.
 pub const ECHO: usize = 0o000_010;
 /* } c_lflag */
-
-// POSIX extensions
-/// Sentinel value to disable a control char.
-pub const _POSIX_VDISABLE: u8 = 0;

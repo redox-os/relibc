@@ -938,11 +938,25 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ptsname.html>.
+///
+/// Returns the name of the subsidiary pseudo-terminal device associated with a
+/// manager pseudo-terminal device.
+///
+/// Upon success, returns a pointer to a string which is the name of the
+/// subsidiary pseudo-terminal device. Upon failure, returns a null pointer and
+/// sets errno to indicate the error value.
+///
+/// # Safety
+/// - The application shall not modify the string returned.
+/// - The returned pointer might be invalidated or the string content might be
+///   overwritten by a subsequent call to `ptsname()`.
+/// - The returned pointer and string content might be invalidated if the
+///   calling thread is terminated.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn ptsname(fd: c_int) -> *mut c_char {
+pub unsafe extern "C" fn ptsname(fildes: c_int) -> *mut c_char {
     const PTS_BUFFER_LEN: usize = limits::TTY_NAME_MAX as usize;
     static mut PTS_BUFFER: [c_char; PTS_BUFFER_LEN] = [0; PTS_BUFFER_LEN];
-    let ret = unsafe { ptsname_r(fd, (&raw mut PTS_BUFFER).cast(), PTS_BUFFER_LEN) };
+    let ret = unsafe { ptsname_r(fildes, (&raw mut PTS_BUFFER).cast(), PTS_BUFFER_LEN) };
     if ret != 0 {
         platform::ERRNO.set(ret);
         ptr::null_mut()
@@ -952,42 +966,43 @@ pub unsafe extern "C" fn ptsname(fd: c_int) -> *mut c_char {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ptsname.html>.
+///
+/// Stores the name of the subsidiary pseudo-terminal device corresponding to
+/// `fildes` in the character array referenced by `name`. The array is
+/// `namesize` characters long and should have space for the `name` and the
+/// terminating null character.
+///
+/// Upon success, returns `0`. Upon failure, an error number is returned to
+/// indicate the error.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
-    if buf.is_null() {
-        platform::ERRNO.set(EINVAL);
+pub unsafe extern "C" fn ptsname_r(fildes: c_int, name: *mut c_char, namesize: size_t) -> c_int {
+    if name.is_null() {
         EINVAL
     } else {
-        unsafe { __ptsname_r(fd, buf, buflen) }
-    }
-}
+        let mut pty: c_int = 0;
 
-// ptsname_r is not allowed to set errno, but it has it as a return value.
-#[inline(always)]
-unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
-    let mut pty: c_int = 0;
-
-    if unsafe { ioctl(fd, TIOCGPTN, ptr::from_mut(&mut pty).cast::<c_void>()) } == 0 {
-        // Linux and Redox use different resource names for PTS's.
-        #[cfg(target_os = "linux")]
-        let name = format!("/dev/pts/{}", pty);
-        #[cfg(target_os = "redox")]
-        let name = format!("/scheme/pty/{}", pty);
-        let len = name.len();
-        // We need + 1 to account for the NUL terminator.
-        if len + 1 > buflen {
-            ERANGE
+        if unsafe { ioctl(fildes, TIOCGPTN, ptr::from_mut(&mut pty).cast::<c_void>()) } == 0 {
+            // Linux and Redox use different resource names for PTS's.
+            #[cfg(target_os = "linux")]
+            let inner_name = format!("/dev/pts/{}", pty);
+            #[cfg(target_os = "redox")]
+            let inner_name = format!("/scheme/pty/{}", pty);
+            let len = inner_name.len();
+            // We need + 1 to account for the NUL terminator.
+            if len + 1 > namesize {
+                ERANGE
+            } else {
+                // we have checked the string will fit in the buffer
+                // so can use strcpy safely
+                let s = inner_name.as_ptr().cast();
+                unsafe { ptr::copy_nonoverlapping(s, name, len) };
+                // NUL-terminate the result.
+                unsafe { *(name.add(len + 1)) = 0 };
+                0
+            }
         } else {
-            // we have checked the string will fit in the buffer
-            // so can use strcpy safely
-            let s = name.as_ptr().cast();
-            unsafe { ptr::copy_nonoverlapping(s, buf, len) };
-            // NUL-terminate the result.
-            unsafe { *(buf.add(len + 1)) = 0 };
-            0
+            platform::ERRNO.get()
         }
-    } else {
-        platform::ERRNO.get()
     }
 }
 
