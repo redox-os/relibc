@@ -33,6 +33,7 @@ pub const RENAME_EXCHANGE: c_uint = 0x02;
 pub const RENAME_WHITEOUT: c_uint = 0x04;
 
 // /dev/tty + nul
+/// Maximum size of character array to hold `ctermid()` output.
 pub const L_ctermid: usize = 9;
 // form of name is /XXXXXX, so 7
 pub const L_tmpnam: c_int = 7;

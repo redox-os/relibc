@@ -87,6 +87,10 @@ pub const STDERR_FILENO: c_int = 2;
 
 pub const L_cuserid: usize = 9;
 
+/// This symbol shall be defined to be the value of a character that shall
+/// disable terminal special character handling.
+pub const _POSIX_VDISABLE: u8 = 0;
+
 // confstr constants
 // These are copied from Rust's libc and match musl as well.
 pub const _CS_PATH: c_int = 0;
@@ -437,6 +441,20 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
+///
+/// Creates a new process. After `fork()`, both the parent and the child
+/// processes shall be capable of executing independently before either one
+/// terminates.
+///
+/// Upon success, returns `0` to the child process and returns the process ID
+/// of the child process to the parent process. Upon failure, returns `-1` to
+/// the parent process, no child process shall be created, and sets errno to
+/// indicate the error.
+///
+/// # Safety
+/// For locks held by any thread in the calling process that have not been set
+/// to be process-shared, any attempt by the child process to perform any
+/// operation on the lock results in undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fork() -> pid_t {
     for prepare in unsafe { &fork_hooks[0] } {
@@ -1039,6 +1057,17 @@ pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setsid.html>.
+///
+/// Creates a new session, if the calling process is not a process group
+/// leader. Upon return the calling process shall be the session leader of this
+/// new session, shall be the process group leader of a new process group, and
+/// shall have no controlling terminal. The process group ID of the calling
+/// process shall be set equal to the process ID of the calling process. The
+/// calling process shall be the only process in the new process group and the
+/// only process in the new session.
+///
+/// Upon success, returns the value of the new process group ID of the calling
+/// process. Upon failure, returns `-1` and sets errno to indicate the error.
 #[unsafe(no_mangle)]
 pub extern "C" fn setsid() -> pid_t {
     Sys::setsid().or_minus_one_errno()
@@ -1123,22 +1152,45 @@ pub extern "C" fn sync() {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetpgrp.html>.
+///
+/// Returns the value of the process group ID of the foreground process group
+/// associated with the terminal. Calling this function is allowed from a
+/// process that is a member of the background process group; however, the
+/// information may be subsequently changed by a process that is a member of
+/// the foreground process group.
+///
+/// Upon success, returns the value of the process group ID of the foreground
+/// process group associated with the terminal. If there is no foreground
+/// process group, returns a value greater than `1` that does not match the
+/// process group ID of any existing process group. Upon failure, returns `-1`
+/// and sets errno to indicate the error.
 #[unsafe(no_mangle)]
-pub extern "C" fn tcgetpgrp(fd: c_int) -> pid_t {
+pub extern "C" fn tcgetpgrp(fildes: c_int) -> pid_t {
     let mut pgrp = 0;
-    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGPGRP, (&raw mut pgrp).cast()) } < 0 {
+    if unsafe { sys_ioctl::ioctl(fildes, sys_ioctl::TIOCGPGRP, (&raw mut pgrp).cast()) } < 0 {
         return -1;
     }
     pgrp
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetpgrp.html>.
+///
+/// If the process has a controlling terminal, sets the foreground process
+/// group ID associated with the terminal to `pgid_id`. Using this function
+/// from a process which is a member of the background process group on a
+/// `fildes` associated with its controlling terminal shall cause the process
+/// group to be sent a `SIGTTOU` signal. If the calling thread is blocking
+/// `SIGTTOU` signals or the process is ignoring `SIGTTOU` signals, the process
+/// shall be allowed to perform the operation, and no signal is sent.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
-pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
-    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSPGRP, &raw const pgrp as _) } < 0 {
+pub extern "C" fn tcsetpgrp(fildes: c_int, pgid_id: pid_t) -> c_int {
+    if unsafe { sys_ioctl::ioctl(fildes, sys_ioctl::TIOCSPGRP, &raw const pgid_id as _) } < 0 {
         return -1;
     }
-    pgrp
+    pgid_id
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/truncate.html>.
