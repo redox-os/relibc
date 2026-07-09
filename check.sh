@@ -68,6 +68,10 @@ while [[ $# -gt 0 ]]; do
         --cargo)
             CMD_ACTION="cargo"
             ;;
+        --clippy)
+            CMD_ACTION="cargo"
+            CARGO_ACTION="clippy"
+            ;;
         --host)
             CURRENT_TARGET="$(uname -m)-unknown-linux-gnu"
             IS_HOST=1
@@ -123,7 +127,7 @@ run_redoxer() {
     if [ "$CMD_ACTION" == "make" ]; then
         CMD_OPT="-j $(nproc) $MAKE_ACTION"
     else
-        CMD_OPT="$CARGO_ACTION"
+        CMD_OPT="$CARGO_ACTION --target=$TARGET"
     fi
 
     echo "----------------------------------------"
