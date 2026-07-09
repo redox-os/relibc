@@ -196,7 +196,7 @@ pub fn sys_call_ro<T: Call>(
 
     let _siglock = tmp_disable_signals();
 
-    if payload.len().is_multiple_of(size_of::<usize>()) {
+    if !payload.len().is_multiple_of(size_of::<usize>()) {
         return Err(Error::new(EINVAL));
     }
 
@@ -273,7 +273,7 @@ pub fn sys_call_wo<T: Call>(
     }
     let _siglock = tmp_disable_signals();
 
-    if payload.len().is_multiple_of(size_of::<usize>()) {
+    if !payload.len().is_multiple_of(size_of::<usize>()) {
         return Err(Error::new(EINVAL));
     }
     let fd_slice = unsafe {
