@@ -69,6 +69,7 @@ pub struct ExtraInfo<'a> {
     pub same_process: bool,
 }
 
+#[expect(clippy::too_many_arguments)]
 pub fn fexec_impl(
     image_file: FdGuardUpper,
     thread_fd: &FdGuardUpper,
@@ -124,7 +125,13 @@ pub fn fexec_impl(
         min_mmap_addr = cmp::max(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
     };
 
-    pread_all(&image_file, u64::from(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
+    pread_all(
+        &image_file,
+        #[expect(clippy::useless_conversion, reason = "could be 32bit Header")]
+        u64::from(header.e_phoff),
+        phs,
+    )
+    .map_err(|_| Error::new(EIO))?;
 
     let mut span: Option<Range<usize>> = None;
     for ph_idx in 0..phnum {
@@ -190,7 +197,12 @@ pub fn fexec_impl(
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
                 let mut interp = vec![0_u8; segment.p_filesz as usize];
-                pread_all(&image_file, u64::from(segment.p_offset), &mut interp)?;
+                pread_all(
+                    &image_file,
+                    #[expect(clippy::useless_conversion, reason = "could be 32bit ProgramHeader")]
+                    u64::from(segment.p_offset),
+                    &mut interp,
+                )?;
 
                 interpreter = Some(interp.into_boxed_slice());
             }
@@ -235,6 +247,10 @@ pub fn fexec_impl(
                     };
                     pread_all(
                         &image_file,
+                        #[expect(
+                            clippy::useless_conversion,
+                            reason = "could be 32bit ProgramHeader"
+                        )]
                         u64::from(segment.p_offset),
                         &mut dst_memory[voff..voff + filesz],
                     )?;
@@ -399,9 +415,9 @@ pub fn fexec_impl(
         push(extrainfo.umask as usize)?;
         push(AT_REDOX_UMASK)?;
 
-        push(extrainfo.thr_fd as usize)?;
+        push(extrainfo.thr_fd)?;
         push(AT_REDOX_THR_FD)?;
-        push(extrainfo.proc_fd as usize)?;
+        push(extrainfo.proc_fd)?;
         push(AT_REDOX_PROC_FD)?;
         push(extrainfo.ns_fd.unwrap_or(usize::MAX))?;
         push(AT_REDOX_NS_FD)?;
@@ -519,7 +535,7 @@ pub fn fexec_impl(
         }
 
         unsafe {
-            deactivate_tcb(&thread_fd)?;
+            deactivate_tcb(thread_fd)?;
         }
 
         let old_filetable_fd = {
@@ -718,6 +734,7 @@ impl<'a> MmapGuard<'a> {
     pub fn addr(&self) -> usize {
         self.base
     }
+    #[expect(clippy::len_without_is_empty, reason = "this len() is not costly")]
     pub fn len(&self) -> usize {
         self.size
     }
@@ -948,7 +965,7 @@ pub fn fork_impl(args: &ForkArgs<'_>) -> Result<usize> {
     let old_mask = crate::signal::get_sigmask()?;
     let pid = unsafe {
         Error::demux(__relibc_internal_fork_wrapper(
-            args as *const ForkArgs as usize,
+            core::ptr::from_ref::<ForkArgs>(args) as usize,
         ))?
     };
 
@@ -1006,7 +1023,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             target_arch = "riscv64"
         ))]
         let arg1 = {
-            let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
+            let scratchpad_ptr: *const ForkScratchpad = &raw const scratchpad;
             scratchpad_ptr as usize
         };
         #[cfg(target_arch = "x86")]

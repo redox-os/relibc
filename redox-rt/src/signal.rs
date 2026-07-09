@@ -108,11 +108,9 @@ unsafe fn inner(stack: &mut SigStack) {
     let os = unsafe { &Tcb::current().unwrap().os_specific };
 
     let stack_ptr = NonNull::from(&mut *stack);
-    stack.link = core::mem::replace(
-        unsafe { &mut (*os.arch.get()).last_sigstack },
-        Some(stack_ptr),
-    )
-    .map_or_else(core::ptr::null_mut, |x| x.as_ptr());
+    stack.link = unsafe { &mut (*os.arch.get()).last_sigstack }
+        .replace(stack_ptr)
+        .map_or_else(core::ptr::null_mut, |x| x.as_ptr());
 
     let signals_were_disabled = unsafe { (*os.arch.get()).disable_signals_depth > 0 };
 
@@ -228,7 +226,7 @@ unsafe fn inner(stack: &mut SigStack) {
             sigaction(
                 stack.sig_num as c_int,
                 core::ptr::addr_of!(info).cast(),
-                stack as *mut SigStack as *mut (),
+                core::ptr::from_mut::<SigStack>(stack).cast::<()>(),
             )
         };
     } else if let Some(handler) = unsafe { handler.handler } {
@@ -415,7 +413,7 @@ fn convert_old(action: &RawAction) -> Sigaction {
         SigactionKind::Ignore
     } else {
         SigactionKind::Handled {
-            handler: unsafe { core::mem::transmute(handler as usize) },
+            handler: unsafe { core::mem::transmute::<usize, SignalHandler>(handler) },
         }
     };
 
@@ -696,7 +694,7 @@ pub fn current_setsighandler_struct() -> SetSighandlerData {
         thread_control_addr: core::ptr::addr_of!(
             unsafe { Tcb::current() }.unwrap().os_specific.control
         ) as usize,
-        proc_control_addr: &PROC_CONTROL_STRUCT as *const SigProcControl as usize,
+        proc_control_addr: &raw const PROC_CONTROL_STRUCT as usize,
     }
 }
 
@@ -821,12 +819,12 @@ pub fn callback_or_signal_async<T, F: FnOnce() -> Result<T>>(
     let old_allowset = get_allowset_raw(&control.word);
     set_allowset_raw(&control.word, old_allowset, inner_allowset);
     let res = callback();
-    if let Err(err) = &res {
-        if err.errno == EINTR {
-            // Run trampoline if EINTR returned
-            unsafe {
-                manually_enter_trampoline();
-            }
+    if let Err(err) = &res
+        && err.errno == EINTR
+    {
+        // Run trampoline if EINTR returned
+        unsafe {
+            manually_enter_trampoline();
         }
     }
 
@@ -860,7 +858,7 @@ pub fn await_signal_sync(inner_allowset: u64, timeout: Option<&TimeSpec>) -> Res
     }
 
     let res = match timeout {
-        Some(t) => syscall::nanosleep(&t, &mut TimeSpec::default()),
+        Some(t) => syscall::nanosleep(t, &mut TimeSpec::default()),
         None => syscall::nanosleep(
             &TimeSpec {
                 tv_sec: i64::MAX,
