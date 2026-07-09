@@ -1,5 +1,5 @@
 use core::{
-    mem::{replace, size_of},
+    mem::size_of,
     ptr::addr_of,
     sync::atomic::{AtomicU32, Ordering},
 };
@@ -122,7 +122,11 @@ pub fn posix_setpriority(which: i32, who: u32, prio: u32) -> Result<(), syscall:
     this_proc_call(
         &mut [],
         CallFlags::empty(),
-        &[ProcCall::SetProcPriority as u64, who as u64, prio as u64],
+        &[
+            ProcCall::SetProcPriority as u64,
+            u64::from(who),
+            u64::from(prio),
+        ],
     )?;
 
     Ok(())
@@ -137,7 +141,7 @@ pub fn posix_getpriority(which: i32, who: u32) -> Result<u32, syscall::Error> {
     let res = this_proc_call(
         &mut [],
         CallFlags::empty(),
-        &[ProcCall::GetProcPriority as u64, who as u64],
+        &[ProcCall::GetProcPriority as u64, u64::from(who)],
     )?;
 
     Ok(res as u32)
@@ -152,7 +156,7 @@ pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpe
                 addr as usize,
                 syscall::FUTEX_WAIT,
                 val as usize,
-                deadline.map_or(0, |d| d as *const _ as usize),
+                deadline.map_or(0, |d| core::ptr::from_ref(d) as usize),
                 0,
             )
         }
@@ -192,13 +196,13 @@ pub fn sys_call_ro<T: Call>(
 
     let _siglock = tmp_disable_signals();
 
-    if payload.len() % size_of::<usize>() != 0 {
+    if payload.len().is_multiple_of(size_of::<usize>()) {
         return Err(Error::new(EINVAL));
     }
 
     let fd_slice = unsafe {
         core::slice::from_raw_parts_mut(
-            payload.as_mut_ptr() as *mut usize,
+            payload.as_mut_ptr().cast::<usize>(),
             payload.len() / size_of::<usize>(),
         )
     };
@@ -269,12 +273,12 @@ pub fn sys_call_wo<T: Call>(
     }
     let _siglock = tmp_disable_signals();
 
-    if payload.len() % size_of::<usize>() != 0 {
+    if payload.len().is_multiple_of(size_of::<usize>()) {
         return Err(Error::new(EINVAL));
     }
     let fd_slice = unsafe {
         core::slice::from_raw_parts(
-            payload.as_ptr() as *const usize,
+            payload.as_ptr().cast::<usize>(),
             payload.len() / size_of::<usize>(),
         )
     };
@@ -572,8 +576,7 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
 pub fn setns(fd: usize) -> Option<FdGuardUpper> {
     let mut info = DYNAMIC_PROC_INFO.lock();
     let new_fd_guard = FdGuard::new(fd).to_upper().unwrap();
-    let old_fd_guard = replace(&mut info.ns_fd, Some(new_fd_guard));
-    old_fd_guard
+    info.ns_fd.replace(new_fd_guard)
 }
 pub fn getns() -> Result<usize> {
     let cur_ns = crate::current_namespace_fd()?;
@@ -814,9 +817,7 @@ pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
         let _siglock = tmp_disable_signals();
 
         let res = unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, cmd, arg) };
-        if res.is_err() {
-            return res;
-        }
+        res?;
 
         FILETABLE.lock().set_fd_flags(fd, arg)?;
         return Ok(0);
@@ -922,7 +923,7 @@ pub fn close(fd: usize) -> Result<usize> {
 
     let res = unsafe { syscall::syscall1(syscall::SYS_CLOSE, fd) };
 
-    if res.is_ok() || res.err().map_or(false, |e| e.errno == EBADF) {
+    if res.is_ok() || res.err().is_some_and(|e| e.errno == EBADF) {
         let mut guard = FILETABLE.lock();
         let _ = guard.remove(fd);
     }
@@ -933,7 +934,7 @@ pub fn close(fd: usize) -> Result<usize> {
 pub fn close_raw(fd: usize) -> Result<usize> {
     let res = unsafe { syscall::syscall1(syscall::SYS_CLOSE, fd) };
 
-    if res.is_ok() || res.err().map_or(false, |e| e.errno == EBADF) {
+    if res.is_ok() || res.err().is_some_and(|e| e.errno == EBADF) {
         let mut guard = FILETABLE.lock();
         let _ = guard.remove(fd);
     }
@@ -1064,7 +1065,7 @@ impl FdTbl {
     }
 
     fn sync_size(fd: Option<&FdGuardUpper>, new_size: usize, tag: usize) -> Result<()> {
-        if let Some(ref fd) = fd {
+        if let Some(fd) = fd {
             fd.call_wo(
                 &[],
                 CallFlags::empty(),
@@ -1313,13 +1314,13 @@ impl PosixFdTbl {
     fn is_vacant(&self, handle: usize) -> bool {
         self.table
             .get(handle)
-            .map_or(true, |&flags| !flags.contains(FdFlags::OCCUPIED))
+            .is_none_or(|&flags| !flags.contains(FdFlags::OCCUPIED))
     }
 
     fn is_occupied(&self, handle: usize) -> bool {
         self.table
             .get(handle)
-            .map_or(false, |&flags| flags.contains(FdFlags::OCCUPIED))
+            .is_some_and(|&flags| flags.contains(FdFlags::OCCUPIED))
     }
 
     pub fn resize(&mut self, size: usize) {
@@ -1335,6 +1336,10 @@ impl PosixFdTbl {
             .iter()
             .filter(|&&e| e.contains(FdFlags::OCCUPIED))
             .count()
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.table.is_empty()
     }
 
     pub fn with_transaction<T, F>(&mut self, rollback_len: usize, f: F) -> Result<T>
