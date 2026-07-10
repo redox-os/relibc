@@ -108,7 +108,7 @@ macro_rules! define_ioctl_data {
 
                 assert!(buf.is_empty());
 
-                let noncounted_fields = unsafe { &*(noncounted_fields as *const _ as *const ${concat(__, $mem_ty, Noncounted)}) };
+                let noncounted_fields = unsafe { &*core::ptr::from_ref(noncounted_fields).cast::<${concat(__, $mem_ty, Noncounted)}>() };
                 $(self.$noncounted_field = noncounted_fields.$noncounted_field;)*
             }
         }
@@ -120,13 +120,13 @@ macro_rules! define_ioctl_data {
             ) -> syscall::Result<usize> {
                 let noncounted_fields = buf.split_off_mut(..size_of::<${concat(__, $mem_ty, Noncounted)}>())
                     .ok_or(syscall::Error::new(syscall::EINVAL))?;
-                let noncounted_fields = unsafe { &mut *(noncounted_fields as *mut _ as *mut ${concat(__, $mem_ty, Noncounted)}) };
+                let noncounted_fields = unsafe { &mut *core::ptr::from_mut(noncounted_fields).cast::<${concat(__, $mem_ty, Noncounted)}>() };
 
                 $(
                     let $counted_field = buf.split_off_mut(..noncounted_fields.$counted_by as usize * size_of::<$el>())
                         .ok_or(syscall::Error::new(syscall::EINVAL))?;
                     let $counted_field = unsafe {
-                        slice::from_raw_parts_mut($counted_field as *mut _ as *mut $el, noncounted_fields.$counted_by as usize)
+                        slice::from_raw_parts_mut(core::ptr::from_mut($counted_field).cast::<$el>(), noncounted_fields.$counted_by as usize)
                     };
                 )*
 
@@ -135,11 +135,10 @@ macro_rules! define_ioctl_data {
                 }
 
 
-
-                Ok( f($mem_ty {
+                f($mem_ty {
                     noncounted_fields,
                     $($counted_field,)*
-                })?)
+                })
             }
 
             $(
