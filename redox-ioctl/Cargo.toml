@@ -11,3 +11,6 @@ drm-sys = "0.8.0"
 redox_syscall = "0.9.0"
 
 [features]
+
+[lints]
+workspace = true
