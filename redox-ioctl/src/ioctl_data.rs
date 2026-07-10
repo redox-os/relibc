@@ -135,12 +135,10 @@ macro_rules! define_ioctl_data {
                 }
 
 
-                #[expect(clippy::needless_question_mark)]
-                // TODO unsure if safe to remove wrapping
-                Ok( f($mem_ty {
+                f($mem_ty {
                     noncounted_fields,
                     $($counted_field,)*
-                })?)
+                })
             }
 
             $(
