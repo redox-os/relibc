@@ -953,6 +953,10 @@ impl FdTbl {
     pub const CONTEXT_MAX_FILES: u32 = 65_536;
     pub const DEFAULT_CAPACITY: usize = usize::BITS as usize;
 
+    #[expect(
+        clippy::new_without_default,
+        reason = "default not expected for this type"
+    )]
     pub const fn new() -> Self {
         Self {
             fd: None,
@@ -1267,6 +1271,10 @@ bitflags::bitflags! {
 }
 
 impl PosixFdTbl {
+    #[expect(
+        clippy::new_without_default,
+        reason = "default not expected for this type"
+    )]
     pub const fn new() -> Self {
         Self {
             table: Vec::new(),
@@ -1595,6 +1603,10 @@ pub struct UpperFdTbl {
 }
 
 impl UpperFdTbl {
+    #[expect(
+        clippy::new_without_default,
+        reason = "default not expected for this type"
+    )]
     pub const fn new() -> Self {
         Self {
             table: Vec::new(),

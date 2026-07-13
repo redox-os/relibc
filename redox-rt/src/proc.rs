@@ -713,6 +713,7 @@ impl<'a> MmapGuard<'a> {
 
         Ok(())
     }
+    #[expect(clippy::mut_from_ref)]
     pub unsafe fn map_mut_anywhere(
         fd: &'a FdGuardUpper,
         offset: usize,
