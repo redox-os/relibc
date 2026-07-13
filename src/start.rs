@@ -198,6 +198,11 @@ pub unsafe extern "C" fn relibc_start_v1(
         )
     };
 
+    #[cfg(target_os = "redox")]
+    {
+        redox_rt::TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
+    }
+
     // Set up the right allocator...
     // if any memory rust based memory allocation happen before this step .. we are doomed.
     alloc_init();

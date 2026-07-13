@@ -970,7 +970,6 @@ impl FdTbl {
         let mut fdtbl = Self::new();
         let files_reader_fd = filetable_fd.as_raw_fd();
         let _ = filetable_fd.lseek(0, syscall::flag::SEEK_SET);
-        fdtbl.set_fd(filetable_fd);
         fdtbl.resize(Self::DEFAULT_CAPACITY);
 
         let mut reader = crate::proc::FileBufReader::from_fd(files_reader_fd);
@@ -978,6 +977,8 @@ impl FdTbl {
 
         // Manually mark the filetable_fd itself as occupied in userspace FILETABLE
         fdtbl.override_at(files_reader_fd, files_reader_fd)?;
+
+        fdtbl.set_fd(filetable_fd);
 
         Ok(fdtbl)
     }
@@ -1070,7 +1071,7 @@ impl FdTbl {
 
     fn sync_size(fd: Option<&FdGuardUpper>, new_size: usize, tag: usize) -> Result<()> {
         if let Some(fd) = fd {
-            fd.call_wo(
+            let res = fd.call_wo(
                 &[],
                 CallFlags::empty(),
                 &[
@@ -1078,7 +1079,14 @@ impl FdTbl {
                     tag as u64,
                     new_size as u64,
                 ],
-            )?;
+            );
+            if let Err(err) = res {
+                if err.errno == EINVAL {
+                    // Ignore EINVAL, because it means the kernel table is already larger than new_size.
+                } else {
+                    return Err(err);
+                }
+            }
         }
         Ok(())
     }
