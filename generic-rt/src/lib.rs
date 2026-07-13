@@ -1,6 +1,5 @@
 #![no_std]
 #![allow(internal_features)]
-#![feature(core_intrinsics)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use core::{

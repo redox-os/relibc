@@ -258,6 +258,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// Scan the string to get its length.
     #[doc(alias = "strlen")]
     #[doc(alias = "wcslen")]
+    #[expect(clippy::len_without_is_empty, reason = "len() signature intentional")]
     pub fn len(self) -> usize {
         self.to_chars().len()
     }
