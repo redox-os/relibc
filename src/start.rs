@@ -1,14 +1,13 @@
 //! Startup code.
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{intrinsics, ptr};
 
 use crate::{
     ALLOCATOR,
     header::{libgen, stdio, stdlib},
-    ld_so::{self, linker::Linker},
+    ld_so::{self},
     platform::{self, Pal, Sys, get_auxvs, types::*},
-    sync::mutex::Mutex,
 };
 
 #[repr(C)]
