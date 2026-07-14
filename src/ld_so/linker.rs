@@ -26,7 +26,7 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::SymbolBinding,
+    ld_so::dso::{Dyn, SymbolBinding},
     out::Out,
     platform::{
         Pal, Sys,
@@ -417,8 +417,16 @@ impl Config {
     }
 }
 
+pub struct Me {
+    pub base: *const u8,
+    pub phdrs: &'static [ProgramHeader],
+    pub dyns: &'static [Dyn],
+}
+
 pub struct Linker {
     config: Config,
+
+    me: Me,
 
     next_object_id: usize,
     next_tls_module_id: usize,
@@ -431,8 +439,9 @@ pub struct Linker {
 const ROOT_ID: usize = 1;
 
 impl Linker {
-    pub fn new(config: Config) -> Self {
+    pub fn new(me: Me, config: Config) -> Self {
         Self {
+            me,
             config,
             next_object_id: ROOT_ID,
             next_tls_module_id: 1,
@@ -642,7 +651,11 @@ impl Linker {
         )?;
 
         for (i, obj) in new_objects.iter().enumerate() {
-            obj.relocate(&objects_data[i], resolve).unwrap();
+            obj.relocate(
+                objects_data[i].as_ref().map(|phdrs| phdrs.as_slice()),
+                resolve,
+            )
+            .unwrap();
         }
 
         unsafe {
@@ -788,7 +801,7 @@ impl Linker {
         base_addr: Option<usize>,
         dlopened: bool,
         new_objects: &mut Vec<Arc<DSO>>,
-        objects_data: &mut Vec<Vec<ProgramHeader>>,
+        objects_data: &mut Vec<Option<Vec<ProgramHeader>>>,
         tcb_masters: &mut Vec<Master>,
         // Scope of the object that caused this object to be loaded.
         dependent_scope: Option<&mut Scope>,
@@ -821,6 +834,49 @@ impl Linker {
 
         let debug = self.config.debug_flags.contains(DebugFlags::LOAD);
 
+        if name == "libc.so.6" || name == "libc.so" {
+            if debug {
+                println!(
+                    "[ld.so]: loading libc.so.6 (aka. ld.so) at {:#?}",
+                    self.me.base
+                );
+            }
+
+            let (me, master) = DSO::from_raw(
+                self.me.base,
+                self.me.dyns,
+                self.me.phdrs,
+                self.next_object_id,
+                self.next_tls_module_id,
+                self.tls_size.next_multiple_of(16),
+            );
+
+            self.tls_size = master.offset;
+            self.next_tls_module_id += 1;
+            self.next_object_id += 1;
+
+            let obj = Arc::new(me);
+
+            tcb_masters.push(master);
+            objects_data.push(None);
+            new_objects.push(obj.clone());
+
+            if let Some(dependent_scope) = dependent_scope {
+                match scope_kind {
+                    ScopeKind::Local => dependent_scope.add(&obj),
+                    ScopeKind::Global => GLOBAL_SCOPE.write().add(&obj),
+                }
+            } else if let ScopeKind::Global = scope_kind {
+                GLOBAL_SCOPE.write().add(&obj);
+            }
+
+            let mut scope = Scope::local();
+            scope.set_owner(Arc::downgrade(&obj));
+            obj.scope.call_once(|| scope);
+
+            return Ok(obj);
+        }
+
         let path = self.search_object(name, parent_runpath)?;
         let file = self.read_file(&path)?;
         let data = file.data();
@@ -846,8 +902,8 @@ impl Linker {
             eprintln!(
                 "[ld.so]: loading object: {} at {:#x}:{:#x} (pie: {})",
                 name,
-                obj.mmap.as_ptr() as usize,
-                obj.mmap.as_ptr() as usize + obj.mmap.len(),
+                obj.mmap.as_ref().unwrap().as_ptr() as usize,
+                obj.mmap.as_ref().unwrap().as_ptr() as usize + obj.mmap.as_ref().unwrap().size(),
                 obj.pie,
             );
         }
@@ -896,7 +952,7 @@ impl Linker {
             )?;
         }
 
-        objects_data.push(elf);
+        objects_data.push(Some(elf));
         new_objects.push(obj.clone());
 
         scope.set_owner(Arc::downgrade(&obj));
@@ -1011,7 +1067,7 @@ impl Linker {
 #[cfg(target_pointer_width = "64")]
 extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> *mut c_void {
     let obj = unsafe { &*obj };
-    let obj_base = obj.mmap.as_ptr() as usize;
+    let obj_base = obj.base as usize;
     let jmprel = obj.dynamic.jmprel;
 
     let rela = unsafe { &*(jmprel as *const Rela).add(relocation_index as usize) };

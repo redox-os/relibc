@@ -12,7 +12,7 @@ use alloc::{
 use object::{
     NativeEndian,
     elf::{self, PT_DYNAMIC, PT_PHDR},
-    read::elf::{Dyn as _, ProgramHeader as _},
+    read::elf::{Dyn as _, FileHeader as _, ProgramHeader as _},
 };
 
 use crate::{
@@ -23,10 +23,10 @@ use crate::{
     },
     ld_so::{
         dso::{
-            DT_RELR, DT_RELRENT, DT_RELRSZ, Dyn, ProgramHeader, Rel, Rela, Relocation,
+            DT_RELR, DT_RELRENT, DT_RELRSZ, Dyn, FileHeader, ProgramHeader, Rel, Rela, Relocation,
             RelocationKind, Relr, apply_relr,
         },
-        linker::DebugFlags,
+        linker::{DebugFlags, Me},
     },
     platform::{auxv_iter, get_auxvs, types::c_char},
     start::Stack,
@@ -211,7 +211,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
 
     let is_manual = at_entry == ld_entry; // Whether the dynamic linker was invoked as a command.
 
-    let mut i = dynamic;
+    let mut i = 0;
     let mut rela_ptr = None;
     let mut rela_len = None;
     let mut relr_ptr = None;
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     let mut rel_ptr = None;
     let mut rel_len = None;
     loop {
-        let entry = unsafe { &*i };
+        let entry = unsafe { &*dynamic.add(i) };
         let val = entry.d_val(NativeEndian);
         let ptr = val as *const u8;
         match entry.d_tag(NativeEndian) as u32 {
@@ -241,8 +241,10 @@ pub unsafe extern "C" fn relibc_ld_so_start(
             }
             _ => {}
         }
-        i = unsafe { i.add(1) };
+        i += 1;
     }
+
+    let dyns = unsafe { slice::from_raw_parts(dynamic, i) };
 
     unsafe fn get_array<'a, T>(
         ptr: Option<*const T>,
@@ -251,7 +253,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     ) -> &'a [T] {
         if let Some(ptr) = ptr {
             let len = len.expect("dynamic entry was present without it's corresponding size");
-            unsafe { core::slice::from_raw_parts(ptr.byte_add(base_addr), len) }
+            unsafe { slice::from_raw_parts(ptr.byte_add(base_addr), len) }
         } else {
             &[]
         }
@@ -298,7 +300,23 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
-    stage2(sp, self_base, is_manual, base_addr)
+    unsafe extern "C" {
+        safe static __ehdr_start: FileHeader;
+    }
+
+    let ph_off = __ehdr_start.e_phoff(NativeEndian) as usize;
+    let ph_num = __ehdr_start.e_phnum(NativeEndian) as usize;
+
+    let my_phdrs = unsafe {
+        slice::from_raw_parts(
+            core::ptr::addr_of!(__ehdr_start)
+                .byte_add(ph_off)
+                .cast::<ProgramHeader>(),
+            ph_num,
+        )
+    };
+
+    stage2(sp, self_base, is_manual, base_addr, dyns, my_phdrs)
 }
 
 fn stage2(
@@ -306,6 +324,8 @@ fn stage2(
     self_base: usize,
     is_manual: bool,
     base_addr: Option<usize>,
+    my_dyns: &'static [Dyn],
+    my_phdrs: &'static [ProgramHeader],
 ) -> usize {
     // Setup TCB for ourselves.
     unsafe {
@@ -394,7 +414,9 @@ fn stage2(
 
         crate::platform::environ = crate::platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
 
-        crate::platform::logger::init();
+        if let Err(_) = crate::platform::logger::init() {
+            log::error!("Logger has already been initialised");
+        }
     }
 
     // we might need global lock for this kind of stuff
@@ -435,7 +457,14 @@ fn stage2(
         }
     }
 
-    let mut linker = Linker::new(config);
+    let mut linker = Linker::new(
+        Me {
+            base: self_base as *const u8,
+            phdrs: my_phdrs,
+            dyns: my_dyns,
+        },
+        config,
+    );
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {
