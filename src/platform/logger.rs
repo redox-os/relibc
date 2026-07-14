@@ -3,11 +3,11 @@ use core::{fmt, str::FromStr};
 use crate::{c_str::CStr, io::prelude::*, sync::Mutex};
 
 use alloc::string::{String, ToString};
-use log::{Metadata, Record};
+use log::{Metadata, Record, SetLoggerError};
 
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
-pub unsafe fn init() {
+pub unsafe fn init() -> Result<(), SetLoggerError> {
     let mut logger = RedoxLogger::new();
     let log_env = c"RELIBC_LOG_LEVEL".as_ptr();
     #[cfg(feature = "no_trace")]
@@ -28,9 +28,8 @@ pub unsafe fn init() {
             logger = logger.with_process_name(name.to_str().unwrap_or("").to_string());
         }
     }
-    if logger.enable().is_err() {
-        log::error!("Logger already initialized");
-    }
+
+    logger.enable()?;
 
     #[cfg(feature = "no_trace")]
     if trace_warn {
@@ -38,6 +37,8 @@ pub unsafe fn init() {
             "The 'no_trace' feature is enabled but RELIBC_LOG_LEVEL=TRACE, there will be no trace logs"
         );
     }
+
+    Ok(())
 }
 
 /// Copied from redox_log crate with some modifications, in future we might use it instead?
