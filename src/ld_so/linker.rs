@@ -11,7 +11,7 @@ use object::{
     read::elf::{Rela as _, Sym},
 };
 
-use core::ptr::{self, NonNull};
+use core::ptr;
 
 use crate::{
     ALLOCATOR,
@@ -323,41 +323,6 @@ impl Scope {
     }
 }
 
-// Used by dlfcn.h
-//
-// We need this as the handle must be created and destroyed with the dynamic
-// linker's allocator.
-pub struct ObjectHandle(*const DSO);
-
-impl ObjectHandle {
-    #[inline]
-    fn new(obj: Arc<DSO>) -> Self {
-        Self(Arc::into_raw(obj))
-    }
-
-    #[inline]
-    fn into_inner(self) -> Arc<DSO> {
-        unsafe { Arc::from_raw(self.0) }
-    }
-
-    #[inline]
-    pub fn as_ptr(&self) -> *const c_void {
-        self.0.cast()
-    }
-
-    #[inline]
-    pub fn from_ptr(ptr: *const c_void) -> Option<Self> {
-        NonNull::new(ptr as *mut DSO).map(|ptr| Self(ptr.as_ptr()))
-    }
-}
-
-impl AsRef<DSO> for ObjectHandle {
-    #[inline]
-    fn as_ref(&self) -> &DSO {
-        unsafe { &*self.0 }
-    }
-}
-
 bitflags::bitflags! {
     #[derive(Debug, Default)]
     pub struct DebugFlags: u32 {
@@ -467,7 +432,7 @@ impl Linker {
         resolve: Resolve,
         scope: ScopeKind,
         noload: bool,
-    ) -> Result<ObjectHandle> {
+    ) -> Result<Arc<DSO>> {
         log::trace!(
             "[ld.so] load_library(name={:?}, resolve={:#?}, scope={:#?}, noload={})",
             name,
@@ -502,14 +467,14 @@ impl Linker {
                         self.scope_debug();
                     }
 
-                    Ok(ObjectHandle::new(obj.clone()))
+                    Ok(obj.clone())
                 } else if !noload {
                     let parent_runpath = &self
                         .objects
                         .get(&ROOT_ID)
                         .and_then(|parent| parent.runpath().cloned());
 
-                    Ok(ObjectHandle::new(self.load_object(
+                    Ok(self.load_object(
                         name,
                         parent_runpath,
                         None,
@@ -520,29 +485,24 @@ impl Linker {
                             resolve
                         },
                         scope,
-                    )?))
+                    )?)
                 } else {
-                    // FIXME: LoadError?
-                    // Err(Error::Malformed(format!(
-                    //     "object '{}' has not yet been loaded",
-                    //     name
-                    // )))
-                    Ok(ObjectHandle(ptr::null()))
+                    Err(DlError::NotFound)
                 }
             }
 
             None => match self.objects.get(&ROOT_ID) {
-                Some(obj) => Ok(ObjectHandle::new(obj.clone())),
+                Some(obj) => Ok(obj.clone()),
                 None => Err(DlError::NotFound),
             },
         }
     }
 
-    pub fn get_sym(&self, handle: Option<ObjectHandle>, name: &str) -> Option<*mut c_void> {
+    pub fn get_sym(&self, handle: Option<&DSO>, name: &str) -> Option<*mut c_void> {
         let guard;
 
-        if let Some(handle) = handle.as_ref() {
-            handle.as_ref().scope()
+        if let Some(handle) = handle {
+            handle.scope()
         } else {
             guard = GLOBAL_SCOPE.read();
             &guard
@@ -562,8 +522,7 @@ impl Linker {
         })
     }
 
-    pub fn unload(&mut self, handle: ObjectHandle) {
-        let obj = handle.into_inner();
+    pub fn unload(&mut self, obj: Arc<DSO>) {
         if !obj.dlopened {
             return;
         }
@@ -592,7 +551,7 @@ impl Linker {
                 if let Some(name) = self.name_to_object_id_map.get(*dep)
                     && let Some(object_name) = self.objects.get(name)
                 {
-                    self.unload(ObjectHandle::new(object_name.clone()));
+                    self.unload(object_name.clone());
                 }
             }
             self.name_to_object_id_map.remove(&obj.name);

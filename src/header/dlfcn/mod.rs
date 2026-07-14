@@ -11,10 +11,13 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use alloc::sync::Arc;
+
 use crate::{
     c_str::CStr,
     ld_so::{
-        linker::{DlError, ObjectHandle, Resolve, ScopeKind},
+        dso::DSO,
+        linker::{DlError, Resolve, ScopeKind},
         tcb::Tcb,
     },
     platform::types::{c_char, c_int, c_void},
@@ -124,7 +127,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     let mut linker = unsafe { (*tcb.linker_ptr).lock() };
 
     match linker.load_library(filename, resolve, scope, noload) {
-        Ok(handle) => handle.as_ptr().cast_mut(),
+        Ok(handle) => Arc::into_raw(handle).cast::<c_void>().cast_mut(),
         Err(error) => {
             set_last_error(error);
             ptr::null_mut()
@@ -135,7 +138,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlsym.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void {
-    let handle = ObjectHandle::from_ptr(handle);
+    let handle = unsafe { handle.cast::<DSO>().as_ref() };
 
     if symbol.is_null() {
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -181,13 +184,14 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
         return -1;
     };
 
-    let Some(handle) = ObjectHandle::from_ptr(handle) else {
+    if handle.is_null() {
         set_last_error(DlError::InvalidHandle);
         return -1;
-    };
+    }
 
     let mut linker = unsafe { (*tcb.linker_ptr).lock() };
-    linker.unload(handle);
+    let obj = unsafe { Arc::from_raw(handle.cast::<DSO>()) };
+    linker.unload(obj);
     0
 }
 

@@ -22,7 +22,7 @@ pub const PATH_SEP: char = ':';
 
 mod access;
 pub mod debug;
-mod dso;
+pub mod dso;
 pub mod linker;
 pub mod start;
 pub mod tcb;
