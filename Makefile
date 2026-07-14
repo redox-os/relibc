@@ -147,8 +147,12 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/libc.a
 		-o $@
 
 $(BUILD)/$(PROFILE)/ld.so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/libc.a
-	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
-	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --gc-sections $^ -o $@
+	# Specifying a dynamic list makes all non-local `STV_DEFAULT`
+	# definitions non-preemptible, except for the symbols listed in
+	# `dynlst.txt`. So, the symbols defined in `dynlst.txt` may be
+	# interposed by other definitions at runtime (either from the
+	# executable or some shared library).
+	$(LD) --shared --whole-archive --dynamic-list=dynlst.txt $^ -o $@
 
 $(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"

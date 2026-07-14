@@ -1,0 +1,5 @@
+{
+stdin;
+stdout;
+stderr;
+};
