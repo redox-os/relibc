@@ -1,6 +1,5 @@
 use alloc::{
     collections::BTreeMap,
-    rc::Rc,
     string::{String, ToString},
     sync::{Arc, Weak},
     vec::Vec,
@@ -12,10 +11,7 @@ use object::{
     read::elf::{Rela as _, Sym},
 };
 
-use core::{
-    cell::RefCell,
-    ptr::{self, NonNull},
-};
+use core::ptr::{self, NonNull};
 
 use crate::{
     ALLOCATOR,
@@ -43,7 +39,6 @@ use super::dso::Rela;
 use super::{
     PATH_SEP,
     access::accessible,
-    callbacks::LinkerCallbacks,
     debug::{_dl_debug_state, _r_debug, RTLDState},
     dso::{DSO, ProgramHeader},
     tcb::{Master, Tcb},
@@ -433,7 +428,6 @@ pub struct Linker {
     tls_size: usize,
     objects: BTreeMap<usize, Arc<DSO>>,
     name_to_object_id_map: BTreeMap<String, usize>,
-    pub cbs: Rc<RefCell<LinkerCallbacks>>,
 }
 
 const ROOT_ID: usize = 1;
@@ -448,7 +442,6 @@ impl Linker {
             tls_size: 0,
             objects: BTreeMap::new(),
             name_to_object_id_map: BTreeMap::new(),
-            cbs: Rc::new(RefCell::new(LinkerCallbacks::new())),
         }
     }
 

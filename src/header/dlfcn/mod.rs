@@ -123,10 +123,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
 
     let mut linker = unsafe { (*tcb.linker_ptr).lock() };
 
-    let cbs_c = linker.cbs.clone();
-    let cbs = cbs_c.borrow();
-
-    match (cbs.load_library)(&mut linker, filename, resolve, scope, noload) {
+    match linker.load_library(filename, resolve, scope, noload) {
         Ok(handle) => handle.as_ptr().cast_mut(),
         Err(error) => {
             set_last_error(error);
@@ -161,9 +158,8 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     }
 
     let linker = unsafe { (*tcb.linker_ptr).lock() };
-    let cbs_c = linker.cbs.clone();
-    let cbs = cbs_c.borrow();
-    match (cbs.get_sym)(&linker, handle, symbol_str) {
+
+    match linker.get_sym(handle, symbol_str) {
         Some(sym) => sym,
         _ => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -191,9 +187,7 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
     };
 
     let mut linker = unsafe { (*tcb.linker_ptr).lock() };
-    let cbs_c = linker.cbs.clone();
-    let cbs = cbs_c.borrow();
-    (cbs.unload)(&mut linker, handle);
+    linker.unload(handle);
     0
 }
 
