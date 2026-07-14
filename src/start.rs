@@ -207,22 +207,19 @@ pub unsafe extern "C" fn relibc_start_v1(
     // if any memory rust based memory allocation happen before this step .. we are doomed.
     alloc_init();
 
-    if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
+    let is_dynamically_linked = if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
         // Update TCB mspace
         if tcb.mspace.is_null() {
             tcb.mspace = ALLOCATOR.get();
         }
 
-        // Set linker pointer if necessary
-        if tcb.linker_ptr.is_null() {
-            //TODO: get ld path
-            let linker = Linker::new(ld_so::linker::Config::default());
-            //TODO: load root object
-            tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
-        }
         #[cfg(target_os = "redox")]
         redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
-    }
+
+        !tcb.linker_ptr.is_null()
+    } else {
+        false
+    };
 
     // Set up argc and argv
     let argc = sp.argc;
@@ -249,9 +246,17 @@ pub unsafe extern "C" fn relibc_start_v1(
     }
 
     let auxvs = unsafe { get_auxvs(sp.auxv().cast()) };
-    unsafe { crate::platform::init(auxvs) };
-    init_array();
-    unsafe { crate::platform::logger::init() };
+    if !is_dynamically_linked {
+        unsafe { crate::platform::init(auxvs) };
+        init_array();
+    }
+    unsafe {
+        if let Err(_) = crate::platform::logger::init()
+            && !is_dynamically_linked
+        {
+            log::error!("Logger has already been initialised");
+        }
+    }
 
     // Run preinit array
     {
