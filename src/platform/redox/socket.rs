@@ -51,7 +51,7 @@ unsafe fn bind_or_connect(
             let data = unsafe { &*address.cast::<sockaddr_in>() };
             let addr = unsafe {
                 slice::from_raw_parts(
-                    &raw const data.sin_addr.s_addr as *const u8,
+                    (&raw const data.sin_addr.s_addr).cast::<u8>(),
                     mem::size_of_val(&data.sin_addr.s_addr),
                 )
             };
@@ -106,7 +106,7 @@ unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut so
     data.sun_family = AF_UNIX as c_ushort;
 
     let path = unsafe {
-        slice::from_raw_parts_mut(&raw mut data.sun_path as *mut u8, data.sun_path.len())
+        slice::from_raw_parts_mut((&raw mut data.sun_path).cast::<u8>(), data.sun_path.len())
     };
 
     let len = cmp::min(path.len(), buf.len());
@@ -161,7 +161,7 @@ unsafe fn inner_af_inet(
     let len = cmp::min(unsafe { *address_len } as usize, mem::size_of_val(&ret));
 
     unsafe {
-        ptr::copy_nonoverlapping(&raw const ret as *const u8, address.cast::<u8>(), len);
+        ptr::copy_nonoverlapping((&raw const ret).cast::<u8>(), address.cast::<u8>(), len);
         *address_len = len as socklen_t;
     }
 }
@@ -486,7 +486,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 let cred = ucred { pid, uid, gid };
 
                 temp_posix_cmsg_data_buf.extend_from_slice(unsafe {
-                    slice::from_raw_parts(&raw const cred as *const u8, mem::size_of::<ucred>())
+                    slice::from_raw_parts((&raw const cred).cast::<u8>(), mem::size_of::<ucred>())
                 });
                 temp_posix_cmsg_data_buf.len()
             }
@@ -567,11 +567,12 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
+                    // TODO triggers clippy::borrow_as_ptr, applying suggestion fails to compile
                     unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
                 );
 
                 let addr =
-                    unsafe { slice::from_raw_parts(&raw const data.sun_path as *const u8, len) };
+                    unsafe { slice::from_raw_parts((&raw const data.sun_path).cast::<u8>(), len) };
                 let path = str::from_utf8(addr).map_err(|_| Errno(EINVAL))?;
                 log::trace!("bind(): path: {:?}", path);
 
@@ -653,11 +654,12 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
+                    // TODO triggers clippy::borrow_as_ptr, applying suggestion fails to compile
                     unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
                 );
 
                 let addr =
-                    unsafe { slice::from_raw_parts(&raw const data.sun_path as *const u8, len) };
+                    unsafe { slice::from_raw_parts((&raw const data.sun_path).cast::<u8>(), len) };
                 let path = str::from_utf8(addr).map_err(|_| Errno(EINVAL))?;
                 log::trace!("bind(): path: {:?}", path);
 
