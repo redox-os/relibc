@@ -51,13 +51,13 @@ endif
 	@set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
-			echo -e "\033[0;36;49mWriting Header $$header\033[0m"; \
+			printf "\033[0;36;49mWriting Header $$header\033[0m\n"; \
 			out=`echo "$$header" | sed 's/_/\//g'`; \
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
 		fi \
-	done; echo -e "\033[0;36;49mAll headers written\033[0m";
+	done; printf "\033[0;36;49mAll headers written\033[0m\n";
 
 clean:
 	$(CARGO) clean
