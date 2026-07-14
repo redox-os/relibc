@@ -225,7 +225,7 @@ $(BUILD)/openlibm: openlibm
 ifeq ($(USE_RUST_LIBM),)
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/$(PROFILE)/librelibc.a
 	$(MAKE) -s AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
-	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
+	./renamesyms.sh "$@" "$(BUILD)/$(PROFILE)/deps/"
 else
 $(BUILD)/openlibm/libopenlibm.a:
 	mkdir -p "$(BUILD)/openlibm"
