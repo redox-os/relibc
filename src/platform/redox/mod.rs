@@ -136,7 +136,7 @@ impl Pal for Sys {
         let perms = (if stat.st_uid == uid {
             stat.st_mode >> (3 * 2)
         } else if stat.st_gid == gid {
-            stat.st_mode >> (3 * 1)
+            stat.st_mode >> 3
         } else {
             stat.st_mode
         }) & 0o7;
@@ -169,7 +169,7 @@ impl Pal for Sys {
 
             unsafe {
                 BRK_CUR = allocated;
-                BRK_END = (allocated as *mut u8).add(BRK_MAX_SIZE) as *mut c_void
+                BRK_END = allocated.cast::<u8>().add(BRK_MAX_SIZE).cast::<c_void>()
             };
         }
 
@@ -187,7 +187,7 @@ impl Pal for Sys {
     }
 
     fn chdir(path: CStr) -> Result<()> {
-        let path = RedoxStr::new_c(path.to_cstr()).ok_or_else(|| Errno(EINVAL))?;
+        let path = RedoxStr::new_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
         path::chdir(path)?;
         Ok(())
     }
@@ -208,11 +208,11 @@ impl Pal for Sys {
             CLOCK_MONOTONIC => "/scheme/time/4/getres",
             _ => return Err(Errno(EINVAL)),
         };
-        let timerfd = FdGuard::open(&path, syscall::O_RDONLY)?;
+        let timerfd = FdGuard::open(path, syscall::O_RDONLY)?;
         let mut redox_res = timespec::default();
         let buffer = unsafe {
             slice::from_raw_parts_mut(
-                &mut redox_res as *mut _ as *mut u8,
+                (&raw mut redox_res).cast::<u8>(),
                 mem::size_of::<timespec>(),
             )
         };
@@ -347,7 +347,7 @@ impl Pal for Sys {
                 let start = start as u64 | if is_ofd { 1 << 63 } else { 0 };
                 let len = len as u64;
 
-                match flock.l_type as i32 {
+                match i32::from(flock.l_type) {
                     F_UNLCK => {
                         let meta = StdFsCallMeta::new(StdFsCallKind::Unlock, start, len);
                         syscall::std_fs_call(fd as usize, &mut [], &meta)?;
@@ -358,7 +358,7 @@ impl Pal for Sys {
                         let meta = StdFsCallMeta::new(
                             StdFsCallKind::Lock,
                             start,
-                            len | if flock.l_type as i32 == F_WRLCK {
+                            len | if i32::from(flock.l_type) == F_WRLCK {
                                 1 << 63
                             } else {
                                 0
@@ -394,7 +394,7 @@ impl Pal for Sys {
                 }
 
                 let mut len = len as u64;
-                if flock.l_type as i32 == F_WRLCK {
+                if i32::from(flock.l_type) == F_WRLCK {
                     len |= 1 << 63;
                 }
 
@@ -510,7 +510,7 @@ impl Pal for Sys {
 
     #[inline]
     unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()> {
-        let deadline = deadline.map(|d| syscall::TimeSpec::from(d));
+        let deadline = deadline.map(syscall::TimeSpec::from);
         (unsafe { redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref()) })?;
         Ok(())
     }
@@ -559,7 +559,7 @@ impl Pal for Sys {
     // NOTE: fn is unsafe, but this just means we can assume more things. impl is safe
     unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
         let mut header = DirentHeader::default();
-        header.copy_from_slice(&this_dent.get(..size_of::<DirentHeader>())?);
+        header.copy_from_slice(this_dent.get(..size_of::<DirentHeader>())?);
 
         // If scheme does not send a NUL byte, this shouldn't be able to cause UB for the caller.
         if this_dent.get(usize::from(header.record_len) - 1) != Some(&b'\0') {
@@ -613,7 +613,7 @@ impl Pal for Sys {
                 }
 
                 if found {
-                    if !list.is_empty() && (count as usize) < list.len() {
+                    if !list.is_empty() && count < list.len() {
                         list.index(count).write(grp.gr_gid);
                     }
                     count += 1;
@@ -622,7 +622,7 @@ impl Pal for Sys {
             grp::endgrent();
         }
 
-        if !list.is_empty() && (count as usize) > list.len() {
+        if !list.is_empty() && count > list.len() {
             return Err(Errno(EINVAL));
         }
 
@@ -646,9 +646,9 @@ impl Pal for Sys {
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
-        match redox_rt::sys::posix_getpriority(which, who as u32) {
+        match redox_rt::sys::posix_getpriority(which, who) {
             Ok(kernel_prio) => {
-                let posix_prio = (kernel_prio as i32 * -1) + 40 as i32;
+                let posix_prio = -(kernel_prio as i32) + 40_i32;
                 Ok(posix_prio)
             }
             Err(e) => Err(Errno(e.errno)),
@@ -773,7 +773,7 @@ impl Pal for Sys {
         if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
             return Err(Errno(EINVAL));
         }
-        let newpath = RedoxStr::new_c(newpath.to_cstr()).ok_or_else(|| Errno(EINVAL))?;
+        let newpath = RedoxStr::new_c(newpath.to_cstr()).ok_or(Errno(EINVAL))?;
 
         // By default, we don't follow the symlink if there is one.
         // We only follow it if AT_SYMLINK_FOLLOW is passed in flags.
@@ -939,7 +939,7 @@ impl Pal for Sys {
             redox_rmtp = unsafe { (&*rmtp).into() };
         }
         match redox_rt::sys::posix_nanosleep(&redox_rqtp, &mut redox_rmtp) {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(Error { errno: EINTR }) => {
                 unsafe {
                     if !rmtp.is_null() {
@@ -987,7 +987,7 @@ impl Pal for Sys {
         let total_offset = offset.checked_add(length).ok_or(Errno(EFBIG))?;
 
         let mut stat: stat = unsafe { mem::zeroed() };
-        unsafe { libredox::fstat(fd as usize, &mut stat)? };
+        unsafe { libredox::fstat(fd as usize, &raw mut stat)? };
         let st_size = stat.st_size as u64;
         // The difference between total_offset and the file size is the number of bytes to
         // allocate. So, if it's negative then the file is already large enough and we don't
@@ -1076,7 +1076,7 @@ impl Pal for Sys {
 
         let redox_path = str::from_utf8(&buf[..count])
             .ok()
-            .and_then(|x| redox_path::RedoxPath::from_absolute(x))
+            .and_then(redox_path::RedoxPath::from_absolute)
             .ok_or(Errno(EINVAL))?;
 
         let (scheme, reference) = redox_path.as_parts().ok_or(Errno(EINVAL))?;
@@ -1163,8 +1163,8 @@ impl Pal for Sys {
         let clamped_prio = prio.clamp(-20, 19);
         let kernel_prio = (20 + clamped_prio) as u32;
 
-        match redox_rt::sys::posix_setpriority(which, who as u32, kernel_prio) {
-            Ok(_) => Ok(()),
+        match redox_rt::sys::posix_setpriority(which, who, kernel_prio) {
+            Ok(()) => Ok(()),
             Err(e) => Err(Errno(e.errno)),
         }
     }
@@ -1237,7 +1237,7 @@ impl Pal for Sys {
             }
         }
 
-        args[0] = &program.to_bytes();
+        args[0] = program.to_bytes();
 
         let new_file_table = child.thr_fd.dup_into_upper(b"filetable-binary")?;
 
@@ -1544,7 +1544,7 @@ impl Pal for Sys {
             CLOCK_MONOTONIC => "/scheme/time/4",
             _ => return Err(Errno(EINVAL)),
         };
-        let timerfd = FdGuard::open_into_upper(&path, syscall::O_RDWR)?;
+        let timerfd = FdGuard::open_into_upper(path, syscall::O_RDWR)?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)
         })?)
@@ -1565,7 +1565,7 @@ impl Pal for Sys {
         let mut memory_pointer: *mut timer_internal_t = ptr::null_mut();
         unsafe {
             let result = posix_memalign(
-                (&mut memory_pointer as *mut *mut timer_internal_t).cast(),
+                (&raw mut memory_pointer).cast(),
                 align_of::<timer_internal_t>(),
                 size_of::<timer_internal_t>(),
             );
@@ -1616,11 +1616,11 @@ impl Pal for Sys {
         let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
-        if timer_st.evp.sigev_notify == SIGEV_NONE {
-            if timespec::subtract(&timer_st.next_wake_time.it_value, &now).is_none() {
-                // error here means the timer is disarmed
-                let _ = timer_update_wake_time(timer_st);
-            }
+        if timer_st.evp.sigev_notify == SIGEV_NONE
+            && timespec::subtract(&timer_st.next_wake_time.it_value, &now).is_none()
+        {
+            // error here means the timer is disarmed
+            let _ = timer_update_wake_time(timer_st);
         }
         let remaining = &timer_st.next_wake_time.it_value;
         value.write(if remaining.is_zero() {
@@ -1685,10 +1685,10 @@ impl Pal for Sys {
                     let mut tid = pthread_t::default();
                     let result = unsafe {
                         pthread_create(
-                            &mut tid as *mut _,
+                            &raw mut tid,
                             ptr::null(),
                             timer_routine,
-                            timerid as *mut c_void,
+                            timerid.cast::<c_void>(),
                         )
                     };
                     if result != 0 {
@@ -1742,21 +1742,19 @@ impl Pal for Sys {
         }
 
         match gethostname(nodename.as_slice_mut().cast_slice_to::<u8>()) {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(_) => return Err(Errno(EIO)),
         }
 
         let file_path = c"/scheme/sys/uname".into();
-        let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
-            Ok(ok) => ok,
-            Err(_) => return Err(Errno(EIO)),
+        let Ok(mut file) = File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) else {
+            return Err(Errno(EIO));
         };
         let mut lines = BufReader::new(&mut file).lines();
 
         let mut read_line = |mut dst: Out<[u8]>| {
-            let mut line = match lines.next() {
-                Some(Ok(l)) => l,
-                None | Some(Err(_)) => return Err(Errno(EIO)),
+            let Some(Ok(mut line)) = lines.next() else {
+                return Err(Errno(EIO));
             };
             line.push('\0');
             let line_slice: &[u8] = line.as_bytes();
@@ -1900,7 +1898,7 @@ impl Sys {
         len: off_t,
     ) -> Result<(off_t, off_t)> {
         // let file_off = Self::lseek(fd, 0, SEEK_SET)?;
-        match whence as i32 {
+        match i32::from(whence) {
             SEEK_SET => {
                 let (start, len) = if len < 0 {
                     (start + len, -len)
