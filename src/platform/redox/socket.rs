@@ -567,7 +567,7 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
-                    unsafe { strnlen(&raw const data.sun_path, maxlen as size_t) },
+                    unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
                 );
 
                 let addr =
@@ -653,7 +653,7 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
-                    unsafe { strnlen(&raw const data.sun_path, maxlen as size_t) },
+                    unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
                 );
 
                 let addr =
@@ -844,7 +844,7 @@ impl PalSocket for Sys {
         if msg.is_null() {
             return Err(Errno(EINVAL));
         }
-        let mut mhdr = unsafe { &mut *msg };
+        let mhdr = unsafe { &mut *msg };
         let iovs_slice: &[iovec] = if mhdr.msg_iov.is_null() || mhdr.msg_iovlen == 0 {
             &[]
         } else {
