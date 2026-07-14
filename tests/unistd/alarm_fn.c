@@ -1,9 +1,9 @@
-#include <assert.h>
-#include <signal.h>
-#include <setjmp.h>
-#include <unistd.h>
-#include <stdio.h>
 #include "test_helpers.h"
+#include <assert.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
 
 static sigjmp_buf jmpenv;
 
@@ -15,6 +15,7 @@ void alarm_handler(int sig) {
 int main() {
     struct sigaction sa;
 
+    sa.sa_flags = 0;
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
 
@@ -27,7 +28,7 @@ int main() {
     }
 
     alarm(1);
-    sleep(5); 
+    sleep(5);
 
     assert(0); // unreachable
 }
