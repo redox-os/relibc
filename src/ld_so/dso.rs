@@ -42,7 +42,7 @@ pub type Relr = usize;
 
 #[cfg(target_pointer_width = "32")]
 mod shim {
-    use object::{NativeEndian, read::elf::ElfFile32};
+    use object::{NativeEndian, elf, read::elf::ElfFile32};
     pub type Dyn = elf::Dyn32<NativeEndian>;
     pub type Rel = elf::Rel32<NativeEndian>;
     pub type Rela = elf::Rela32<NativeEndian>;
