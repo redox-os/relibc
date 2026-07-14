@@ -70,16 +70,15 @@ pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
                 if let Some(fun) = timer_st.evp.sigev_notify_function {
                     fun(timer_st.evp.sigev_value);
                 }
-            } else if timer_st.evp.sigev_notify == SIGEV_SIGNAL {
-                if Sys::sigqueue(
+            } else if timer_st.evp.sigev_notify == SIGEV_SIGNAL
+                && Sys::sigqueue(
                     timer_st.process_pid,
                     timer_st.evp.sigev_signo as _,
                     timer_st.evp.sigev_value,
                 )
                 .is_err()
-                {
-                    break;
-                }
+            {
+                break;
             }
         }
 
@@ -107,7 +106,7 @@ fn timer_next_event(timer_st: &mut timer_internal_t) -> Result<()> {
 
         syscall::TimeSpec::from(&timer_st.next_wake_time.it_value)
     };
-    let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, &*buf_to_write)?;
+    let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, &buf_to_write)?;
     if bytes_written < size_of::<timespec>() {
         return Err(Errno(EIO));
     }
