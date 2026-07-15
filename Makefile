@@ -51,13 +51,13 @@ endif
 	@set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
-			echo -e "\033[0;36;49mWriting Header $$header\033[0m"; \
+			printf "\033[0;36;49mWriting Header $$header\033[0m\n"; \
 			out=`echo "$$header" | sed 's/_/\//g'`; \
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
 		fi \
-	done; echo -e "\033[0;36;49mAll headers written\033[0m";
+	done; printf "\033[0;36;49mAll headers written\033[0m\n";
 
 clean:
 	$(CARGO) clean
@@ -147,8 +147,12 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/libc.a
 		-o $@
 
 $(BUILD)/$(PROFILE)/ld.so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/libc.a
-	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
-	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --gc-sections $^ -o $@
+	# Specifying a dynamic list makes all non-local `STV_DEFAULT`
+	# definitions non-preemptible, except for the symbols listed in
+	# `dynlst.txt`. So, the symbols defined in `dynlst.txt` may be
+	# interposed by other definitions at runtime (either from the
+	# executable or some shared library).
+	$(LD) --shared --whole-archive --dynamic-list=dynlst.txt $^ -o $@
 
 $(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
@@ -221,7 +225,7 @@ $(BUILD)/openlibm: openlibm
 ifeq ($(USE_RUST_LIBM),)
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/$(PROFILE)/librelibc.a
 	$(MAKE) -s AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
-	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
+	./renamesyms.sh "$@" "$(BUILD)/$(PROFILE)/deps/"
 else
 $(BUILD)/openlibm/libopenlibm.a:
 	mkdir -p "$(BUILD)/openlibm"

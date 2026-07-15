@@ -1,14 +1,13 @@
 //! Startup code.
 
-use alloc::{boxed::Box, vec::Vec};
-use core::{intrinsics, ptr};
+use alloc::vec::Vec;
+use core::{intrinsics, ptr, str::FromStr};
 
 use crate::{
-    ALLOCATOR,
+    c_str::CStr,
     header::{libgen, stdio, stdlib},
-    ld_so::{self, linker::Linker},
-    platform::{self, Pal, Sys, get_auxvs, types::*},
-    sync::mutex::Mutex,
+    ld_so::{self},
+    platform::{self, Pal, Sys, get_auxvs, logger::RELIBC_LOG_ENV_VAR, types::*},
 };
 
 #[repr(C)]
@@ -89,41 +88,23 @@ static mut INIT_COMPLETE: bool = false;
 #[unsafe(no_mangle)]
 static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
 
-fn alloc_init() {
-    unsafe {
-        if INIT_COMPLETE {
-            return;
-        }
-    }
-    unsafe {
-        if let Some(tcb) = ld_so::tcb::Tcb::current()
-            && !tcb.mspace.is_null()
-        {
-            ALLOCATOR.set(tcb.mspace);
-        }
-    }
-}
-
 extern "C" fn init_array() {
     // The thing is that we cannot guarantee if
     // init_array runs first or if relibc_start runs first
-    // Still whoever gets to run first must initialize rust
-    // memory allocator before doing anything else.
 
     unsafe {
         if INIT_COMPLETE {
             return;
         }
     }
-
-    alloc_init();
-    io_init();
 
     unsafe {
         if platform::environ.is_null() {
             platform::environ = __relibc_init_environ;
         }
     }
+
+    io_init();
 
     unsafe {
         crate::pthread::init();
@@ -203,26 +184,14 @@ pub unsafe extern "C" fn relibc_start_v1(
         redox_rt::TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
     }
 
-    // Set up the right allocator...
-    // if any memory rust based memory allocation happen before this step .. we are doomed.
-    alloc_init();
-
-    if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
-        // Update TCB mspace
-        if tcb.mspace.is_null() {
-            tcb.mspace = ALLOCATOR.get();
-        }
-
-        // Set linker pointer if necessary
-        if tcb.linker_ptr.is_null() {
-            //TODO: get ld path
-            let linker = Linker::new(ld_so::linker::Config::default());
-            //TODO: load root object
-            tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
-        }
+    let is_dynamically_linked = if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
         #[cfg(target_os = "redox")]
         redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
-    }
+
+        !tcb.linker_ptr.is_null()
+    } else {
+        false
+    };
 
     // Set up argc and argv
     let argc = sp.argc;
@@ -249,9 +218,21 @@ pub unsafe extern "C" fn relibc_start_v1(
     }
 
     let auxvs = unsafe { get_auxvs(sp.auxv().cast()) };
-    unsafe { crate::platform::init(auxvs) };
-    init_array();
-    unsafe { crate::platform::logger::init() };
+    if !is_dynamically_linked {
+        unsafe { crate::platform::init(auxvs) };
+        init_array();
+    }
+
+    if let Some(env) = unsafe {
+        CStr::from_nullable_ptr(crate::header::stdlib::getenv(RELIBC_LOG_ENV_VAR.as_ptr()))
+    } && let Ok(level) = log::LevelFilter::from_str(env.to_str().unwrap_or(""))
+    {
+        if let Err(_) = unsafe { crate::platform::logger::init(level) }
+            && !is_dynamically_linked
+        {
+            log::error!("Logger has already been initialised");
+        }
+    }
 
     // Run preinit array
     {

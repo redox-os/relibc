@@ -112,7 +112,7 @@ global_asm!(
 .globl _start
 _start:
     mv a0, sp
-    jal relibc_ld_so_start
+    call relibc_ld_so_start
     unimp
 "
 );

@@ -3,7 +3,7 @@
 //! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
 use object::{
-    NativeEndian, Object, StringTable, SymbolIndex, elf,
+    NativeEndian, Object, StringTable, SymbolIndex, U32, elf,
     read::elf::{
         Dyn as _, GnuHashTable, HashTable as SysVHashTable, ProgramHeader as _, Rel as _,
         Rela as _, Sym as _, Version, VersionTable,
@@ -42,25 +42,29 @@ pub type Relr = usize;
 
 #[cfg(target_pointer_width = "32")]
 mod shim {
-    use object::{NativeEndian, elf::*, read::elf::ElfFile32};
-    pub type Dyn = Dyn32<NativeEndian>;
-    pub type Rel = Rel32<NativeEndian>;
-    pub type Rela = Rela32<NativeEndian>;
-    pub type Sym = Sym32<NativeEndian>;
-    pub type FileHeader = FileHeader32<NativeEndian>;
-    pub type ProgramHeader = ProgramHeader32<NativeEndian>;
+    use object::{NativeEndian, elf, read::elf::ElfFile32};
+    pub type Dyn = elf::Dyn32<NativeEndian>;
+    pub type Rel = elf::Rel32<NativeEndian>;
+    pub type Rela = elf::Rela32<NativeEndian>;
+    pub type Sym = elf::Sym32<NativeEndian>;
+    pub type FileHeader = elf::FileHeader32<NativeEndian>;
+    pub type ProgramHeader = elf::ProgramHeader32<NativeEndian>;
+    pub type GnuHashHeader = elf::GnuHashHeader<NativeEndian>;
+    pub type SysVHashHeader = elf::HashHeader<NativeEndian>;
     pub type ElfFile<'a> = ElfFile32<'a, NativeEndian>;
 }
 
 #[cfg(target_pointer_width = "64")]
 mod shim {
-    use object::{NativeEndian, elf::*, read::elf::ElfFile64};
-    pub type Dyn = Dyn64<NativeEndian>;
-    pub type Rel = Rel64<NativeEndian>;
-    pub type Rela = Rela64<NativeEndian>;
-    pub type Sym = Sym64<NativeEndian>;
-    pub type FileHeader = FileHeader64<NativeEndian>;
-    pub type ProgramHeader = ProgramHeader64<NativeEndian>;
+    use object::{NativeEndian, elf, read::elf::ElfFile64};
+    pub type Dyn = elf::Dyn64<NativeEndian>;
+    pub type Rel = elf::Rel64<NativeEndian>;
+    pub type Rela = elf::Rela64<NativeEndian>;
+    pub type Sym = elf::Sym64<NativeEndian>;
+    pub type FileHeader = elf::FileHeader64<NativeEndian>;
+    pub type ProgramHeader = elf::ProgramHeader64<NativeEndian>;
+    pub type GnuHashHeader = elf::GnuHashHeader<NativeEndian>;
+    pub type SysVHashHeader = elf::HashHeader<NativeEndian>;
     pub type ElfFile<'a> = ElfFile64<'a, NativeEndian>;
 }
 
@@ -176,7 +180,7 @@ impl<'data> Dynamic<'data> {
 unsafe impl Send for Dynamic<'_> {}
 unsafe impl Sync for Dynamic<'_> {}
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub(super) struct Relocation {
     pub(super) offset: usize,
     pub(super) addend: Option<usize>,
@@ -331,14 +335,35 @@ impl SymbolBinding {
     }
 }
 
+pub struct MemoryMapHandle {
+    ptr: *const u8,
+    size: usize,
+}
+
+impl MemoryMapHandle {
+    pub fn as_ptr(&self) -> *const u8 {
+        self.ptr
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+}
+
+impl Drop for MemoryMapHandle {
+    fn drop(&mut self) {
+        unsafe { Sys::munmap(self.ptr as *mut c_void, self.size).unwrap() };
+    }
+}
+
 /// Use to represent a library as well as all the symbols that is loaded withen it.
 pub struct DSO {
     pub name: String,
     pub id: usize,
     pub dlopened: bool,
     pub entry_point: usize,
-    /// Loaded library in-memory data
-    pub mmap: &'static [u8],
+    pub base: *const u8,
+    pub mmap: Option<MemoryMapHandle>,
     pub tls_module_id: usize,
     pub tls_offset: usize,
 
@@ -350,9 +375,55 @@ pub struct DSO {
 
     /// Whether this DSO *and* its dependencies have been successfully loaded.
     is_ready: AtomicBool,
+
+    /// Is this DSO for ld.so?
+    is_me: bool,
 }
 
 impl DSO {
+    pub fn from_raw(
+        base: *const u8,
+        dyns: &[Dyn],
+        phdrs: &[ProgramHeader],
+        id: usize,
+        tls_module_id: usize,
+        tls_offset: usize,
+    ) -> (Self, Master) {
+        // FIXME: What should `path` be set to?
+        // FIXME: this function and `parse_dynamic` should be unsafe.
+        let (dynamic, _debug) = Self::parse_dynamic("", base, true, dyns).unwrap();
+
+        let tcb_master = phdrs
+            .iter()
+            .find(|ph| ph.p_type(NativeEndian) == elf::PT_TLS)
+            .map(|ph| Master {
+                ptr: unsafe { base.byte_add(ph.p_vaddr(NativeEndian) as usize) },
+                image_size: ph.p_filesz(NativeEndian) as usize,
+                segment_size: ph.p_memsz(NativeEndian) as usize,
+                offset: tls_offset + ph.p_memsz(NativeEndian) as usize,
+            })
+            .unwrap();
+
+        (
+            Self {
+                name: String::from("libc.so.6"),
+                id,
+                tls_offset: tcb_master.offset,
+                tls_module_id,
+                dlopened: false,
+                entry_point: 0,
+                base,
+                mmap: None,
+                dynamic,
+                scope: spin::Once::new(),
+                pie: true,
+                is_ready: AtomicBool::new(false),
+                is_me: true,
+            },
+            tcb_master,
+        )
+    }
+
     pub fn new(
         path: &str,
         data: &[u8],
@@ -385,7 +456,10 @@ impl DSO {
             id,
             dlopened,
             entry_point,
-            mmap,
+
+            base: mmap.as_ptr(),
+            mmap: Some(mmap),
+
             tls_module_id: if tcb_master.is_some() {
                 tls_module_id
             } else {
@@ -397,13 +471,14 @@ impl DSO {
             dynamic,
             scope: spin::Once::new(),
             is_ready: AtomicBool::new(false),
+            is_me: false,
         };
 
         Ok((dso, tcb_master, elf.elf_program_headers().to_vec()))
     }
 
     #[inline]
-    pub fn mark_ready(&self) {
+    pub unsafe fn mark_ready(&self) {
         self.is_ready.store(true, Ordering::SeqCst);
     }
 
@@ -444,11 +519,7 @@ impl DSO {
         Some((
             Symbol {
                 name,
-                base: if self.pie {
-                    self.mmap.as_ptr() as usize
-                } else {
-                    0
-                },
+                base: if self.pie { self.base as usize } else { 0 },
                 value: sym.st_value(NativeEndian) as usize,
                 size: sym.st_size(NativeEndian) as usize,
                 sym_type: sym.st_type(),
@@ -468,7 +539,7 @@ impl DSO {
         }
     }
 
-    pub fn run_fini(&self) {
+    pub unsafe fn run_fini(&self) {
         for f in self.dynamic.fini_array.iter().rev() {
             unsafe { f() }
         }
@@ -480,7 +551,7 @@ impl DSO {
         data: &'a [u8],
         base_addr: Option<usize>,
         tls_offset: usize,
-    ) -> Result<(&'static [u8], Option<Master>, Dynamic<'static>), String> {
+    ) -> Result<(MemoryMapHandle, Option<Master>, Dynamic<'static>), String> {
         let endian = elf.endian();
         log::trace!("# {}", path);
         // data for struct LinkMap
@@ -640,8 +711,9 @@ impl DSO {
 
         let dynamic = dynamic.ok_or_else(|| "Unable to find PT_DYNAMIC section".to_string())?;
 
-        let (parsed_dynamic, debug) = Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic)
-            .map_err(|e| e.to_string())?;
+        let (parsed_dynamic, debug) =
+            Self::parse_dynamic(path, mmap.as_ptr(), is_pie_enabled(elf), dynamic.1)
+                .map_err(|e| e.to_string())?;
 
         if let Some(i) = debug {
             // FIXME: cleanup
@@ -664,14 +736,21 @@ impl DSO {
             }
         }
 
-        Ok((mmap, tcb_master, parsed_dynamic))
+        Ok((
+            MemoryMapHandle {
+                ptr: mmap.as_ptr(),
+                size: mmap.len(),
+            },
+            tcb_master,
+            parsed_dynamic,
+        ))
     }
 
     fn parse_dynamic<'a>(
         path: &str,
-        mmap: &'a [u8],
+        mmap: *const u8,
         is_pie: bool,
-        (_, entries): (&ProgramHeader, &[Dyn]),
+        entries: &[Dyn],
     ) -> object::Result<(Dynamic<'a>, Option<usize>)> {
         let mut runpath = None;
         let mut got = None;
@@ -692,28 +771,79 @@ impl DSO {
 
         for (i, entry) in entries.iter().enumerate() {
             let val = entry.d_val(NativeEndian);
-            let relative_idx = val as usize - if is_pie { 0 } else { mmap.as_ptr() as usize };
-            let ptr = (val as usize + if is_pie { mmap.as_ptr() as usize } else { 0 }) as *const u8;
+            let relative_idx = val as usize - if is_pie { 0 } else { mmap as usize };
+            let ptr = (val as usize + if is_pie { mmap as usize } else { 0 }) as *const u8;
             let tag = entry.d_tag(NativeEndian) as u32;
 
             match tag {
                 elf::DT_DEBUG => debug = Some(i),
 
-                // {Gnu,SysV}HashTable::parse()
-                //
-                // > The header does not contain a length field, and so all of
-                // > `data` will be used as the hash table values. It does not
-                // > matter if this is longer than needed...
                 elf::DT_GNU_HASH => {
-                    let value = GnuHashTable::parse(NativeEndian, &mmap[relative_idx..])?;
-                    hash_table = Some(HashTable::Gnu(value));
+                    let header = unsafe { ptr.cast::<GnuHashHeader>().as_ref() }.unwrap();
+                    let bloom_count = header.bloom_count.get(NativeEndian) as usize;
+                    let bucket_count = header.bucket_count.get(NativeEndian) as usize;
+                    let symbol_base = header.symbol_base.get(NativeEndian);
+
+                    let bloom_size = bloom_count * size_of::<usize>();
+                    let mut ptr = unsafe { ptr.byte_add(size_of::<GnuHashHeader>()) };
+
+                    let bloom_filters = unsafe { slice::from_raw_parts(ptr, bloom_size) };
+                    unsafe { ptr = ptr.byte_add(bloom_size) };
+
+                    let buckets = unsafe {
+                        slice::from_raw_parts(ptr.cast::<U32<NativeEndian>>(), bucket_count)
+                    };
+                    unsafe { ptr = ptr.byte_add(bucket_count * size_of::<u32>()) };
+
+                    let mut max_symbol = 0;
+                    for bucket in buckets {
+                        let bucket = bucket.get(NativeEndian);
+                        if max_symbol < bucket {
+                            max_symbol = bucket;
+                        }
+                    }
+
+                    assert_ne!(max_symbol, 0);
+                    let chains_ptr = ptr.cast::<u32>();
+                    let mut i = max_symbol - symbol_base;
+
+                    while unsafe { chains_ptr.add(i as usize).read() & 1 == 0 } {
+                        i += 1;
+                    }
+
+                    let values = unsafe {
+                        slice::from_raw_parts(ptr.cast::<U32<NativeEndian>>(), i as usize + 1)
+                    };
+
+                    let table = GnuHashTable {
+                        symbol_base,
+                        bloom_shift: header.bloom_shift.get(NativeEndian),
+                        bloom_filters,
+                        buckets,
+                        values,
+                    };
+
+                    hash_table = Some(HashTable::Gnu(table));
                 }
 
                 // XXX: Both GNU_HASH and HASH may be present, we give priority
                 // to GNU_HASH as it is significantly faster.
                 elf::DT_HASH if hash_table.is_none() => {
-                    let value = SysVHashTable::parse(NativeEndian, &mmap[relative_idx..])?;
-                    hash_table = Some(HashTable::Sysv(value));
+                    let header = unsafe { ptr.cast::<SysVHashHeader>().as_ref() }.unwrap();
+                    let bucket_count = header.bucket_count.get(NativeEndian) as usize;
+                    let chain_count = header.chain_count.get(NativeEndian) as usize;
+
+                    let mut ptr = unsafe {
+                        ptr.byte_add(size_of::<SysVHashHeader>())
+                            .cast::<U32<NativeEndian>>()
+                    };
+
+                    let buckets = unsafe { slice::from_raw_parts(ptr, bucket_count) };
+                    unsafe { ptr = ptr.add(bucket_count) };
+                    let chains = unsafe { slice::from_raw_parts(ptr, chain_count) };
+
+                    let table = SysVHashTable { buckets, chains };
+                    hash_table = Some(HashTable::Sysv(table));
                 }
 
                 elf::DT_PLTGOT => {
@@ -771,14 +901,16 @@ impl DSO {
             }
         }
 
-        let strtab_offset = strtab_offset.expect("mandatory DT_STRTAB not present");
-        let strtab_size = strtab_size.expect("mandatory DT_STRSZ not present");
+        let hash_table = hash_table.expect("either DT_GNU_HASH and/or DT_HASH mut be present");
+
+        let strtab_offset = strtab_offset.expect("DT_STRTAB must be present");
+        let strtab_size = strtab_size.expect("DT_STRSZ must be present");
 
         #[expect(clippy::unnecessary_cast, reason = "needed on i586")]
         let dynstrtab = StringTable::new(
-            mmap,
-            strtab_offset as u64,
-            strtab_offset as u64 + strtab_size as u64,
+            unsafe { slice::from_raw_parts(mmap.byte_add(strtab_offset), strtab_size as usize) },
+            0,
+            strtab_size as u64,
         );
 
         let get_str = |entry: &Dyn| {
@@ -812,7 +944,6 @@ impl DSO {
         let soname = soname.map(get_str).transpose()?;
 
         let jmprel = jmprel.unwrap_or_default();
-        let hash_table = hash_table.expect("either DT_GNU_HASH and/or DT_HASH mut be present");
 
         let init_array = unsafe { get_array(init_array_ptr, init_array_len) };
         let fini_array = unsafe { get_array(fini_array_ptr, fini_array_len) };
@@ -889,8 +1020,6 @@ impl DSO {
     }
 
     fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
-        let b = self.mmap.as_ptr() as usize;
-
         let (sym, my_sym) = if reloc.sym != STN_UNDEF {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
@@ -923,7 +1052,7 @@ impl DSO {
             .unwrap_or((0, self));
 
         let ptr = if self.pie {
-            (b + reloc.offset) as *mut u8
+            unsafe { self.base.byte_add(reloc.offset).cast_mut() }
         } else {
             reloc.offset as *mut u8
         };
@@ -956,7 +1085,7 @@ impl DSO {
             }
             RelocationKind::GOT => set_usize(s),
             RelocationKind::OFFSET => set_usize((s + a).wrapping_sub(p)),
-            RelocationKind::RELATIVE => set_usize(b + a),
+            RelocationKind::RELATIVE => set_usize(self.base as usize + a),
             RelocationKind::SYMBOLIC => set_usize(s + a),
             RelocationKind::TPOFF => {
                 assert!(
@@ -974,7 +1103,8 @@ impl DSO {
                 }
             }
             RelocationKind::IRELATIVE => unsafe {
-                let f: unsafe extern "C" fn() -> usize = core::mem::transmute(b + a);
+                let f: unsafe extern "C" fn() -> usize =
+                    core::mem::transmute(self.base as usize + a);
                 set_usize(f());
             },
             RelocationKind::COPY => unsafe {
@@ -1007,7 +1137,6 @@ impl DSO {
             return Ok(());
         };
 
-        let object_base_addr = self.mmap.as_ptr() as usize;
         let jmprel = self.dynamic.jmprel;
         let pltrelsz = self.dynamic.pltrelsz;
 
@@ -1031,14 +1160,14 @@ impl DSO {
             };
 
             let ptr = if self.pie {
-                (object_base_addr + reloc.offset) as *mut usize
+                (self.base as usize + reloc.offset) as *mut usize
             } else {
                 reloc.offset as *mut usize
             };
 
             match (reloc.kind, resolve) {
                 (RelocationKind::PLT, Resolve::Lazy) if self.pie => unsafe {
-                    *ptr += object_base_addr;
+                    *ptr += self.base as usize;
                 },
 
                 (RelocationKind::PLT, Resolve::Lazy) => {
@@ -1082,19 +1211,30 @@ impl DSO {
         Ok(())
     }
 
-    pub fn relocate(&self, ph: &[ProgramHeader], resolve: Resolve) -> object::Result<()> {
+    pub fn relocate(&self, ph: Option<&[ProgramHeader]>, resolve: Resolve) -> object::Result<()> {
         let global_scope = GLOBAL_SCOPE.read();
-        let base = self.mmap.as_ptr();
 
-        unsafe {
-            apply_relr(base, self.dynamic.relr);
+        if !self.is_me {
+            unsafe {
+                apply_relr(self.base, self.dynamic.relr);
+            }
         }
 
-        self.dynamic
-            .static_relocations()
-            .try_for_each(|reloc| self.static_relocate(&global_scope, reloc))?;
+        for reloc in self.dynamic.static_relocations() {
+            if reloc.kind == RelocationKind::RELATIVE && self.is_me {
+                continue;
+            }
+            self.static_relocate(&global_scope, reloc)?;
+        }
+
+        if self.is_me {
+            // TODO: assert that ld.so have no lazy relocations.
+            return Ok(());
+        }
 
         self.lazy_relocate(&global_scope, resolve)?;
+
+        let ph = ph.unwrap();
 
         // Protect pages
         for ph in ph
@@ -1120,7 +1260,7 @@ impl DSO {
 
             unsafe {
                 let ptr = if self.pie {
-                    self.mmap.as_ptr().add(vaddr)
+                    self.base.add(vaddr)
                 } else {
                     vaddr as *const u8
                 };
@@ -1135,12 +1275,16 @@ impl DSO {
 
 impl Drop for DSO {
     fn drop(&mut self) {
+        if self.is_me {
+            return;
+        }
         if self.is_ready.load(Ordering::SeqCst) {
             // `run_fini` should not be called if we are being prematurely
             // dropped (e.g. failed to satisfy dependencies).
-            self.run_fini();
+            unsafe {
+                self.run_fini();
+            }
         }
-        unsafe { Sys::munmap(self.mmap.as_ptr() as *mut c_void, self.mmap.len()).unwrap() };
     }
 }
 
@@ -1309,3 +1453,7 @@ pub unsafe fn apply_relr(base: *const u8, relr: &[Relr]) {
         }
     }
 }
+
+// TODO: Add safety comment.
+unsafe impl Send for DSO {}
+unsafe impl Sync for DSO {}

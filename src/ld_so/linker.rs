@@ -1,6 +1,5 @@
 use alloc::{
     collections::BTreeMap,
-    rc::Rc,
     string::{String, ToString},
     sync::{Arc, Weak},
     vec::Vec,
@@ -12,13 +11,9 @@ use object::{
     read::elf::{Rela as _, Sym},
 };
 
-use core::{
-    cell::RefCell,
-    ptr::{self, NonNull},
-};
+use core::ptr;
 
 use crate::{
-    ALLOCATOR,
     c_str::{CStr, CString},
     error::Errno,
     header::{
@@ -26,7 +21,7 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::SymbolBinding,
+    ld_so::dso::{Dyn, SymbolBinding},
     out::Out,
     platform::{
         Pal, Sys,
@@ -43,7 +38,6 @@ use super::dso::Rela;
 use super::{
     PATH_SEP,
     access::accessible,
-    callbacks::LinkerCallbacks,
     debug::{_dl_debug_state, _r_debug, RTLDState},
     dso::{DSO, ProgramHeader},
     tcb::{Master, Tcb},
@@ -328,41 +322,6 @@ impl Scope {
     }
 }
 
-// Used by dlfcn.h
-//
-// We need this as the handle must be created and destroyed with the dynamic
-// linker's allocator.
-pub struct ObjectHandle(*const DSO);
-
-impl ObjectHandle {
-    #[inline]
-    fn new(obj: Arc<DSO>) -> Self {
-        Self(Arc::into_raw(obj))
-    }
-
-    #[inline]
-    fn into_inner(self) -> Arc<DSO> {
-        unsafe { Arc::from_raw(self.0) }
-    }
-
-    #[inline]
-    pub fn as_ptr(&self) -> *const c_void {
-        self.0.cast()
-    }
-
-    #[inline]
-    pub fn from_ptr(ptr: *const c_void) -> Option<Self> {
-        NonNull::new(ptr as *mut DSO).map(|ptr| Self(ptr.as_ptr()))
-    }
-}
-
-impl AsRef<DSO> for ObjectHandle {
-    #[inline]
-    fn as_ref(&self) -> &DSO {
-        unsafe { &*self.0 }
-    }
-}
-
 bitflags::bitflags! {
     #[derive(Debug, Default)]
     pub struct DebugFlags: u32 {
@@ -417,29 +376,36 @@ impl Config {
     }
 }
 
+pub struct Me {
+    pub base: *const u8,
+    pub phdrs: &'static [ProgramHeader],
+    pub dyns: &'static [Dyn],
+}
+
 pub struct Linker {
     config: Config,
+
+    me: Me,
 
     next_object_id: usize,
     next_tls_module_id: usize,
     tls_size: usize,
     objects: BTreeMap<usize, Arc<DSO>>,
     name_to_object_id_map: BTreeMap<String, usize>,
-    pub cbs: Rc<RefCell<LinkerCallbacks>>,
 }
 
 const ROOT_ID: usize = 1;
 
 impl Linker {
-    pub fn new(config: Config) -> Self {
+    pub fn new(me: Me, config: Config) -> Self {
         Self {
+            me,
             config,
             next_object_id: ROOT_ID,
             next_tls_module_id: 1,
             tls_size: 0,
             objects: BTreeMap::new(),
             name_to_object_id_map: BTreeMap::new(),
-            cbs: Rc::new(RefCell::new(LinkerCallbacks::new())),
         }
     }
 
@@ -465,7 +431,7 @@ impl Linker {
         resolve: Resolve,
         scope: ScopeKind,
         noload: bool,
-    ) -> Result<ObjectHandle> {
+    ) -> Result<Arc<DSO>> {
         log::trace!(
             "[ld.so] load_library(name={:?}, resolve={:#?}, scope={:#?}, noload={})",
             name,
@@ -500,14 +466,14 @@ impl Linker {
                         self.scope_debug();
                     }
 
-                    Ok(ObjectHandle::new(obj.clone()))
+                    Ok(obj.clone())
                 } else if !noload {
                     let parent_runpath = &self
                         .objects
                         .get(&ROOT_ID)
                         .and_then(|parent| parent.runpath().cloned());
 
-                    Ok(ObjectHandle::new(self.load_object(
+                    Ok(self.load_object(
                         name,
                         parent_runpath,
                         None,
@@ -518,29 +484,24 @@ impl Linker {
                             resolve
                         },
                         scope,
-                    )?))
+                    )?)
                 } else {
-                    // FIXME: LoadError?
-                    // Err(Error::Malformed(format!(
-                    //     "object '{}' has not yet been loaded",
-                    //     name
-                    // )))
-                    Ok(ObjectHandle(ptr::null()))
+                    Err(DlError::NotFound)
                 }
             }
 
             None => match self.objects.get(&ROOT_ID) {
-                Some(obj) => Ok(ObjectHandle::new(obj.clone())),
+                Some(obj) => Ok(obj.clone()),
                 None => Err(DlError::NotFound),
             },
         }
     }
 
-    pub fn get_sym(&self, handle: Option<ObjectHandle>, name: &str) -> Option<*mut c_void> {
+    pub fn get_sym(&self, handle: Option<&DSO>, name: &str) -> Option<*mut c_void> {
         let guard;
 
-        if let Some(handle) = handle.as_ref() {
-            handle.as_ref().scope()
+        if let Some(handle) = handle {
+            handle.scope()
         } else {
             guard = GLOBAL_SCOPE.read();
             &guard
@@ -560,8 +521,7 @@ impl Linker {
         })
     }
 
-    pub fn unload(&mut self, handle: ObjectHandle) {
-        let obj = handle.into_inner();
+    pub fn unload(&mut self, obj: Arc<DSO>) {
         if !obj.dlopened {
             return;
         }
@@ -590,7 +550,7 @@ impl Linker {
                 if let Some(name) = self.name_to_object_id_map.get(*dep)
                     && let Some(object_name) = self.objects.get(name)
                 {
-                    self.unload(ObjectHandle::new(object_name.clone()));
+                    self.unload(object_name.clone());
                 }
             }
             self.name_to_object_id_map.remove(&obj.name);
@@ -603,7 +563,9 @@ impl Linker {
 
     pub fn fini(&self) {
         for obj in self.objects.values() {
-            obj.run_fini();
+            unsafe {
+                obj.run_fini();
+            }
         }
     }
 
@@ -642,7 +604,11 @@ impl Linker {
         )?;
 
         for (i, obj) in new_objects.iter().enumerate() {
-            obj.relocate(&objects_data[i], resolve).unwrap();
+            obj.relocate(
+                objects_data[i].as_ref().map(|phdrs| phdrs.as_slice()),
+                resolve,
+            )
+            .unwrap();
         }
 
         unsafe {
@@ -735,7 +701,6 @@ impl Linker {
                     #[cfg(target_os = "redox")]
                     Some(thr_fd),
                 );
-                tcb.mspace = ALLOCATOR.get();
 
                 #[cfg(target_os = "redox")]
                 {
@@ -751,7 +716,10 @@ impl Linker {
         }
 
         for obj in new_objects.into_iter() {
-            obj.mark_ready();
+            // SAFETY: `obj` and its dependencies have been successfuly loaded.
+            unsafe {
+                obj.mark_ready();
+            }
             self.run_init(&obj);
             self.register_object(obj);
         }
@@ -788,7 +756,7 @@ impl Linker {
         base_addr: Option<usize>,
         dlopened: bool,
         new_objects: &mut Vec<Arc<DSO>>,
-        objects_data: &mut Vec<Vec<ProgramHeader>>,
+        objects_data: &mut Vec<Option<Vec<ProgramHeader>>>,
         tcb_masters: &mut Vec<Master>,
         // Scope of the object that caused this object to be loaded.
         dependent_scope: Option<&mut Scope>,
@@ -821,6 +789,49 @@ impl Linker {
 
         let debug = self.config.debug_flags.contains(DebugFlags::LOAD);
 
+        if name == "libc.so.6" || name == "libc.so" {
+            if debug {
+                println!(
+                    "[ld.so]: loading libc.so.6 (aka. ld.so) at {:#?}",
+                    self.me.base
+                );
+            }
+
+            let (me, master) = DSO::from_raw(
+                self.me.base,
+                self.me.dyns,
+                self.me.phdrs,
+                self.next_object_id,
+                self.next_tls_module_id,
+                self.tls_size.next_multiple_of(16),
+            );
+
+            self.tls_size = master.offset;
+            self.next_tls_module_id += 1;
+            self.next_object_id += 1;
+
+            let obj = Arc::new(me);
+
+            tcb_masters.push(master);
+            objects_data.push(None);
+            new_objects.push(obj.clone());
+
+            if let Some(dependent_scope) = dependent_scope {
+                match scope_kind {
+                    ScopeKind::Local => dependent_scope.add(&obj),
+                    ScopeKind::Global => GLOBAL_SCOPE.write().add(&obj),
+                }
+            } else if let ScopeKind::Global = scope_kind {
+                GLOBAL_SCOPE.write().add(&obj);
+            }
+
+            let mut scope = Scope::local();
+            scope.set_owner(Arc::downgrade(&obj));
+            obj.scope.call_once(|| scope);
+
+            return Ok(obj);
+        }
+
         let path = self.search_object(name, parent_runpath)?;
         let file = self.read_file(&path)?;
         let data = file.data();
@@ -846,8 +857,8 @@ impl Linker {
             eprintln!(
                 "[ld.so]: loading object: {} at {:#x}:{:#x} (pie: {})",
                 name,
-                obj.mmap.as_ptr() as usize,
-                obj.mmap.as_ptr() as usize + obj.mmap.len(),
+                obj.mmap.as_ref().unwrap().as_ptr() as usize,
+                obj.mmap.as_ref().unwrap().as_ptr() as usize + obj.mmap.as_ref().unwrap().size(),
                 obj.pie,
             );
         }
@@ -896,7 +907,7 @@ impl Linker {
             )?;
         }
 
-        objects_data.push(elf);
+        objects_data.push(Some(elf));
         new_objects.push(obj.clone());
 
         scope.set_owner(Arc::downgrade(&obj));
@@ -1011,7 +1022,7 @@ impl Linker {
 #[cfg(target_pointer_width = "64")]
 extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> *mut c_void {
     let obj = unsafe { &*obj };
-    let obj_base = obj.mmap.as_ptr() as usize;
+    let obj_base = obj.base as usize;
     let jmprel = obj.dynamic.jmprel;
 
     let rela = unsafe { &*(jmprel as *const Rela).add(relocation_index as usize) };

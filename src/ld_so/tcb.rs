@@ -11,7 +11,7 @@ use generic_rt::GenericTcb;
 use crate::{
     header::sys_mman,
     ld_so::linker::Linker,
-    platform::{Dlmalloc, Pal, Sys},
+    platform::{Pal, Sys},
     pthread::{OsTid, Pthread},
     sync::{mutex::Mutex, waitval::Waitval},
 };
@@ -56,8 +56,6 @@ pub struct Tcb {
     pub num_copied_masters: usize,
     /// Pointer to dynamic linker
     pub linker_ptr: *const Mutex<Linker>,
-    /// pointer to rust memory allocator structure
-    pub mspace: *const Mutex<Dlmalloc>,
     /// Underlying pthread_t struct, pthread_self() returns &self.pthread
     pub pthread: Pthread,
 
@@ -98,7 +96,6 @@ impl Tcb {
                 masters_len: 0,
                 num_copied_masters: 0,
                 linker_ptr: ptr::null(),
-                mspace: ptr::null(),
                 pthread: Pthread {
                     waitval: Waitval::new(),
                     flags: Default::default(),

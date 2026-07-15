@@ -44,7 +44,8 @@ run-once: $(BUILD)/bins_verify/relibc-tests $(BUILD)/$(TESTBIN) support_build
 $(BUILD)/bins_verify/relibc-tests: src/main.rs
 	mkdir -p $(BUILD)/bins_verify
 	RUSTFLAGS="-C target-feature=-crt-static" $(CARGO_TEST) build --release --bin relibc-tests \
-		--artifact-dir $(BUILD)/bins_verify --target-dir $(BUILD)/target -Z unstable-options
+		--artifact-dir $(BUILD)/bins_verify --target-dir $(BUILD)/target -Z unstable-options \
+		--target $(TARGET)
 	rm -rf $(BUILD)/target
 
 $(BUILD)/Makefile: Makefile.run.mk

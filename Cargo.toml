@@ -117,6 +117,7 @@ features = ["c_api"]
 [dependencies.object]
 version = "0.36.7"
 git = "https://gitlab.redox-os.org/andypython/object"
+branch = "new"
 default-features = false
 features = ["elf", "read_core"]
 
