@@ -372,7 +372,7 @@ pub struct DSO {
     pub pie: bool,
 
     /// Whether this DSO *and* its dependencies have been successfully loaded.
-    pub is_ready: AtomicBool,
+    is_ready: AtomicBool,
 
     /// Is this DSO for ld.so?
     is_me: bool,
@@ -476,7 +476,7 @@ impl DSO {
     }
 
     #[inline]
-    pub fn mark_ready(&self) {
+    pub unsafe fn mark_ready(&self) {
         self.is_ready.store(true, Ordering::SeqCst);
     }
 
@@ -537,7 +537,7 @@ impl DSO {
         }
     }
 
-    pub fn run_fini(&self) {
+    pub unsafe fn run_fini(&self) {
         for f in self.dynamic.fini_array.iter().rev() {
             unsafe { f() }
         }
@@ -1266,7 +1266,9 @@ impl Drop for DSO {
         if self.is_ready.load(Ordering::SeqCst) {
             // `run_fini` should not be called if we are being prematurely
             // dropped (e.g. failed to satisfy dependencies).
-            self.run_fini();
+            unsafe {
+                self.run_fini();
+            }
         }
     }
 }

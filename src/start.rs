@@ -90,8 +90,6 @@ static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
 extern "C" fn init_array() {
     // The thing is that we cannot guarantee if
     // init_array runs first or if relibc_start runs first
-    // Still whoever gets to run first must initialize rust
-    // memory allocator before doing anything else.
 
     unsafe {
         if INIT_COMPLETE {
@@ -99,13 +97,13 @@ extern "C" fn init_array() {
         }
     }
 
-    io_init();
-
     unsafe {
         if platform::environ.is_null() {
             platform::environ = __relibc_init_environ;
         }
     }
+
+    io_init();
 
     unsafe {
         crate::pthread::init();

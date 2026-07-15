@@ -41,12 +41,6 @@ use super::{
     tcb::Tcb,
 };
 
-#[cfg(target_pointer_width = "32")]
-pub const SIZEOF_EHDR: usize = 52;
-
-#[cfg(target_pointer_width = "64")]
-pub const SIZEOF_EHDR: usize = 64;
-
 unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
     //traverse the stack and collect argument vector
     let mut argv = Vec::new();
