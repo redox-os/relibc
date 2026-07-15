@@ -22,7 +22,9 @@ fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
 
     let size = mem::size_of::<T>();
 
-    let bytes = dup.read(unsafe { slice::from_raw_parts_mut(t as *mut T as *mut u8, size) })?;
+    let bytes = dup.read(unsafe {
+        slice::from_raw_parts_mut(core::ptr::from_mut::<T>(t).cast::<u8>(), size)
+    })?;
 
     Ok(bytes / size)
 }
@@ -33,7 +35,8 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> Result<usize> {
 
     let size = mem::size_of::<T>();
 
-    let bytes = dup.write(unsafe { slice::from_raw_parts(t as *const T as *const u8, size) })?;
+    let bytes = dup
+        .write(unsafe { slice::from_raw_parts(core::ptr::from_ref::<T>(t).cast::<u8>(), size) })?;
 
     Ok(bytes / size)
 }
@@ -50,13 +53,13 @@ impl IoctlBuffer {
     unsafe fn read<T>(&self) -> Result<T> {
         let (ptr, size) = match *self {
             Self::Write(ptr, size) => (ptr, size),
-            Self::ReadWrite(ptr, size) => (ptr as *const c_void, size),
+            Self::ReadWrite(ptr, size) => (ptr.cast_const(), size),
             _ => {
                 return Err(Errno(EINVAL));
             }
         };
         if size == mem::size_of::<T>() {
-            let value = unsafe { ptr::read(ptr as *const T) };
+            let value = unsafe { ptr::read(ptr.cast::<T>()) };
             Ok(value)
         } else {
             Err(Errno(EINVAL))
@@ -64,14 +67,11 @@ impl IoctlBuffer {
     }
 
     unsafe fn write<T>(&mut self, value: T) -> Result<()> {
-        let (ptr, size) = match *self {
-            Self::Read(ptr, size) | Self::ReadWrite(ptr, size) => (ptr, size),
-            _ => {
-                return Err(Errno(EINVAL));
-            }
+        let (Self::Read(ptr, size) | Self::ReadWrite(ptr, size)) = *self else {
+            return Err(Errno(EINVAL));
         };
         if size == mem::size_of::<T>() {
-            unsafe { ptr::write(ptr as *mut T, value) };
+            unsafe { ptr::write(ptr.cast::<T>(), value) };
             Ok(())
         } else {
             Err(Errno(EINVAL))
@@ -83,7 +83,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
     match request {
         FIONBIO => {
             let mut flags = Sys::fcntl(fd, fcntl::F_GETFL, 0)?;
-            flags = if unsafe { *(out as *mut c_int) } == 0 {
+            flags = if unsafe { *out.cast::<c_int>() } == 0 {
                 flags & !fcntl::O_NONBLOCK
             } else {
                 flags | fcntl::O_NONBLOCK
@@ -91,7 +91,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             Sys::fcntl(fd, fcntl::F_SETFL, flags as c_ulonglong)?;
         }
         TCGETS => {
-            let termios = unsafe { &mut *(out as *mut termios::termios) };
+            let termios = unsafe { &mut *out.cast::<termios::termios>() };
             dup_read(fd, "termios", termios)?;
         }
         // TODO: give these different behaviors
@@ -119,7 +119,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             todo_skip!(0, "ioctl TIOCSCTTY");
         }
         TIOCGPGRP => {
-            let pgrp = unsafe { &mut *(out as *mut pid_t) };
+            let pgrp = unsafe { &mut *out.cast::<pid_t>() };
             dup_read(fd, "pgrp", pgrp)?;
         }
         TIOCSPGRP => {
@@ -127,7 +127,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             dup_write(fd, "pgrp", pgrp)?;
         }
         TIOCGWINSZ => {
-            let winsize = unsafe { &mut *(out as *mut winsize) };
+            let winsize = unsafe { &mut *out.cast::<winsize>() };
             dup_read(fd, "winsize", winsize)?;
         }
         TIOCSWINSZ => {
@@ -135,7 +135,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             dup_write(fd, "winsize", winsize)?;
         }
         TIOCGPTLCK => {
-            let lock = unsafe { &mut *(out as *mut c_int) };
+            let lock = unsafe { &mut *out.cast::<c_int>() };
             dup_read(fd, "ptlock", lock)?;
         }
         TIOCSPTLCK => {
@@ -143,7 +143,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             dup_write(fd, "ptlock", lock)?;
         }
         TIOCGPTN => {
-            let name = unsafe { &mut *(out as *mut c_int) };
+            let name = unsafe { &mut *out.cast::<c_int>() };
             dup_read(fd, "ptsname", name)?;
         }
         SIOCATMARK => {

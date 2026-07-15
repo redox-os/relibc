@@ -68,13 +68,13 @@ impl<'a> From<&'a syscall::TimeSpec> for timespec {
     fn from(value: &'a syscall::TimeSpec) -> Self {
         Self {
             tv_sec: value.tv_sec as _,
-            tv_nsec: value.tv_nsec as _,
+            tv_nsec: value.tv_nsec.into(),
         }
     }
 }
 
 #[cfg(target_os = "redox")]
-impl<'a> From<&'a timespec> for syscall::TimeSpec {
+impl From<&timespec> for syscall::TimeSpec {
     fn from(tp: &timespec) -> Self {
         Self {
             tv_sec: tp.tv_sec as _,

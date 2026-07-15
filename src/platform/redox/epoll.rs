@@ -104,13 +104,12 @@ impl PalEpoll for Sys {
         };
 
         let callback = || {
-            let res = syscall::read(epfd as usize, unsafe {
+            syscall::read(epfd as usize, unsafe {
                 slice::from_raw_parts_mut(
-                    events as *mut u8,
+                    events.cast::<u8>(),
                     maxevents as usize * mem::size_of::<syscall::Event>(),
                 )
-            });
-            res
+            })
         };
 
         let bytes_read = if sigset.is_null() {
@@ -128,7 +127,7 @@ impl PalEpoll for Sys {
             unsafe {
                 let event_ptr = events.add(i);
                 let target_ptr = events.add(count);
-                let event = *(event_ptr as *mut Event);
+                let event = *event_ptr.cast::<Event>();
                 *target_ptr = epoll_event {
                     events: event_flags_to_epoll(event.flags),
                     data: epoll_data {

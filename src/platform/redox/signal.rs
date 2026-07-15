@@ -115,7 +115,14 @@ impl PalSignal for Sys {
                 SigactionKind::Handled {
                     handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_int != 0 {
                         SignalHandler {
-                            sigaction: unsafe { core::mem::transmute(c_act.sa_handler) },
+                            sigaction: unsafe {
+                                core::mem::transmute::<
+                                    core::option::Option<extern "C" fn(i32)>,
+                                    core::option::Option<
+                                        unsafe extern "C" fn(i32, *const (), *mut ()),
+                                    >,
+                                >(c_act.sa_handler)
+                            },
                         }
                     } else {
                         SignalHandler {
@@ -138,20 +145,33 @@ impl PalSignal for Sys {
         if let (Some(c_oact), Some(old_action)) = (c_oact, old_action) {
             *c_oact = match old_action.kind {
                 SigactionKind::Ignore => sigaction {
-                    sa_handler: unsafe { core::mem::transmute(SIG_IGN) },
+                    sa_handler: unsafe {
+                        core::mem::transmute::<usize, core::option::Option<extern "C" fn(i32)>>(
+                            SIG_IGN,
+                        )
+                    },
                     sa_flags: 0,
                     sa_restorer: None,
                     sa_mask: 0,
                 },
                 SigactionKind::Default => sigaction {
-                    sa_handler: unsafe { core::mem::transmute(SIG_DFL) },
+                    sa_handler: unsafe {
+                        core::mem::transmute::<usize, core::option::Option<extern "C" fn(i32)>>(
+                            SIG_DFL,
+                        )
+                    },
                     sa_flags: 0,
                     sa_restorer: None,
                     sa_mask: 0,
                 },
                 SigactionKind::Handled { handler } => sigaction {
                     sa_handler: if old_action.flags.contains(SigactionFlags::SIGINFO) {
-                        unsafe { core::mem::transmute(handler.sigaction) }
+                        unsafe {
+                            core::mem::transmute::<
+                                core::option::Option<unsafe extern "C" fn(i32, *const (), *mut ())>,
+                                core::option::Option<extern "C" fn(i32)>,
+                            >(handler.sigaction)
+                        }
                     } else {
                         unsafe { handler.handler }
                     },

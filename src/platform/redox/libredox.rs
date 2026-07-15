@@ -31,7 +31,7 @@ pub fn openat(dirfd: c_int, path: RedoxStr<'_>, oflag: c_int, mode: mode_t) -> R
         ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
     )?;
 
-    if let Err(_) = c_int::try_from(usize_fd) {
+    if c_int::try_from(usize_fd).is_err() {
         let _ = redox_rt::sys::close(usize_fd);
         return Err(Error::new(EMFILE));
     }
@@ -42,7 +42,7 @@ pub fn fchmod(fd: usize, new_mode: u16) -> Result<()> {
     std_fs_call_wo(
         fd,
         &[],
-        &StdFsCallMeta::new(StdFsCallKind::Fchmod, new_mode as u64, 0),
+        &StdFsCallMeta::new(StdFsCallKind::Fchmod, u64::from(new_mode), 0),
     )?;
     Ok(())
 }
@@ -77,7 +77,7 @@ pub fn getdents(fd: usize, buf: &mut [u8], opaque: u64) -> Result<usize> {
         }) => (),
         other => {
             //println!("REAL GETDENTS {:?}", other);
-            return Ok(other?);
+            return other;
         }
     }
 
@@ -87,7 +87,7 @@ pub fn getdents(fd: usize, buf: &mut [u8], opaque: u64) -> Result<usize> {
 
     let (header, name) = buf.split_at_mut(mem::size_of::<DirentHeader>());
 
-    let bytes_read = Sys::pread(fd as c_int, name, opaque as i64)? as usize;
+    let bytes_read = Sys::pread(fd as c_int, name, opaque as i64)?;
     if bytes_read == 0 {
         return Ok(0);
     }
@@ -122,7 +122,7 @@ pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> Resul
     if let Some(buf) = unsafe { buf.as_mut() } {
         buf.st_dev = redox_buf.st_dev as dev_t;
         buf.st_ino = redox_buf.st_ino as ino_t;
-        buf.st_nlink = redox_buf.st_nlink as nlink_t;
+        buf.st_nlink = nlink_t::from(redox_buf.st_nlink);
         buf.st_mode = redox_buf.st_mode as mode_t;
         buf.st_uid = redox_buf.st_uid as uid_t;
         buf.st_gid = redox_buf.st_gid as gid_t;
@@ -202,7 +202,7 @@ pub unsafe fn futimens(fd: usize, times: *const timespec) -> Result<()> {
     };
     let redox_buf = unsafe {
         slice::from_raw_parts(
-            times.as_ptr() as *const u8,
+            times.as_ptr().cast::<u8>(),
             times.len() * mem::size_of::<syscall::TimeSpec>(),
         )
     };
@@ -215,7 +215,7 @@ pub unsafe fn futimens(fd: usize, times: *const timespec) -> Result<()> {
 }
 pub fn clock_gettime(clock: usize, mut tp: Out<timespec>) -> Result<()> {
     let mut redox_tp = syscall::TimeSpec::default();
-    syscall::clock_gettime(clock as usize, &mut redox_tp)?;
+    syscall::clock_gettime(clock, &mut redox_tp)?;
     tp.write((&redox_tp).into());
     Ok(())
 }
@@ -228,9 +228,8 @@ pub unsafe extern "C" fn redox_open_v1(
     mode: u16,
 ) -> RawResult {
     let path = unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) };
-    let path = match RedoxStr::new(path) {
-        Some(path) => path,
-        None => return Error::mux(Err(Error::new(EINVAL))),
+    let Some(path) = RedoxStr::new(path) else {
+        return Error::mux(Err(Error::new(EINVAL)));
     };
     Error::mux(openat(AT_FDCWD, path, flags as c_int, mode as mode_t))
 }

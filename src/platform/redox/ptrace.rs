@@ -60,7 +60,7 @@ pub fn init_state() -> &'static State {
         if STATE.unsafe_ref().is_none() {
             STATE.unsafe_set(Some(State::new()));
         }
-        let state_ptr = STATE.unsafe_ref().as_ref().unwrap() as *const State;
+        let state_ptr = core::ptr::from_ref::<State>(STATE.unsafe_ref().as_ref().unwrap());
         &*state_ptr
     }
 }
@@ -193,7 +193,7 @@ unsafe fn inner_ptrace(
             Ok(0)
         }
         sys_ptrace::PTRACE_GETREGS => {
-            let c_regs = unsafe { &mut *(data as *mut user_regs_struct) };
+            let c_regs = unsafe { &mut *data.cast::<user_regs_struct>() };
             let mut redox_regs = syscall::IntRegisters::default();
             (&mut &session.regs).read(&mut redox_regs)?;
             *c_regs = user_regs_struct {
@@ -228,7 +228,7 @@ unsafe fn inner_ptrace(
             Ok(0)
         }
         sys_ptrace::PTRACE_SETREGS => {
-            let c_regs = unsafe { &*(data as *mut user_regs_struct) };
+            let c_regs = unsafe { &*data.cast::<user_regs_struct>() };
             let redox_regs = syscall::IntRegisters {
                 r15: c_regs.r15 as _,
                 r14: c_regs.r14 as _,

@@ -1,8 +1,7 @@
-use crate::{c_str::CStr, header::stdlib::getenv, platform::types::*};
-use core::ptr;
+use crate::{c_str::CStr, header::stdlib::getenv, platform::types::c_char};
 use syscall::{EIO, ENOENT, Error, Result, flag::*};
 
-pub const LIBC_SCHEME: &'static str = "libc:";
+pub const LIBC_SCHEME: &str = "libc:";
 
 const ENV_MAX_LEN: i32 = i32::MAX;
 
@@ -10,8 +9,8 @@ macro_rules! env_str {
     ($lit:expr) => {
         #[allow(unused_unsafe)]
         {
-            let val_bytes = unsafe { getenv(concat!($lit, "\0").as_ptr() as *const c_char) };
-            if val_bytes != ptr::null_mut() {
+            let val_bytes = unsafe { getenv(concat!($lit, "\0").as_ptr().cast::<c_char>()) };
+            if !val_bytes.is_null() {
                 if let Ok(val_str) = unsafe { CStr::from_ptr(val_bytes) }.to_str() {
                     Some(val_str)
                 } else {
