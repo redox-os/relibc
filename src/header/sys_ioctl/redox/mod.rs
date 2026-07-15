@@ -22,8 +22,9 @@ fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
 
     let size = mem::size_of::<T>();
 
-    let bytes = dup
-        .read(unsafe { slice::from_raw_parts_mut(core::ptr::from_mut::<T>(t) as *mut u8, size) })?;
+    let bytes = dup.read(unsafe {
+        slice::from_raw_parts_mut(core::ptr::from_mut::<T>(t).cast::<u8>(), size)
+    })?;
 
     Ok(bytes / size)
 }
@@ -35,7 +36,7 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> Result<usize> {
     let size = mem::size_of::<T>();
 
     let bytes = dup
-        .write(unsafe { slice::from_raw_parts(core::ptr::from_ref::<T>(t) as *const u8, size) })?;
+        .write(unsafe { slice::from_raw_parts(core::ptr::from_ref::<T>(t).cast::<u8>(), size) })?;
 
     Ok(bytes / size)
 }

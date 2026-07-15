@@ -1,7 +1,7 @@
 use crate::{c_str::CStr, header::stdlib::getenv, platform::types::c_char};
 use syscall::{EIO, ENOENT, Error, Result, flag::*};
 
-pub const LIBC_SCHEME: &'static str = "libc:";
+pub const LIBC_SCHEME: &str = "libc:";
 
 const ENV_MAX_LEN: i32 = i32::MAX;
 

@@ -665,7 +665,7 @@ impl Linker {
 
                     // Unmap just the TCB page.
                     Sys::munmap(
-                        core::ptr::from_mut::<Tcb>(new_tcb) as *mut c_void,
+                        core::ptr::from_mut::<Tcb>(new_tcb).cast::<c_void>(),
                         syscall::PAGE_SIZE,
                     )
                     .unwrap();
@@ -698,7 +698,7 @@ impl Linker {
                     drop(_guard);
                     (
                         new_tcb,
-                        core::ptr::from_mut::<Tcb>(old_tcb) as *mut c_void,
+                        core::ptr::from_mut::<Tcb>(old_tcb).cast::<c_void>(),
                         thr_fd,
                     )
                 };
