@@ -29,7 +29,7 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
     let (redox, fd) = match path {
         RedoxStr::Absolute(path) => {
             let path = path.to_standard_canon();
-            let fd = FdGuard::open_into_upper(&path.as_reference(), O_STAT);
+            let fd = FdGuard::open_into_upper(path.as_reference(), O_STAT);
             (path.into_owned(), fd)
         }
         RedoxStr::Relative(redox_reference) => {
@@ -112,7 +112,7 @@ pub struct Cwd<'a> {
 static CWD: RwLock<Option<Cwd<'_>>> = RwLock::new(None);
 
 pub fn to_cwd_path(path: &str) -> Result<CwdPath> {
-    ArrayString::from_str(&path).or(Err(Error::new(ENAMETOOLONG)))
+    ArrayString::from_str(path).or(Err(Error::new(ENAMETOOLONG)))
 }
 
 pub fn set_cwd_manual(path: CwdPath, fd: FdGuardUpper) -> Result<()> {
@@ -126,7 +126,7 @@ pub fn set_cwd_manual(path: CwdPath, fd: FdGuardUpper) -> Result<()> {
 
 pub fn clone_cwd() -> Option<CwdPath> {
     let _siglock = tmp_disable_signals();
-    CWD.read().as_ref().map(|cwd| cwd.path.clone())
+    CWD.read().as_ref().map(|cwd| cwd.path)
 }
 
 fn open_absolute(path: &str, flags: usize) -> Result<usize> {
@@ -138,9 +138,9 @@ fn open_absolute(path: &str, flags: usize) -> Result<usize> {
 }
 
 // Read symlink content
-fn read_link_content<'a, 'b>(
+fn read_link_content<'b>(
     dirfd: Option<&FdGuard>,
-    path: &'a str,
+    path: &str,
     is_relative: bool,
 ) -> Result<RedoxStr<'b>> {
     let resolve_flags = O_CLOEXEC | O_SYMLINK | O_RDONLY;
@@ -156,7 +156,7 @@ fn read_link_content<'a, 'b>(
     log::trace!(
         "read_link_content ({:?} {:?} {}): {:?}",
         dirfd,
-        &path,
+        path,
         is_relative,
         fd
     );
@@ -180,7 +180,7 @@ fn resolve_sym_links<'a>(mut current_path_string: RedoxPath<'a>, flags: usize) -
         let dirname = current_path_string.dirname();
         let cow: Cow<'_, str> = current_path_string.into();
         let initial_res = open_absolute(&cow, flags);
-        log::trace!("resolve_sym_links({:?}): {:?}", &cow, initial_res);
+        log::trace!("resolve_sym_links({:?}): {:?}", cow, initial_res);
         match initial_res {
             Ok(fd) => return Ok(fd),
             Err(e) if e == Error::new(EXDEV) => {
@@ -384,14 +384,14 @@ fn at_flags_to_open_flags(at_flags: c_int) -> c_int {
 /// # Arguments
 /// * `dirfd` is a directory descriptor to which `path` is resolved.
 /// * `path` is a relative or absolute path. Relative paths are resolved in relation to `dirfd`
-/// while absolute paths skip `dirfd`.
+///   while absolute paths skip `dirfd`.
 /// * `at_flags` constrains how `path` is resolved.
 /// * `oflags` are flags that are passed to open.
 ///
 /// # Constants
 /// `at_flags`:
 /// * AT_EMPTY_PATH returns the path at `dirfd` itself if `path` is empty. If `path` is not
-/// empty, it's resolved w.r.t `dirfd` like normal.
+///   empty, it's resolved w.r.t `dirfd` like normal.
 ///
 /// `dirfd`:
 /// `AT_FDCWD` is a special constant for `dirfd` that resolves `path` under the current working

@@ -31,7 +31,7 @@ fn fexec_impl(
         interp_override: new_interp_override,
     } = redox_rt::proc::fexec_impl(
         exec_file,
-        &RtTcb::current().thread_fd(),
+        RtTcb::current().thread_fd(),
         redox_rt::current_proc_fd(),
         path,
         args,
@@ -49,11 +49,11 @@ fn fexec_impl(
     // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
     let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
 
-    return execve(
+    execve(
         Executable::AtPath(path_cstr),
         ArgEnv::Parsed { args, envs },
         Some(new_interp_override),
-    );
+    )
 }
 
 pub enum ArgEnv<'a> {
@@ -111,9 +111,9 @@ pub fn execve(
     let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
     let mode = if ruid == stat.st_uid {
-        (stat.st_mode >> 3 * 2) & 0o7
+        (stat.st_mode >> (3 * 2)) & 0o7
     } else if rgid == stat.st_gid {
-        (stat.st_mode >> 3 * 1) & 0o7
+        (stat.st_mode >> 3) & 0o7
     } else {
         stat.st_mode & 0o7
     };
@@ -162,7 +162,7 @@ pub fn execve(
     let mut args: Vec<&[u8]> = Vec::with_capacity(len);
 
     if let Some(interpreter) = &interpreter_path {
-        image_file = File::open(CStr::borrow(&interpreter), O_RDONLY as c_int)
+        image_file = File::open(CStr::borrow(interpreter), O_RDONLY as c_int)
             .map_err(|_| Error::new(ENOENT))?;
 
         // Push interpreter to arguments

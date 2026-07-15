@@ -5,7 +5,7 @@ pub fn split(line: &mut [u8]) -> Option<passwd> {
     let mut parts = line.split_mut(|&c| c == b'\0');
     Some(passwd {
         pw_name: parts.next()?.as_mut_ptr().cast::<c_char>(),
-        pw_passwd: c"x".as_ptr() as *const c_char as *mut c_char,
+        pw_passwd: c"x".as_ptr().cast::<c_char>() as *mut c_char,
         pw_uid: parsed(parts.next())?,
         pw_gid: parsed(parts.next())?,
         pw_gecos: parts.next()?.as_mut_ptr().cast::<c_char>(),

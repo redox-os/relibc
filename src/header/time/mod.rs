@@ -72,7 +72,7 @@ pub(crate) struct timer_internal_t {
 #[cfg(target_os = "redox")]
 impl timer_internal_t {
     pub unsafe fn from_raw(timerid: timer_t) -> &'static mut Self {
-        unsafe { &mut *(timerid as *mut Self) }
+        unsafe { &mut *timerid.cast::<Self>() }
     }
 }
 

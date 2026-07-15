@@ -10,8 +10,8 @@ macro_rules! env_str {
     ($lit:expr) => {
         #[allow(unused_unsafe)]
         {
-            let val_bytes = unsafe { getenv(concat!($lit, "\0").as_ptr() as *const c_char) };
-            if val_bytes != ptr::null_mut() {
+            let val_bytes = unsafe { getenv(concat!($lit, "\0").as_ptr().cast::<c_char>()) };
+            if !val_bytes.is_null() {
                 if let Ok(val_str) = unsafe { CStr::from_ptr(val_bytes) }.to_str() {
                     Some(val_str)
                 } else {

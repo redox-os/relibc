@@ -664,14 +664,18 @@ impl Linker {
                     let new_tcb_len = new_tcb.generic.tcb_len;
 
                     // Unmap just the TCB page.
-                    Sys::munmap(new_tcb as *mut Tcb as *mut c_void, syscall::PAGE_SIZE).unwrap();
+                    Sys::munmap(
+                        core::ptr::from_mut::<Tcb>(new_tcb) as *mut c_void,
+                        syscall::PAGE_SIZE,
+                    )
+                    .unwrap();
 
                     let new_addr = ptr::addr_of!(*new_tcb) as usize;
 
                     assert_eq!(
                         syscall::syscall5(
                             syscall::SYS_MREMAP,
-                            old_tcb as *mut Tcb as usize,
+                            core::ptr::from_mut::<Tcb>(old_tcb) as usize,
                             syscall::PAGE_SIZE,
                             new_addr,
                             syscall::PAGE_SIZE,
@@ -692,7 +696,11 @@ impl Linker {
                     new_tcb.generic.tcb_len = new_tcb_len;
 
                     drop(_guard);
-                    (new_tcb, old_tcb as *mut Tcb as *mut c_void, thr_fd)
+                    (
+                        new_tcb,
+                        core::ptr::from_mut::<Tcb>(old_tcb) as *mut c_void,
+                        thr_fd,
+                    )
                 };
 
                 #[cfg(not(target_os = "redox"))]
