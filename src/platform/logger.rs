@@ -1,28 +1,26 @@
-use core::{fmt, str::FromStr};
+use core::fmt;
 
 use crate::{c_str::CStr, io::prelude::*, sync::Mutex};
 
 use alloc::string::{String, ToString};
-use log::{Metadata, Record, SetLoggerError};
+use log::{LevelFilter, Metadata, Record, SetLoggerError};
 
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
-pub unsafe fn init() -> Result<(), SetLoggerError> {
+pub const RELIBC_LOG_ENV_VAR: &'static core::ffi::CStr = c"RELIBC_LOG_LEVEL";
+
+pub unsafe fn init(level: LevelFilter) -> Result<(), SetLoggerError> {
     let mut logger = RedoxLogger::new();
-    let log_env = c"RELIBC_LOG_LEVEL".as_ptr();
     #[cfg(feature = "no_trace")]
     let mut trace_warn = false;
     unsafe {
-        if let Some(env) = CStr::from_nullable_ptr(crate::header::stdlib::getenv(log_env))
-            && let Ok(level) = log::LevelFilter::from_str(env.to_str().unwrap_or(""))
-        {
-            #[cfg(feature = "no_trace")]
-            if level == log::LevelFilter::Trace {
-                trace_warn = true;
-            }
-
-            logger = logger.with_output(OutputBuilder::stderr().with_filter(level).build());
+        #[cfg(feature = "no_trace")]
+        if level == log::LevelFilter::Trace {
+            trace_warn = true;
         }
+
+        logger = logger.with_output(OutputBuilder::stderr().with_filter(level).build());
+
         if let Some(name) = CStr::from_nullable_ptr(crate::platform::program_invocation_short_name)
         {
             logger = logger.with_process_name(name.to_str().unwrap_or("").to_string());

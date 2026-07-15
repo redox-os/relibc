@@ -1,6 +1,6 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
-use core::slice;
+use core::{slice, str::FromStr};
 
 use alloc::{
     borrow::ToOwned,
@@ -9,6 +9,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use log::LevelFilter;
 use object::{
     NativeEndian,
     elf::{self, PT_DYNAMIC, PT_PHDR},
@@ -28,7 +29,7 @@ use crate::{
         },
         linker::{DebugFlags, Me},
     },
-    platform::{auxv_iter, get_auxvs, types::c_char},
+    platform::{auxv_iter, get_auxvs, logger::RELIBC_LOG_ENV_VAR, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
 };
@@ -406,9 +407,10 @@ fn stage2(
                 .collect::<Vec<_>>(),
         );
 
-        crate::platform::environ = crate::platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
-
-        if let Err(_) = crate::platform::logger::init() {
+        if let Some(env) = envs.get(RELIBC_LOG_ENV_VAR.to_str().unwrap())
+            && let Ok(level) = LevelFilter::from_str(env)
+            && let Err(_) = crate::platform::logger::init(level)
+        {
             log::error!("Logger has already been initialised");
         }
     }

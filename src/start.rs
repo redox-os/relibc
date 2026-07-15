@@ -1,12 +1,13 @@
 //! Startup code.
 
 use alloc::vec::Vec;
-use core::{intrinsics, ptr};
+use core::{intrinsics, ptr, str::FromStr};
 
 use crate::{
+    c_str::CStr,
     header::{libgen, stdio, stdlib},
     ld_so::{self},
-    platform::{self, Pal, Sys, get_auxvs, types::*},
+    platform::{self, Pal, Sys, get_auxvs, logger::RELIBC_LOG_ENV_VAR, types::*},
 };
 
 #[repr(C)]
@@ -221,8 +222,12 @@ pub unsafe extern "C" fn relibc_start_v1(
         unsafe { crate::platform::init(auxvs) };
         init_array();
     }
-    unsafe {
-        if let Err(_) = crate::platform::logger::init()
+
+    if let Some(env) = unsafe {
+        CStr::from_nullable_ptr(crate::header::stdlib::getenv(RELIBC_LOG_ENV_VAR.as_ptr()))
+    } && let Ok(level) = log::LevelFilter::from_str(env.to_str().unwrap_or(""))
+    {
+        if let Err(_) = unsafe { crate::platform::logger::init(level) }
             && !is_dynamically_linked
         {
             log::error!("Logger has already been initialised");

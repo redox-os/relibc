@@ -563,7 +563,9 @@ impl Linker {
 
     pub fn fini(&self) {
         for obj in self.objects.values() {
-            obj.run_fini();
+            unsafe {
+                obj.run_fini();
+            }
         }
     }
 
