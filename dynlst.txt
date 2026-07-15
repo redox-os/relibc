@@ -21,12 +21,5 @@ __optreset;
 
 getdate_err;
 
-h_errno;
-
-program_invocation_name;
-program_invocation_short_name;
-__progname;
-__progname_full;
-
 __stack_chk_guard;
 };
