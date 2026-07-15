@@ -1,5 +1,4 @@
-use crate::{c_str::CStr, header::stdlib::getenv, platform::types::*};
-use core::ptr;
+use crate::{c_str::CStr, header::stdlib::getenv, platform::types::c_char};
 use syscall::{EIO, ENOENT, Error, Result, flag::*};
 
 pub const LIBC_SCHEME: &'static str = "libc:";
