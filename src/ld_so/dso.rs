@@ -50,6 +50,7 @@ mod shim {
     pub type FileHeader = elf::FileHeader32<NativeEndian>;
     pub type ProgramHeader = elf::ProgramHeader32<NativeEndian>;
     pub type GnuHashHeader = elf::GnuHashHeader<NativeEndian>;
+    pub type SysVHashHeader = elf::HashHeader<NativeEndian>;
     pub type ElfFile<'a> = ElfFile32<'a, NativeEndian>;
 }
 
@@ -63,6 +64,7 @@ mod shim {
     pub type FileHeader = elf::FileHeader64<NativeEndian>;
     pub type ProgramHeader = elf::ProgramHeader64<NativeEndian>;
     pub type GnuHashHeader = elf::GnuHashHeader<NativeEndian>;
+    pub type SysVHashHeader = elf::HashHeader<NativeEndian>;
     pub type ElfFile<'a> = ElfFile64<'a, NativeEndian>;
 }
 
@@ -827,8 +829,21 @@ impl DSO {
                 // XXX: Both GNU_HASH and HASH may be present, we give priority
                 // to GNU_HASH as it is significantly faster.
                 elf::DT_HASH if hash_table.is_none() => {
-                    // FIXME: BEFORE MR FIX THIS
-                    // todo!();
+                    let header = unsafe { ptr.cast::<SysVHashHeader>().as_ref() }.unwrap();
+                    let bucket_count = header.bucket_count.get(NativeEndian) as usize;
+                    let chain_count = header.chain_count.get(NativeEndian) as usize;
+
+                    let mut ptr = unsafe {
+                        ptr.byte_add(size_of::<SysVHashHeader>())
+                            .cast::<U32<NativeEndian>>()
+                    };
+
+                    let buckets = unsafe { slice::from_raw_parts(ptr, bucket_count) };
+                    unsafe { ptr = ptr.add(bucket_count) };
+                    let chains = unsafe { slice::from_raw_parts(ptr, chain_count) };
+
+                    let table = SysVHashTable { buckets, chains };
+                    hash_table = Some(HashTable::Sysv(table));
                 }
 
                 elf::DT_PLTGOT => {
