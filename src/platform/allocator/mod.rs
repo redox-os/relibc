@@ -3,8 +3,7 @@ use core::{
     cell::SyncUnsafeCell,
     cmp,
     mem::align_of,
-    ptr::{self, copy_nonoverlapping, write_bytes},
-    sync::atomic::{AtomicPtr, Ordering},
+    ptr::{copy_nonoverlapping, write_bytes},
 };
 
 mod sys;
@@ -17,31 +16,18 @@ pub type Dlmalloc = DlmallocCApi<sys::System>;
 #[allow(clippy::declare_interior_mutable_const)]
 pub const NEWALLOCATOR: Allocator = Allocator::new();
 
-pub struct Allocator {
-    inner: SyncUnsafeCell<Mutex<Dlmalloc>>,
-    pub ptr: AtomicPtr<Mutex<Dlmalloc>>,
-}
+pub struct Allocator(SyncUnsafeCell<Mutex<Dlmalloc>>);
 
 impl Allocator {
     #[allow(clippy::new_without_default)]
     pub const fn new() -> Self {
-        Allocator {
-            inner: SyncUnsafeCell::new(Mutex::new(Dlmalloc::new(sys::System::new()))),
-            ptr: AtomicPtr::new(ptr::null_mut()),
-        }
+        Self(SyncUnsafeCell::new(Mutex::new(Dlmalloc::new(
+            sys::System::new(),
+        ))))
     }
 
     pub fn get(&self) -> *const Mutex<Dlmalloc> {
-        let ptr = self.ptr.load(Ordering::Acquire);
-        if !ptr.is_null() {
-            return ptr;
-        }
-
-        self.inner.get()
-    }
-
-    pub fn set(&self, mspace: *const Mutex<Dlmalloc>) {
-        self.ptr.store(mspace.cast_mut(), Ordering::Release);
+        self.0.get()
     }
 }
 

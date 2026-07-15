@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 use core::{intrinsics, ptr};
 
 use crate::{
-    ALLOCATOR,
     header::{libgen, stdio, stdlib},
     ld_so::{self},
     platform::{self, Pal, Sys, get_auxvs, types::*},
@@ -88,21 +87,6 @@ static mut INIT_COMPLETE: bool = false;
 #[unsafe(no_mangle)]
 static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
 
-fn alloc_init() {
-    unsafe {
-        if INIT_COMPLETE {
-            return;
-        }
-    }
-    unsafe {
-        if let Some(tcb) = ld_so::tcb::Tcb::current()
-            && !tcb.mspace.is_null()
-        {
-            ALLOCATOR.set(tcb.mspace);
-        }
-    }
-}
-
 extern "C" fn init_array() {
     // The thing is that we cannot guarantee if
     // init_array runs first or if relibc_start runs first
@@ -115,7 +99,6 @@ extern "C" fn init_array() {
         }
     }
 
-    alloc_init();
     io_init();
 
     unsafe {
@@ -202,16 +185,7 @@ pub unsafe extern "C" fn relibc_start_v1(
         redox_rt::TLS_ACTIVATED.store(true, core::sync::atomic::Ordering::Relaxed);
     }
 
-    // Set up the right allocator...
-    // if any memory rust based memory allocation happen before this step .. we are doomed.
-    alloc_init();
-
     let is_dynamically_linked = if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
-        // Update TCB mspace
-        if tcb.mspace.is_null() {
-            tcb.mspace = ALLOCATOR.get();
-        }
-
         #[cfg(target_os = "redox")]
         redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
 
