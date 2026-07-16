@@ -40,7 +40,7 @@ BUILTINS_VERSION=0.1.70
 
 all: | headers libs
 
-headers: $(HEADERS_DEPS)
+headers: $(BUILD)/$(PROFILE)/librelibc.a $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
 	mkdir -p $(TARGET_HEADERS)
 	cp -r include/* $(TARGET_HEADERS)
@@ -223,7 +223,7 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 ifeq ($(USE_RUST_LIBM),)
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/$(PROFILE)/librelibc.a
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm headers $(BUILD)/$(PROFILE)/librelibc.a
 	$(MAKE) -s AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
 	./renamesyms.sh "$@" "$(BUILD)/$(PROFILE)/deps/"
 else
