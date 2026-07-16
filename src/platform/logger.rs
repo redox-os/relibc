@@ -7,7 +7,7 @@ use log::{LevelFilter, Metadata, Record, SetLoggerError};
 
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
-pub const RELIBC_LOG_ENV_VAR: &'static core::ffi::CStr = c"RELIBC_LOG_LEVEL";
+pub const RELIBC_LOG_ENV_VAR: &core::ffi::CStr = c"RELIBC_LOG_LEVEL";
 
 pub unsafe fn init(level: LevelFilter) -> Result<(), SetLoggerError> {
     let mut logger = RedoxLogger::new();

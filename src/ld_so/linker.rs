@@ -604,11 +604,7 @@ impl Linker {
         )?;
 
         for (i, obj) in new_objects.iter().enumerate() {
-            obj.relocate(
-                objects_data[i].as_ref().map(|phdrs| phdrs.as_slice()),
-                resolve,
-            )
-            .unwrap();
+            obj.relocate(objects_data[i].as_deref(), resolve).unwrap();
         }
 
         unsafe {

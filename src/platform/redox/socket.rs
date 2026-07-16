@@ -78,7 +78,7 @@ unsafe fn bind_or_connect(
             }
             SocketCall::Connect => {
                 // When a connect is made using AF_UNSPEC TCP and UDP need to disconnect from the default peer
-                format!("disconnect")
+                "disconnect".to_string()
             }
             _ => unreachable!(),
         },

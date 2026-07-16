@@ -226,12 +226,10 @@ pub unsafe extern "C" fn relibc_start_v1(
     if let Some(env) = unsafe {
         CStr::from_nullable_ptr(crate::header::stdlib::getenv(RELIBC_LOG_ENV_VAR.as_ptr()))
     } && let Ok(level) = log::LevelFilter::from_str(env.to_str().unwrap_or(""))
+        && let Err(_) = unsafe { crate::platform::logger::init(level) }
+        && !is_dynamically_linked
     {
-        if let Err(_) = unsafe { crate::platform::logger::init(level) }
-            && !is_dynamically_linked
-        {
-            log::error!("Logger has already been initialised");
-        }
+        log::error!("Logger has already been initialised");
     }
 
     // Run preinit array

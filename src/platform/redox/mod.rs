@@ -1800,6 +1800,7 @@ impl Pal for Sys {
         Ok(())
     }
 
+    #[expect(clippy::unnecessary_literal_unwrap, reason = "res needs refactoring")]
     fn waitpid(pid: pid_t, stat_loc: Option<Out<'_, c_int>>, options: c_int) -> Result<pid_t> {
         let res = None;
         let mut status = 0;
