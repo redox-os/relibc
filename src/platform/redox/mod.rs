@@ -1591,28 +1591,36 @@ impl Pal for Sys {
         Ok(())
     }
 
+    #[expect(clippy::not_unsafe_ptr_arg_deref)]
     fn timer_delete(timerid: timer_t) -> Result<()> {
         let timers = &mut TIMERS.lock().0;
         let removed = timers.remove(&timerid);
         if !removed {
             return Err(Errno(EINVAL));
         }
+        // SAFETY: `timerid` should have already been created via `timer_create()`
+        // before calling `timer_delete()` so should not be NULL
         let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
         let _ = redox_rt::sys::close(timer_st.timerfd);
         let _ = redox_rt::sys::close(timer_st.eventfd);
         if !timer_st.thread.is_null() {
             let _ = unsafe { pthread_cancel(timer_st.thread) };
         }
+        // SAFETY: `timerid` should have already been created via `timer_create()`
+        // before calling `timer_delete()` so should not be NULL
         unsafe { free(timerid) };
 
         Ok(())
     }
 
+    #[expect(clippy::not_unsafe_ptr_arg_deref)]
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
         let timers = &mut TIMERS.lock().0;
         if !timers.contains(&timerid) {
             return Err(Errno(EINVAL));
         }
+        // SAFETY: `timerid` should have already been created via `timer_create()`
+        // before calling `timer_delete()` so should not be NULL
         let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
@@ -1636,6 +1644,7 @@ impl Pal for Sys {
         Ok(())
     }
 
+    #[expect(clippy::not_unsafe_ptr_arg_deref)]
     fn timer_settime(
         timerid: timer_t,
         flags: c_int,
@@ -1650,6 +1659,8 @@ impl Pal for Sys {
         if !timers.contains(&timerid) {
             return Err(Errno(EINVAL));
         }
+        // SAFETY: `timerid` should have already been created via `timer_create()`
+        // before calling `timer_delete()` so should not be NULL
         let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
 
         if value.it_value.is_zero() {
