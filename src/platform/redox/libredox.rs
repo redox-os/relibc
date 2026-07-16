@@ -129,7 +129,14 @@ pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> Resul
         // TODO st_rdev
         buf.st_rdev = 0;
         buf.st_size = redox_buf.st_size as off_t;
-        buf.st_blksize = redox_buf.st_blksize as blksize_t;
+        #[cfg(target_pointer_width = "32")]
+        {
+            buf.st_blksize = redox_buf.st_blksize as blksize_t;
+        }
+        #[cfg(target_pointer_width = "64")]
+        {
+            buf.st_blksize = blksize_t::from(redox_buf.st_blksize);
+        }
         buf.st_blocks = redox_buf.st_blocks as blkcnt_t;
         buf.st_atim = timespec {
             tv_sec: redox_buf.st_atime as time_t,

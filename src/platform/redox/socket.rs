@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{cmp, mem, ptr, slice, str};
 use redox_path::RedoxStr;
 use redox_protocols::protocol::{FsCall, O_CLOEXEC, SocketCall};
@@ -78,7 +78,7 @@ unsafe fn bind_or_connect(
             }
             SocketCall::Connect => {
                 // When a connect is made using AF_UNSPEC TCP and UDP need to disconnect from the default peer
-                format!("disconnect")
+                "disconnect".to_string()
             }
             _ => unreachable!(),
         },

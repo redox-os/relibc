@@ -381,6 +381,7 @@ pub struct DSO {
 }
 
 impl DSO {
+    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "see FIXME note")]
     pub fn from_raw(
         base: *const u8,
         dyns: &[Dyn],

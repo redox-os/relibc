@@ -309,12 +309,21 @@ pub struct FileLock(c_int);
 
 impl FileLock {
     pub fn lock(fd: c_int, op: c_int) -> Result<Self> {
-        if op & sys_file::LOCK_SH | sys_file::LOCK_EX == 0 {
-            return Err(Error::new(EINVAL));
+        const LOCK_SH_NB: c_int = sys_file::LOCK_SH | sys_file::LOCK_NB;
+        const LOCK_EX_NB: c_int = sys_file::LOCK_EX | sys_file::LOCK_NB;
+        const LOCK_UN_NB: c_int = sys_file::LOCK_UN | sys_file::LOCK_NB;
+        match op {
+            sys_file::LOCK_SH
+            | sys_file::LOCK_EX
+            | sys_file::LOCK_UN
+            | LOCK_SH_NB
+            | LOCK_EX_NB
+            | LOCK_UN_NB => {
+                Sys::flock(fd, op)?;
+                Ok(Self(fd))
+            }
+            _ => Err(Error::new(EINVAL)),
         }
-
-        Sys::flock(fd, op)?;
-        Ok(Self(fd))
     }
 
     pub fn unlock(self) -> Result<()> {
