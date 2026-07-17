@@ -250,7 +250,9 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
+        #[expect(clippy::diverging_sub_expression)]
         let _ = redox_rt::sys::posix_exit(status);
+        #[expect(clippy::empty_loop)]
         loop {}
     }
 
