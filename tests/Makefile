@@ -113,7 +113,7 @@ STATIC_FLAGS+=\
 
 ifeq ($(IS_REDOX),0)
 DYNAMIC_FLAGS+=\
-	-Wl,-dynamic-linker=$(SYSROOT_TARGET)/$(LD_SO_PATH) \
+	-Wl,-dynamic-linker=$(SYSROOT_TARGET)/lib/$(LD_SONAME) \
 	-Wl,-rpath=$(SYSROOT_TARGET)/lib:\$$ORIGIN \
 	-L $(SYSROOT)/lib \
 	-lc \
