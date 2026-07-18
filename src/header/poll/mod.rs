@@ -98,11 +98,16 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
             continue;
         }
 
-        #[expect(clippy::needless_update)]
+        #[cfg(target_os = "redox")]
         let mut event = epoll_event {
             events: 0,
             data: epoll_data { u64: i as u64 },
-            ..Default::default() // needed only on redox for _pad field
+            ..Default::default()
+        };
+        #[cfg(target_os = "linux")]
+        let mut event = epoll_event {
+            events: 0,
+            data: epoll_data { u64: i as u64 },
         };
 
         for (p, ep) in event_map.iter() {

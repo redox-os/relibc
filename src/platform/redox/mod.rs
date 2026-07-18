@@ -250,8 +250,7 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
-        let _ = redox_rt::sys::posix_exit(status);
-        loop {}
+        redox_rt::sys::posix_exit(status)
     }
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {

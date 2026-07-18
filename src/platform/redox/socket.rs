@@ -567,8 +567,11 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
-                    // TODO triggers clippy::borrow_as_ptr, applying suggestion fails to compile
-                    unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
+                    // FIXME applying clippy suggestion fails to compile
+                    #[expect(clippy::borrow_as_ptr)]
+                    unsafe {
+                        strnlen(&data.sun_path as *const _, maxlen as size_t)
+                    },
                 );
 
                 let addr =
@@ -654,8 +657,11 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
-                    // TODO triggers clippy::borrow_as_ptr, applying suggestion fails to compile
-                    unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
+                    // FIXME applying clippy suggestion fails to compile
+                    #[expect(clippy::borrow_as_ptr)]
+                    unsafe {
+                        strnlen(&data.sun_path as *const _, maxlen as size_t)
+                    },
                 );
 
                 let addr =
