@@ -79,20 +79,19 @@ libs: \
 	$(BUILD)/$(PROFILE)/libc.so \
 	$(BUILD)/$(PROFILE)/crt0.o \
 	$(BUILD)/$(PROFILE)/crti.o \
-	$(BUILD)/$(PROFILE)/crtn.o \
-	$(BUILD)/$(PROFILE)/ld.so
+	$(BUILD)/$(PROFILE)/crtn.o
 
 install-libs: headers libs
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/libc.so" "$(DESTDIR)/lib"
 	ln -vnfs libc.so "$(DESTDIR)/lib/libc.so.6"
+	ln -vnfs libc.so "$(DESTDIR)/lib/$(LD_SONAME)"
 	cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/lib"
 	ln -vnfs crt0.o "$(DESTDIR)/lib/crt1.o"
 	ln -vnfs crt0.o "$(DESTDIR)/lib/Scrt1.o"
 	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/$(PROFILE)/ld.so" "$(DESTDIR)/$(LD_SO_PATH)"
 ifeq ($(USE_RUST_LIBM),)
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 else
@@ -135,24 +134,22 @@ test-once: sysroot/$(TARGET)
 	$(MAKE) -C tests run-once TESTBIN=$(TESTBIN)
 
 
-$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/libc.a
+$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/libc.a
+	# Specifying a dynamic list makes all non-local `STV_DEFAULT`
+	# definitions non-preemptible, except for the symbols listed in
+	# `dynlst.txt`. So, the symbols defined in `dynlst.txt` may be
+	# interposed by other definitions at runtime (either from the
+	# executable or some shared library).
 	$(CC) -nostdlib \
 		-shared \
 		-Wl,--gc-sections \
+		-Wl,--dynamic-list=dynlst.txt \
 		-Wl,-z,pack-relative-relocs \
 		-Wl,--sort-common \
 		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
 		-Wl,-soname,libc.so.6 \
 		$(LINKFLAGS) \
 		-o $@
-
-$(BUILD)/$(PROFILE)/ld.so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/libc.a
-	# Specifying a dynamic list makes all non-local `STV_DEFAULT`
-	# definitions non-preemptible, except for the symbols listed in
-	# `dynlst.txt`. So, the symbols defined in `dynlst.txt` may be
-	# interposed by other definitions at runtime (either from the
-	# executable or some shared library).
-	$(LD) --shared --whole-archive --dynamic-list=dynlst.txt $^ -o $@
 
 $(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"

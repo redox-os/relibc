@@ -9,7 +9,7 @@ ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export NM=aarch64-linux-gnu-nm
 	export OBJCOPY=aarch64-linux-gnu-objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
+	LD_SONAME=ld.so.1
 endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-relibc)
@@ -19,7 +19,7 @@ ifeq ($(TARGET),aarch64-unknown-linux-relibc)
 	export NM=aarch64-linux-relibc-nm
 	export OBJCOPY=aarch64-linux-relibc-objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
+	LD_SONAME=ld.so.1
 endif
 
 
@@ -30,7 +30,7 @@ ifeq ($(TARGET),aarch64-unknown-redox)
 	export NM=aarch64-unknown-redox-nm
 	export OBJCOPY=aarch64-unknown-redox-objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
+	LD_SONAME=ld.so.1
 endif
 
 ifeq ($(TARGET),i586-unknown-redox)
@@ -40,7 +40,7 @@ ifeq ($(TARGET),i586-unknown-redox)
 	export NM=i586-unknown-redox-nm
 	export OBJCOPY=i586-unknown-redox-objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/libc.so.1
+	LD_SONAME=ld.so.1
 endif
 
 ifeq ($(TARGET),i686-unknown-redox)
@@ -50,7 +50,7 @@ ifeq ($(TARGET),i686-unknown-redox)
 	export NM=i686-unknown-redox-nm
 	export OBJCOPY=i686-unknown-redox-objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/libc.so.1
+	LD_SONAME=ld.so.1
 endif
 
 ifeq ($(TARGET),x86_64-unknown-linux-gnu)
@@ -60,7 +60,7 @@ ifeq ($(TARGET),x86_64-unknown-linux-gnu)
 	export NM=x86_64-linux-gnu-nm
 	export OBJCOPY=objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
+	LD_SONAME=ld64.so.1
 endif
 
 ifeq ($(TARGET),x86_64-unknown-linux-relibc)
@@ -70,7 +70,7 @@ ifeq ($(TARGET),x86_64-unknown-linux-relibc)
 	export NM=x86_64-linux-relibc-nm
 	export OBJCOPY=x86_64-linux-relibc-objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
+	LD_SONAME=ld64.so.1
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
@@ -80,7 +80,7 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 	export NM=x86_64-unknown-redox-nm
 	export OBJCOPY=x86_64-unknown-redox-objcopy
 	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
+	LD_SONAME=ld64.so.1
 endif
 
 ifeq ($(TARGET),riscv64gc-unknown-redox)
@@ -90,5 +90,5 @@ ifeq ($(TARGET),riscv64gc-unknown-redox)
 	export NM=riscv64-unknown-redox-nm
 	export OBJCOPY=riscv64-unknown-redox-objcopy
 	export CPPFLAGS=-march=rv64gc -mabi=lp64d
-	LD_SO_PATH=lib/ld.so.1
+	LD_SONAME=ld.so.1
 endif
