@@ -5,8 +5,6 @@ FAILING_TESTS=
 else
 # Wrong modified time
 FAILING_TESTS := futimens
-# Crash, mmap issue
-FAILING_TESTS += malloc/usable_size
 # Not a FIFO
 FAILING_TESTS += mkfifo
 # Waitpid had EINTR
@@ -72,6 +70,7 @@ EXPECT_NAMES=\
 	locale/duplocale \
 	locale/newlocale \
 	locale/setlocale \
+	malloc/usable_size \
 	math \
 	regex \
 	semaphore/lock \
