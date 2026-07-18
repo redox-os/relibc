@@ -969,7 +969,17 @@ impl FdTbl {
     pub fn from_binary_fd(filetable_fd: FdGuardUpper) -> Result<Self> {
         let mut fdtbl = Self::new();
         let files_reader_fd = filetable_fd.as_raw_fd();
-        let _ = filetable_fd.lseek(0, syscall::flag::SEEK_SET);
+        let buf = b"refresh";
+        unsafe {
+            syscall::syscall4(
+                syscall::SYS_DUP2,
+                files_reader_fd,
+                files_reader_fd,
+                buf.as_ptr() as usize,
+                buf.len(),
+            )
+        }?;
+
         fdtbl.resize(Self::DEFAULT_CAPACITY);
 
         let mut reader = crate::proc::FileBufReader::from_fd(files_reader_fd);
