@@ -125,9 +125,12 @@ impl PalEpoll for Sys {
         let mut count = 0;
         for i in 0..read {
             unsafe {
-                let event_ptr = events.add(i);
+                let event_ptr = (events.cast::<Event>()).add(i);
                 let target_ptr = events.add(count);
-                let event = *event_ptr.cast::<Event>();
+                let event = *event_ptr;
+                if event.id == syscall::EVENT_TIMEOUT_ID {
+                    continue;
+                }
                 *target_ptr = epoll_event {
                     events: event_flags_to_epoll(event.flags),
                     data: epoll_data {
