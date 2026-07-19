@@ -59,7 +59,7 @@ pub unsafe fn deactivate_tcb(open_via_dup: &FdGuardUpper) -> Result<()> {
 
     env.tp = 0;
 
-    file.write(&mut env)?;
+    file.write(&env)?;
     crate::TLS_ACTIVATED.store(false, core::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
@@ -591,7 +591,7 @@ pub unsafe fn manually_enter_trampoline() {
         Ordering::Release,
     );
     ctl.saved_archdep_reg.set(0);
-    let ip_location = &ctl.saved_ip as *const _ as usize;
+    let ip_location = &raw const ctl.saved_ip as usize;
 
     unsafe {
         core::arch::asm!("

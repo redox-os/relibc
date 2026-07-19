@@ -84,7 +84,7 @@ impl Number {
             VaArg::c_char(i) => i as usize,
             VaArg::c_double(i) => i as usize,
             #[cfg(target_pointer_width = "32")]
-            VaArg::c_longdouble(_) => 0 as usize,
+            VaArg::c_longdouble(_) => 0_usize,
             #[cfg(target_pointer_width = "64")]
             VaArg::c_longdouble(i) => i as usize,
             VaArg::c_int(i) => i as usize,
