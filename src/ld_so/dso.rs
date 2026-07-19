@@ -1228,12 +1228,14 @@ impl DSO {
             self.static_relocate(&global_scope, reloc)?;
         }
 
+        // ld.so is itself PIE and uses lazy PLT relocations internally,
+        // so its own PLT entries must be adjusted by the load base before
+        // use.
+        self.lazy_relocate(&global_scope, resolve)?;
+
         if self.is_me {
-            // TODO: assert that ld.so have no lazy relocations.
             return Ok(());
         }
-
-        self.lazy_relocate(&global_scope, resolve)?;
 
         let ph = ph.unwrap();
 
