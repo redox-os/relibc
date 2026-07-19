@@ -25,8 +25,6 @@ fmt:
 clippy:
     stage: build
     needs: []
-    # TODO: remove when passed
-    allow_failure: true
     script:
         - ./check.sh --clippy
 
@@ -35,7 +33,7 @@ linux:
     script:
         - rustup component add clippy
         - ./check.sh --host
-#        - ./check.sh --host --clippy
+        - ./check.sh --host --clippy
 
 x86_64:
     stage: build
@@ -60,6 +58,31 @@ riscv64gc:
     script:
         - ./check.sh --arch=riscv64gc
 #        - ./check.sh --arch=riscv64gc --clippy
+
+i586:clippy:
+    stage: cross-build
+    needs: [i586]
+    # TODO: remove when passed
+    allow_failure: true
+    script:
+        - ./check.sh --arch=i586 --clippy
+
+aarch64:clippy:
+    stage: cross-build
+    needs: [aarch64]
+    image: "redoxos/redoxer:aarch64"
+    # TODO: remove when passed
+    allow_failure: true
+    script:
+        - ./check.sh --arch=aarch64 --clippy
+
+riscv64gc:clippy:
+    stage: cross-build
+    needs: [riscv64gc]
+    # TODO: remove when passed
+    allow_failure: true
+    script:
+        - ./check.sh --arch=riscv64gc --clippy
 
 test:linux:
     stage: test
