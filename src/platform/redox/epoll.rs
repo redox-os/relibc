@@ -136,6 +136,7 @@ impl PalEpoll for Sys {
                     data: epoll_data {
                         u64: event.data as u64,
                     },
+                    ..Default::default()
                 };
                 count += 1;
             }
