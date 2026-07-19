@@ -1,6 +1,6 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
-use core::{slice, str::FromStr};
+use core::slice;
 
 use alloc::{
     borrow::ToOwned,
@@ -9,7 +9,6 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use log::LevelFilter;
 use object::{
     NativeEndian,
     elf::{self, PT_DYNAMIC, PT_PHDR},
@@ -29,7 +28,7 @@ use crate::{
         },
         linker::{DebugFlags, Me},
     },
-    platform::{auxv_iter, get_auxvs, logger::RELIBC_LOG_ENV_VAR, types::c_char},
+    platform::{auxv_iter, get_auxvs, logger::RELIBC_LOG_ENV_VAR_STR, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
 };
@@ -406,13 +405,6 @@ fn stage2(
                 .chain(core::iter::once(core::ptr::null_mut()))
                 .collect::<Vec<_>>(),
         );
-
-        if let Some(env) = envs.get(RELIBC_LOG_ENV_VAR.to_str().unwrap())
-            && let Ok(level) = LevelFilter::from_str(env)
-            && let Err(_) = crate::platform::logger::init(level)
-        {
-            log::error!("Logger has already been initialised");
-        }
     }
 
     // we might need global lock for this kind of stuff
@@ -433,6 +425,14 @@ fn stage2(
     } else {
         argv[0].clone()
     };
+
+    {
+        let name = name_or_path.split('/').last();
+        let level = envs.get(RELIBC_LOG_ENV_VAR_STR).map(|s| s.as_str());
+        if crate::platform::logger::init_inner(level, name).is_err() {
+            log::error!("Logger has already been initialised");
+        }
+    }
 
     // TODO: Fix memory leak, although minimal.
     #[cfg(target_os = "redox")]
