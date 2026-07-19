@@ -192,7 +192,7 @@ pub fn execve(
                 let arg = argv.read();
 
                 let len = strlen(arg);
-                args.push(core::slice::from_raw_parts(arg.cast_const(), len));
+                args.push(core::slice::from_raw_parts(arg as *const u8, len));
                 argv = argv.add(1);
             }
 
@@ -207,7 +207,7 @@ pub fn execve(
                 let env = envp.read();
 
                 let len = strlen(env);
-                envs.push(core::slice::from_raw_parts(env.cast_const(), len));
+                envs.push(core::slice::from_raw_parts(env as *const u8, len));
                 envp = envp.add(1);
             }
             (args, envs)
