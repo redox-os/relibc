@@ -229,7 +229,7 @@ fn list_dir(
             } else if (*entry).d_type == DT_LNK {
                 // Resolve symbolic link
                 let mut full_path = path.to_bytes().to_vec();
-                if !full_path.ends_with(b"/") {
+                if !full_path.is_empty() && !full_path.ends_with(b"/") {
                     full_path.push(b'/');
                 }
                 full_path.extend_from_slice(name.as_bytes());
