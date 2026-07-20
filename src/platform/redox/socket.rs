@@ -11,6 +11,7 @@ use super::{
     path::dir_path_and_fd_path,
 };
 use crate::{
+    casting::CCharPtr,
     error::{Errno, Result},
     header::{
         arpa_inet::inet_aton,
@@ -146,7 +147,7 @@ unsafe fn inner_af_inet(
 
     let mut addr = in_addr::default();
     assert_eq!(
-        unsafe { inet_aton(raw_addr.as_ptr() as *mut c_char, &raw mut addr) },
+        unsafe { inet_aton(CCharPtr::cast_mut(raw_addr.as_ptr()), &raw mut addr) },
         1,
         "inet_aton might be broken, failed to parse netstack address"
     );

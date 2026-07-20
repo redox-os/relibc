@@ -40,25 +40,45 @@ impl ByteLiteral {
     }
 }
 
+/// An abstraction for converting a pointer to a `c_char` pointer.
 pub struct CCharPtr;
 
 impl CCharPtr {
+    /// A method that casts a `*const u8` to a `*const c_char`.
+    ///
+    /// It is the caller's responsibility to understand and ensure that casting
+    /// from `u8` to `i8` is intentional for the applicable architectures.
+    ///
+    /// # Panics
+    /// Unsupported architectures will panic.
     pub fn cast_const(input: *const u8) -> *const c_char {
+        // `c_char` is an `i8` on these arches
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             return input.cast();
         }
+        // `c_char` is already a `u8` on these arches
         #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
         {
             return input;
         }
         panic!("Arch not supported!")
     }
+    /// A method that casts a `*const u8` to a `*mut c_char`.
+    ///
+    /// It is the caller's responsibility to understand and ensure that casting
+    /// from `u8` to `i8` is intentional for the applicable architectures.
+    ///
+    /// # Panics
+    /// Unsupported architectures will panic.
     pub fn cast_mut(input: *const u8) -> *mut c_char {
+        // `c_char` is an `i8` on these arches
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
+            // TODO replace `as` casting with something better
             return input as *mut _;
         }
+        // `c_char` is already a `u8` on these arches
         #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
         {
             return input.cast_mut();

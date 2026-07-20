@@ -7,6 +7,7 @@ use core::{iter::once, mem, ptr, slice};
 use cbitset::BitSet256;
 
 use crate::{
+    casting::CCharPtr,
     header::{
         errno::{ENOMEM, ERANGE, STR_ERROR, STRERROR_MAX},
         signal,
@@ -607,10 +608,12 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strsignal.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strsignal(sig: c_int) -> *mut c_char {
-    signal::SIGNAL_STRINGS
-        .get(sig as usize)
-        .unwrap_or(&signal::SIGNAL_STRINGS[0]) // Unknown signal message
-        .as_ptr() as *mut c_char
+    CCharPtr::cast_mut(
+        signal::SIGNAL_STRINGS
+            .get(sig as usize)
+            .unwrap_or(&signal::SIGNAL_STRINGS[0]) // Unknown signal message
+            .as_ptr(),
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strspn.html>.
