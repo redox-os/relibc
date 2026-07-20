@@ -907,11 +907,17 @@ impl DSO {
         let strtab_offset = strtab_offset.expect("DT_STRTAB must be present");
         let strtab_size = strtab_size.expect("DT_STRSZ must be present");
 
-        #[expect(clippy::unnecessary_cast, reason = "needed on i586")]
+        #[cfg(target_arch = "x86")]
         let dynstrtab = StringTable::new(
             unsafe { slice::from_raw_parts(mmap.byte_add(strtab_offset), strtab_size as usize) },
             0,
             strtab_size as u64,
+        );
+        #[cfg(not(target_arch = "x86"))]
+        let dynstrtab = StringTable::new(
+            unsafe { slice::from_raw_parts(mmap.byte_add(strtab_offset), strtab_size as usize) },
+            0,
+            strtab_size,
         );
 
         let get_str = |entry: &Dyn| {

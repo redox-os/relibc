@@ -2,7 +2,10 @@
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 
-use crate::platform::types::{c_char, c_uchar, int32_t, int64_t, uint16_t, uint32_t, uint64_t};
+use crate::{
+    byte_literal::ByteLiteral,
+    platform::types::{c_char, c_uchar, int32_t, int64_t, uint16_t, uint32_t, uint64_t},
+};
 
 pub type Elf32_Half = uint16_t;
 pub type Elf64_Half = uint16_t;
@@ -72,11 +75,11 @@ pub struct Elf64_Ehdr {
 pub const EI_MAG0: usize = 0;
 pub const ELFMAG0: usize = 0x7f;
 pub const EI_MAG1: usize = 1;
-pub const ELFMAG1: c_char = 'E' as c_char;
+pub const ELFMAG1: c_char = ByteLiteral::cast_cchar(b'E');
 pub const EI_MAG2: usize = 2;
-pub const ELFMAG2: c_char = 'L' as c_char;
+pub const ELFMAG2: c_char = ByteLiteral::cast_cchar(b'L');
 pub const EI_MAG3: usize = 3;
-pub const ELFMAG3: c_char = 'F' as c_char;
+pub const ELFMAG3: c_char = ByteLiteral::cast_cchar(b'F');
 // ELFMAG is defined in cbindgen.toml
 pub const SELFMAG: usize = 4;
 pub const EI_CLASS: usize = 4;

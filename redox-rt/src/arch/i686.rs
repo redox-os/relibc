@@ -66,7 +66,7 @@ pub unsafe fn deactivate_tcb(open_via_dup: &FdGuardUpper) -> Result<()> {
     env.fsbase = 0;
     env.gsbase = 0;
 
-    file.write(&mut env)?;
+    file.write(&env)?;
     crate::TLS_ACTIVATED.store(false, core::sync::atomic::Ordering::Relaxed);
     Ok(())
 }

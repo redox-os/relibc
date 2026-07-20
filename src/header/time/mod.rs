@@ -255,9 +255,11 @@ pub extern "C" fn clock() -> clock_t {
     }
     let ts = unsafe { ts.assume_init() };
 
-    #[expect(clippy::unnecessary_cast, reason = "needed on i586")]
+    #[cfg(target_arch = "x86")]
     let clocks =
         ts.tv_sec * CLOCKS_PER_SEC as i64 + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)) as i64;
+    #[cfg(not(target_arch = "x86"))]
+    let clocks = ts.tv_sec * CLOCKS_PER_SEC + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC));
     clock_t::try_from(clocks).unwrap_or(-1)
 }
 
