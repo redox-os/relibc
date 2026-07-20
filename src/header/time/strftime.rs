@@ -7,6 +7,7 @@ use alloc::string::String;
 use super::tm;
 use crate::{
     c_str::CStr,
+    casting::CCharPtr,
     platform::{
         self, WriteByte,
         types::{c_char, c_int, size_t},
@@ -68,7 +69,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 tmp.push_str($fmt);
                 tmp.push('\0');
 
-                if unsafe { !inner_strftime(w, tmp.as_ptr() as *mut c_char, t) } {
+                if unsafe { !inner_strftime(w, CCharPtr::cast_mut(tmp.as_ptr()), t) } {
                     return false;
                 }
             }};

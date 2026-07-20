@@ -17,9 +17,9 @@ use core::{
 };
 
 use crate::{
-    byte_literal::ByteLiteral,
     c_str::{CStr, Thin},
     c_vec::CVec,
+    casting::ByteLiteral,
     error::{ResultExt, ResultExtPtrMut},
     fs::File,
     header::{

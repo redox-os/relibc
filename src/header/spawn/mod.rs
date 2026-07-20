@@ -10,6 +10,7 @@ pub use spawn_attr::{Flags, posix_spawnattr_t};
 
 use crate::{
     c_str::CStr,
+    casting::CCharPtr,
     header::{
         errno,
         stdlib::getenv,
@@ -127,7 +128,7 @@ pub unsafe extern "C" fn posix_spawnp(
         return unsafe {
             posix_spawn(
                 pid,
-                program_buf.as_ptr() as *mut _,
+                CCharPtr::cast_mut(program_buf.as_ptr()),
                 file_actions,
                 attrp,
                 argv,

@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/libgen.h.html>.
 
-use crate::{byte_literal::ByteLiteral, header::string::strlen, platform::types::c_char};
+use crate::{casting::ByteLiteral, header::string::strlen, platform::types::c_char};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/basename.html>.
 ///

@@ -11,8 +11,8 @@ use rand_jitter::JitterRng;
 use rand_xorshift::XorShiftRng;
 
 use crate::{
-    byte_literal::ByteLiteral,
     c_str::CStr,
+    casting::ByteLiteral,
     error::{Errno, ResultExt},
     fs::File,
     header::{

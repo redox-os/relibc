@@ -36,9 +36,9 @@ extern crate syscall;
 
 #[macro_use]
 mod macros;
-pub mod byte_literal;
 pub mod c_str;
 pub mod c_vec;
+pub mod casting;
 pub mod cxa;
 pub mod db;
 pub mod error;

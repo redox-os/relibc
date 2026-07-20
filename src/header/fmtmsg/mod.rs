@@ -6,7 +6,7 @@
 //! See <https://github.com/kraj/musl/blob/kraj/master/src/misc/fmtmsg.c>
 
 use crate::{
-    byte_literal::ByteLiteral,
+    casting::ByteLiteral,
     header::{
         fcntl::{O_WRONLY, open},
         pthread::{PTHREAD_CANCEL_DISABLE, pthread_setcancelstate},
