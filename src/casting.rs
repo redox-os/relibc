@@ -50,7 +50,7 @@ impl CCharPtr {
         }
         #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
         {
-            return core::ptr::cast_const::<c_char>(input);
+            return core::ptr::mut_ptr::cast_const::<c_char>(input);
         }
         panic!("Arch not supported!")
     }
