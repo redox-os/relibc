@@ -1,30 +1,48 @@
-use core::fmt;
+use core::{fmt, str::FromStr};
 
 use crate::{c_str::CStr, io::prelude::*, sync::Mutex};
 
 use alloc::string::{String, ToString};
-use log::{LevelFilter, Metadata, Record, SetLoggerError};
+use log::{Metadata, Record, SetLoggerError};
 
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
-pub const RELIBC_LOG_ENV_VAR: &core::ffi::CStr = c"RELIBC_LOG_LEVEL";
+const RELIBC_LOG_ENV_VAR: &core::ffi::CStr = c"RELIBC_LOG_LEVEL";
 
-pub unsafe fn init(level: LevelFilter) -> Result<(), SetLoggerError> {
+pub const RELIBC_LOG_ENV_VAR_STR: &str = "RELIBC_LOG_LEVEL";
+
+/// Initialize logger from libc
+pub unsafe fn init() -> Result<(), SetLoggerError> {
+    let (level, name) = unsafe {
+        (
+            CStr::from_nullable_ptr(crate::header::stdlib::getenv(RELIBC_LOG_ENV_VAR.as_ptr()))
+                .and_then(|s| s.to_str().ok()),
+            CStr::from_nullable_ptr(crate::platform::program_invocation_short_name)
+                .and_then(|s| s.to_str().ok()),
+        )
+    };
+    init_inner(level, name)
+}
+
+/// Initialize logger from known strings (used by ld.so)
+pub fn init_inner(level: Option<&str>, name: Option<&str>) -> Result<(), SetLoggerError> {
     let mut logger = RedoxLogger::new();
     #[cfg(feature = "no_trace")]
     let mut trace_warn = false;
-    unsafe {
+    let mut output = OutputBuilder::stderr();
+    if let Some(level) = level.and_then(|s| log::LevelFilter::from_str(s).ok()) {
         #[cfg(feature = "no_trace")]
         if level == log::LevelFilter::Trace {
             trace_warn = true;
         }
 
-        logger = logger.with_output(OutputBuilder::stderr().with_filter(level).build());
+        output = output.with_filter(level)
+    }
 
-        if let Some(name) = CStr::from_nullable_ptr(crate::platform::program_invocation_short_name)
-        {
-            logger = logger.with_process_name(name.to_str().unwrap_or("").to_string());
-        }
+    logger = logger.with_output(output.build());
+
+    if let Some(name) = name {
+        logger = logger.with_process_name(name.to_string());
     }
 
     logger.enable()?;
