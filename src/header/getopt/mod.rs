@@ -3,7 +3,7 @@
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 
 use crate::{
-    byte_literal::ByteLiteral,
+    casting::ByteLiteral,
     header::{
         stdio, string,
         unistd::{optarg, opterr, optind, optopt},

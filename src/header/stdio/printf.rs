@@ -218,7 +218,7 @@ impl VaArg {
         }
 
         let ap_impl: &mut VaListInner = unsafe {
-            let ptr_to_struct = ap as *mut core::ffi::VaList as *mut VaListInner;
+            let ptr_to_struct = core::ptr::from_mut::<core::ffi::VaList>(ap).cast::<VaListInner>();
             &mut *ptr_to_struct
         };
 

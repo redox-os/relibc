@@ -3,7 +3,7 @@
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 
 use crate::{
-    byte_literal::ByteLiteral,
+    casting::ByteLiteral,
     platform::types::{c_char, c_uchar, int32_t, int64_t, uint16_t, uint32_t, uint64_t},
 };
 
