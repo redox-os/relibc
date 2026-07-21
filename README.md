@@ -73,6 +73,12 @@ sudo dnf install expect
 sudo pacman -S expect
 ```
 
+- Void Linux:
+
+```sh
+sudo xbps-install -S expect
+```
+
 ### Build Relibc
 
 To build the relibc library objects, run the following command:
