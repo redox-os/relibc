@@ -19,7 +19,7 @@ use core::{
 use crate::{
     c_str::{CStr, Thin},
     c_vec::CVec,
-    casting::ByteLiteral,
+    casting::{ByteLiteral, CCharPtrToU8Ptr},
     error::{ResultExt, ResultExtPtrMut},
     fs::File,
     header::{
@@ -642,7 +642,7 @@ pub unsafe extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
         return -1;
     }
 
-    let buf = unsafe { slice::from_raw_parts(s as *mut u8, strlen(s)) };
+    let buf = unsafe { slice::from_raw_parts(CCharPtrToU8Ptr::cast_mut(s), strlen(s)) };
 
     if stream.write_all(buf).is_ok() { 0 } else { -1 }
 }
@@ -1127,7 +1127,7 @@ pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
         return -1;
     }
 
-    let buf = unsafe { slice::from_raw_parts(s as *mut u8, strlen(s)) };
+    let buf = unsafe { slice::from_raw_parts(CCharPtrToU8Ptr::cast_mut(s), strlen(s)) };
 
     if stream.write_all(buf).is_err() {
         return -1;

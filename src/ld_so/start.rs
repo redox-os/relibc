@@ -427,7 +427,7 @@ fn stage2(
     };
 
     {
-        let name = name_or_path.split('/').last();
+        let name = name_or_path.split('/').next_back();
         let level = envs.get(RELIBC_LOG_ENV_VAR_STR).map(|s| s.as_str());
         if crate::platform::logger::init_inner(level, name).is_err() {
             log::error!("Logger has already been initialised");

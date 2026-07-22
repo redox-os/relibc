@@ -40,10 +40,10 @@ impl ByteLiteral {
     }
 }
 
-/// An abstraction for converting a pointer to a `c_char` pointer.
-pub struct CCharPtr;
+/// An abstraction for converting a `u8` pointer to a `c_char` pointer.
+pub struct U8PtrToCCharPtr;
 
-impl CCharPtr {
+impl U8PtrToCCharPtr {
     /// A method that casts a `*const u8` to a `*const c_char`.
     ///
     /// It is the caller's responsibility to understand and ensure that casting
@@ -72,6 +72,53 @@ impl CCharPtr {
     /// # Panics
     /// Unsupported architectures will panic.
     pub fn cast_mut(input: *const u8) -> *mut c_char {
+        // `c_char` is an `i8` on these arches
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            // TODO replace `as` casting with something better
+            return input as *mut _;
+        }
+        // `c_char` is already a `u8` on these arches
+        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+        {
+            return input.cast_mut();
+        }
+        panic!("Arch not supported!")
+    }
+}
+
+/// An abstraction for converting a `c_char` pointer to a `u8` pointer.
+pub struct CCharPtrToU8Ptr;
+
+impl CCharPtrToU8Ptr {
+    /// A method that casts a `*const c_char` to a `*const u8`.
+    ///
+    /// It is the caller's responsibility to understand and ensure that casting
+    /// from `c_char` to `u8` is intentional for the applicable architectures.
+    ///
+    /// # Panics
+    /// Unsupported architectures will panic.
+    pub fn cast_const(input: *const c_char) -> *const u8 {
+        // `c_char` is an `i8` on these arches
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            return input.cast();
+        }
+        // `c_char` is already a `u8` on these arches
+        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+        {
+            return input;
+        }
+        panic!("Arch not supported!")
+    }
+    /// A method that casts a `*const c_char` to a `*mut u8`.
+    ///
+    /// It is the caller's responsibility to understand and ensure that casting
+    /// from `c_char` to `u8` is intentional for the applicable architectures.
+    ///
+    /// # Panics
+    /// Unsupported architectures will panic.
+    pub fn cast_mut(input: *const c_char) -> *mut u8 {
         // `c_char` is an `i8` on these arches
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {

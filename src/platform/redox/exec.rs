@@ -5,6 +5,7 @@ use core::{
 
 use crate::{
     c_str::{CStr, CString},
+    casting::CCharPtrToU8Ptr,
     fs::File,
     header::{limits::PATH_MAX, string::strlen},
     io::{BufReader, SeekFrom, prelude::*},
@@ -192,7 +193,10 @@ pub fn execve(
                 let arg = argv.read();
 
                 let len = strlen(arg);
-                args.push(core::slice::from_raw_parts(arg as *const u8, len));
+                args.push(core::slice::from_raw_parts(
+                    CCharPtrToU8Ptr::cast_const(arg),
+                    len,
+                ));
                 argv = argv.add(1);
             }
 
@@ -207,7 +211,10 @@ pub fn execve(
                 let env = envp.read();
 
                 let len = strlen(env);
-                envs.push(core::slice::from_raw_parts(env as *const u8, len));
+                envs.push(core::slice::from_raw_parts(
+                    CCharPtrToU8Ptr::cast_const(env),
+                    len,
+                ));
                 envp = envp.add(1);
             }
             (args, envs)
