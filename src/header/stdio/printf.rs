@@ -222,7 +222,12 @@ impl VaArg {
             &mut *ptr_to_struct
         };
 
-        let ptr = unsafe { ap_impl.vr_top.offset(ap_impl.vr_offs as isize) as *const c_longdouble };
+        let ptr = unsafe {
+            ap_impl
+                .vr_top
+                .offset(ap_impl.vr_offs as isize)
+                .cast::<c_longdouble>()
+        };
 
         ap_impl.vr_offs += 16;
 
