@@ -80,7 +80,11 @@ macro_rules! define_ioctl_data {
                     let size = self.$counted_by as usize * size_of::<$el>();
                     if self.$counted_field as usize != 0 {
                         let $counted_field = unsafe {
-                            slice::from_raw_parts(self.$counted_field as *const u8, size)
+                            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+                            let x =self.$counted_field as *const u8;
+                            #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+                            let x =self.$counted_field.cast_const();
+                            slice::from_raw_parts(x, size)
                         };
                         data.extend_from_slice(&$counted_field);
                     } else {
