@@ -67,7 +67,10 @@ impl<'a> From<&'a syscall::TimeSpec> for timespec {
     fn from(value: &'a syscall::TimeSpec) -> Self {
         Self {
             tv_sec: value.tv_sec as _,
+            #[cfg(target_arch = "x86")]
             tv_nsec: value.tv_nsec,
+            #[cfg(not(target_arch = "x86"))]
+            tv_nsec: value.tv_nsec.into(),
         }
     }
 }
