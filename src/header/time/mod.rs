@@ -256,8 +256,8 @@ pub extern "C" fn clock() -> clock_t {
     let ts = unsafe { ts.assume_init() };
 
     #[cfg(target_arch = "x86")]
-    let clocks =
-        ts.tv_sec * CLOCKS_PER_SEC as i64 + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)) as i64;
+    let clocks = ts.tv_sec * i64::from(CLOCKS_PER_SEC)
+        + i64::from(ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC));
     #[cfg(not(target_arch = "x86"))]
     let clocks = ts.tv_sec * CLOCKS_PER_SEC + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC));
     clock_t::try_from(clocks).unwrap_or(-1)

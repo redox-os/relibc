@@ -12,7 +12,7 @@ use rand_xorshift::XorShiftRng;
 
 use crate::{
     c_str::CStr,
-    casting::ByteLiteral,
+    casting::{ByteLiteral, CCharToU8},
     error::{Errno, ResultExt},
     fs::File,
     header::{
@@ -1388,11 +1388,11 @@ pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
 }
 
 pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
-    let first = unsafe { *s } as u8;
+    let first = CCharToU8::cast(unsafe { *s });
     match first {
         0 => None,
         b'0' => {
-            let second = unsafe { *s.add(1) } as u8;
+            let second = CCharToU8::cast(unsafe { *s.add(1) });
             if second == b'X' || second == b'x' {
                 Some((16, 2))
             } else if (b'0'..=b'7').contains(&second) {
@@ -1462,7 +1462,7 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
         // `-1 as usize` is usize::MAX
         // `-1 as u8 as usize` is u8::MAX
         // It extends by the sign bit unless we cast it to unsigned first.
-        let val = LOOKUP_TABLE[unsafe { *s.offset(idx) } as u8 as usize];
+        let val = LOOKUP_TABLE[CCharToU8::cast(unsafe { *s.offset(idx) }) as usize];
         if val == -1 || val as c_int >= base {
             break;
         } else {

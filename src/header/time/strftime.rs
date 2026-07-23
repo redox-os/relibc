@@ -7,7 +7,7 @@ use alloc::string::String;
 use super::tm;
 use crate::{
     c_str::CStr,
-    casting::U8PtrToCCharPtr,
+    casting::{CCharPtrToU8, U8PtrToCCharPtr},
     platform::{
         self, WriteByte,
         types::{c_char, c_int, size_t},
@@ -88,8 +88,8 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
 
         while unsafe { *format } != 0 {
             // If the character isn't '%', just copy it out.
-            if unsafe { *format } as u8 != b'%' {
-                w!(byte unsafe { *format } as u8);
+            if unsafe { CCharPtrToU8::from_const(format) } != b'%' {
+                w!(byte unsafe { CCharPtrToU8::from_const(format) });
                 format = unsafe { format.add(1) };
                 continue;
             }
@@ -99,11 +99,13 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
 
             // POSIX says '%E' and '%O' can modify numeric formats for locales,
             // but we ignore them in this minimal "C" locale approach.
-            if unsafe { *format } as u8 == b'E' || unsafe { *format } as u8 == b'O' {
+            if unsafe { CCharPtrToU8::from_const(format) } == b'E'
+                || unsafe { CCharPtrToU8::from_const(format) } == b'O'
+            {
                 format = unsafe { format.add(1) };
             }
 
-            match unsafe { *format } as u8 {
+            match unsafe { CCharPtrToU8::from_const(format) } {
                 // Literal '%'
                 b'%' => w!(byte b'%'),
 

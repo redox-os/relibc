@@ -133,3 +133,60 @@ impl CCharPtrToU8Ptr {
         panic!("Arch not supported!")
     }
 }
+
+/// An abstraction for converting a `c_char` pointer to a `u8`.
+pub struct CCharPtrToU8;
+
+impl CCharPtrToU8 {
+    /// A method that casts a `*const c_char` to a `u8`.
+    ///
+    /// It is the caller's responsibility to understand and ensure that casting
+    /// from `c_char` to `u8` is intentional for the applicable architectures.
+    ///
+    /// # Panics
+    /// Unsupported architectures will panic.
+    ///
+    /// # Safety
+    /// `input` must not be null.
+    pub unsafe fn from_const(input: *const c_char) -> u8 {
+        // `c_char` is an `i8` on these arches
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            // TODO replace `as` casting with something better
+            return unsafe { *input } as u8;
+        }
+        // `c_char` is already a `u8` on these arches
+        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+        {
+            return unsafe { *input };
+        }
+        panic!("Arch not supported!")
+    }
+}
+
+/// An abstraction for converting a `c_char` to a `u8`.
+pub struct CCharToU8;
+
+impl CCharToU8 {
+    /// A method that casts a `c_char` to a `u8`.
+    ///
+    /// It is the caller's responsibility to understand and ensure that casting
+    /// from `c_char` to `u8` is intentional for the applicable architectures.
+    ///
+    /// # Panics
+    /// Unsupported architectures will panic.
+    pub fn cast(input: c_char) -> u8 {
+        // `c_char` is an `i8` on these arches
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            // TODO replace `as` casting with something better
+            return input as u8;
+        }
+        // `c_char` is already a `u8` on these arches
+        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+        {
+            return input;
+        }
+        panic!("Arch not supported!")
+    }
+}

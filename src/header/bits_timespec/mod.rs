@@ -27,7 +27,7 @@ impl timespec {
         }
 
         Some(Self {
-            tv_sec: delta_sec + (delta_nsec / NANOSECONDS) as time_t,
+            tv_sec: delta_sec + time_t::from(delta_nsec / NANOSECONDS),
             tv_nsec: delta_nsec % NANOSECONDS,
         })
     }
@@ -39,12 +39,12 @@ impl timespec {
         let time = if delta_nsec < 0 {
             let roundup_sec = -delta_nsec / NANOSECONDS + 1;
             timespec {
-                tv_sec: delta_sec - (roundup_sec as time_t),
+                tv_sec: delta_sec - time_t::from(roundup_sec),
                 tv_nsec: roundup_sec * NANOSECONDS - delta_nsec,
             }
         } else {
             timespec {
-                tv_sec: delta_sec + (delta_nsec / NANOSECONDS) as time_t,
+                tv_sec: delta_sec + time_t::from(delta_nsec / NANOSECONDS),
                 tv_nsec: delta_nsec % NANOSECONDS,
             }
         };
@@ -67,6 +67,9 @@ impl<'a> From<&'a syscall::TimeSpec> for timespec {
     fn from(value: &'a syscall::TimeSpec) -> Self {
         Self {
             tv_sec: value.tv_sec as _,
+            #[cfg(target_arch = "x86")]
+            tv_nsec: value.tv_nsec,
+            #[cfg(not(target_arch = "x86"))]
             tv_nsec: value.tv_nsec.into(),
         }
     }
