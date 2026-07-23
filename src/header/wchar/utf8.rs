@@ -4,6 +4,7 @@
 use core::{char, slice, str};
 
 use crate::{
+    casting::CCharPtrToU8,
     header::errno,
     platform::{
         self,
@@ -45,7 +46,7 @@ fn utf8_char_width(b: u8) -> usize {
 
 //It's guaranteed that we don't have any nullpointers here
 pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
-    let size = utf8_char_width(unsafe { *s } as u8);
+    let size = utf8_char_width(unsafe { CCharPtrToU8::from_const(s) });
     if size > n {
         platform::ERRNO.set(errno::EILSEQ);
         return -2isize as usize;

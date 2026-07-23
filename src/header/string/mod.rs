@@ -7,7 +7,7 @@ use core::{iter::once, mem, ptr, slice};
 use cbitset::BitSet256;
 
 use crate::{
-    casting::U8PtrToCCharPtr,
+    casting::{CCharToU8, U8PtrToCCharPtr},
     header::{
         errno::{ENOMEM, ERANGE, STR_ERROR, STRERROR_MAX},
         signal,
@@ -510,8 +510,8 @@ pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) 
 pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t) -> c_int {
     for i in 0..n {
         // These must be cast as u8 to have correct comparisons
-        let a = unsafe { *s1.add(i) } as u8;
-        let b = unsafe { *s2.add(i) } as u8;
+        let a = CCharToU8::cast(unsafe { *s1.add(i) });
+        let b = CCharToU8::cast(unsafe { *s2.add(i) });
         if a != b || a == 0 {
             return c_int::from(a) - c_int::from(b);
         }

@@ -1,8 +1,4 @@
 // TODO: reuse more code with the wide printf impl
-use crate::{
-    c_str::{self, CStr, NulStr},
-    io::{self, Write},
-};
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
@@ -11,7 +7,10 @@ use alloc::{
 use core::{cmp, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
 
 use crate::{
+    c_str::{self, CStr, NulStr},
+    casting::CCharToU8,
     header::errno::{self, EILSEQ},
+    io::{self, Write},
     platform::{
         self,
         types::{
@@ -1100,7 +1099,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 match unsafe { varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) } {
                     VaArg::c_char(c) => {
                         pad(w, !left, b' ', 1..pad_space)?;
-                        w.write_all(&[c as u8])?;
+                        w.write_all(&[CCharToU8::cast(c)])?;
                         pad(w, left, b' ', 1..pad_space)?;
                     }
                     VaArg::wint_t(c) => {

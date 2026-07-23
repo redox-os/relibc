@@ -670,7 +670,7 @@ impl PalSocket for Sys {
                 let path = str::from_utf8(addr).map_err(|_| Errno(EINVAL))?;
                 log::trace!("bind(): path: {:?}", path);
 
-                let socket_file_fd = FdGuard::open(&path, syscall::O_RDWR)?;
+                let socket_file_fd = FdGuard::open(path, syscall::O_RDWR)?;
 
                 const TOKEN_BUF_SIZE: usize = 16;
 
