@@ -1,17 +1,7 @@
 //! C data types for this platform.
 
-// Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
-// more optimization opportunities around it recognizing things like
-// malloc/free.
 /// The `void` type in C.
-#[repr(u8)]
-pub enum c_void {
-    // Two dummy variants so the #[repr] attribute can be used.
-    #[doc(hidden)]
-    __variant1,
-    #[doc(hidden)]
-    __variant2,
-}
+pub use core::ffi::c_void;
 
 /// The `int8_t` type provided in `stdint.h`, see <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdint.h.html>.
 pub type int8_t = i8;
