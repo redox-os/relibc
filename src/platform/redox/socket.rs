@@ -11,6 +11,7 @@ use super::{
     path::dir_path_and_fd_path,
 };
 use crate::{
+    c_str::CStr,
     casting::U8PtrToCCharPtr,
     error::{Errno, Result},
     header::{
@@ -21,6 +22,7 @@ use crate::{
             EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK, EOPNOTSUPP,
             EPROTONOSUPPORT,
         },
+        fcntl,
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_select::timeval,
@@ -665,12 +667,10 @@ impl PalSocket for Sys {
                     },
                 );
 
-                let addr =
-                    unsafe { slice::from_raw_parts((&raw const data.sun_path).cast::<u8>(), len) };
-                let path = str::from_utf8(addr).map_err(|_| Errno(EINVAL))?;
-                log::trace!("bind(): path: {:?}", path);
+                let path = unsafe { CStr::from_ptr(data.sun_path.as_ptr()) };
 
-                let socket_file_fd = FdGuard::open(path, syscall::O_RDWR)?;
+                let socket_file_fd = Sys::open(path, fcntl::O_RDWR, 0)?;
+                let socket_file_fd = FdGuard::new(socket_file_fd as usize);
 
                 const TOKEN_BUF_SIZE: usize = 16;
 
