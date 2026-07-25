@@ -2,6 +2,7 @@ use alloc::{borrow::Cow, string::ToString};
 use arrayvec::ArrayString;
 use core::{
     ffi::c_int,
+    mem::ManuallyDrop,
     str::{self, FromStr},
 };
 use redox_path::{RedoxReference, RedoxStr};
@@ -235,9 +236,9 @@ pub fn openat(dirfd: c_int, path: RedoxStr<'_>, flags: usize) -> Result<usize> {
                 let link_path = read_link_content(None, &path, true);
                 (link_path, dirfd)
             } else {
-                let fd = FdGuard::new(dirfd as usize);
+                let fd = ManuallyDrop::new(FdGuard::new(dirfd as usize));
                 let link_path = read_link_content(Some(&fd), &path, true);
-                (link_path, fd.take() as i32)
+                (link_path, ManuallyDrop::into_inner(fd).take() as i32)
             };
             let link_path = openat2_path(dirfd, link_path?, 0)?;
             resolve_sym_links(link_path, flags)
