@@ -170,7 +170,7 @@ macro_rules! wcsto_impl {
 
         let mut result: $type = 0;
         while let Some(digit) =
-            char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base as u32))
+            char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base.cast_unsigned()))
         {
             let new = result.checked_mul(base as $type).and_then(|result| {
                 if has_minus && type_is_signed {
@@ -319,6 +319,8 @@ macro_rules! strto_impl {
 #[macro_export]
 macro_rules! strto_float_impl {
     ($type:ident, $s:expr, $endptr:expr) => {{
+        use $crate::casting::CCharToU8;
+
         let mut s = $s;
         let endptr = $endptr;
 
@@ -330,7 +332,7 @@ macro_rules! strto_float_impl {
         let mut exponent: Option<$type> = None;
         let mut radix = 10;
 
-        let result_sign = match unsafe{*s} as u8 {
+        let result_sign = match CCharToU8::cast(unsafe{*s}) {
             b'-' => {
                 s = unsafe{s.offset(1)};
                 -1.0
@@ -354,22 +356,22 @@ macro_rules! strto_float_impl {
             result = $type::NAN;
             s = unsafe{s.offset(3)};
         } else {
-            if unsafe{*s} as u8 == b'0' && unsafe{*s.offset(1)} as u8 == b'x' {
+            if CCharToU8::cast(unsafe{*s}) == b'0' && CCharToU8::cast(unsafe{*s.offset(1)}) == b'x' {
                 s = unsafe{s.offset(2)};
                 radix = 16;
             }
 
-            while let Some(digit) = (unsafe{*s} as u8 as char).to_digit(radix) {
+            while let Some(digit) = (CCharToU8::cast(unsafe{*s}) as char).to_digit(radix) {
                 result *= radix as $type;
                 result += digit as $type;
                 s = unsafe{s.offset(1)};
             }
 
-            if unsafe{*s} as u8 == b'.' {
+            if CCharToU8::cast(unsafe{*s}) == b'.' {
                 s = unsafe{s.offset(1)};
 
                 let mut i = 1.0;
-                while let Some(digit) = (unsafe{*s} as u8 as char).to_digit(radix) {
+                while let Some(digit) = (CCharToU8::cast(unsafe{*s}) as char).to_digit(radix) {
                     i *= radix as $type;
                     result += digit as $type / i;
                     s = unsafe{s.offset(1)};
@@ -378,11 +380,11 @@ macro_rules! strto_float_impl {
 
             let s_before_exponent = s;
 
-            exponent = match (unsafe{*s} as u8, radix) {
+            exponent = match (CCharToU8::cast(unsafe{*s}), radix) {
                 (b'e' | b'E', 10) | (b'p' | b'P', 16) => {
                     s = unsafe{s.offset(1)};
 
-                    let is_exponent_positive = match unsafe{*s} as u8 {
+                    let is_exponent_positive = match CCharToU8::cast(unsafe{*s}) {
                         b'-' => {
                             s = unsafe{s.offset(1)};
                             false
@@ -395,10 +397,10 @@ macro_rules! strto_float_impl {
                     };
 
                     // Exponent digits are always in base 10.
-                    if (unsafe{*s} as u8 as char).is_digit(10) {
+                    if (CCharToU8::cast(unsafe{*s}) as char).is_digit(10) {
                         let mut exponent_value = 0;
 
-                        while let Some(digit) = (unsafe{*s} as u8 as char).to_digit(10) {
+                        while let Some(digit) = (CCharToU8::cast(unsafe{*s}) as char).to_digit(10) {
                             exponent_value *= 10;
                             exponent_value += digit;
                             s = unsafe{s.offset(1)};

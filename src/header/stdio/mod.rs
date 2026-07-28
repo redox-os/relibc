@@ -973,7 +973,8 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
 pub unsafe extern "C" fn perror(s: *const c_char) {
     let err = ERRNO.get();
     let err_str = if err >= 0 && err < STR_ERROR.len() as c_int {
-        STR_ERROR[err as usize]
+        STR_ERROR[usize::try_from(err.cast_unsigned())
+            .expect("u32 to usize is fine on 32bit arches and above")]
     } else {
         "Unknown error"
     };
