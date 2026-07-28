@@ -11,7 +11,7 @@ use crate::{
 
 use crate::header::{
     bits_arpainet::htons,
-    errno::*,
+    errno::{EINVAL, EIO},
     netinet_in::{IPPROTO_UDP, in_addr, sockaddr_in},
     sys_socket::{
         self,
@@ -77,6 +77,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
                 return Err(EIO);
             }
             if sys_socket::send(sock, packet_data_ptr, packet_data_len, 0) < 0 {
+                #[expect(clippy::from_raw_with_void_ptr, reason = "intentional")]
                 drop(Box::from_raw(packet_data_ptr));
                 return Err(EIO);
             }
@@ -84,6 +85,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
         };
 
         unsafe {
+            #[expect(clippy::from_raw_with_void_ptr, reason = "intentional")]
             drop(Box::from_raw(packet_data_ptr));
         }
 
@@ -188,6 +190,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         }
 
         unsafe {
+            #[expect(clippy::from_raw_with_void_ptr, reason = "intentional")]
             drop(Box::from_raw(packet_data_ptr));
         }
 

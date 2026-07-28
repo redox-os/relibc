@@ -27,6 +27,7 @@ cast_possible_wrap = "allow" # TODO review occurrences
 cast_precision_loss = "allow" # TODO review occurrences
 cast_ptr_alignment = "allow" # TODO review occurrences
 cast_sign_loss = "allow" # TODO review occurrences
+from_raw_with_void_ptr = "deny"
 ignored_unit_patterns = "deny"
 implicit_clone = "deny"
 manual_let_else = "deny"
