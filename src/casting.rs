@@ -152,8 +152,7 @@ impl CCharPtrToU8 {
         // `c_char` is an `i8` on these arches
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            // TODO replace `as` casting with something better
-            return unsafe { *input } as u8;
+            return unsafe { *input }.cast_unsigned();
         }
         // `c_char` is already a `u8` on these arches
         #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
@@ -179,8 +178,7 @@ impl CCharToU8 {
         // `c_char` is an `i8` on these arches
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            // TODO replace `as` casting with something better
-            return input as u8;
+            return input.cast_unsigned();
         }
         // `c_char` is already a `u8` on these arches
         #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]

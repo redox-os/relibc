@@ -263,13 +263,13 @@ pub unsafe extern "C" fn mbsnrtowcs(
         let amount = unsafe { mbrtowc(&raw mut wc, src.add(src_offset), src_len - src_offset, ps) };
 
         // Stop in the event a decoding error occured.
-        if amount == -1isize as usize {
+        if amount == (-1isize).cast_unsigned() {
             unsafe { *src_ptr = src.add(src_offset) };
             return 1isize as usize;
         }
 
         // Stop decoding early in the event we encountered a partial character.
-        if amount == -2isize as usize {
+        if amount == (-2isize).cast_unsigned() {
             unsafe { *ps = ps_copy };
             break;
         }

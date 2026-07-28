@@ -720,10 +720,10 @@ pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
     let mut state: mbstate_t = mbstate_t {};
     let result: usize = unsafe { mbrtowc(&raw mut wc, s, n, &raw mut state) };
 
-    if result == -1isize as usize {
+    if result == (-1isize).cast_unsigned() {
         return -1;
     }
-    if result == -2isize as usize {
+    if result == (-2isize).cast_unsigned() {
         return -1;
     }
 
@@ -1221,7 +1221,7 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
         if read < 0 {
             return ptr::null_mut();
         }
-        out[read as usize] = 0;
+        out[read.cast_unsigned()] = 0;
     }
 
     ptr
@@ -1731,10 +1731,10 @@ pub unsafe extern "C" fn wctomb(s: *mut c_char, wc: wchar_t) -> c_int {
     let mut state: mbstate_t = mbstate_t {};
     let result: usize = unsafe { wcrtomb(s, wc, &raw mut state) };
 
-    if result == -1isize as usize {
+    if result == (-1isize).cast_unsigned() {
         return -1;
     }
-    if result == -2isize as usize {
+    if result == (-2isize).cast_unsigned() {
         return -1;
     }
 

@@ -1236,7 +1236,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
     if len < 0 {
         return -platform::ERRNO.get();
     }
-    name[len as usize] = 0;
+    name[len.cast_unsigned()] = 0;
 
     0
 }

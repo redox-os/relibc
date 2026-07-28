@@ -65,7 +65,7 @@ impl RawLineBuffer {
                 .map(|u| u as isize)
                 .or_minus_one_errno();
 
-            let read_usize = read.max(0) as usize;
+            let read_usize = read.max(0).cast_unsigned();
 
             // Remove all uninitialized memory that wasn't read
             unsafe {
