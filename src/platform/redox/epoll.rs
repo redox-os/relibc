@@ -141,7 +141,6 @@ impl PalEpoll for Sys {
                         data: epoll_data {
                             u64: event.data as u64,
                         },
-                        ..Default::default()
                     };
                 }
                 #[cfg(not(target_arch = "x86"))]
@@ -151,6 +150,7 @@ impl PalEpoll for Sys {
                         data: epoll_data {
                             u64: event.data as u64,
                         },
+                        ..Default::default()
                     };
                 }
                 count += 1;
