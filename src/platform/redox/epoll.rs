@@ -135,20 +135,24 @@ impl PalEpoll for Sys {
                     continue;
                 }
                 #[cfg(target_arch = "x86")]
-                *target_ptr = epoll_event {
-                    events: event_flags_to_epoll(event.flags),
-                    data: epoll_data {
-                        u64: event.data as u64,
-                    },
-                    ..Default::default()
-                };
+                {
+                    *target_ptr = epoll_event {
+                        events: event_flags_to_epoll(event.flags),
+                        data: epoll_data {
+                            u64: event.data as u64,
+                        },
+                        ..Default::default()
+                    };
+                }
                 #[cfg(not(target_arch = "x86"))]
-                *target_ptr = epoll_event {
-                    events: event_flags_to_epoll(event.flags),
-                    data: epoll_data {
-                        u64: event.data as u64,
-                    },
-                };
+                {
+                    *target_ptr = epoll_event {
+                        events: event_flags_to_epoll(event.flags),
+                        data: epoll_data {
+                            u64: event.data as u64,
+                        },
+                    };
+                }
                 count += 1;
             }
         }
