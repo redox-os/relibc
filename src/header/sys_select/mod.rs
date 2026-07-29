@@ -90,7 +90,7 @@ pub unsafe fn select_epoll(
             let mut event = {
                 #[cfg(target_os = "redox")]
                 {
-                    #[cfg(not(target_arch = "x86"))]
+                    #[cfg(target_pointer_width = "64")]
                     {
                         epoll_event {
                             events,
@@ -98,7 +98,7 @@ pub unsafe fn select_epoll(
                             ..Default::default()
                         }
                     }
-                    #[cfg(target_arch = "x86")]
+                    #[cfg(target_pointer_width = "32")]
                     {
                         epoll_event {
                             events,

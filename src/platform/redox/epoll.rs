@@ -134,7 +134,7 @@ impl PalEpoll for Sys {
                 if event.id == syscall::EVENT_TIMEOUT_ID {
                     continue;
                 }
-                #[cfg(target_arch = "x86")]
+                #[cfg(target_pointer_width = "32")]
                 {
                     *target_ptr = epoll_event {
                         events: event_flags_to_epoll(event.flags),
@@ -143,7 +143,7 @@ impl PalEpoll for Sys {
                         },
                     };
                 }
-                #[cfg(not(target_arch = "x86"))]
+                #[cfg(target_pointer_width = "64")]
                 {
                     *target_ptr = epoll_event {
                         events: event_flags_to_epoll(event.flags),

@@ -100,7 +100,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         let mut event = {
             #[cfg(target_os = "redox")]
             {
-                #[cfg(not(target_arch = "x86"))]
+                #[cfg(target_pointer_width = "64")]
                 {
                     epoll_event {
                         events: 0,
@@ -108,7 +108,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
                         ..Default::default()
                     }
                 }
-                #[cfg(target_arch = "x86")]
+                #[cfg(target_pointer_width = "32")]
                 {
                     epoll_event {
                         events: 0,
