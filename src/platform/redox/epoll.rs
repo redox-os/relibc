@@ -134,25 +134,12 @@ impl PalEpoll for Sys {
                 if event.id == syscall::EVENT_TIMEOUT_ID {
                     continue;
                 }
-                #[cfg(target_pointer_width = "32")]
-                {
-                    *target_ptr = epoll_event {
-                        events: event_flags_to_epoll(event.flags),
-                        data: epoll_data {
-                            u64: event.data as u64,
-                        },
-                    };
-                }
-                #[cfg(target_pointer_width = "64")]
-                {
-                    *target_ptr = epoll_event {
-                        events: event_flags_to_epoll(event.flags),
-                        data: epoll_data {
-                            u64: event.data as u64,
-                        },
-                        ..Default::default()
-                    };
-                }
+                *target_ptr = epoll_event::new(
+                    event_flags_to_epoll(event.flags),
+                    epoll_data {
+                        u64: event.data as u64,
+                    },
+                );
                 count += 1;
             }
         }

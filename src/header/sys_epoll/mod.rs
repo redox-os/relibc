@@ -109,6 +109,20 @@ pub struct epoll_event {
     pub data: epoll_data,
 }
 
+impl epoll_event {
+    pub fn new(events: c_uint, data: epoll_data) -> Self {
+        #[cfg(all(target_os = "redox", target_pointer_width = "64"))]
+        {
+            return Self {
+                events,
+                data,
+                _pad: Default::default(),
+            };
+        }
+        Self { events, data }
+    }
+}
+
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_create.2.html>.
 ///
 /// Creates a file descriptor referring to the new epoll instance.
