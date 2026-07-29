@@ -119,7 +119,10 @@ impl epoll_event {
                 _pad: Default::default(),
             };
         }
-        Self { events, data }
+        #[cfg(not(all(target_os = "redox", target_pointer_width = "64")))]
+        {
+            Self { events, data }
+        }
     }
 }
 
