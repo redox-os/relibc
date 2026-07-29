@@ -911,7 +911,7 @@ impl DSO {
         let dynstrtab = StringTable::new(
             unsafe { slice::from_raw_parts(mmap.byte_add(strtab_offset), strtab_size as usize) },
             0,
-            strtab_size as u64,
+            u64::from(strtab_size),
         );
         #[cfg(not(target_arch = "x86"))]
         let dynstrtab = StringTable::new(

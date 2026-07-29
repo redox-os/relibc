@@ -570,7 +570,10 @@ pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
     // POSIX says we should only consider the lower 32 bits of value.
+    #[cfg(not(target_arch = "x86"))]
     let value_as_i32 = value as i32;
+    #[cfg(target_arch = "x86")]
+    let value_as_i32 = value;
 
     /* If we pretend to extend the 32-bit value with 4 binary zeros, we
      * would get a 36-bit integer. The number of base-64 digits to be

@@ -1,5 +1,8 @@
 use super::{
-    super::{Pal, PalEpoll, types::*},
+    super::{
+        Pal, PalEpoll,
+        types::{c_int, c_uint},
+    },
     Sys,
 };
 
@@ -131,13 +134,12 @@ impl PalEpoll for Sys {
                 if event.id == syscall::EVENT_TIMEOUT_ID {
                     continue;
                 }
-                *target_ptr = epoll_event {
-                    events: event_flags_to_epoll(event.flags),
-                    data: epoll_data {
+                *target_ptr = epoll_event::new(
+                    event_flags_to_epoll(event.flags),
+                    epoll_data {
                         u64: event.data as u64,
                     },
-                    ..Default::default()
-                };
+                );
                 count += 1;
             }
         }
