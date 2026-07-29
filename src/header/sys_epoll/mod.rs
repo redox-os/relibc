@@ -113,11 +113,11 @@ impl epoll_event {
     pub fn new(events: c_uint, data: epoll_data) -> Self {
         #[cfg(all(target_os = "redox", target_pointer_width = "64"))]
         {
-            return Self {
+            Self {
                 events,
                 data,
                 _pad: Default::default(),
-            };
+            }
         }
         #[cfg(not(all(target_os = "redox", target_pointer_width = "64")))]
         {
