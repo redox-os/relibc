@@ -87,16 +87,32 @@ pub unsafe fn select_epoll(
         }
 
         if events > 0 {
-            #[cfg(target_os = "redox")]
-            let mut event = epoll_event {
-                events,
-                data: epoll_data { fd },
-                ..Default::default()
-            };
-            #[cfg(target_os = "linux")]
-            let mut event = epoll_event {
-                events,
-                data: epoll_data { fd },
+            let mut event = {
+                #[cfg(target_os = "redox")]
+                {
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        epoll_event {
+                            events,
+                            data: epoll_data { fd },
+                            ..Default::default()
+                        }
+                    }
+                    #[cfg(target_arch = "x86")]
+                    {
+                        epoll_event {
+                            events,
+                            data: epoll_data { fd },
+                        }
+                    }
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    epoll_event {
+                        events,
+                        data: epoll_data { fd },
+                    }
+                }
             };
             if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &raw mut event) } < 0 {
                 if crate::platform::ERRNO.get() == errno::EPERM {

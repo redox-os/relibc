@@ -97,16 +97,32 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
             continue;
         }
 
-        #[cfg(target_os = "redox")]
-        let mut event = epoll_event {
-            events: 0,
-            data: epoll_data { u64: i as u64 },
-            ..Default::default()
-        };
-        #[cfg(target_os = "linux")]
-        let mut event = epoll_event {
-            events: 0,
-            data: epoll_data { u64: i as u64 },
+        let mut event = {
+            #[cfg(target_os = "redox")]
+            {
+                #[cfg(not(target_arch = "x86"))]
+                {
+                    epoll_event {
+                        events: 0,
+                        data: epoll_data { u64: i as u64 },
+                        ..Default::default()
+                    }
+                }
+                #[cfg(target_arch = "x86")]
+                {
+                    epoll_event {
+                        events: 0,
+                        data: epoll_data { u64: i as u64 },
+                    }
+                }
+            }
+            #[cfg(target_os = "linux")]
+            {
+                epoll_event {
+                    events: 0,
+                    data: epoll_data { u64: i as u64 },
+                }
+            }
         };
 
         for (p, ep) in event_map.iter() {

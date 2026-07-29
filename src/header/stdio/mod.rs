@@ -742,7 +742,7 @@ pub unsafe extern "C" fn freopen(
 /// Seek to an offset `offset` from `whence`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fseek(stream: *mut FILE, offset: c_long, whence: c_int) -> c_int {
-    unsafe { fseeko(stream, offset as off_t, whence) }
+    unsafe { fseeko(stream, off_t::from(offset), whence) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fseek.html>.
