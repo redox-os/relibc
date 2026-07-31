@@ -593,6 +593,31 @@ pub unsafe extern "C" fn redox_sys_call_v0(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_sys_call_multiple_v0(
+    fds: *const usize,
+    fds_len: usize,
+    payload: *mut u8,
+    payload_len: usize,
+    flags: usize,
+    metadata: *const u64,
+    metadata_len: usize,
+) -> RawResult {
+    let flags = syscall::CallFlags::from_bits_retain(flags);
+    let read = flags.contains(syscall::CallFlags::READ);
+    let write = flags.contains(syscall::CallFlags::WRITE);
+    let fds = unsafe { slice::from_raw_parts(fds, fds_len) };
+    let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
+    let metadata = unsafe { slice::from_raw_parts(metadata, metadata_len) };
+
+    Error::mux(match (read, write) {
+        (true, true) => redox_rt::sys::sys_call_rw(fds, payload, flags, metadata),
+        (true, false) => redox_rt::sys::sys_call_ro(fds, payload, flags, metadata),
+        (false, true) => redox_rt::sys::sys_call_wo(fds, payload, flags, metadata),
+        (false, false) => redox_rt::sys::sys_call(fds, payload, flags, metadata),
+    })
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_socket_token_v0(
     fd: usize,
     payload: *mut u8,
