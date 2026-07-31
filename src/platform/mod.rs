@@ -365,7 +365,6 @@ pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
 
     // TODO: Is it safe to assume setup_sighandler has been called at this point?
     redox_rt::sys::this_proc_call(
-        &mut [],
         syscall::CallFlags::empty(),
         &[redox_protocols::protocol::ProcCall::SyncSigPctl as u64],
     )

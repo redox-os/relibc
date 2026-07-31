@@ -581,14 +581,28 @@ pub unsafe extern "C" fn redox_sys_call_v0(
     let flags = syscall::CallFlags::from_bits_retain(flags);
     let read = flags.contains(syscall::CallFlags::READ);
     let write = flags.contains(syscall::CallFlags::WRITE);
-    let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
     let metadata = unsafe { slice::from_raw_parts(metadata, metadata_len) };
 
     Error::mux(match (read, write) {
-        (true, true) => redox_rt::sys::sys_call_rw(fd, payload, flags, metadata),
-        (true, false) => redox_rt::sys::sys_call_ro(fd, payload, flags, metadata),
-        (false, true) => redox_rt::sys::sys_call_wo(fd, payload, flags, metadata),
-        (false, false) => redox_rt::sys::sys_call(fd, payload, flags, metadata),
+        (true, true) => {
+            // read-write
+            let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
+            redox_rt::sys::sys_call_rw(fd, payload, flags, metadata)
+        }
+        (true, false) => {
+            // read-only
+            let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
+            redox_rt::sys::sys_call_ro(fd, payload, flags, metadata)
+        }
+        (false, true) => {
+            // write-only
+            let payload = unsafe { slice::from_raw_parts(payload.cast_const(), payload_len) };
+            redox_rt::sys::sys_call_wo(fd, payload, flags, metadata)
+        }
+        (false, false) => {
+            // no payload
+            redox_rt::sys::sys_call(fd, flags, metadata)
+        }
     })
 }
 
@@ -606,14 +620,28 @@ pub unsafe extern "C" fn redox_sys_call_multiple_v0(
     let read = flags.contains(syscall::CallFlags::READ);
     let write = flags.contains(syscall::CallFlags::WRITE);
     let fds = unsafe { slice::from_raw_parts(fds, fds_len) };
-    let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
     let metadata = unsafe { slice::from_raw_parts(metadata, metadata_len) };
 
     Error::mux(match (read, write) {
-        (true, true) => redox_rt::sys::sys_call_rw(fds, payload, flags, metadata),
-        (true, false) => redox_rt::sys::sys_call_ro(fds, payload, flags, metadata),
-        (false, true) => redox_rt::sys::sys_call_wo(fds, payload, flags, metadata),
-        (false, false) => redox_rt::sys::sys_call(fds, payload, flags, metadata),
+        (true, true) => {
+            // read-write
+            let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
+            redox_rt::sys::sys_call_rw(fds, payload, flags, metadata)
+        }
+        (true, false) => {
+            // read-only
+            let payload = unsafe { slice::from_raw_parts_mut(payload, payload_len) };
+            redox_rt::sys::sys_call_ro(fds, payload, flags, metadata)
+        }
+        (false, true) => {
+            // write-only
+            let payload = unsafe { slice::from_raw_parts(payload.cast_const(), payload_len) };
+            redox_rt::sys::sys_call_wo(fds, payload, flags, metadata)
+        }
+        (false, false) => {
+            // no payload
+            redox_rt::sys::sys_call(fds, flags, metadata)
+        }
     })
 }
 
