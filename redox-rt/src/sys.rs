@@ -64,7 +64,6 @@ pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
 
     match wrapper(false, true, || {
         this_proc_call(
-            &mut [],
             CallFlags::empty(),
             &[ProcCall::Kill as u64, target.raw() as u64, sig as u64],
         )
@@ -89,7 +88,7 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
         pid: posix_getpid(),
     };
     match wrapper(false, true, || {
-        this_proc_call(
+        this_proc_call_wo(
             unsafe { plain::as_mut_bytes(&mut siginf) },
             CallFlags::empty(),
             &[ProcCall::Sigq as u64, pid as u64, sig as u64],
@@ -109,8 +108,7 @@ pub fn posix_getpid() -> u32 {
 }
 #[inline]
 pub fn posix_getppid() -> u32 {
-    this_proc_call(&mut [], CallFlags::empty(), &[ProcCall::Getppid as u64]).expect("cannot fail")
-        as u32
+    this_proc_call(CallFlags::empty(), &[ProcCall::Getppid as u64]).expect("cannot fail") as u32
 }
 
 #[inline]
@@ -120,7 +118,6 @@ pub fn posix_setpriority(which: i32, who: u32, prio: u32) -> Result<(), syscall:
     }
 
     this_proc_call(
-        &mut [],
         CallFlags::empty(),
         &[
             ProcCall::SetProcPriority as u64,
@@ -139,7 +136,6 @@ pub fn posix_getpriority(which: i32, who: u32) -> Result<u32, syscall::Error> {
     }
 
     let res = this_proc_call(
-        &mut [],
         CallFlags::empty(),
         &[ProcCall::GetProcPriority as u64, u64::from(who)],
     )?;
@@ -316,46 +312,32 @@ pub fn sys_call_rw<T: Call>(
         )
     }
 }
-pub fn sys_call<T: Call>(
-    fd: T,
-    payload: &mut [u8],
-    flags: CallFlags,
-    metadata: &[u64],
-) -> Result<usize> {
-    unsafe { fd.raw_call(payload.as_mut_ptr(), payload.len(), flags, metadata) }
+pub fn sys_call<T: Call>(fd: T, flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    unsafe { fd.raw_call(core::ptr::null_mut(), 0, flags, metadata) }
 }
 
-pub fn this_proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
-    proc_call(
+pub fn this_proc_call(flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    sys_call(crate::current_proc_fd().as_raw_fd(), flags, metadata)
+}
+pub fn this_proc_call_ro(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    sys_call_ro(
         crate::current_proc_fd().as_raw_fd(),
         payload,
         flags,
         metadata,
     )
 }
-pub fn proc_call(
-    proc_fd: usize,
-    payload: &mut [u8],
-    flags: CallFlags,
-    metadata: &[u64],
-) -> Result<usize> {
-    sys_call(proc_fd, payload, flags, metadata)
-}
-pub fn thread_call(
-    thread_fd: usize,
-    payload: &mut [u8],
-    flags: CallFlags,
-    metadata: &[u64],
-) -> Result<usize> {
-    sys_call(thread_fd, payload, flags, metadata)
-}
-pub fn this_thread_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
-    thread_call(
-        RtTcb::current().thread_fd().as_raw_fd(),
+pub fn this_proc_call_wo(payload: &[u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    sys_call_wo(
+        crate::current_proc_fd().as_raw_fd(),
         payload,
         flags,
         metadata,
     )
+}
+
+pub fn this_thread_call(flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    sys_call(RtTcb::current().thread_fd().as_raw_fd(), flags, metadata)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -386,7 +368,7 @@ pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) 
         WaitpidTarget::ProcGroup { pgid } => (ProcCall::Waitpgid, pgid),
     };
     wrapper(true, false, || {
-        this_proc_call(
+        this_proc_call_ro(
             unsafe { plain::as_mut_bytes(status) },
             CallFlags::empty(),
             &[call as u64, pid as u64, flags.bits() as u64],
@@ -400,9 +382,8 @@ pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
     }
 
     match wrapper(false, true, || {
-        thread_call(
+        sys_call(
             thread_fd,
-            &mut [],
             CallFlags::empty(),
             &[ThreadCall::SignalThread as u64, signal.into()],
         )
@@ -458,14 +439,14 @@ pub fn posix_setresugid(ids: &Resugid<Option<u32>>, pid: Option<usize>) -> Resul
         ]);
 
     if let Some(pid) = pid {
-        proc_call(
+        sys_call_wo(
             pid,
-            &mut buf,
+            &buf,
             CallFlags::empty(),
             &[ProcCall::SetResugid as u64],
         )?;
     } else {
-        this_proc_call(&mut buf, CallFlags::empty(), &[ProcCall::SetResugid as u64])?;
+        this_proc_call_wo(&buf, CallFlags::empty(), &[ProcCall::SetResugid as u64])?;
     }
 
     if let Some(ruid) = ids.ruid {
@@ -516,7 +497,7 @@ pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) ->
     if buf.len() < size_of::<redox_protocols::protocol::ProcMeta>() {
         return Err(Error::new(EINVAL));
     }
-    proc_call(
+    sys_call_ro(
         cap_fd,
         buf,
         CallFlags::empty(),
@@ -526,7 +507,6 @@ pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) ->
 pub fn posix_exit(status: i32) -> ! {
     loop {
         match this_proc_call(
-            &mut [],
             CallFlags::empty(),
             &[ProcCall::Exit as u64, (status & 0xFF) as u64],
         ) {
@@ -542,7 +522,6 @@ pub fn posix_exit(status: i32) -> ! {
 }
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
     this_proc_call(
-        &mut [],
         CallFlags::empty(),
         &[ProcCall::Setpgid as u64, pid as u64, u64::wrapping_neg(1)],
     )
@@ -552,21 +531,16 @@ pub fn posix_setpgid(pid: usize, pgid: usize) -> Result<()> {
         return Err(Error::new(EINVAL));
     }
     this_proc_call(
-        &mut [],
         CallFlags::empty(),
         &[ProcCall::Setpgid as u64, pid as u64, pgid as u64],
     )?;
     Ok(())
 }
 pub fn posix_getsid(pid: usize) -> Result<usize> {
-    this_proc_call(
-        &mut [],
-        CallFlags::empty(),
-        &[ProcCall::Getsid as u64, pid as u64],
-    )
+    this_proc_call(CallFlags::empty(), &[ProcCall::Getsid as u64, pid as u64])
 }
 pub fn posix_setsid() -> Result<u32> {
-    this_proc_call(&mut [], CallFlags::empty(), &[ProcCall::Setsid as u64])?;
+    this_proc_call(CallFlags::empty(), &[ProcCall::Setsid as u64])?;
     Ok(posix_getpid())
 }
 pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {

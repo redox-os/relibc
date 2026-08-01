@@ -5,7 +5,7 @@ use crate::{
     arch::*,
     auxv_defs::*,
     read_proc_meta,
-    sys::{fstat, open, proc_call, thread_call},
+    sys::{fstat, open, sys_call, sys_call_wo},
 };
 use redox_protocols::protocol::{O_CLOEXEC, ProcCall, ThreadCall};
 
@@ -458,20 +458,17 @@ pub fn fexec_impl(
         let new_name = interp_override.as_ref().map_or(path, |o| &o.name);
         let len = new_name.len().min(32);
         buf[..len].copy_from_slice(&new_name[..len]);
-        // XXX: takes &mut [] since it can mutate, but we could unsafe{}ly pass it directly
-        // otherwise
-        let _ = proc_call(
+        let _ = sys_call_wo(
             proc_fd.as_raw_fd(),
-            &mut buf,
+            &buf,
             CallFlags::empty(),
             &[ProcCall::Rename as u64],
         );
     }
 
     // TODO: Error handling
-    let _ = proc_call(
+    let _ = sys_call(
         proc_fd.as_raw_fd(),
-        &mut [],
         CallFlags::empty(),
         &[ProcCall::DisableSetpgid as u64],
     );
@@ -1128,15 +1125,13 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 new_sighandler_fd.write(&crate::signal::current_setsighandler_struct())?;
             }
             if let Some(ref proc_fd) = new_proc_fd {
-                proc_call(
+                sys_call(
                     proc_fd.as_raw_fd(),
-                    &mut [],
                     CallFlags::empty(),
                     &[ProcCall::SyncSigPctl as u64],
                 )?;
-                thread_call(
+                sys_call(
                     new_thr_fd.as_raw_fd(),
-                    &mut [],
                     CallFlags::empty(),
                     &[ThreadCall::SyncSigTctl as u64],
                 )?;

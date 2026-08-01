@@ -10,7 +10,7 @@ use crate::{
     arch::*,
     current_proc_fd, static_proc_info,
     sync::Mutex,
-    sys::{proc_call, this_thread_call},
+    sys::{sys_call, sys_call_rw, this_thread_call},
 };
 
 use redox_protocols::protocol::{
@@ -175,9 +175,8 @@ unsafe fn inner(stack: &mut SigStack) {
         // }
         SigactionKind::Default if usize::from(sig) == SIGCONT => SignalHandler { handler: None },
         SigactionKind::Default => {
-            let _ = proc_call(
+            let _ = sys_call(
                 current_proc_fd().as_raw_fd(),
-                &mut [],
                 CallFlags::empty(),
                 &[ProcCall::Exit as u64, u64::from(sig) << 8],
             );
@@ -675,12 +674,8 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
         .dup_into_upper(b"sighandler")
         .expect("failed to open sighandler fd");
     fd.write(&data).expect("failed to write to sighandler fd");
-    this_thread_call(
-        &mut [],
-        CallFlags::empty(),
-        &[ThreadCall::SyncSigTctl as u64],
-    )
-    .expect("failed to sync signal tctl");
+    this_thread_call(CallFlags::empty(), &[ThreadCall::SyncSigTctl as u64])
+        .expect("failed to sync signal tctl");
 
     // TODO: Inherited set of ignored signals
     // TODO: handle error
@@ -914,7 +909,7 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
         let rt_inf: RtSigInfo = unsafe {
             let mut buf = [0_u8; size_of::<RtSigInfo>()];
             buf[..4].copy_from_slice(&(sig_idx - 32).to_ne_bytes());
-            proc_call(
+            sys_call_rw(
                 static_proc_info().proc_fd.as_ref().unwrap().as_raw_fd(),
                 &mut buf,
                 CallFlags::empty(),
