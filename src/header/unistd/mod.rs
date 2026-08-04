@@ -203,6 +203,11 @@ pub unsafe extern "C" fn chroot(path: *const c_char) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/close.html>.
+///
+/// Deallocates the file descriptor indicated by `fildes`.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub extern "C" fn close(fildes: c_int) -> c_int {
     Sys::close(fildes).map(|()| 0).or_minus_one_errno()
@@ -662,6 +667,13 @@ pub extern "C" fn getpagesize() -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpgid.html>.
+///
+/// Gets the process group ID of the process whose process ID is equal to
+/// `pid`. Shall get the process group ID of the calling process if `pid` is
+/// `0`.
+///
+/// Upon success, returns a process group ID. Upon failure, returns `(pid_t)-1`
+/// and sets errno to indicate the error.
 #[unsafe(no_mangle)]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
     Sys::getpgid(pid).or_minus_one_errno()
@@ -674,12 +686,22 @@ pub extern "C" fn getpgrp() -> pid_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpid.html>.
+///
+/// Returns the process ID of the calling process.
+///
+/// # Implementation
+/// Infallible. Can never return an error.
 #[unsafe(no_mangle)]
 pub extern "C" fn getpid() -> pid_t {
     Sys::getpid()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getppid.html>.
+///
+/// Returns the parent process ID of the calling process.
+///
+/// # Implementation
+/// Infallible. Cannot return an error.
 #[unsafe(no_mangle)]
 pub extern "C" fn getppid() -> pid_t {
     Sys::getppid()
@@ -710,6 +732,15 @@ pub unsafe extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mu
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
+///
+/// Obtains the process group ID of the process that is the session leader of
+/// the process specified by `pid`.
+///
+/// If `pid` is `0`, it specifies the calling process.
+///
+/// Upon success, returns the process group ID of the session leader of the
+/// specified process. Upon failure, returns `-1` and sets errno to indicate
+/// the error.
 #[unsafe(no_mangle)]
 pub extern "C" fn getsid(pid: pid_t) -> pid_t {
     Sys::getsid(pid).or_minus_one_errno()
@@ -856,12 +887,51 @@ pub unsafe extern "C" fn pause() -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
+///
+/// Creates a pipe and places two file descriptors, one each into the argiments
+/// `fildes[0]` and `fildes[1]`, that refer to the open file descriptions for
+/// the read and write ends of the pipe, respectively.
+///
+/// The pipe's user ID shall be set to the effective user ID of the calling
+/// process.
+///
+/// The pipe's group ID shall be set to the effective group ID of the calling
+/// process.
+///
+/// The `FD_CLOEXEC` and `FD_CLOFORK` flags shall be clear on both file
+/// descriptors. The `O_NONBLOCK` flag shall be clear on both open file
+/// descriptions.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1`, sets errno to
+/// indicate the error, no file descriptors shall be allocated and the contents
+/// of `fildes` shall be left unmodified.
+///
+/// # Implementation
+/// Calls `pipe2()` with `flags` set to `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
     unsafe { pipe2(fildes, 0) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
+///
+/// Creates a pipe and places two file descriptors, one each into the argiments
+/// `fildes[0]` and `fildes[1]`, that refer to the open file descriptions for
+/// the read and write ends of the pipe, respectively.
+///
+/// The pipe's user ID shall be set to the effective user ID of the calling
+/// process.
+///
+/// The pipe's group ID shall be set to the effective group ID of the calling
+/// process.
+///
+/// The `flag` argument is used to determine the state of `O_NONBLOCK` on both
+/// new file descriptions, and `FD_CLOEXEC` and `FD_CLOFORK` on both new file
+/// descriptors.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1`, sets errno to
+/// indicate the error, no file descriptors shall be allocated and the contents
+/// of `fildes` shall be left unmodified.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
     Sys::pipe2(unsafe { Out::nonnull(fildes.cast::<[c_int; 2]>()) }, flags)
@@ -1008,6 +1078,17 @@ pub extern "C" fn setgid(gid: gid_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setpgid.html>.
+///
+/// Either joins an existing process group or creates a new process group
+/// within the session of the calling process.
+///
+/// The process group ID of a session leader shall not change.
+///
+/// If `pid` is `0`, the process ID of the calling process shall be used.
+/// If `pgid` is `0`, the process ID of the indicated process shall be used.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
 #[unsafe(no_mangle)]
 pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
     Sys::setpgid(pid, pgid).map(|()| 0).or_minus_one_errno()
