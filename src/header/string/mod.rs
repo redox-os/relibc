@@ -606,11 +606,18 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strsignal.html>.
+///
+/// Maps the signal number in `signum` to an implementation defined string and
+/// returns a pointer to it.
+///
+/// # Implementation
+/// An invalid signal number will return a pointer to a string signifying an
+/// unknown signal.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strsignal(sig: c_int) -> *mut c_char {
+pub unsafe extern "C" fn strsignal(signum: c_int) -> *mut c_char {
     U8PtrToCCharPtr::cast_mut(
         signal::SIGNAL_STRINGS
-            .get(sig as usize)
+            .get(signum as usize)
             .unwrap_or(&signal::SIGNAL_STRINGS[0]) // Unknown signal message
             .as_ptr(),
     )

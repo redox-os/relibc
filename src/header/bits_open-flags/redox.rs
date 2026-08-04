@@ -45,7 +45,7 @@ pub const O_SYMLINK: c_int = 0x4000_0000;
 pub const O_NOFOLLOW: c_int = -0x8000_0000;
 
 /// Do not assign controlling terminal.
-pub const O_NOCTTY: c_int = 0x00000200;
+pub const O_NOCTTY: c_int = 0x0000_0200;
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/open.2.html>.
 ///

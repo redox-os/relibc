@@ -355,6 +355,8 @@ pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exit.html>.
+///
+/// Causes normal process termination to occur.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn exit(status: c_int) -> ! {
     unsafe extern "C" {
@@ -370,7 +372,6 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
 
     // Look for the neighbor functions in memory until the end
     let mut f = core::ptr::from_ref(unsafe { &__fini_array_end });
-    #[allow(clippy::op_ref)]
     while f > &raw const __fini_array_start {
         f = unsafe { f.sub(1) };
         (unsafe { *f })();
@@ -514,9 +515,13 @@ pub unsafe extern "C" fn getsubopt(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/grantpt.html>.
+///
+/// Grants access to the subterm pseudo-terminal device.
+///
+/// # Implementation
+/// This is a no-op and unconditionally returns 0 indicating success.
 #[unsafe(no_mangle)]
 pub extern "C" fn grantpt(fildes: c_int) -> c_int {
-    // No-op on Linux and Redox
     0
 }
 
@@ -926,6 +931,13 @@ pub unsafe extern "C" fn posix_memalign(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_openpt.html>.
+///
+/// Establishes a connection between a manager device for a pseudo-terminal and
+/// a file descriptor.
+///
+/// Upon success, opens a file desciptor for a manager pseudo-terminal device
+/// and returns a non-negative integer representing a file descriptor. Upon
+/// failure, returns `-1` and sets errno to indicate the error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "redox")]
@@ -1648,6 +1660,15 @@ pub extern "C" fn ttyslot() -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/unlockpt.html>.
+///
+/// Unlocks the subterm pseudo-terminal device associated with the manager
+/// device to which `fildes` refers.
+///
+/// Upon success, returns `0`. Upon failure, returns `-1` and sets errno to
+/// indicate the error.
+///
+/// # Implementation
+/// Uses `ioctl()` internally.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn unlockpt(fildes: c_int) -> c_int {
     let mut u: c_int = 0;
