@@ -453,7 +453,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 }
                 let fd_count = read_num::<usize>(cmsg_data_from_stream)?;
 
-                let mut fds_usize = vec![0usize; fd_count];
+                let mut fds_usize = vec![usize::MAX; fd_count];
 
                 let fds_bytes = unsafe {
                     slice::from_raw_parts_mut(
