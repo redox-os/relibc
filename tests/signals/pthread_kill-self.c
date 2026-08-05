@@ -4,14 +4,14 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <semaphore.h>
 #include "signals_list.h"
 #include "../test_helpers.h"
 
 //test pthread_kill on self
 
-# define INTHREAD 0
-# define INMAIN 1
-int sem1;		/* Manual semaphore */
+sem_t sem_main;
+sem_t sem_thread;
 volatile sig_atomic_t handler_called = 0;
 
 struct signal {
@@ -26,17 +26,16 @@ void handler(int sig) {
 
 void *a_thread_func( void *arg)
 {
-	
 	struct sigaction act;
 	act.sa_flags = 0;
 	act.sa_handler = handler;
 	sigemptyset(&act.sa_mask);
 	sigaction(((struct signal *)arg)->signum, &act, 0);
 
-	sem1=INMAIN;
-
-	while(sem1==INMAIN)
-		usleep(100000);
+	sem_post(&sem_main);
+	sem_wait(&sem_thread);
+	// pthread_kill here
+	sem_wait(&sem_thread);
 
 	// sleep(50);
 
@@ -49,7 +48,8 @@ int pthread_kill_test1(int signum)
 {
 	pthread_t new_th;
 
-	sem1=INTHREAD;
+	sem_init(&sem_main, 0, 0);
+	sem_init(&sem_thread, 0, 0);
 
 	struct signal arg;
 	arg.signum = signum;
@@ -58,21 +58,24 @@ int pthread_kill_test1(int signum)
 	status = pthread_create(&new_th, NULL, a_thread_func, &arg);
 	ERROR_IF(pthread_create, status, != 0);
 
-	while(sem1==INTHREAD)
-		usleep(100000);
+	sem_wait(&sem_main);
 
 	status = pthread_kill(new_th, signum);
 	ERROR_IF(pthread_kill, status, != 0);
 
-    usleep(100000);
-	sem1=INTHREAD;
+	usleep(20000);
+	sem_post(&sem_thread);
 	
 	while(handler_called==0)
-		usleep(100000);
+		usleep(20000);
 
 	ERROR_IF(pthread_kill, handler_called, == -1);
 	ERROR_IF(pthread_kill, handler_called, == 0);
 	pthread_join(new_th, NULL);
+
+	sem_post(&sem_thread);
+	sem_destroy(&sem_main);
+	sem_destroy(&sem_thread);
 
 	handler_called = 0;
 	return EXIT_SUCCESS;
