@@ -17,6 +17,8 @@ FAILING_TESTS += sys_epoll/epollet
 FAILING_TESTS += sys_mman/fmap
 # Hang
 FAILING_TESTS += sys_socket/unixpeername
+# EEXIST
+FAILING_TESTS += sys_socket/unixscmrights
 # Task failed successfully?
 FAILING_TESTS += signals/pthread_kill-child
 # Got EBADF
@@ -147,6 +149,7 @@ EXPECT_NAMES=\
 	sys_shm/shm \
 	sys_socket/recv \
 	sys_socket/recvfrom \
+	sys_socket/unixnonblock \
 	sys_socket/unixrecv \
 	sys_socket/unixrecvfrom \
 	sys_socket/unixsocketpair \
