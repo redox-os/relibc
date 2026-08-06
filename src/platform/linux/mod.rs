@@ -279,6 +279,22 @@ impl Pal for Sys {
         })
         .map(|_| ())
     }
+
+    #[inline]
+    unsafe fn futex_wait(addr: *mut u64, val: u64, deadline: Option<&timespec>) -> Result<()> {
+        let deadline = deadline.map_or(0, |d| ptr::from_ref(d) as usize);
+        e_raw(unsafe {
+            syscall!(
+                FUTEX64, addr,       // uaddr
+                9,          // futex_op: FUTEX_WAIT_BITSET
+                val,        // val
+                deadline,   // timeout: deadline
+                0,          // uaddr2/val2: 0/NULL
+                0xffffffff  // val3: FUTEX_BITSET_MATCH_ANY
+            )
+        })
+        .map(|_| ())
+    }
     #[inline]
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
         e_raw(unsafe {

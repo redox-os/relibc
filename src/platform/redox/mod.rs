@@ -513,6 +513,13 @@ impl Pal for Sys {
         (unsafe { redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref()) })?;
         Ok(())
     }
+
+    #[inline]
+    unsafe fn futex_wait64(addr: *mut u64, val: u64, deadline: Option<&timespec>) -> Result<()> {
+        let deadline = deadline.map(syscall::TimeSpec::from);
+        (unsafe { redox_rt::sys::sys_futex_wait64(addr, val, deadline.as_ref()) })?;
+        Ok(())
+    }
     #[inline]
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
         Ok(unsafe { redox_rt::sys::sys_futex_wake(addr, num) }?)
