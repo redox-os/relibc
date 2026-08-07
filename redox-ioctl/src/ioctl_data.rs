@@ -80,11 +80,11 @@ macro_rules! define_ioctl_data {
                     let size = self.$counted_by as usize * size_of::<$el>();
                     if self.$counted_field as usize != 0 {
                         let $counted_field = unsafe {
-                            #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-                            let slice_data = self.$counted_field.cast_const();
-                            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                            let slice_data = self.$counted_field as *const u8;
-                            slice::from_raw_parts(slice_data, size)
+                            // FIXME: on aarch64 and riscv64 as cast triggers clippy ptr_cast_constness
+                            // applying the lint complains .cast_const() method not found on u64 on self.$counted_field
+                            // why is self.$counted_field picked up as a u64?
+                            // are we sure this as cast is doing the right thing on x86(_64)?
+                            slice::from_raw_parts(self.$counted_field as *const u8, size)
                         };
                         data.extend_from_slice(&$counted_field);
                     } else {
