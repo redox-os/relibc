@@ -1,0 +1,17 @@
+sys_includes = ["stdint.h", "sys/types.h", "signal.h"]
+include_guard = "_REDOX_RING_H"
+language = "C"
+style = "Tag"
+no_includes = true
+
+after_includes = """
+typedef struct redox_ring redox_ring;
+typedef struct redox_ring_sq redox_ring_sq;
+typedef struct redox_ring_cq redox_ring_cq;
+"""
+
+[enum]
+prefix_with_name = true
+
+[export]
+item_types = ["enums", "structs", "unions", "typedefs", "functions"]

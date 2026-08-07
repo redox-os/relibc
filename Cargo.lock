@@ -45,9 +45,9 @@ dependencies = [
 
 [[package]]
 name = "bitflags"
-version = "2.13.0"
+version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
+checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
 name = "blake2"
@@ -218,6 +218,15 @@ dependencies = [
  "log",
  "plain",
  "scroll",
+]
+
+[[package]]
+name = "guard-trait"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7747cdd4eb681330c039e570a9aafee12e9f85e1e2d61c32d9781cce47a4adf4"
+dependencies = [
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -438,6 +447,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox-buffer-pool"
+version = "0.6.0"
+source = "git+https://gitlab.redox-os.org/redox-os/redox-buffer-pool.git#259719734304f6d2138b8b910fbdac663ebe6ff0"
+dependencies = [
+ "guard-trait",
+ "log",
+ "redox_syscall",
+ "spinning",
+]
+
+[[package]]
 name = "redox-ioctl"
 version = "0.1.0"
 dependencies = [
@@ -450,6 +470,16 @@ name = "redox-path"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54ec1b67c01c63545205ea6d218b336751399f0d8974c1a635c28604bedb81bc"
+
+[[package]]
+name = "redox-rings"
+version = "0.1.0"
+source = "git+https://gitlab.redox-os.org/redox-os/redox-rings.git#73102ebb173595b38b8c2cfa9f44591faf7d12f9"
+dependencies = [
+ "bitflags",
+ "redox_syscall",
+ "zerocopy",
+]
 
 [[package]]
 name = "redox-rt"
@@ -514,8 +544,10 @@ dependencies = [
  "rand",
  "rand_jitter",
  "rand_xorshift",
+ "redox-buffer-pool",
  "redox-ioctl",
  "redox-path",
+ "redox-rings",
  "redox-rt",
  "redox_event",
  "redox_syscall",
@@ -525,6 +557,7 @@ dependencies = [
  "sha2",
  "spin",
  "unicode-width",
+ "zerocopy",
 ]
 
 [[package]]
@@ -621,6 +654,21 @@ checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "spinning"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d4f0e86297cad2658d92a707320d87bf4e6ae1050287f51d19b67ef3f153a7b"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "subtle"
@@ -735,3 +783,23 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "zerocopy"
+version = "0.8.55"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5a105cd7b140f6eeec8acff2ea38135d3cab283ada58540f629fe51e46696eb"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.55"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fe976fb70c78cd64cccfe3a6fc142244e8a77b70959b30faf9d0ac37ee228eb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]

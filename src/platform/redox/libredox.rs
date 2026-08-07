@@ -659,6 +659,20 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
         &metadata,
     ))
 }
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_futex_wait_v0(
+    addr: *mut u32,
+    val: u32,
+    deadline: *const timespec,
+) -> RawResult {
+    let deadline = unsafe { deadline.as_ref() }.map(syscall::TimeSpec::from);
+    Error::mux(unsafe { redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref()) }.map(|()| 0))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_futex_wake_v0(addr: *mut u32, num: u32) -> RawResult {
+    Error::mux(unsafe { redox_rt::sys::sys_futex_wake(addr, num) }.map(|r| r as usize))
+}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_setns_v0(fd: usize) -> RawResult {
