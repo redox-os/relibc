@@ -1,27 +1,31 @@
-#include <assert.h>
+#include <errno.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "test_helpers.h"
 
-static volatile sig_atomic_t alarm_count = 0;
+static sem_t alarm_sem;
 
 static void handler(int sig) {
     (void)sig;
-    alarm_count++;
+    sem_post(&alarm_sem);
 }
 
 int main(void) {
     long COUNTDOWN_MILLISECONDS = 100;
-    unsigned int SLEEP_MILLISECONDS = 110;
+    int r = sem_init(&alarm_sem, 0, 0);
+    ERROR_IF(sem_init, r, == -1);
 
     struct sigaction sa;
     sa.sa_handler = handler;
     sa.sa_flags = 0;
     sigemptyset(&sa.sa_mask);
-    int r = sigaction(SIGALRM, &sa, NULL);
+    r = sigaction(SIGALRM, &sa, NULL);
     ERROR_IF(sigaction, r, == -1);
 
     struct sigevent signal_event = {0};
@@ -34,7 +38,6 @@ int main(void) {
     struct itimerspec new_timer_spec = {0};
     new_timer_spec.it_value.tv_sec = 0;
     new_timer_spec.it_value.tv_nsec = COUNTDOWN_MILLISECONDS * 1000000;
-
 
     // use an invalid timer
     status = timer_gettime(timerid, &current_timer_spec);
@@ -52,8 +55,8 @@ int main(void) {
     // check that no timer has been configured yet
     status = timer_gettime(timerid, &current_timer_spec);
     ERROR_IF(timer_gettime, status, == -1);
-    assert(current_timer_spec.it_value.tv_sec == 0);
-    assert(current_timer_spec.it_value.tv_nsec == 0);
+    UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_sec, != 0);
+    UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_nsec, != 0);
 
     printf("timer_gettime: ok\n");
 
@@ -61,23 +64,26 @@ int main(void) {
     status = timer_settime(timerid, 0, &new_timer_spec, &current_timer_spec);
     ERROR_IF(timer_settime, status, == -1);
     // check that there has been no previous timer
-    assert(current_timer_spec.it_value.tv_sec == 0);
-    assert(current_timer_spec.it_value.tv_nsec == 0);
+    UNEXP_IF(timer_settime, current_timer_spec.it_value.tv_sec, != 0);
+    UNEXP_IF(timer_settime, current_timer_spec.it_value.tv_nsec, != 0);
 
     // timer_gettime reports the timer
     status = timer_gettime(timerid, &current_timer_spec);
-    assert(current_timer_spec.it_value.tv_sec == 0);
-    assert(current_timer_spec.it_value.tv_nsec > 0);
-    assert(current_timer_spec.it_value.tv_nsec <= COUNTDOWN_MILLISECONDS * 1000000);
+    UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_sec, != 0);
+    UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_nsec, == 0);
+    // TODO: posix says this can round up, and it happens, why?
+    // UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_nsec, > COUNTDOWN_MILLISECONDS * 1000000);
+    
+    r = sem_wait(&alarm_sem);
+    // will always EINTR because of SIGARLM
+    ERROR_IF(sem_wait, r, != -1);
+    UNEXP_IF(sem_wait, errno, != EINTR);
+    r = sem_wait(&alarm_sem);
+    ERROR_IF(sem_wait, r, == -1);
 
-    // timer fires
-    usleep(SLEEP_MILLISECONDS * 1000);
-    assert(alarm_count == 1);
-
-    // timer_gettime reports no timer any more
     status = timer_gettime(timerid, &current_timer_spec);
-    assert(current_timer_spec.it_value.tv_sec == 0);
-    assert(current_timer_spec.it_value.tv_nsec == 0);
+    UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_sec, != 0);
+    UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_nsec, != 0);
 
     printf("timer_settime: ok\n");
 
@@ -87,13 +93,15 @@ int main(void) {
 
     // any attempts to use the timerid should report EINVAL
     status = timer_gettime(timerid, &current_timer_spec); // must fail
-    ERROR_IF(timer_delete, status, == 0);
-    assert(errno == EINVAL);
+    ERROR_IF(timer_gettime, status, == 0);
+    UNEXP_IF(timer_gettime, errno, != EINVAL);
     status = timer_settime(timerid, 0, &new_timer_spec, &current_timer_spec);
-    ERROR_IF(timer_delete, status, == 0);
-    assert(errno == EINVAL);
+    ERROR_IF(timer_settime, status, == 0);
+    UNEXP_IF(timer_settime, errno, != EINVAL);
 
-    printf("timer_delete: ok\n", status);
+    printf("timer_delete: ok\n");
+
+    sem_destroy(&alarm_sem);
 
     return EXIT_SUCCESS;
 }

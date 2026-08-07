@@ -716,24 +716,28 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(SYNC) }).map(|_| ())
     }
 
-    fn timer_create(clock_id: clockid_t, evp: &sigevent, mut timerid: Out<timer_t>) -> Result<()> {
+    fn timer_create(clock_id: clockid_t, evp: &sigevent) -> Result<timer_t> {
+        let mut timer_id: timer_t = ptr::null_mut();
+        let mut timerptr = Out::from_mut(&mut timer_id);
         e_raw(unsafe {
             syscall!(
                 TIMER_CREATE,
                 clock_id,
                 &raw const *evp,
-                timerid.as_mut_ptr()
+                timerptr.as_mut_ptr()
             )
         })
-        .map(|_| ())
+        .map(|_| timer_id)
     }
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
         e_raw(unsafe { syscall!(TIMER_DELETE, timerid) }).map(|_| ())
     }
 
-    fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
-        e_raw(unsafe { syscall!(TIMER_GETTIME, timerid, value.as_mut_ptr()) }).map(|_| ())
+    fn timer_gettime(timerid: timer_t) -> Result<itimerspec> {
+        let mut value: itimerspec = itimerspec::default();
+        let mut valueptr = Out::from_mut(&mut value);
+        e_raw(unsafe { syscall!(TIMER_GETTIME, timerid, valueptr.as_mut_ptr()) }).map(|_| value)
     }
 
     fn timer_settime(

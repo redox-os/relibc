@@ -37,10 +37,8 @@ use crate::{
             F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
         limits::{self},
-        pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
-        stdlib::posix_memalign,
         sys_file,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
@@ -50,9 +48,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
-        time::{
-            CLOCK_MONOTONIC, CLOCK_REALTIME, TIMER_ABSTIME, itimerspec, timer_internal_t, timespec,
-        },
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, TIMER_ABSTIME, itimerspec, timespec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
@@ -60,12 +56,13 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
     platform::{
-        ERRNO, free,
+        ERRNO,
         sys::{
             path::{CwdPath, to_cwd_path},
-            timer::{TIMERS, timer_routine, timer_update_wake_time},
+            timer::{RlctTimer, TIMERS, timer_routine, timer_update_wake_time},
         },
     },
+    pthread,
     sync::rwlock::RwLock,
 };
 
@@ -1521,7 +1518,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn timer_create(clock_id: clockid_t, evp: &sigevent, mut timerid: Out<timer_t>) -> Result<()> {
+    fn timer_create(clock_id: clockid_t, evp: &sigevent) -> Result<timer_t> {
         if evp.sigev_notify == SIGEV_THREAD {
             if evp.sigev_notify_function.is_none() {
                 return Err(Errno(EINVAL));
@@ -1550,78 +1547,27 @@ impl Pal for Sys {
         })?)
         .to_upper()?;
 
-        let timer_st = timer_internal_t {
-            clockid: clock_id,
-            timerfd: timerfd.take(),
-            eventfd: eventfd.take(),
-            evp: (*evp).clone(),
-            thread: ptr::null_mut(),
-            next_wake_time: itimerspec::default(),
-            next_wake_version: 0,
-            process_pid: Sys::getpid(),
-        };
-        let timers = &mut TIMERS.lock().0;
-        // allocate enough memory on the heap to store one timer_internal_t
-        let mut memory_pointer: *mut timer_internal_t = ptr::null_mut();
-        unsafe {
-            let result = posix_memalign(
-                (&raw mut memory_pointer).cast(),
-                align_of::<timer_internal_t>(),
-                size_of::<timer_internal_t>(),
-            );
-            assert_eq!(result, 0, "Failed to allocate or invalid alignment");
-        };
-
-        let pointer = {
-            ptr::NonNull::new(memory_pointer)
-                .expect("Pointer is guaranteed to not be null if posix_memalign returns 0")
-        };
-
-        // move value from the stack to the location we allocated on the heap
-        unsafe {
-            // Safety: If non-null, posix_memalign gives us a pointer that is valid
-            // for writes and properly aligned.
-            pointer.as_ptr().write(timer_st);
-        }
-        let timer_ptr = pointer.as_ptr() as timer_t;
-        timers.insert(timer_ptr);
-
-        timerid.write(timer_ptr);
-
-        Ok(())
+        Ok(RlctTimer::create(clock_id, evp, timerfd, eventfd))
     }
 
-    #[expect(clippy::not_unsafe_ptr_arg_deref)]
     fn timer_delete(timerid: timer_t) -> Result<()> {
-        let timers = &mut TIMERS.lock().0;
-        let removed = timers.remove(&timerid);
-        if !removed {
+        let mut timers = TIMERS.lock();
+        let Some(timer_st) = timers.remove(&timerid.addr()) else {
             return Err(Errno(EINVAL));
+        };
+        if !timer_st.thread.is_null()
+            && let Err(e) = unsafe { pthread::cancel(&*timer_st.thread.cast()) }
+        {
+            log::warn!("timer_delete: failed to cancel pthread: {e:?}");
         }
-        // SAFETY: `timerid` should have already been created via `timer_create()`
-        // before calling `timer_delete()` so should not be NULL
-        let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
-        let _ = redox_rt::sys::close(timer_st.timerfd);
-        let _ = redox_rt::sys::close(timer_st.eventfd);
-        if !timer_st.thread.is_null() {
-            let _ = unsafe { pthread_cancel(timer_st.thread) };
-        }
-        // SAFETY: `timerid` should have already been created via `timer_create()`
-        // before calling `timer_delete()` so should not be NULL
-        unsafe { free(timerid) };
-
         Ok(())
     }
 
-    #[expect(clippy::not_unsafe_ptr_arg_deref)]
-    fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
-        let timers = &mut TIMERS.lock().0;
-        if !timers.contains(&timerid) {
+    fn timer_gettime(timerid: timer_t) -> Result<itimerspec> {
+        let mut timers = TIMERS.lock();
+        let Some(timer_st) = timers.get_mut(&timerid.addr()) else {
             return Err(Errno(EINVAL));
-        }
-        // SAFETY: `timerid` should have already been created via `timer_create()`
-        // before calling `timer_delete()` so should not be NULL
-        let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
+        };
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
         if timer_st.evp.sigev_notify == SIGEV_NONE
@@ -1631,17 +1577,14 @@ impl Pal for Sys {
             let _ = timer_update_wake_time(timer_st);
         }
         let remaining = &timer_st.next_wake_time.it_value;
-        value.write(if remaining.is_zero() {
+        if remaining.is_zero() {
             // disarmed
-            itimerspec::default()
-        } else {
-            itimerspec {
-                it_interval: timer_st.next_wake_time.it_interval.clone(),
-                it_value: timespec::subtract(remaining, &now).unwrap_or_default(),
-            }
-        });
-
-        Ok(())
+            return Ok(itimerspec::default());
+        }
+        Ok(itimerspec {
+            it_interval: timer_st.next_wake_time.it_interval.clone(),
+            it_value: timespec::subtract(remaining, &now).unwrap_or_default(),
+        })
     }
 
     #[expect(clippy::not_unsafe_ptr_arg_deref)]
@@ -1651,17 +1594,14 @@ impl Pal for Sys {
         value: &itimerspec,
         ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
-        if let Some(ovalue) = ovalue {
-            Self::timer_gettime(timerid, ovalue)?;
+        if let Some(mut ovalue) = ovalue {
+            ovalue.write(Self::timer_gettime(timerid)?);
         }
 
-        let timers = &mut TIMERS.lock().0;
-        if !timers.contains(&timerid) {
+        let mut timers = TIMERS.lock();
+        let Some(timer_st) = timers.get_mut(&timerid.addr()) else {
             return Err(Errno(EINVAL));
-        }
-        // SAFETY: `timerid` should have already been created via `timer_create()`
-        // before calling `timer_delete()` so should not be NULL
-        let timer_st = unsafe { timer_internal_t::from_raw(timerid) };
+        };
 
         if value.it_value.is_zero() {
             timer_st.next_wake_version += 1;
@@ -1679,34 +1619,25 @@ impl Pal for Sys {
         };
 
         Error::demux(unsafe {
-            event::redox_event_queue_ctl_v1(timer_st.eventfd, timer_st.timerfd, 1, 0)
+            event::redox_event_queue_ctl_v1(
+                timer_st.eventfd.as_raw_fd(),
+                timer_st.timerfd.as_raw_fd(),
+                1,
+                0,
+            )
         })?;
 
         let buf_to_write = syscall::TimeSpec::from(&timer_st.next_wake_time.it_value);
-
-        let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, &buf_to_write)?;
-
+        let bytes_written = timer_st.timerfd.write(&buf_to_write)?;
         if bytes_written < mem::size_of::<timespec>() {
             return Err(Errno(EIO));
         }
 
         if timer_st.thread.is_null() {
             timer_st.thread = match timer_st.evp.sigev_notify {
-                SIGEV_THREAD | SIGEV_SIGNAL => {
-                    let mut tid = pthread_t::default();
-                    let result = unsafe {
-                        pthread_create(
-                            &raw mut tid,
-                            ptr::null(),
-                            timer_routine,
-                            timerid.cast::<c_void>(),
-                        )
-                    };
-                    if result != 0 {
-                        return Err(Errno(result));
-                    }
-                    tid
-                }
+                SIGEV_THREAD | SIGEV_SIGNAL => unsafe {
+                    pthread::create(None, timer_routine, timerid)?
+                },
                 SIGEV_NONE => ptr::null_mut(),
                 _ => {
                     return Err(Errno(EINVAL));
