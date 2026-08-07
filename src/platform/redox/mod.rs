@@ -79,6 +79,7 @@ mod libcscheme;
 mod libredox;
 pub(crate) mod path;
 mod ptrace;
+pub mod ring;
 pub(crate) mod signal;
 mod socket;
 mod timer;

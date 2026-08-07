@@ -209,3 +209,5 @@ pub mod wchar;
 pub mod wctype;
 // TODO: wordexp.h
 // TODO: xti.h (deprecated)
+#[cfg(target_os = "redox")]
+pub mod redox_ring;
