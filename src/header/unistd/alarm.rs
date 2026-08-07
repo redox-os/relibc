@@ -4,7 +4,6 @@ use crate::{
         signal::{SIGALRM, SIGEV_SIGNAL, sigevent},
         time::itimerspec,
     },
-    out::Out,
     platform::{
         Pal, Sys,
         types::{c_int, c_uint, timer_t},
@@ -15,7 +14,7 @@ use crate::{
 /// Wrapper for timer_t that implements Send (the timer_t pointer is a process-
 /// wide mmap'd allocation that outlives any single thread).
 struct AlarmTimer(timer_t);
-// SAFETY: The timer_t pointer refers to an mmap'd timer_internal_t that is
+// SAFETY: The timer_t pointer refers to an mmap'd RlctTimer that is
 // only accessed under the ALARM_TIMER mutex lock.
 unsafe impl Send for AlarmTimer {}
 
@@ -36,16 +35,16 @@ pub fn alarm_timespec(duration: timespec) -> c_uint {
 
     // Determine remaining time on any existing alarm
     let remaining = if let Some(ref alarm) = *guard {
-        let mut cur = itimerspec::default();
-        if Sys::timer_gettime(alarm.0, Out::from_mut(&mut cur)).is_ok() {
-            let secs = cur.it_value.tv_sec as c_uint;
-            if cur.it_value.tv_nsec > 0 {
-                secs + 1 // POSIX: round up
-            } else {
-                secs
+        match Sys::timer_gettime(alarm.0) {
+            Ok(cur) => {
+                let secs = cur.it_value.tv_sec as c_uint;
+                if cur.it_value.tv_nsec > 0 {
+                    secs + 1 // POSIX: round up
+                } else {
+                    secs
+                }
             }
-        } else {
-            0
+            Err(_) => 0,
         }
     } else {
         0
@@ -63,28 +62,20 @@ pub fn alarm_timespec(duration: timespec) -> c_uint {
     }
 
     // Lazily create the singleton timer if it doesn't exist yet
-    if guard.is_none() {
+    let timer_id = if let Some(timer) = &*guard {
+        timer.0
+    } else {
         let mut evp = unsafe { core::mem::zeroed::<sigevent>() };
         evp.sigev_notify = SIGEV_SIGNAL;
         evp.sigev_signo = SIGALRM as c_int;
-        let mut timer_id: timer_t = core::ptr::null_mut();
-        if Sys::timer_create(
-            crate::header::time::CLOCK_REALTIME,
-            &evp,
-            Out::from_mut(&mut timer_id),
-        )
-        .is_err()
-        {
+        let Ok(timer_id) = Sys::timer_create(crate::header::time::CLOCK_REALTIME, &evp) else {
             return remaining;
-        }
+        };
 
         *guard = Some(AlarmTimer(timer_id));
-    }
-
-    let timer_id = guard
-        .as_ref()
-        .expect("alarm timer must exist after lazy init")
-        .0;
+        timer_id
+    };
+    drop(guard);
 
     // Arm the timer as a one-shot (no interval)
     let spec = itimerspec {

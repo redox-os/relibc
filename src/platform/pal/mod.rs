@@ -454,13 +454,13 @@ pub trait Pal {
     fn sync() -> Result<()>;
 
     /// Platform implementation of [`timer_create()`](crate::header::time::timer_create) from [`time.h`](crate::header::time).
-    fn timer_create(clock_id: clockid_t, evp: &sigevent, timerid: Out<timer_t>) -> Result<()>;
+    fn timer_create(clock_id: clockid_t, evp: &sigevent) -> Result<timer_t>;
 
     /// Platform implementation of [`timer_delete()`](crate::header::time::timer_delete) from [`time.h`](crate::header::time).
     fn timer_delete(timerid: timer_t) -> Result<()>;
 
     /// Platform implementation of [`timer_gettime()`](crate::header::time::timer_gettime) from [`time.h`](crate::header::time).
-    fn timer_gettime(timerid: timer_t, value: Out<itimerspec>) -> Result<()>;
+    fn timer_gettime(timerid: timer_t) -> Result<itimerspec>;
 
     /// Platform implementation of [`timer_settime()`](crate::header::time::timer_settime) from [`time.h`](crate::header::time).
     fn timer_settime(

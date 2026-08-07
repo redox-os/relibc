@@ -6,7 +6,7 @@ use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
     header::{
-        errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
+        errno::{EINVAL, ENOMEM, EOVERFLOW, ETIMEDOUT},
         signal::sigevent,
         stdlib::getenv,
         unistd::readlink,
@@ -49,32 +49,6 @@ const SECS_PER_DAY: time_t = 24 * 60 * 60;
 pub(crate) const NANOSECONDS: c_long = 1_000_000_000;
 /// cbindgen:ignore
 const UTC_STR: &core::ffi::CStr = c"UTC";
-
-/// timer_t internal data, ABI unstable
-#[repr(C)]
-#[derive(Clone)]
-#[cfg(target_os = "redox")]
-pub(crate) struct timer_internal_t {
-    pub clockid: clockid_t,
-    pub timerfd: usize,
-    pub eventfd: usize,
-    pub evp: sigevent,
-    pub thread: platform::types::pthread_t,
-    /// relibc handles it_interval, not the kernel
-    pub next_wake_time: itimerspec,
-    /// kernel does not support unregistering timer
-    pub next_wake_version: usize,
-    // When non-zero, timer_routine delivers SIGALRM via kill(process_pid, sig)
-    // instead of rlct_kill (thread-specific). Used by alarm().
-    pub process_pid: platform::types::pid_t,
-}
-
-#[cfg(target_os = "redox")]
-impl timer_internal_t {
-    pub unsafe fn from_raw(timerid: timer_t) -> &'static mut Self {
-        unsafe { &mut *timerid.cast::<Self>() }
-    }
-}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[allow(non_camel_case_types)]
@@ -589,12 +563,14 @@ pub unsafe extern "C" fn timer_create(
     evp: *mut sigevent,
     timerid: *mut timer_t,
 ) -> c_int {
-    if evp.is_null() || timerid.is_null() {
-        return Err(Errno(EFAULT)).or_minus_one_errno();
-    }
-    let (evp, timerid) = unsafe { (&*evp, Out::nonnull(timerid)) };
-    Sys::timer_create(clock_id, evp, timerid)
-        .map(|()| 0)
+    let (Some(evp), Some(mut timerid)) = (unsafe { (evp.as_ref(), Out::nullable(timerid)) }) else {
+        return Err(Errno(EINVAL)).or_minus_one_errno();
+    };
+    Sys::timer_create(clock_id, evp)
+        .map(|timer| {
+            timerid.write(timer);
+            0
+        })
         .or_minus_one_errno()
 }
 
@@ -610,19 +586,21 @@ pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
     unimplemented!();
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_gettime.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
-    if value.is_null() {
-        return Err(Errno(EFAULT)).or_minus_one_errno();
-    }
-    let value = unsafe { Out::nonnull(value) };
-    Sys::timer_gettime(timerid, value)
-        .map(|()| 0)
+    let Some(mut value) = (unsafe { Out::nullable(value) }) else {
+        return Err(Errno(EINVAL)).or_minus_one_errno();
+    };
+    Sys::timer_gettime(timerid)
+        .map(|itimer| {
+            value.write(itimer);
+            0
+        })
         .or_minus_one_errno()
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_settime.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timer_settime(
     timerid: timer_t,
@@ -630,10 +608,9 @@ pub unsafe extern "C" fn timer_settime(
     value: *const itimerspec,
     ovalue: *mut itimerspec,
 ) -> c_int {
-    if value.is_null() {
-        return Err(Errno(EFAULT)).or_minus_one_errno();
-    }
-    let (value, ovalue) = unsafe { (&*value, Out::nullable(ovalue)) };
+    let (Some(value), ovalue) = (unsafe { (value.as_ref(), Out::nullable(ovalue)) }) else {
+        return Err(Errno(EINVAL)).or_minus_one_errno();
+    };
     Sys::timer_settime(timerid, flags, value, ovalue)
         .map(|()| 0)
         .or_minus_one_errno()
