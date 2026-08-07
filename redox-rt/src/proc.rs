@@ -125,13 +125,11 @@ pub fn fexec_impl(
         min_mmap_addr = cmp::max(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
     };
 
-    pread_all(
-        &image_file,
-        #[expect(clippy::useless_conversion, reason = "could be 32bit Header")]
-        u64::from(header.e_phoff),
-        phs,
-    )
-    .map_err(|_| Error::new(EIO))?;
+    #[cfg(target_pointer_width = "64")]
+    let header_e_phoff = header.e_phoff;
+    #[cfg(target_pointer_width = "32")]
+    let header_e_phoff = u64::from(header.e_phoff);
+    pread_all(&image_file, header_e_phoff, phs).map_err(|_| Error::new(EIO))?;
 
     let mut span: Option<Range<usize>> = None;
     for ph_idx in 0..phnum {
@@ -197,12 +195,11 @@ pub fn fexec_impl(
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
                 let mut interp = vec![0_u8; segment.p_filesz as usize];
-                pread_all(
-                    &image_file,
-                    #[expect(clippy::useless_conversion, reason = "could be 32bit ProgramHeader")]
-                    u64::from(segment.p_offset),
-                    &mut interp,
-                )?;
+                #[cfg(target_pointer_width = "64")]
+                let segment_p_offset = segment.p_offset;
+                #[cfg(target_pointer_width = "32")]
+                let segment_p_offset = u64::from(segment.p_offset);
+                pread_all(&image_file, segment_p_offset, &mut interp)?;
 
                 interpreter = Some(interp.into_boxed_slice());
             }
@@ -245,13 +242,13 @@ pub fn fexec_impl(
                             (voff + filesz).next_multiple_of(PAGE_SIZE), // size
                         )?
                     };
+                    #[cfg(target_pointer_width = "64")]
+                    let segment_p_offset = segment.p_offset;
+                    #[cfg(target_pointer_width = "32")]
+                    let segment_p_offset = u64::from(segment.p_offset);
                     pread_all(
                         &image_file,
-                        #[expect(
-                            clippy::useless_conversion,
-                            reason = "could be 32bit ProgramHeader"
-                        )]
-                        u64::from(segment.p_offset),
+                        segment_p_offset,
                         &mut dst_memory[voff..voff + filesz],
                     )?;
                 }

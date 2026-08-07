@@ -72,7 +72,14 @@ impl U48 {
     /// Get the high 32 bits, signed (for `mrand48()` and `jrand48()`).
     pub fn get_i32(self) -> c_long {
         // Cast via i32 to ensure we get the sign correct
-        ((self.0 >> 16) as i32).into()
+        #[cfg(target_pointer_width = "64")]
+        {
+            ((self.0 >> 16) as i32).into()
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            (self.0 >> 16) as i32
+        }
     }
 }
 

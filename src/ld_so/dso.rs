@@ -774,6 +774,9 @@ impl DSO {
             let val = entry.d_val(NativeEndian);
             let relative_idx = val as usize - if is_pie { 0 } else { mmap as usize };
             let ptr = (val as usize + if is_pie { mmap as usize } else { 0 }) as *const u8;
+            #[cfg(target_pointer_width = "32")]
+            let tag = entry.d_tag(NativeEndian);
+            #[cfg(target_pointer_width = "64")]
             let tag = entry.d_tag(NativeEndian) as u32;
 
             match tag {
@@ -877,6 +880,7 @@ impl DSO {
                 }
 
                 elf::DT_PLTREL => {
+                    #[cfg(target_pointer_width = "64")]
                     let val = val as u32;
                     if val == elf::DT_RELA {
                         explicit_addend = Some(true);
