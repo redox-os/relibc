@@ -78,7 +78,7 @@ impl U48 {
         }
         #[cfg(target_pointer_width = "32")]
         {
-            ((self.0 >> 16) as i32)
+            (self.0 >> 16) as i32
         }
     }
 }
