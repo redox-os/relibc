@@ -32,7 +32,7 @@ const RECURSIVE_COUNT_MAX_INCLUSIVE: u32 = u32::MAX;
 const SPIN_COUNT: usize = 0;
 
 impl RlctMutex {
-    pub(crate) fn new(attr: &RlctMutexAttr) -> Result<Self, Errno> {
+    pub(crate) const fn new(attr: &RlctMutexAttr) -> Result<Self, Errno> {
         let RlctMutexAttr {
             prioceiling,
             protocol,

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::{intrinsics, ptr};
 
 use crate::{
-    header::{libgen, stdio, stdlib},
+    header::{libgen, stdlib},
     ld_so::{self},
     platform::{self, Pal, Sys, get_auxvs, types::*},
 };
@@ -103,21 +103,9 @@ extern "C" fn init_array() {
         }
     }
 
-    io_init();
-
     unsafe {
         crate::pthread::init();
         INIT_COMPLETE = true
-    }
-}
-
-fn io_init() {
-    unsafe {
-        // Initialize stdin/stdout/stderr.
-        // TODO: const fn initialization of FILE
-        stdio::stdin = stdio::default_stdin().get();
-        stdio::stdout = stdio::default_stdout().get();
-        stdio::stderr = stdio::default_stderr().get();
     }
 }
 
