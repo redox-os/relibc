@@ -205,8 +205,12 @@ impl BufRead for FILE {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         if self.read_buf.len() == 0 {
             match &mut self.read_buf {
+                // Borrowed can only happen with size > 0 in `setvbuf`
                 Buffer::Borrowed(items) => unreachable!(),
-                Buffer::Owned(array_vec) => unsafe { array_vec.set_len(array_vec.capacity()) },
+                Buffer::Owned(array_vec) => unsafe {
+                    array_vec.zero();
+                    array_vec.set_len(array_vec.capacity());
+                },
             }
         }
         if self.read_pos == self.read_size {
