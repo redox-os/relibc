@@ -216,7 +216,11 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         let entry = unsafe { &*dynamic.add(i) };
         let val = entry.d_val(NativeEndian);
         let ptr = val as *const u8;
-        match entry.d_tag(NativeEndian) as u32 {
+        #[cfg(target_pointer_width = "32")]
+        let d_tag = entry.d_tag(NativeEndian);
+        #[cfg(target_pointer_width = "64")]
+        let d_tag = entry.d_tag(NativeEndian) as u32;
+        match d_tag {
             elf::DT_NULL => break,
             elf::DT_RELA => rela_ptr = Some(ptr.cast::<Rela>()),
             elf::DT_RELASZ => rela_len = Some(val as usize / size_of::<Rela>()),

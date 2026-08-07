@@ -567,11 +567,15 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
     };
 
     let tz_name = CString::new(tz.name()).unwrap();
+    #[cfg(target_pointer_width = "64")]
+    let tm_gmtoff = dt.offset().fix().local_minus_utc().into();
+    #[cfg(target_pointer_width = "32")]
+    let tm_gmtoff = dt.offset().fix().local_minus_utc();
     unsafe {
         (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
         (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
         (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
-        (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc().into();
+        (*tm).tm_gmtoff = tm_gmtoff;
         (*tm).tm_zone = tz_name.into_raw().cast();
     }
 
@@ -823,7 +827,11 @@ fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let offset = local_time.offset();
     t.tm_isdst = offset.dst_offset().num_hours() as _;
     // Get the UTC offset in seconds
-    t.tm_gmtoff = offset.fix().local_minus_utc().into();
+    #[cfg(target_pointer_width = "64")]
+    let tm_gtoff = offset.fix().local_minus_utc().into();
+    #[cfg(target_pointer_width = "32")]
+    let tm_gtoff = offset.fix().local_minus_utc();
+    t.tm_gmtoff = tm_gtoff;
 
     let tm_zone = {
         let mut timezone_names = TIMEZONE_NAMES.lock();
