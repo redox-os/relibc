@@ -56,14 +56,14 @@ int main(void) {
         _exit(EXIT_FAILURE);
     }
     
-    try_tzset("PENI-5");
-    if (strcmp("PENI", tzname[0]) != 0 || timezone != -18000) {
-        printf("FAILURE: zone (PENI) != tzname[0] (%s) OR", tzname[0]);
+    try_tzset("SMNTH-5");
+    if (strcmp("SMNTH", tzname[0]) != 0 || timezone != -18000) {
+        printf("FAILURE: zone (SMNTH) != tzname[0] (%s) OR", tzname[0]);
         printf("timezone (-18000) != (%ld)\n", timezone);
         _exit(EXIT_FAILURE);
     }
     
-    try_tzset("PE5NI5"); // tzname[0] & [1] = '', daylight = 0, timezone = 0
+    try_tzset("SMN5TH5"); // tzname[0] & [1] = '', daylight = 0, timezone = 0
     if (strcmp("", tzname[0]) != 0 || timezone != 0) {
         printf("FAILURE: zone () != tzname[0] (%s) OR", tzname[0]);
         printf("timezone (0) != (%ld)\n", timezone);
