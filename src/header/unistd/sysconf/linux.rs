@@ -132,7 +132,9 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_CLK_TCK => 100,
         // TODO: getrlimit
         _SC_CHILD_MAX => -1,
-        _SC_NGROUPS_MAX => NGROUPS_MAX as c_long,
+        _SC_NGROUPS_MAX => {
+            c_long::try_from(NGROUPS_MAX).expect("constant value within c_long::MAX")
+        }
         // TODO: getrlimit
         _SC_OPEN_MAX => -1,
         _SC_STREAM_MAX => -1,

@@ -7,6 +7,7 @@ use core::{ptr, str::FromStr};
 
 use crate::{
     c_str::CStr,
+    casting::ByteLiteral,
     error::{Errno, ResultExtPtrMut},
     fs::File,
     header::{errno, fcntl},
@@ -15,7 +16,7 @@ use crate::{
 };
 
 // Can't use &str because of the mutability
-static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
+static mut C_LOCALE: [c_char; 2] = [ByteLiteral::cast_cchar(b'C'), 0];
 
 mod constants;
 use constants::*;

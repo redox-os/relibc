@@ -972,12 +972,13 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn perror(s: *const c_char) {
     let err = ERRNO.get();
-    let err_str = if err >= 0 && err < STR_ERROR.len() as c_int {
-        STR_ERROR[usize::try_from(err.cast_unsigned())
-            .expect("u32 to usize is fine on 32bit arches and above")]
-    } else {
-        "Unknown error"
-    };
+    let err_str =
+        if err >= 0 && err < c_int::try_from(STR_ERROR.len()).expect("length within c_int::MAX") {
+            STR_ERROR[usize::try_from(err.cast_unsigned())
+                .expect("u32 to usize is fine on 32bit arches and above")]
+        } else {
+            "Unknown error"
+        };
     let mut w = platform::FileWriter::new(2);
 
     // The prefix, `s`, is optional (empty or NULL) according to the spec

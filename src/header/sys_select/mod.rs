@@ -47,7 +47,7 @@ pub unsafe fn select_epoll(
     timeout: Option<&mut timeval>,
     sigmask: *const sigset_t,
 ) -> c_int {
-    if nfds < 0 || nfds > FD_SETSIZE as i32 {
+    if nfds < 0 || nfds > i32::try_from(FD_SETSIZE).expect("constant value within i32::MAX") {
         crate::platform::ERRNO.set(errno::EINVAL);
         return -1;
     };
@@ -151,7 +151,7 @@ pub unsafe fn select_epoll(
     for event in events.iter().take(res as usize) {
         let fd = unsafe { event.data.fd };
         // TODO: Error status when fd does not match?
-        if fd >= 0 && fd < FD_SETSIZE as c_int {
+        if fd >= 0 && fd < c_int::try_from(FD_SETSIZE).expect("constant value within c_int::MAX") {
             if event.events & EPOLLIN > 0
                 && let Some(ref mut fd_set) = read_bitset
             {

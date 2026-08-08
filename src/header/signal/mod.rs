@@ -486,9 +486,9 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     unsafe { sigaction(sig, ptr::null_mut(), psa.as_mut_ptr()) };
     let mut sa = unsafe { psa.assume_init() };
     if flag != 0 {
-        sa.sa_flags &= !SA_RESTART as c_int;
+        sa.sa_flags &= c_int::try_from(!SA_RESTART).expect("contant value within c_int::MAX");
     } else {
-        sa.sa_flags |= SA_RESTART as c_int;
+        sa.sa_flags |= c_int::try_from(SA_RESTART).expect("contant value within c_int::MAX");
     }
 
     unsafe { sigaction(sig, &raw const sa, ptr::null_mut()) }
@@ -540,7 +540,7 @@ pub extern "C" fn signal(
 ) -> Option<extern "C" fn(c_int)> {
     let sa = sigaction {
         sa_handler: func,
-        sa_flags: SA_RESTART as _,
+        sa_flags: c_int::try_from(SA_RESTART).expect("contant value within c_int::MAX"),
         sa_restorer: None, // set by platform if applicable
         sa_mask: sigset_t::default(),
     };

@@ -67,7 +67,7 @@ pub fn alarm_timespec(duration: timespec) -> c_uint {
     } else {
         let mut evp = unsafe { core::mem::zeroed::<sigevent>() };
         evp.sigev_notify = SIGEV_SIGNAL;
-        evp.sigev_signo = SIGALRM as c_int;
+        evp.sigev_signo = c_int::try_from(SIGALRM).expect("constant within c_int::MAX");
         let Ok(timer_id) = Sys::timer_create(crate::header::time::CLOCK_REALTIME, &evp) else {
             return remaining;
         };

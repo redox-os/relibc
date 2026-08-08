@@ -82,7 +82,8 @@ impl PalSignal for Sys {
         }
         let act = act.map(|act| {
             let mut act_clone = act.clone();
-            act_clone.sa_flags |= SA_RESTORER as c_int;
+            act_clone.sa_flags |=
+                c_int::try_from(SA_RESTORER).expect("constant value should always fit");
             act_clone.sa_restorer = Some(__restore_rt);
             act_clone
         });
