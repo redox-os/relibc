@@ -657,7 +657,8 @@ pub unsafe extern "C" fn tzset() {
     let tz_option = time_zone();
 
     match tz_option {
-        Some(tz) => { // IANA
+        Some(tz) => {
+            // IANA
             let datetime = now();
             let (std_time, dst_time) = match tz.from_local_datetime(&datetime) {
                 MappedLocalTime::Single(t) => (t, None),
@@ -665,17 +666,24 @@ pub unsafe extern "C" fn tzset() {
                 MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
                 MappedLocalTime::None => return,
             };
-        
+
             // SAFETY: the caller is required to ensure that `daylight`, `timezone`
             // and `tzname` are not accessed by user code.
             unsafe { set_timezone(&mut lock, &std_time, dst_time) }
-        },
-        None => {   // POSIX
+        }
+        None => {
+            // POSIX
             let tz_posix = get_current_time_zone();
-            let name_end = tz_posix.find(|c: char| !c.is_ascii_alphabetic()).unwrap_or(tz_posix.len());
+            let name_end = tz_posix
+                .find(|c: char| !c.is_ascii_alphabetic())
+                .unwrap_or(tz_posix.len());
             let tz = &tz_posix[..name_end];
             // checks for if there is some number by the end, if none, 0, if not a number, bad value
-            let zone: Result<i32, _> = if tz_posix.len() == name_end { Ok(0) } else { tz_posix[name_end..].parse() };
+            let zone: Result<i32, _> = if tz_posix.len() == name_end {
+                Ok(0)
+            } else {
+                tz_posix[name_end..].parse()
+            };
 
             // gcc on Fedora Linux makes tzname[0] == "" when value is bad
             // SAFETY: the caller is required to ensure access exclusively for the
@@ -685,16 +693,15 @@ pub unsafe extern "C" fn tzset() {
                     lock.0 = Some(CString::new(tz).unwrap());
                     // timezone = -c_long::from(ut_offset.fix().local_minus_utc());
                     c_long::from(zone * 3600).clamp(-86400, 86400) // TODO: offset convert
-                },
+                }
                 Err(_) => {
                     lock.0 = Some(CString::new("").unwrap());
                     0
                 }
             };
-            
+
             unsafe {
                 tzname.0[0] = lock.0.as_ref().unwrap().as_ptr().cast_mut();
-            
                 tzname.0[1] = lock.0.as_ref().unwrap().as_ptr().cast_mut();
                 daylight = 0;
                 timezone = timezone_long;
