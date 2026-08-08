@@ -974,7 +974,9 @@ pub extern "C" fn wctob(c: wint_t) -> c_int {
 pub extern "C" fn wcwidth(wc: wchar_t) -> c_int {
     match char::from_u32(wc as u32) {
         Some(c) => match unicode_width::UnicodeWidthChar::width(c) {
-            Some(width) => width as c_int,
+            Some(width) => {
+                c_int::try_from(width).expect("unicode character width within c_int::MAX")
+            }
             None => -1,
         },
         None => -1,

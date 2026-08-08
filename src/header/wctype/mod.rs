@@ -51,7 +51,7 @@ pub extern "C" fn iswalpha(wc: wint_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswblank.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn iswblank(wc: wint_t) -> c_int {
-    ctype::isblank(wc as c_int)
+    ctype::isblank(wc.cast_signed())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswcntrl.html>.
