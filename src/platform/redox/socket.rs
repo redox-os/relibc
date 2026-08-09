@@ -112,13 +112,16 @@ unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut so
         slice::from_raw_parts_mut((&raw mut data.sun_path).cast::<u8>(), data.sun_path.len())
     };
 
-    let len = cmp::min(path.len(), buf.len());
+    let mut len = cmp::min(path.len(), buf.len());
     path[..len].copy_from_slice(&buf[..len]);
     if len < path.len() {
         path[len] = 0;
+        len += 1;
     }
 
-    unsafe { *address_len = len as socklen_t };
+    unsafe {
+        *address_len = mem::offset_of!(sockaddr_un, sun_path) as socklen_t + len as socklen_t
+    };
 }
 
 unsafe fn inner_af_inet(
@@ -165,7 +168,7 @@ unsafe fn inner_af_inet(
 
     unsafe {
         ptr::copy_nonoverlapping((&raw const ret).cast::<u8>(), address.cast::<u8>(), len);
-        *address_len = len as socklen_t;
+        *address_len = mem::offset_of!(sockaddr_in, sin_addr) as socklen_t + len as socklen_t;
     }
 }
 
@@ -184,9 +187,9 @@ unsafe fn inner_get_name_inner(
     } else if buf.starts_with(b"/scheme/chan/") {
         unsafe { inner_af_unix(&buf[13..], address, address_len) };
     } else if buf.starts_with(b"/scheme/uds_stream/") {
-        unsafe { inner_af_unix(&buf[19..], address, address_len) };
-    } else if buf.starts_with(b"/scheme/uds_dgram/") {
         unsafe { inner_af_unix(&buf[18..], address, address_len) };
+    } else if buf.starts_with(b"/scheme/uds_dgram/") {
+        unsafe { inner_af_unix(&buf[17..], address, address_len) };
     } else {
         // Socket doesn't belong to any scheme
         log::trace!(
