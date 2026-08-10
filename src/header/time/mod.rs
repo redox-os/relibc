@@ -9,6 +9,7 @@ use crate::{
         errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
         signal::sigevent,
         stdlib::getenv,
+        time::posix_tz::PosixTz,
         unistd::readlink,
     },
     out::Out,
@@ -35,6 +36,7 @@ pub use self::constants::*;
 
 pub mod constants;
 
+mod posix_tz;
 mod strftime;
 mod strptime;
 pub use strptime::strptime;
@@ -693,37 +695,17 @@ pub unsafe extern "C" fn tzset() {
         None => {
             // POSIX
             let tz_posix = get_current_time_zone();
-            let name_end = tz_posix
-                .find(|c: char| !c.is_ascii_alphabetic())
-                .unwrap_or(tz_posix.len());
-            let tz = &tz_posix[..name_end];
-            // checks for if there is some number by the end, if none, 0, if not a number, bad value
-            let zone: Result<i32, _> = if tz_posix.len() == name_end {
-                Ok(0)
-            } else {
-                tz_posix[name_end..].parse()
-            };
-
-            // gcc on Fedora Linux makes tzname[0] == "" when value is bad
-            // SAFETY: the caller is required to ensure access exclusively for the
-            // holder of `TIMEZONE_LOCK`.
-            let timezone_long: c_long = match zone {
-                Ok(zone) => {
-                    lock.0 = Some(CString::new(tz).unwrap());
-                    // timezone = -c_long::from(ut_offset.fix().local_minus_utc());
-                    c_long::from(zone * 3600).clamp(-86400, 86400) // TODO: offset convert
-                }
-                Err(_) => {
-                    lock.0 = Some(CString::new("").unwrap());
-                    0
-                }
-            };
-
+            let tz = PosixTz::parse(tz_posix);
             unsafe {
+                // SAFETY: the caller is required to ensure access exclusively for the
+                // holder of `TIMEZONE_LOCK`.
+                lock.0 = Some(CString::new(tz.std).unwrap());
+                lock.1 = Some(CString::new(tz.dst).unwrap());
+
                 tzname.0[0] = lock.0.as_ref().unwrap().as_ptr().cast_mut();
-                tzname.0[1] = lock.0.as_ref().unwrap().as_ptr().cast_mut();
-                daylight = 0;
-                timezone = timezone_long;
+                tzname.0[1] = lock.1.as_ref().unwrap().as_ptr().cast_mut();
+                daylight = tz.daylight as i32;
+                timezone = tz.timezone.unwrap_or(0);
             }
         }
     }
