@@ -704,7 +704,7 @@ pub unsafe extern "C" fn tzset() {
 
                 tzname.0[0] = lock.0.as_ref().unwrap().as_ptr().cast_mut();
                 tzname.0[1] = lock.1.as_ref().unwrap().as_ptr().cast_mut();
-                daylight = tz.daylight as i32;
+                daylight = i32::from(tz.daylight);
                 timezone = tz.timezone.unwrap_or(0);
             }
         }
