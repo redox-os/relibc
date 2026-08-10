@@ -1,1 +1,21 @@
-tzname[0] UTC, tzname[1] UTC, daylight 0, timezone 0
+Default: tzname[0] UTC, tzname[1] UTC, daylight 0, timezone 0
+UTC: tzname[0] UTC, tzname[1] UTC, daylight 0, timezone 0
+EST: tzname[0] EST, tzname[1] EST, daylight 0, timezone 18000
+Default after unset: tzname[0] UTC, tzname[1] UTC, daylight 0, timezone 0
+EST5: tzname[0] EST, tzname[1] EST, daylight 0, timezone 18000
+: tzname[0] UTC, tzname[1] UTC, daylight 0, timezone 0
+JST: tzname[0] JST, tzname[1] , daylight 0, timezone 0
+SMNTH-5: tzname[0] SMNTH, tzname[1] SMNTH, daylight 0, timezone -18000
+SM5NTH5: tzname[0] , tzname[1] , daylight 0, timezone 0
+CST-100: tzname[0] CST, tzname[1] CST, daylight 0, timezone -86400
+CDT+5: tzname[0] CDT, tzname[1] CDT, daylight 0, timezone 18000
+IST-5:30: tzname[0] IST, tzname[1] IST, daylight 0, timezone -19800
+FAKE5:00:30: tzname[0] FAKE, tzname[1] FAKE, daylight 0, timezone 18030
+JST+0: tzname[0] JST, tzname[1] JST, daylight 0, timezone 0
+EST5EDT,M3.2.0/2,M11.1.0/2: tzname[0] EST, tzname[1] EDT, daylight 1, timezone 18000
+EST5EDT,M3.2.0,M11.1.0: tzname[0] EST, tzname[1] EDT, daylight 1, timezone 18000
+EST5,M3.2.0,M11.1.0: tzname[0] EST, tzname[1] , daylight 1, timezone 18000
+EST5EDT,M3.2.0/2: tzname[0] EST, tzname[1] EDT, daylight 1, timezone 18000
+EST5,M3.2.0: tzname[0] EST, tzname[1] , daylight 1, timezone 18000
+EST5EDT,,M3.2.0/2: tzname[0] EST, tzname[1] EDT, daylight 1, timezone 18000
+EST5,,M3.2.0/2: tzname[0] EST, tzname[1] , daylight 1, timezone 18000
