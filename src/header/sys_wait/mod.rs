@@ -36,7 +36,7 @@ pub const __WALL: c_int = 0x4000_0000;
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/waitpid.2.html>.
 ///
 /// Wait for "clone" children only.
-#[allow(overflowing_literals)]
+#[expect(overflowing_literals, reason = "intentional")]
 pub const __WCLONE: c_int = 0x8000_0000;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wait.html>.

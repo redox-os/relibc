@@ -75,7 +75,7 @@ pub extern "C" fn rust_eh_personality() {}
 #[cfg(not(test))]
 #[alloc_error_handler]
 #[linkage = "weak"]
-#[allow(improper_ctypes_definitions)]
+#[expect(improper_ctypes_definitions)]
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
     panic!(

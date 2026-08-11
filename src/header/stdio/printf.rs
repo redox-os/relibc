@@ -21,7 +21,7 @@ use crate::{
     },
 };
 
-#[allow(unused_doc_comments)]
+#[expect(unused_doc_comments, reason = "cbindgen")]
 /// cbindgen:ignore
 unsafe extern "C" {
     pub unsafe fn relibc_ldtod(x: *const c_longdouble) -> c_double;

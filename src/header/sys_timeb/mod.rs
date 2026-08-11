@@ -7,7 +7,7 @@
 //! Specifications Issue 6, and the entire `sys/timeb.h` header was removed in
 //! Issue 7.
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 use crate::header::sys_time::gettimeofday;
 use crate::{
     header::{sys_select::timeval, sys_time::timezone},
@@ -42,7 +42,7 @@ pub struct timeb {
 /// The `ftime()` function was marked as legacy in the Open Group Base
 /// Specifications Issue 6, and the entire `sys/timeb.h` header was removed in
 /// Issue 7.
-#[allow(deprecated)]
+#[expect(deprecated)]
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
@@ -55,14 +55,14 @@ pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
     // SAFETY: tv and tz are created above, and thus will coerce to valid
     // pointers.
     if unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         gettimeofday(&raw mut tv, &raw mut tz)
     } < 0
     {
         return -1;
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     tp_out.write(timeb {
         time: tv.tv_sec,
         millitm: (tv.tv_usec / 1000) as c_ushort,

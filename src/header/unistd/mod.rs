@@ -45,7 +45,7 @@ pub use crate::header::pthread::fork_hooks;
 // cuserid() marked legacy in Issue 5.
 #[deprecated]
 pub use crate::header::stdio::ctermid;
-#[allow(deprecated)]
+#[expect(deprecated)]
 pub use crate::header::stdio::cuserid;
 
 use super::{
@@ -1328,7 +1328,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 /// The `ualarm()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 6, and removed in Issue 7.
 #[deprecated]
-#[allow(deprecated)]
+#[expect(deprecated)]
 #[unsafe(no_mangle)]
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
     // TODO setitimer is unimplemented on Redox and obsolete
@@ -1377,7 +1377,7 @@ pub unsafe extern "C" fn unlinkat(fd: c_int, path: *const c_char, flags: c_int) 
 /// The `usleep()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 6, and removed in Issue 7.
 #[deprecated]
-#[allow(deprecated)]
+#[expect(deprecated)]
 #[unsafe(no_mangle)]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     #[cfg(not(target_arch = "x86"))]

@@ -2,7 +2,7 @@ use super::super::{
     Pal,
     types::{c_int, pid_t},
 };
-#[allow(deprecated)]
+#[expect(deprecated)]
 use crate::header::sys_time::itimerval;
 use crate::{
     error::{Errno, Result},
@@ -16,7 +16,7 @@ use crate::{
 /// Platform abstraction of signal-related functionality.
 pub trait PalSignal: Pal {
     /// Platform implementation of [`getitimer()`](crate::header::sys_time::getitimer) from [`sys/time.h`](crate::header::sys_time).
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()>;
 
     /// Platform implementation of [`kill()`](crate::header::signal::kill) from [`signal.h`](crate::header::signal).
@@ -32,7 +32,7 @@ pub trait PalSignal: Pal {
     fn raise(sig: c_int) -> Result<()>;
 
     /// Platform implementation of [`setitimer()`](crate::header::sys_time::setitimer) from [`sys/time.h`](crate::header::sys_time).
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()>;
 
     /// Platform implementation of [`sigaction()`](crate::header::signal::sigaction()) from [`signal.h`](crate::header::signal).

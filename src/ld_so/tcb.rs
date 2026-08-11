@@ -76,7 +76,7 @@ impl Tcb {
     /// Create a new TCB
     ///
     /// `size` is the size of the TLS in bytes.
-    #[allow(unsafe_op_in_unsafe_fn)]
+    #[expect(unsafe_op_in_unsafe_fn)]
     pub unsafe fn new(size: usize) -> Result<&'static mut Self, DlError> {
         let page_size = Sys::getpagesize();
         let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
@@ -263,7 +263,7 @@ impl Tcb {
     }
 
     /// Mapping with correct flags for TCB and TLS
-    #[allow(unsafe_op_in_unsafe_fn)]
+    #[expect(unsafe_op_in_unsafe_fn)]
     unsafe fn map(size: usize) -> Result<&'static mut [u8], DlError> {
         let ptr = Sys::mmap(
             ptr::null_mut(),

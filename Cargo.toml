@@ -21,7 +21,7 @@ exclude = ["tests", "dlmalloc-rs"]
 
 [workspace.lints.clippy]
 borrow_as_ptr = "deny"
-cast_lossless = "warn" # TODO review occurrences
+cast_lossless = "deny"
 cast_possible_truncation = "allow" # TODO review occurrences
 cast_possible_wrap = "allow" # TODO review occurrences
 cast_precision_loss = "allow" # TODO review occurrences
@@ -36,10 +36,10 @@ missing_panics_doc = "allow" # TODO review occurrences
 missing_safety_doc = "allow" # TODO review occurrences
 mut_from_ref = "deny"
 precedence = "deny"
-ptr_as_ptr = "warn" # TODO review occurrences
-ptr_cast_constness = "warn" # TODO review occurrences
+ptr_as_ptr = "deny"
+ptr_cast_constness = "deny"
 ptr_offset_by_literal = "deny"
-ref_as_ptr = "warn" # TODO review occurrences
+ref_as_ptr = "deny"
 type_complexity = "allow" # TODO review occurrences
 upper_case_acronyms = "allow" # TODO review occurrences
 zero_ptr = "deny" # must allow on public constants due to cbindgen issue

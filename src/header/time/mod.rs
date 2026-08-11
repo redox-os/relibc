@@ -94,28 +94,23 @@ static TIMEZONE_LOCK: Mutex<(Option<CString>, Option<CString>)> = Mutex::new((No
 
 // Should only be accessed by relibc when `TIMEZONE_LOCK` is held
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
-#[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut daylight: c_int = 0;
 
 // Should only be accessed by relibc when `TIMEZONE_LOCK` is held
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
-#[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut timezone: c_long = 0;
 
 // Should only be accessed by relibc when `TIMEZONE_LOCK` is held
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
-#[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
 
-#[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut getdate_err: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Default)]
 pub struct itimerspec {
@@ -132,7 +127,7 @@ pub struct itimerspec {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
     unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         asctime_r(timeptr, (&raw mut ASCTIME).cast())
     }
 }
@@ -287,7 +282,7 @@ pub unsafe extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
     unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         asctime(localtime(clock))
     }
 }
@@ -304,7 +299,7 @@ pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut
     let mut tm1 = blank_tm();
     unsafe { localtime_r(clock, &raw mut tm1) };
     unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         asctime_r(&raw const tm1, buf)
     }
 }

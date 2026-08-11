@@ -20,9 +20,16 @@ use crate::{
 use crate::sync::{Mutex, waitval::Waitval};
 
 /// Called only by the main thread, as part of relibc_start.
-#[allow(unused_mut)]
 pub unsafe fn init() {
-    let mut thread = Pthread {
+    #[cfg(target_os = "redox")]
+    //TODO: what is the best way to get these values?
+    use redox_rt::{STACK_SIZE, STACK_TOP};
+    #[cfg(target_os = "redox")]
+    let (stack_base, stack_size) = ((STACK_TOP - STACK_SIZE) as *mut c_void, STACK_SIZE);
+    #[cfg(target_os = "linux")]
+    let (stack_base, stack_size) = (ptr::null_mut(), 0);
+
+    let thread = Pthread {
         waitval: Waitval::new(),
         has_enabled_cancelation: AtomicBool::new(false),
         has_queued_cancelation: AtomicBool::new(false),
@@ -31,21 +38,13 @@ pub unsafe fn init() {
         //index: FIRST_THREAD_IDX,
 
         // TODO: set these values on Linux as well
-        stack_base: ptr::null_mut(),
-        stack_size: 0,
+        stack_base,
+        stack_size,
 
         tcb_selfref: UnsafeCell::new(core::ptr::null_mut()),
 
         os_tid: UnsafeCell::new(Sys::current_os_tid()),
     };
-
-    #[cfg(target_os = "redox")]
-    {
-        //TODO: what is the best way to get these values?
-        use redox_rt::arch::{STACK_SIZE, STACK_TOP};
-        thread.stack_base = (STACK_TOP - STACK_SIZE) as *mut c_void;
-        thread.stack_size = STACK_SIZE;
-    }
 
     let current_tcb = unsafe { Tcb::current() }.expect("no TCB present for main thread");
     current_tcb.pthread = thread;
@@ -110,7 +109,6 @@ impl Drop for MmapGuard {
     }
 }
 
-#[allow(unused_mut)]
 pub(crate) unsafe fn create(
     attrs: Option<&header::RlctAttr>,
     start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void,
@@ -119,9 +117,9 @@ pub(crate) unsafe fn create(
     let attrs = attrs.cloned().unwrap_or_default();
 
     #[cfg(not(target_os = "redox"))]
-    let mut current_sigmask = 0_u64;
+    let current_sigmask = 0_u64;
     #[cfg(target_os = "redox")]
-    let mut current_sigmask =
+    let current_sigmask =
         redox_rt::signal::get_sigmask().expect("failed to obtain sigprocmask for caller");
 
     // Create a locked mutex, unlocked by the thread after it has started.
