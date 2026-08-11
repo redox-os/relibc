@@ -351,6 +351,24 @@ impl<W: Write> BufWriter<W> {
         BufWriter::with_capacity(DEFAULT_BUF_SIZE, inner)
     }
 
+    /// Creates a new `BufWriter` with a zero buffer capacity.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io::BufWriter;
+    /// use std::net::TcpStream;
+    ///
+    /// let mut buffer = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    /// ```
+    pub const fn new_const(inner: W) -> BufWriter<W> {
+        BufWriter {
+            inner: Some(inner),
+            buf: Vec::new(),
+            panicked: false,
+        }
+    }
+
     /// Creates a new `BufWriter` with the specified buffer capacity.
     ///
     /// # Examples
@@ -596,6 +614,27 @@ impl<W: Write> LineWriter<W> {
     pub fn new(inner: W) -> LineWriter<W> {
         // Lines typically aren't that long, don't use a giant buffer
         LineWriter::with_capacity(1024, inner)
+    }
+
+    /// Creates a new `LineWriter`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::fs::File;
+    /// use std::io::LineWriter;
+    ///
+    /// fn main() -> std::io::Result<()> {
+    ///     let file = File::create("poem.txt")?;
+    ///     let file = LineWriter::new(file);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub const fn new_const(inner: W) -> LineWriter<W> {
+        LineWriter {
+            inner: BufWriter::new_const(inner),
+            need_flush: false,
+        }
     }
 
     /// Creates a new `LineWriter` with a specified capacity for the internal

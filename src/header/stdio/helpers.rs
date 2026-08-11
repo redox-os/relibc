@@ -1,8 +1,9 @@
 use alloc::boxed::Box;
+use arrayvec::ArrayVec;
 
 use super::{
     Buffer, FILE,
-    constants::{BUFSIZ, F_APP, F_NORD, F_NOWR},
+    constants::{F_APP, F_NORD, F_NOWR},
 };
 use crate::{
     c_str::CStr,
@@ -74,24 +75,21 @@ pub fn _fdopen(fd: c_int, mode: CStr) -> Result<Box<FILE>, Errno> {
     }
 
     let file = File::new(fd);
-    let writer = Box::new(BufWriter::new(unsafe { file.get_ref() }));
-    let mutex_attr = pthread::RlctMutexAttr {
+    let writer = BufWriter::new(unsafe { file.get_ref() });
+    const MUTEX_ATTR: pthread::RlctMutexAttr = pthread::RlctMutexAttr {
         ty: pthread::PTHREAD_MUTEX_RECURSIVE,
-        ..Default::default()
+        ..pthread::RlctMutexAttr::default_const()
     };
     Ok(Box::new(FILE {
-        lock: pthread::RlctMutex::new(&mutex_attr).unwrap(),
-
+        lock: pthread::RlctMutex::new(&MUTEX_ATTR).unwrap(),
         file,
         flags,
-        read_buf: Buffer::Owned(vec![0; BUFSIZ as usize]),
+        read_buf: Buffer::Owned(ArrayVec::new_const()),
         read_pos: 0,
         read_size: 0,
         unget: Vec::new(),
-        writer,
-
+        writer: super::FileInnerWriter::Buf(writer),
         pid: None,
-
         orientation: 0,
     }))
 }
