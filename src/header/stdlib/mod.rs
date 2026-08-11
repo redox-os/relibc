@@ -150,7 +150,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
     }
     /* The size-is-multiple-of-alignment requirement is the only
      * difference between aligned_alloc() and memalign(). */
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     unsafe {
         memalign(alignment, size)
     }

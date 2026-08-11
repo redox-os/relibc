@@ -45,16 +45,11 @@ pub mod types;
 pub static ERRNO: Cell<c_int> = Cell::new(0);
 
 /// The `argv` argument available to a program's `main` function.
-#[allow(non_upper_case_globals)]
 pub static mut argv: *mut *mut c_char = ptr::null_mut();
-#[allow(non_upper_case_globals)]
 pub static inner_argv: RawCell<Vec<*mut c_char>> = RawCell::new(Vec::new());
-#[allow(non_upper_case_globals)]
 pub static mut program_invocation_name: *mut c_char = ptr::null_mut();
-#[allow(non_upper_case_globals)]
 pub static mut program_invocation_short_name: *mut c_char = ptr::null_mut();
 
-#[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static mut environ: *mut *mut c_char = ptr::null_mut();
 

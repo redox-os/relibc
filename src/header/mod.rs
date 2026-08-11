@@ -168,7 +168,6 @@ pub mod sys_shm;
 pub mod sys_socket;
 pub mod sys_stat;
 pub mod sys_statvfs;
-#[allow(non_upper_case_globals)]
 pub mod sys_syscall;
 pub mod sys_time;
 #[deprecated]

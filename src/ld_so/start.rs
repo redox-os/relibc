@@ -78,7 +78,7 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
     (envs, ptr)
 }
 
-#[allow(unsafe_op_in_unsafe_fn)]
+#[expect(unsafe_op_in_unsafe_fn)]
 unsafe fn adjust_stack(sp: &'static mut Stack) {
     let mut argv = sp.argv() as *mut usize;
 

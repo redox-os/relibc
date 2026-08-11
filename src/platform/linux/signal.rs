@@ -10,7 +10,7 @@ use super::{
     },
     Sys, e_raw,
 };
-#[allow(deprecated)]
+#[expect(deprecated)]
 use crate::header::sys_time::itimerval;
 use crate::{
     error::{Errno, Result},
@@ -22,7 +22,7 @@ use crate::{
 };
 
 impl PalSignal for Sys {
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
         unsafe {
             e_raw(syscall!(GETITIMER, which, ptr::from_mut(out)))?;
@@ -59,7 +59,7 @@ impl PalSignal for Sys {
         Ok(())
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
         e_raw(unsafe {
             syscall!(
