@@ -9,6 +9,7 @@ use crate::{
         errno::{EINVAL, ENOMEM, EOVERFLOW, ETIMEDOUT},
         signal::sigevent,
         stdlib::getenv,
+        time::posix_tz::PosixTz,
         unistd::readlink,
     },
     out::Out,
@@ -35,6 +36,7 @@ pub use self::constants::*;
 
 pub mod constants;
 
+mod posix_tz;
 mod strftime;
 mod strptime;
 pub use strptime::strptime;
@@ -419,7 +421,8 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
         return -1;
     };
 
-    let tz = time_zone();
+    // POSIX TODO
+    let tz = time_zone().unwrap_or(Tz::UTC);
     let isdst = unsafe { (*timeptr).tm_isdst };
     let tz_datetime = match tz.from_local_datetime(&naive_local) {
         MappedLocalTime::Single(datetime) => datetime,
@@ -530,7 +533,8 @@ pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
     let tm_val = unsafe { &mut *tm };
-    let tz = time_zone();
+    // POSIX TODO
+    let tz = time_zone().unwrap_or(Tz::UTC);
     let Some(dt) = convert_tm_generic(&tz, tm_val) else {
         return -1;
     };
@@ -647,18 +651,40 @@ pub unsafe extern "C" fn tzset() {
     // and `tzname` are not accessed by user code.
     unsafe { clear_timezone(&mut lock) };
 
-    let tz = time_zone();
-    let datetime = now();
-    let (std_time, dst_time) = match tz.from_local_datetime(&datetime) {
-        MappedLocalTime::Single(t) => (t, None),
-        // This variant contains the two possible results, in the order (earliest, latest).
-        MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
-        MappedLocalTime::None => return,
-    };
+    let tz_option = time_zone();
 
-    // SAFETY: the caller is required to ensure that `daylight`, `timezone`
-    // and `tzname` are not accessed by user code.
-    unsafe { set_timezone(&mut lock, &std_time, dst_time) }
+    match tz_option {
+        Some(tz) => {
+            // IANA
+            let datetime = now();
+            let (std_time, dst_time) = match tz.from_local_datetime(&datetime) {
+                MappedLocalTime::Single(t) => (t, None),
+                // This variant contains the two possible results, in the order (earliest, latest).
+                MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
+                MappedLocalTime::None => return,
+            };
+
+            // SAFETY: the caller is required to ensure that `daylight`, `timezone`
+            // and `tzname` are not accessed by user code.
+            unsafe { set_timezone(&mut lock, &std_time, dst_time) }
+        }
+        None => {
+            // POSIX
+            let tz_posix = get_current_time_zone();
+            let tz = PosixTz::parse(tz_posix);
+            unsafe {
+                // SAFETY: the caller is required to ensure access exclusively for the
+                // holder of `TIMEZONE_LOCK`.
+                lock.0 = Some(CString::new(tz.std).unwrap());
+                lock.1 = Some(CString::new(tz.dst).unwrap());
+
+                tzname.0[0] = lock.0.as_ref().unwrap().as_ptr().cast_mut();
+                tzname.0[1] = lock.1.as_ref().unwrap().as_ptr().cast_mut();
+                daylight = i32::from(tz.daylight);
+                timezone = tz.timezone.unwrap_or(0);
+            }
+        }
+    }
 }
 
 fn convert_tm_generic<Tz: TimeZone>(tz: &Tz, tm_val: &tm) -> Option<DateTime<Tz>> {
@@ -748,8 +774,8 @@ fn get_current_time_zone<'a>() -> &'a str {
 }
 
 #[inline(always)]
-fn time_zone() -> Tz {
-    get_current_time_zone().parse().unwrap_or(Tz::UTC)
+fn time_zone() -> Option<Tz> {
+    get_current_time_zone().parse().ok() //.unwrap_or(Tz::UTC)
 }
 
 #[inline(always)]
@@ -766,7 +792,8 @@ fn get_localtime(
     timer: time_t,
     mut result: Out<tm>,
 ) -> (Option<DateTime<Tz>>, Option<DateTime<Tz>>) {
-    let tz = time_zone();
+    // POSIX TODO
+    let tz = time_zone().unwrap_or(Tz::UTC);
 
     // Convert UTC time to local time
     let (std_time, dst_time) = match tz.timestamp_opt(timer, 0) {

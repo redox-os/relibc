@@ -69,4 +69,23 @@ int main(void) {
         time_t result = mktime(&tg);
         printf("gmtoff_ignored = %d\n", result != (time_t)-1);
     }
+
+    // POSIX example:
+    // setenv("TZ", "EST5", 1);
+    // tzset();
+
+    // struct tm t_posix = { 0 };
+    // t_posix.tm_year = 2024 - 1900;
+    // t_posix.tm_mon = 0;
+    // t_posix.tm_mday = 1;
+    // t_posix.tm_hour = 12;
+    // t_posix.tm_min = 0;
+    // t_posix.tm_sec = 0;
+
+    // time_t result = mktime(&t_posix);
+
+    // ERROR_IF(mktime, result, != 1704128400);
+    // ERROR_IF(mktime, timezone, != 18000);
+    // printf("POSIX tzname[0] should be EST: %s\n", tzname[0]);
+
 }
