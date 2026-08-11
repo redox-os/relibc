@@ -8,7 +8,7 @@ use core::{
 
 use alloc::collections::BTreeMap;
 #[cfg(target_os = "redox")]
-use redox_rt::RtTcb;
+use redox_rt::{RtTcb, STACK_SIZE, STACK_TOP};
 
 use crate::{
     error::Errno,
@@ -21,9 +21,7 @@ use crate::sync::{Mutex, waitval::Waitval};
 
 /// Called only by the main thread, as part of relibc_start.
 pub unsafe fn init() {
-    #[cfg(target_os = "redox")]
     //TODO: what is the best way to get these values?
-    use redox_rt::{STACK_SIZE, STACK_TOP};
     #[cfg(target_os = "redox")]
     let (stack_base, stack_size) = ((STACK_TOP - STACK_SIZE) as *mut c_void, STACK_SIZE);
     #[cfg(target_os = "linux")]
