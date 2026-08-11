@@ -6,7 +6,7 @@ use redox_rt::proc::FdGuard;
 use syscall::{self, flag::*};
 
 use super::{
-    super::{Pal, PalSocket, types::*},
+    super::{Pal, PalSignal, PalSocket, types::*},
     Sys,
     path::dir_path_and_fd_path,
 };
@@ -20,10 +20,11 @@ use crate::{
         bits_ucred::ucred,
         errno::{
             EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK, EOPNOTSUPP,
-            EPROTONOSUPPORT,
+            EPIPE, EPROTONOSUPPORT,
         },
         fcntl,
         netinet_in::{in_addr, in_port_t, sockaddr_in},
+        signal::SIGPIPE,
         string::strnlen,
         sys_select::timeval,
         sys_socket::{
@@ -995,10 +996,12 @@ impl PalSocket for Sys {
         dest_addr: *const sockaddr,
         dest_len: socklen_t,
     ) -> Result<usize> {
-        // TODO: Actually support MSG_NOSIGNAL
-        // TODO: TCP lacks `SocketCall::SendMsg` handling
+        // MSG_NOSIGNAL controls SIGPIPE delivery in relibc, not socket I/O.
+        let no_signal = flags & MSG_NOSIGNAL != 0;
         let flags = flags & !MSG_NOSIGNAL;
-        if flags != 0 {
+
+        // TODO: TCP lacks `SocketCall::SendMsg` handling
+        let result = if flags != 0 {
             // Convert to sendmsg
             let mut iov = iovec {
                 iov_base: buf.cast_mut(),
@@ -1013,19 +1016,32 @@ impl PalSocket for Sys {
                 msg_controllen: 0,
                 msg_flags: 0,
             };
-            return unsafe { Self::sendmsg(socket, &raw const msg, flags) };
-        }
-        if dest_addr.is_null() || dest_len == 0 {
+            unsafe { Self::sendmsg(socket, &raw const msg, flags) }
+        } else if dest_addr.is_null() || dest_len == 0 {
             Self::write(socket, unsafe {
                 slice::from_raw_parts(buf.cast::<u8>(), len)
             })
         } else {
-            let fd = FdGuard::new(unsafe {
-                bind_or_connect(SocketCall::Connect, socket, dest_addr, dest_len)
-            }?);
-            Self::write(fd.as_c_fd().unwrap(), unsafe {
-                slice::from_raw_parts(buf.cast::<u8>(), len)
-            })
+            match unsafe { bind_or_connect(SocketCall::Connect, socket, dest_addr, dest_len) } {
+                Ok(fd) => {
+                    let fd = FdGuard::new(fd);
+                    Self::write(fd.as_c_fd().unwrap(), unsafe {
+                        slice::from_raw_parts(buf.cast::<u8>(), len)
+                    })
+                }
+                Err(error) => Err(error),
+            }
+        };
+
+        match result {
+            Err(error @ Errno(EPIPE)) => {
+                if !no_signal && matches!(socket_domain_type(socket), Ok((_, SOCK_STREAM))) {
+                    // A failure to raise SIGPIPE must not replace the send error.
+                    let _ = Self::raise(SIGPIPE as c_int);
+                }
+                Err(error)
+            }
+            result => result,
         }
     }
 
