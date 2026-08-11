@@ -1,5 +1,4 @@
 use alloc::boxed::Box;
-use arrayvec::ArrayVec;
 
 use super::{
     Buffer, FILE,
@@ -84,7 +83,7 @@ pub fn _fdopen(fd: c_int, mode: CStr) -> Result<Box<FILE>, Errno> {
         lock: pthread::RlctMutex::new(&MUTEX_ATTR).unwrap(),
         file,
         flags,
-        read_buf: Buffer::Owned(ArrayVec::new_const()),
+        read_buf: Buffer::Owned(None),
         read_pos: 0,
         read_size: 0,
         unget: Vec::new(),
