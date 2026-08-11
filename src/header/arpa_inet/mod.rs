@@ -191,7 +191,7 @@ pub extern "C" fn inet_netof(r#in: in_addr) -> in_addr_t {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
     ntohl(unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         inet_addr(cp)
     })
 }

@@ -348,7 +348,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     if let Some(s_addr) = parse_ipv4_string(name_str) {
         let addr = in_addr { s_addr };
         return unsafe {
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             gethostbyaddr(ptr::from_ref(&addr).cast::<c_void>(), 4, AF_INET)
         };
     }
@@ -1122,14 +1122,14 @@ pub const extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
 /// [`H_ERRNO`], [`hstrerror`], [`herror`], and other functions are deprecated as of
 /// POSIX.1-2001 and removed as of POSIX.1-2008. These functions are provided for backwards
 /// compatibility but should not be used by new code.
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
+#[expect(clippy::not_unsafe_ptr_arg_deref, reason = "see safety note")]
 #[unsafe(no_mangle)]
 #[deprecated]
 pub extern "C" fn herror(prefix: *const c_char) {
     let code = H_ERRNO.get();
     // Safety: `hstrerror` handles every error code case and always returns a valid C string
     let error = unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let msg_cstr = CStr::from_ptr(hstrerror(code));
         str::from_utf8_unchecked(msg_cstr.to_bytes())
     };

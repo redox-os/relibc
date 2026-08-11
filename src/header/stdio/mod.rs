@@ -1316,7 +1316,7 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
 
         // use the same mechanism as tmpnam to get the file name
         if unsafe {
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             tmpnam_inner(out_buf, dirname_len + 1 + prefix_len)
         }
         .is_null()
@@ -1368,7 +1368,7 @@ pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
 
     unsafe { *buf = ByteLiteral::cast_cchar(b'/') };
     unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         tmpnam_inner(buf, 1)
     }
 }
@@ -1384,7 +1384,7 @@ unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_cha
 
     let err = platform::ERRNO.get();
     unsafe {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         stdlib::mktemp(buf)
     };
     platform::ERRNO.set(err);
