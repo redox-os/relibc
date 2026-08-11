@@ -8,7 +8,10 @@ use core::{
 
 use alloc::collections::BTreeMap;
 #[cfg(target_os = "redox")]
-use redox_rt::{RtTcb, STACK_SIZE, STACK_TOP};
+use redox_rt::{
+    RtTcb,
+    arch::{STACK_SIZE, STACK_TOP},
+};
 
 use crate::{
     error::Errno,
