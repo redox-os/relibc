@@ -7,6 +7,7 @@ use alloc::{
     boxed::Box,
     vec::Vec,
 };
+use arrayvec::ArrayVec;
 use core::{
     cmp,
     ffi::VaList as va_list,
@@ -15,6 +16,7 @@ use core::{
     ops::{Deref, DerefMut},
     ptr, slice, str,
 };
+use zerocopy::FromZeros;
 
 use crate::{
     c_str::{CStr, Thin},
@@ -56,9 +58,10 @@ pub mod reader;
 pub mod scanf;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
+const BUFSIZ_USIZE: usize = BUFSIZ as usize;
 enum Buffer<'a> {
     Borrowed(&'a mut [u8]),
-    Owned(Vec<u8>),
+    Owned(ArrayVec<u8, BUFSIZ_USIZE>),
 }
 
 impl<'a> Deref for Buffer<'a> {
@@ -113,6 +116,45 @@ impl<W: crate::io::Write> Writer for LineWriter<W> {
     }
 }
 
+pub enum FileInnerWriter {
+    Buf(BufWriter<File>),
+    Line(LineWriter<File>),
+}
+
+impl Writer for FileInnerWriter {
+    fn purge(&mut self) {
+        match self {
+            FileInnerWriter::Buf(buf_writer) => buf_writer.purge(),
+            FileInnerWriter::Line(line_writer) => line_writer.purge(),
+        }
+    }
+}
+
+impl Pending for FileInnerWriter {
+    fn pending(&self) -> size_t {
+        match self {
+            FileInnerWriter::Buf(buf_writer) => buf_writer.pending(),
+            FileInnerWriter::Line(line_writer) => line_writer.pending(),
+        }
+    }
+}
+
+impl crate::io::Write for FileInnerWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            FileInnerWriter::Buf(buf_writer) => buf_writer.write(buf),
+            FileInnerWriter::Line(line_writer) => line_writer.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            FileInnerWriter::Buf(buf_writer) => buf_writer.flush(),
+            FileInnerWriter::Line(line_writer) => line_writer.flush(),
+        }
+    }
+}
+
 /// This struct gets exposed to the C API.
 pub struct FILE {
     lock: RlctMutex,
@@ -128,9 +170,7 @@ pub struct FILE {
     read_size: usize,
     unget: Vec<u8>,
     // pub for stdio_ext
-
-    // TODO: To support const fn initialization, use static dispatch (perhaps partially)?
-    pub(crate) writer: Box<dyn Writer + Send>,
+    pub(crate) writer: FileInnerWriter,
 
     // Optional pid for use with popen/pclose
     pid: Option<c_int>,
@@ -163,6 +203,16 @@ impl Read for FILE {
 
 impl BufRead for FILE {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        if self.read_buf.len() == 0 {
+            match &mut self.read_buf {
+                // Borrowed can only happen with size > 0 in `setvbuf`
+                Buffer::Borrowed(items) => unreachable!(),
+                Buffer::Owned(array_vec) => unsafe {
+                    array_vec.zero();
+                    array_vec.set_len(array_vec.capacity());
+                },
+            }
+        }
         if self.read_pos == self.read_size {
             self.read_size = match self.file.read(&mut self.read_buf) {
                 Ok(0) => {
@@ -1250,25 +1300,25 @@ pub unsafe extern "C" fn setlinebuf(stream: *mut FILE) {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setvbuf.html>.
 ///
 /// Reset `stream` to use buffer `buf` of size `size`
-/// If this isn't the meaning of unsafe, idk what is
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setvbuf(
     stream: *mut FILE,
     buf: *mut c_char,
     mode: c_int,
-    mut size: size_t,
+    size: size_t,
 ) -> c_int {
     let mut stream = unsafe { (*stream).lock() };
     // Set a buffer of size `size` if no buffer is given
     stream.read_buf = if buf.is_null() || size == 0 {
-        if size == 0 {
-            size = BUFSIZ as usize;
-        }
         // TODO: Make it unbuffered if _IONBF
-        // if mode == _IONBF {
-        // } else {
-        Buffer::Owned(vec![0; size])
-    // }
+        if mode == _IONBF {
+            Buffer::Owned(ArrayVec::new())
+        } else {
+            let mut arr = ArrayVec::new();
+            arr.zero();
+            unsafe { arr.set_len(core::cmp::min(arr.capacity(), size)) };
+            Buffer::Owned(arr)
+        }
     } else {
         Buffer::Borrowed(unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), size) })
     };

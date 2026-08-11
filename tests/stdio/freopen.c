@@ -29,6 +29,7 @@ int test_reopen_resets_orientation(void) {
 }
 
 int main(void) {
+    fclose(stdin);
     int(*tests[])(void) = {
         &test_reopen_opens_file,
         &test_reopen_resets_orientation,

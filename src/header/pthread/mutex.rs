@@ -224,8 +224,8 @@ pub(crate) struct RlctMutexAttr {
     pub ty: c_int,
 }
 
-impl Default for RlctMutexAttr {
-    fn default() -> Self {
+impl RlctMutexAttr {
+    pub const fn default_const() -> Self {
         Self {
             robust: PTHREAD_MUTEX_STALLED,
             pshared: PTHREAD_PROCESS_PRIVATE,
@@ -234,5 +234,11 @@ impl Default for RlctMutexAttr {
             prioceiling: 0,
             ty: PTHREAD_MUTEX_DEFAULT,
         }
+    }
+}
+
+impl Default for RlctMutexAttr {
+    fn default() -> Self {
+        Self::default_const()
     }
 }

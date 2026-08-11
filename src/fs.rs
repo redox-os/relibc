@@ -20,7 +20,7 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(fd: c_int) -> Self {
+    pub const fn new(fd: c_int) -> Self {
         Self {
             fd,
             reference: false,
@@ -72,7 +72,7 @@ impl File {
     /// Create a new file pointing to the same underlying descriptor. This file
     /// will know it's a "reference" and won't close the fd. It will, however,
     /// not prevent the original file from closing the fd.
-    pub unsafe fn get_ref(&self) -> Self {
+    pub const unsafe fn get_ref(&self) -> Self {
         Self {
             fd: self.fd,
             reference: true,
