@@ -302,6 +302,7 @@ VARIED_NAMES=\
 	sys_mman/mmap \
 	sys_resource/constants \
 	sys_socket/getpeername \
+	sys_socket/msg_nosignal \
 	sys_stat/stat \
 	sys_statvfs/statvfs \
 	sys_time/utimes \
