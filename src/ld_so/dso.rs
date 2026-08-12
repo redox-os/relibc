@@ -1251,16 +1251,20 @@ impl DSO {
         }
 
         let ph = ph.unwrap();
-
+        #[cfg(target_pointer_width = "64")]
+        // in aarch64 linux, elf p_align is 64KB, and using that causes miscalculation in mprotect.
+        let page_size = Sys::getpagesize() as u64;
+        #[cfg(target_pointer_width = "32")]
+        let page_size = Sys::getpagesize() as u32;
         // Protect pages
         for ph in ph
             .iter()
             .filter(|ph| ph.p_type(NativeEndian) == elf::PT_LOAD)
         {
-            let voff = ph.p_vaddr(NativeEndian) % ph.p_align(NativeEndian);
+            let voff = ph.p_vaddr(NativeEndian) % page_size;
             let vaddr = (ph.p_vaddr(NativeEndian) - voff) as usize;
-            let vsize = ((ph.p_memsz(NativeEndian) + voff) as usize)
-                .next_multiple_of(ph.p_align(NativeEndian) as usize);
+            let vsize =
+                ((ph.p_memsz(NativeEndian) + voff) as usize).next_multiple_of(page_size as usize);
 
             let mut prot = 0;
             if ph.p_flags(NativeEndian) & elf::PF_R == elf::PF_R {
