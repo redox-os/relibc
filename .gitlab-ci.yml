@@ -1,5 +1,3 @@
-image: "redoxos/redoxer:latest"
-
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
@@ -19,8 +17,7 @@ fmt:
     stage: build
     needs: []
     script:
-        - rustup component add rustfmt-preview
-        - ./fmt.sh -- --check
+        - redoxer env cargo fmt -- --check
 
 clippy:
     stage: build
@@ -44,44 +41,19 @@ i586:
     stage: cross-build
     script:
         - ./check.sh --arch=i586
-#        - ./check.sh --arch=i586 --clippy
+        - ./check.sh --arch=i586 --clippy
 
 aarch64:
     stage: cross-build
     image: "redoxos/redoxer:aarch64"
     script:
         - ./check.sh --arch=aarch64
-#        - ./check.sh --arch=aarch64 --clippy
+        - ./check.sh --arch=aarch64 --clippy
 
 riscv64gc:
     stage: cross-build
     script:
         - ./check.sh --arch=riscv64gc
-#        - ./check.sh --arch=riscv64gc --clippy
-
-i586:clippy:
-    stage: cross-build
-    needs: [i586]
-    # TODO: remove when passed
-    allow_failure: true
-    script:
-        - ./check.sh --arch=i586 --clippy
-
-aarch64:clippy:
-    stage: cross-build
-    needs: [aarch64]
-    image: "redoxos/redoxer:aarch64"
-    # TODO: remove when passed
-    allow_failure: true
-    script:
-        - ./check.sh --arch=aarch64 --clippy
-
-riscv64gc:clippy:
-    stage: cross-build
-    needs: [riscv64gc]
-    # TODO: remove when passed
-    allow_failure: true
-    script:
         - ./check.sh --arch=riscv64gc --clippy
 
 test:linux:
@@ -94,7 +66,6 @@ test:x86_64:
     stage: test
     needs: [x86_64]
     script:
-        # timeout: https://gitlab.redox-os.org/redox-os/relibc/-/issues/238
         - timeout -s KILL 9m ./check.sh --arch=x86_64 --test
 
 test:aarch64:
