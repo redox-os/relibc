@@ -1,4 +1,3 @@
-#[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
 use super::{Pal, types::*};
@@ -23,14 +22,13 @@ use crate::{
     out::Out,
 };
 use core::{num::NonZeroU64, ptr};
-// use header::sys_times::tms;
+use sc::nr::{CLONE, EXIT};
 
 mod epoll;
 mod ptrace;
 mod signal;
 mod socket;
 
-const SYS_CLONE: usize = 56;
 const CLONE_VM: usize = 0x0100;
 const CLONE_FS: usize = 0x0200;
 const CLONE_FILES: usize = 0x0400;
@@ -591,7 +589,7 @@ impl Pal for Sys {
                 call rax
 
                 # Exit
-                mov rax, 60
+                mov rax, {sys_exit}
                 xor rdi, rdi
                 syscall
 
@@ -601,7 +599,8 @@ impl Pal for Sys {
                 # Return PID if parent
                 2:
                 ",
-                inout("rax") SYS_CLONE => pid,
+                sys_exit = const EXIT,
+                inout("rax") CLONE => pid,
                 inout("rdi") flags => _,
                 inout("rsi") stack => _,
                 inout("rdx") 0 => _,
@@ -627,7 +626,51 @@ impl Pal for Sys {
         stack: *mut usize,
         _os_specific: &mut OsSpecific,
     ) -> Result<crate::pthread::OsTid> {
-        todo!("rlct_clone not implemented for aarch64 yet")
+        let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
+        let pid;
+
+        unsafe {
+            asm!("
+            # Call clone syscall
+            svc 0
+
+            # Check if child or parent
+            cbnz x0, 2f
+
+            # Load registers
+            ldp x8, x0, [sp], #16
+            ldp x1, x2, [sp], #16
+            ldp x3, x4, [sp], #16
+            ldr x5, [sp], #16
+
+            # Call entry point
+            blr x8
+
+            # Exit
+            mov x8, {sys_exit}
+            mov x0, 0
+            svc 0
+
+            # Invalid instruction on failure to exit
+            brk 0
+
+            # Return PID if parent
+            2:
+            ",
+                sys_exit = const EXIT,
+                inout("x8") CLONE => _,
+                inout("x0") flags => pid,
+                inout("x1") stack => _,
+                inout("x2") 0 => _, // parent_tid
+                inout("x3") 0 => _, // tls
+                inout("x4") 0 => _, // child_tid
+                out("x5") _,
+            );
+        }
+
+        let tid = e_raw(pid)?;
+
+        Ok(crate::pthread::OsTid { thread_id: tid })
     }
 
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {

@@ -42,6 +42,16 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
 
     let dtv_index = ti.ti_module - 1;
 
+    if dtv_index >= tcb.dtv_mut().len() {
+        // TODO: handle this?
+        log::warn!(
+            "dl-tls: __tls_get_addr requested out-of-bounds module {} (DTV len {})",
+            ti.ti_module,
+            tcb.dtv_mut().len()
+        );
+        return ptr::null_mut();
+    }
+
     if tcb.dtv_mut()[dtv_index].is_null() {
         // Allocate TLS for module.
         let master = &masters[dtv_index];
