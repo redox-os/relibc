@@ -152,14 +152,19 @@ impl Tcb {
         if let Some(tls) = unsafe { self.tls() }
             && let Some(masters) = self.masters()
         {
-            for master in masters
-                .iter()
-                .skip(self.num_copied_masters)
-                .filter(|master| master.image_size != 0)
-            {
+            for (i, master) in masters.iter().skip(self.num_copied_masters).enumerate() {
+                if master.image_size == 0 {
+                    continue;
+                }
+
+                let master_idx = self.num_copied_masters + i;
                 let range = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
                     // x86{_64} TLS layout is backwards
                     self.tls_len - master.offset..self.tls_len - master.offset + master.image_size
+                } else if cfg!(target_arch = "aarch64") {
+                    // AArch64 p_vaddr is ignored for first master, this is experimentally determined
+                    let start = if master_idx == 0 { 0 } else { master.offset };
+                    start..start + master.image_size
                 } else {
                     master.offset..master.offset + master.image_size
                 };
@@ -228,6 +233,9 @@ impl Tcb {
                     let offset = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
                         // x86{_64} TLS layout is backwards
                         self.tls_len - master.offset
+                    } else if cfg!(target_arch = "aarch64") {
+                        // AArch64 p_vaddr is ignored for first master
+                        if i == 0 { 0 } else { master.offset }
                     } else {
                         master.offset
                     };
