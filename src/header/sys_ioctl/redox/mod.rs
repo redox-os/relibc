@@ -22,7 +22,7 @@ fn sys_call_read<T>(fd: c_int, t: &mut T) -> syscall::Result<usize> {
     let payload =
         unsafe { slice::from_raw_parts_mut(core::ptr::from_mut::<T>(t).cast::<u8>(), size) };
 
-    let bytes = redox_rt::sys::sys_call_ro(fd as usize, &mut payload, CallFlags::READ, &[])?;
+    let bytes = redox_rt::sys::sys_call_ro(fd as usize, payload, CallFlags::READ, &[])?;
 
     Ok(bytes / size)
 }
@@ -33,7 +33,7 @@ fn sys_call_write<T>(fd: c_int, t: &T) -> Result<usize> {
 
     let payload = unsafe { slice::from_raw_parts(core::ptr::from_ref::<T>(t).cast::<u8>(), size) };
 
-    let bytes = redox_rt::sys::sys_call_wo(fd as usize, &mut payload, CallFlags::WRITE, &[])?;
+    let bytes = redox_rt::sys::sys_call_wo(fd as usize, payload, CallFlags::WRITE, &[])?;
 
     Ok(bytes / size)
 }
