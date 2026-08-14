@@ -1,9 +1,5 @@
 use core::{mem, ptr, slice};
-use redox_rt::proc::FdGuard;
-use syscall::{
-    self,
-    flag::CallFlags::{READ, WRITE},
-};
+use syscall::{self, flag::CallFlags};
 
 use crate::{
     error::{Errno, Result},
@@ -98,8 +94,8 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
         }
         // TODO: give these different behaviors
         TCSETS | TCSETSW | TCSETSF => {
-            let termios = unsafe { *(out as *const termios::termios) };
-            sys_call_write(fd, &termios)?;
+            let termios = unsafe { &*(out as *const termios::termios) };
+            sys_call_write(fd, termios)?;
         }
         // tcflush()
         TCFLSH => {
@@ -138,8 +134,8 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
         }
         // tcsetwinsize()
         TIOCSWINSZ => {
-            let winsize = unsafe { *(out as *const winsize) };
-            sys_call_write(fd, &winsize)?;
+            let winsize = unsafe { &*(out as *const winsize) };
+            sys_call_write(fd, winsize)?;
         }
         TIOCGPTLCK => {
             let lock = unsafe { &mut *out.cast::<c_int>() };
