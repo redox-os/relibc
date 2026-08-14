@@ -1,6 +1,6 @@
 use core::{
     mem::size_of,
-    ptr::addr_of,
+    ptr::{addr_of, null_mut},
     sync::atomic::{AtomicU32, Ordering},
 };
 
@@ -8,10 +8,15 @@ use ioslice::IoSlice;
 use syscall::{
     Call, CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
     data::StdFsCallMeta,
-    error::{self, EAGAIN, EBADF, EEXIST, EINTR, EMFILE, ENODEV, ESRCH, Error, Result},
+    error::{
+        self, EAGAIN, EBADF, EEXIST, EINTR, EMFILE, ENODEV, ENOMEM, EPERM, ESRCH, Error, Result,
+    },
 };
 
 pub use redox_path::RedoxPath;
+use redox_protocols::protocol::{
+    F_DUPFD_CLOEXEC, NsDup, O_CLOEXEC, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
+};
 
 use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, FILETABLE, RtTcb, Tcb,
@@ -20,10 +25,7 @@ use crate::{
     read_proc_meta,
     signal::tmp_disable_signals,
 };
-use alloc::{collections::btree_set::BTreeSet, vec::Vec};
-use redox_protocols::protocol::{
-    F_DUPFD_CLOEXEC, NsDup, O_CLOEXEC, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
-};
+use alloc::{boxed::Box, collections::btree_set::BTreeSet, vec::Vec};
 
 #[inline]
 fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
@@ -593,7 +595,7 @@ fn openat_into_posix<T: AsRef<str>>(
 
     let out = {
         let mut guard = FILETABLE.lock();
-        guard.add_posix(flags)?
+        guard.add_posix(flags as u32)?
     };
 
     let res = unsafe {
@@ -755,9 +757,9 @@ pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
         let out = {
             let mut guard = FILETABLE.lock();
             if arg & syscall::UPPER_FDTBL_TAG != 0 {
-                guard.insert_upper(cloexec_flag)? | syscall::UPPER_FDTBL_TAG
+                guard.insert_upper(cloexec_flag as u32)? | syscall::UPPER_FDTBL_TAG
             } else {
-                guard.add_posix(cloexec_flag)?
+                guard.add_posix(cloexec_flag as u32)?
             }
         };
 
@@ -811,7 +813,7 @@ pub fn openat_into_upper<T: AsRef<str>>(
 
     let out_idx = {
         let mut guard = FILETABLE.lock();
-        guard.insert_upper(flags)?
+        guard.insert_upper(flags as u32)?
     };
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
@@ -916,20 +918,859 @@ pub fn close_raw(fd: usize) -> Result<usize> {
     res
 }
 
-pub struct FdTbl {
+pub const NODE_BITS: usize = 9;
+pub const NODE_SIZE: usize = 1 << NODE_BITS;
+pub const NODE_MASK: usize = NODE_SIZE - 1;
+pub const CONTEXT_MAX_FILES: u32 = 65_536;
+
+// TODO: Move into syscall
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    pub struct CapRights: u64 {
+        const NONE     = 0;
+        const RESERVED = !0;
+    }
+}
+
+#[repr(C)]
+pub struct FileDescriptor {
+    pub flags: u32,
+    pub is_occupied: u32, // 0 = Vacant, 1 = Occupied
+    pub union_field: VacantOrRights,
+}
+
+impl core::fmt::Debug for FileDescriptor {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut d = f.debug_struct("FileDescriptor");
+        d.field("flags", &self.flags);
+        d.field("is_occupied", &self.is_occupied);
+        if self.is_occupied() {
+            unsafe {
+                d.field("rights", &self.union_field.rights);
+            }
+        } else {
+            unsafe {
+                d.field("next_vacant", &self.union_field.next_vacant);
+            }
+        }
+        d.finish()
+    }
+}
+
+#[repr(C)]
+pub union VacantOrRights {
+    pub next_vacant: *mut FileDescriptor,
+    pub rights: CapRights,
+}
+
+impl core::fmt::Debug for VacantOrRights {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "VacantOrRights {{ ... }}")
+    }
+}
+
+const _: () = {
+    assert!(
+        core::mem::size_of::<FileDescriptor>() == 16,
+        "FileDescriptor size must be exactly 16 bytes for C-ABI stability!"
+    );
+};
+
+impl FileDescriptor {
+    pub fn new_vacant(next_vacant: *mut FileDescriptor) -> Self {
+        Self {
+            flags: 0,
+            is_occupied: 0,
+            union_field: VacantOrRights { next_vacant },
+        }
+    }
+
+    pub fn new_occupied(flags: u32) -> Self {
+        Self {
+            flags,
+            is_occupied: 1,
+            union_field: VacantOrRights {
+                rights: CapRights::empty(),
+            },
+        }
+    }
+
+    #[inline]
+    pub fn is_occupied(&self) -> bool {
+        self.is_occupied == 1
+    }
+
+    #[inline]
+    pub fn set_vacant(&mut self, next_vacant: *mut FileDescriptor) {
+        self.flags = 0;
+        self.is_occupied = 0;
+        self.union_field.next_vacant = next_vacant;
+    }
+
+    #[inline]
+    pub fn set_occupied(&mut self, flags: u32) {
+        self.flags = flags;
+        self.is_occupied = 1;
+        self.union_field.rights = CapRights::empty();
+    }
+
+    #[inline]
+    pub unsafe fn get_next_vacant(&self) -> *mut FileDescriptor {
+        unsafe { self.union_field.next_vacant }
+    }
+
+    #[inline]
+    pub unsafe fn get_rights(&self) -> CapRights {
+        unsafe { self.union_field.rights }
+    }
+
+    #[inline]
+    pub unsafe fn limit_rights(&mut self, limit: CapRights) {
+        unsafe { self.union_field.rights = self.union_field.rights.intersection(limit) };
+    }
+}
+
+#[repr(C)]
+pub struct LeafNode<const N: usize> {
+    pub entries: [*mut FileDescriptor; N],
+}
+
+const _: () = {
+    assert!(
+        core::mem::size_of::<LeafNode<NODE_SIZE>>() == 4096,
+        "LeafNode size must be exactly 4KiB (1 Page)!"
+    );
+};
+
+#[repr(C)]
+pub struct InnerNode {
+    pub children: [*mut LeafNode<NODE_SIZE>; NODE_SIZE],
+}
+
+unsafe impl Send for InnerNode {}
+unsafe impl Sync for InnerNode {}
+
+impl InnerNode {
+    pub const fn new() -> Self {
+        Self {
+            children: [null_mut(); NODE_SIZE],
+        }
+    }
+}
+
+pub trait LeafAllocator {
+    fn alloc_leaf(&mut self) -> *mut LeafNode<NODE_SIZE>;
+    fn free_leaf(&mut self, ptr: *mut LeafNode<NODE_SIZE>);
+    fn alloc_fd(&mut self, init: FileDescriptor) -> *mut FileDescriptor;
+    fn free_fd(&mut self, ptr: *mut FileDescriptor);
+}
+
+pub struct HeapLeafAllocator;
+
+impl LeafAllocator for HeapLeafAllocator {
+    fn alloc_leaf(&mut self) -> *mut LeafNode<NODE_SIZE> {
+        let leaf = Box::new(LeafNode {
+            entries: [null_mut(); NODE_SIZE],
+        });
+        Box::into_raw(leaf)
+    }
+
+    fn free_leaf(&mut self, ptr: *mut LeafNode<NODE_SIZE>) {
+        if !ptr.is_null() {
+            unsafe {
+                let leaf = Box::from_raw(ptr);
+                for &cap_ptr in leaf.entries.iter() {
+                    if !cap_ptr.is_null() {
+                        let _ = Box::from_raw(cap_ptr);
+                    }
+                }
+            }
+        }
+    }
+    fn alloc_fd(&mut self, fd: FileDescriptor) -> *mut FileDescriptor {
+        Box::into_raw(Box::new(fd))
+    }
+
+    fn free_fd(&mut self, ptr: *mut FileDescriptor) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+}
+
+pub struct RadixFdTbl {
+    root: InnerNode,
+}
+
+impl RadixFdTbl {
+    #[expect(
+        clippy::new_without_default,
+        reason = "explicit initialization expected for internal radix table"
+    )]
+    pub const fn new() -> Self {
+        Self {
+            root: InnerNode::new(),
+        }
+    }
+
+    pub fn get(&self, handle: usize) -> Option<&FileDescriptor> {
+        let l1_idx = (handle >> NODE_BITS) & NODE_MASK;
+        let l0_idx = handle & NODE_MASK;
+
+        let leaf_ptr = self.root.children[l1_idx];
+        if leaf_ptr.is_null() {
+            None
+        } else {
+            unsafe {
+                let cap_ptr = (*leaf_ptr).entries[l0_idx];
+                if cap_ptr.is_null() {
+                    None
+                } else {
+                    let fd = &*cap_ptr;
+                    if fd.is_occupied() { Some(fd) } else { None }
+                }
+            }
+        }
+    }
+
+    pub fn get_mut(&mut self, handle: usize) -> Option<&mut FileDescriptor> {
+        let l1_idx = (handle >> NODE_BITS) & NODE_MASK;
+        let l0_idx = handle & NODE_MASK;
+
+        let leaf_ptr = self.root.children[l1_idx];
+        if leaf_ptr.is_null() {
+            None
+        } else {
+            unsafe {
+                let cap_ptr = (*leaf_ptr).entries[l0_idx];
+                if cap_ptr.is_null() {
+                    None
+                } else {
+                    let fd = &mut *cap_ptr;
+                    if fd.is_occupied() { Some(fd) } else { None }
+                }
+            }
+        }
+    }
+
+    pub fn get_or_create_entry<A: LeafAllocator>(
+        &mut self,
+        handle: usize,
+        alloc: &mut A,
+    ) -> Result<&mut FileDescriptor> {
+        let l1_idx = (handle >> NODE_BITS) & NODE_MASK;
+        let l0_idx = handle & NODE_MASK;
+
+        let mut leaf_ptr = self.root.children[l1_idx];
+        if leaf_ptr.is_null() {
+            leaf_ptr = alloc.alloc_leaf();
+            if leaf_ptr.is_null() {
+                return Err(Error::new(ENOMEM));
+            }
+            self.root.children[l1_idx] = leaf_ptr;
+        }
+
+        unsafe {
+            let slot = &mut (*leaf_ptr).entries[l0_idx];
+            if slot.is_null() {
+                let new_fd = alloc.alloc_fd(FileDescriptor::new_vacant(null_mut()));
+                if new_fd.is_null() {
+                    return Err(Error::new(ENOMEM));
+                }
+                *slot = new_fd;
+            }
+            Ok(&mut **slot)
+        }
+    }
+
+    pub fn is_occupied(&self, handle: usize) -> bool {
+        self.get(handle).is_some()
+    }
+}
+
+pub struct PosixFdTbl {
+    table: RadixFdTbl,
+    lowest_idx: u32,
+    active_count: usize,
+}
+
+impl PosixFdTbl {
+    #[expect(
+        clippy::new_without_default,
+        reason = "explicit initialization expected for posix file table"
+    )]
+    pub const fn new() -> Self {
+        Self {
+            table: RadixFdTbl::new(),
+            lowest_idx: 0,
+            active_count: 0,
+        }
+    }
+
+    pub fn get_flags(&self, handle: usize) -> Result<u32> {
+        let entry = self.table.get(handle).ok_or(Error::new(EBADF))?;
+        Ok(entry.flags)
+    }
+
+    pub fn set_flags(&mut self, handle: usize, flags: u32) -> Result<()> {
+        let entry = self.table.get_mut(handle).ok_or(Error::new(EBADF))?;
+        entry.flags = flags;
+        Ok(())
+    }
+
+    pub fn get_rights(&self, index: usize) -> Result<CapRights> {
+        let entry = self.table.get(index).ok_or(Error::new(EBADF))?;
+        unsafe { Ok(entry.get_rights()) }
+    }
+
+    pub fn limit_rights(&mut self, index: usize, limit: CapRights) -> Result<()> {
+        let entry = self.table.get_mut(index).ok_or(Error::new(EBADF))?;
+        unsafe { entry.limit_rights(limit) };
+        Ok(())
+    }
+
+    pub fn check_rights(&self, handle: usize, required: CapRights) -> Result<()> {
+        let rights = self.get_rights(handle)?;
+        if rights.contains(required) {
+            Ok(())
+        } else {
+            Err(Error::new(EPERM))
+        }
+    }
+
+    #[inline]
+    fn is_occupied(&self, handle: usize) -> bool {
+        self.table.is_occupied(handle)
+    }
+
+    pub fn len(&self) -> usize {
+        self.active_count
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.active_count == 0
+    }
+
+    fn update_lowest_idx(&mut self, start_from: usize) {
+        let mut next_lowest = start_from;
+        while next_lowest < CONTEXT_MAX_FILES as usize && self.is_occupied(next_lowest) {
+            next_lowest += 1;
+        }
+        self.lowest_idx = next_lowest as u32;
+    }
+
+    fn validate_handles(&self, handles: &[usize]) -> Result<()> {
+        let mut checked_handles = BTreeSet::new();
+        for &handle in handles {
+            if handle >= CONTEXT_MAX_FILES as usize {
+                return Err(Error::new(EMFILE));
+            }
+            if !checked_handles.insert(handle) || !self.is_occupied(handle) {
+                return Err(Error::new(EBADF));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_free_slots(&self, handles: &[usize]) -> Result<()> {
+        let mut checked_handles = BTreeSet::new();
+        for &handle in handles {
+            if handle >= CONTEXT_MAX_FILES as usize {
+                return Err(Error::new(EMFILE));
+            }
+            if !checked_handles.insert(handle) {
+                return Err(Error::new(EBADF));
+            }
+            if self.is_occupied(handle) {
+                return Err(Error::new(EEXIST));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn find_free_posix_slots(&self, count: usize) -> Vec<usize> {
+        let mut free_slots = Vec::with_capacity(count);
+
+        for i in (self.lowest_idx as usize)..(CONTEXT_MAX_FILES as usize) {
+            if !self.is_occupied(i) {
+                free_slots.push(i);
+                if free_slots.len() == count {
+                    return free_slots;
+                }
+            }
+        }
+
+        for i in 0..(self.lowest_idx as usize) {
+            if !self.is_occupied(i) {
+                free_slots.push(i);
+                if free_slots.len() == count {
+                    return free_slots;
+                }
+            }
+        }
+
+        free_slots
+    }
+
+    pub fn add<A: LeafAllocator>(
+        &mut self,
+        flags: u32,
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<usize> {
+        let handle = self.lowest_idx as usize;
+        if handle >= CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        FdTbl::<A>::sync_size(sync_fd, handle + 1, 0)?;
+
+        let entry = self.table.get_or_create_entry(handle, alloc)?;
+        entry.set_occupied(flags);
+
+        self.active_count += 1;
+        self.update_lowest_idx(handle + 1);
+        Ok(handle)
+    }
+
+    pub fn bulk_add_posix<A: LeafAllocator>(
+        &mut self,
+        entries: Vec<usize>,
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<Vec<usize>> {
+        let count = entries.len();
+        if count == 0 {
+            return Ok(Vec::new());
+        }
+
+        let handles = self.find_free_posix_slots(count);
+        if handles.len() < count {
+            return Err(Error::new(EMFILE));
+        }
+
+        let max_index = *handles.iter().max().unwrap();
+        FdTbl::<A>::sync_size(sync_fd, max_index + 1, 0)?;
+
+        for (&handle, flags) in handles.iter().zip(entries) {
+            let entry = self.table.get_or_create_entry(handle, alloc)?;
+            entry.set_occupied(flags as u32);
+        }
+
+        self.active_count += count;
+
+        self.update_lowest_idx(self.lowest_idx as usize);
+
+        Ok(handles)
+    }
+
+    pub fn insert_at<A: LeafAllocator>(
+        &mut self,
+        handle: usize,
+        flags: u32,
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<usize> {
+        if handle >= CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        FdTbl::<A>::sync_size(sync_fd, handle + 1, 0)?;
+
+        let entry = self.table.get_or_create_entry(handle, alloc)?;
+        let was_occupied = entry.is_occupied();
+
+        entry.set_occupied(flags);
+
+        if !was_occupied {
+            self.active_count += 1;
+        }
+
+        if (handle as u32) <= self.lowest_idx {
+            self.update_lowest_idx(handle);
+        }
+
+        Ok(handle)
+    }
+
+    pub fn bulk_insert_manual<A: LeafAllocator>(
+        &mut self,
+        entries: Vec<u32>,
+        handles: &[usize],
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<()> {
+        if handles.len() != entries.len() {
+            return Err(Error::new(EINVAL));
+        }
+        let count = entries.len();
+        if count == 0 {
+            return Ok(());
+        }
+
+        self.validate_free_slots(handles)?;
+
+        let max_index = handles.iter().max().cloned().unwrap_or(0);
+        FdTbl::<A>::sync_size(sync_fd, max_index + 1, 0)?;
+
+        for (flags, &handle) in entries.into_iter().zip(handles) {
+            let entry = self.table.get_or_create_entry(handle, alloc)?;
+            entry.set_occupied(flags);
+        }
+
+        self.active_count += count;
+        self.update_lowest_idx(0);
+        Ok(())
+    }
+
+    pub fn remove(&mut self, handle: usize) -> Option<u32> {
+        if handle >= CONTEXT_MAX_FILES as usize {
+            return None;
+        }
+        let entry = self.table.get_mut(handle)?;
+        if !entry.is_occupied() {
+            return None;
+        }
+
+        let old_flags = entry.flags;
+        entry.set_vacant(null_mut());
+
+        self.active_count -= 1;
+        if (handle as u32) < self.lowest_idx {
+            self.lowest_idx = handle as u32;
+        }
+
+        Some(old_flags)
+    }
+
+    pub fn bulk_remove(&mut self, handles: &[usize]) -> Option<Vec<u32>> {
+        self.validate_handles(handles).ok()?;
+        let files = handles
+            .iter()
+            .map(|&i| self.remove(i).expect("fd should exist"))
+            .collect();
+        Some(files)
+    }
+}
+
+pub struct UpperFdTbl {
+    table: RadixFdTbl,
+    len: u32,
+    next_alloc_idx: usize,
+}
+
+unsafe impl Send for UpperFdTbl {}
+unsafe impl Sync for UpperFdTbl {}
+
+impl UpperFdTbl {
+    #[expect(
+        clippy::new_without_default,
+        reason = "explicit initialization expected for upper file table"
+    )]
+    pub const fn new() -> Self {
+        Self {
+            table: RadixFdTbl::new(),
+            len: 0,
+            next_alloc_idx: 0,
+        }
+    }
+
+    pub fn get_flags(&self, handle: usize) -> Result<u32> {
+        let index = Self::strip_tags(handle);
+        let entry = self.table.get(index).ok_or(Error::new(EBADF))?;
+        Ok(entry.flags)
+    }
+
+    pub fn set_flags(&mut self, handle: usize, new_flag: u32) -> Result<()> {
+        let index = Self::strip_tags(handle);
+        let entry = self.table.get_mut(index).ok_or(Error::new(EBADF))?;
+        entry.flags = new_flag;
+        Ok(())
+    }
+
+    pub fn get_rights(&self, handle: usize) -> Result<CapRights> {
+        let index = Self::strip_tags(handle);
+        let entry = self.table.get(index).ok_or(Error::new(EBADF))?;
+        unsafe { Ok(entry.get_rights()) }
+    }
+
+    pub fn limit_rights(&mut self, handle: usize, limit: CapRights) -> Result<()> {
+        let index = Self::strip_tags(handle);
+        let entry = self.table.get_mut(index).ok_or(Error::new(EBADF))?;
+        unsafe { entry.limit_rights(limit) };
+        Ok(())
+    }
+
+    pub fn check_rights(&self, handle: usize, required: CapRights) -> Result<()> {
+        let rights = self.get_rights(handle)?;
+        if rights.contains(required) {
+            Ok(())
+        } else {
+            Err(Error::new(EPERM))
+        }
+    }
+
+    fn strip_tags(index: usize) -> usize {
+        index & !syscall::UPPER_FDTBL_TAG
+    }
+
+    pub fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[inline]
+    fn is_occupied(&self, handle: usize) -> bool {
+        self.table.get(handle).map_or(false, |e| e.is_occupied())
+    }
+
+    fn validate_handles(&self, handles: &[usize]) -> Result<()> {
+        let mut checked_handles = BTreeSet::new();
+        for &handle in handles {
+            let handle = Self::strip_tags(handle);
+            if handle >= CONTEXT_MAX_FILES as usize {
+                return Err(Error::new(EMFILE));
+            }
+            if !checked_handles.insert(handle) {
+                return Err(Error::new(EBADF)); // Duplicate handle
+            }
+            let entry = self.table.get(handle).ok_or(Error::new(EBADF))?;
+            if !entry.is_occupied() {
+                return Err(Error::new(EBADF));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_free_slots(&self, handles: &[usize]) -> Result<()> {
+        let mut checked_handles = BTreeSet::new();
+        for &handle in handles {
+            let handle = Self::strip_tags(handle);
+            if handle >= CONTEXT_MAX_FILES as usize {
+                return Err(Error::new(EMFILE));
+            }
+            if !checked_handles.insert(handle) {
+                return Err(Error::new(EBADF)); // Duplicate handle
+            }
+            if self.is_occupied(handle) {
+                return Err(Error::new(EEXIST));
+            }
+        }
+        Ok(())
+    }
+
+    fn find_free_block(&self, len: usize) -> usize {
+        let mut start = 0;
+        let mut count = 0;
+
+        for i in 0..(CONTEXT_MAX_FILES as usize) {
+            if !self.is_occupied(i) {
+                if count == 0 {
+                    start = i;
+                }
+                count += 1;
+                if count == len {
+                    return start;
+                }
+            } else {
+                count = 0;
+            }
+        }
+
+        CONTEXT_MAX_FILES as usize
+    }
+
+    fn find_free_slot(&mut self) -> Option<usize> {
+        for i in self.next_alloc_idx..(CONTEXT_MAX_FILES as usize) {
+            if !self.is_occupied(i) {
+                self.next_alloc_idx = i + 1;
+                return Some(i);
+            }
+        }
+        for i in 0..self.next_alloc_idx {
+            if !self.is_occupied(i) {
+                self.next_alloc_idx = i + 1;
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    pub fn insert<A: LeafAllocator>(
+        &mut self,
+        flags: u32,
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<usize> {
+        let handle = self.find_free_slot().ok_or(Error::new(EMFILE))?;
+
+        FdTbl::<A>::sync_size(sync_fd, handle + 1, syscall::UPPER_FDTBL_TAG)?;
+
+        let entry = self.table.get_or_create_entry(handle, alloc)?;
+        entry.set_occupied(flags);
+
+        self.len += 1;
+        Ok(handle)
+    }
+
+    pub fn bulk_insert<A: LeafAllocator>(
+        &mut self,
+        entries: Vec<usize>,
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<Vec<usize>> {
+        let count = entries.len();
+        if count == 0 {
+            return Ok(Vec::new());
+        }
+        if self.len() + count > CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        let start_index = self.find_free_block(count);
+        if start_index + count > CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        FdTbl::<A>::sync_size(sync_fd, start_index + count, syscall::UPPER_FDTBL_TAG)?;
+
+        let mut handles = Vec::with_capacity(count);
+
+        for (i, flags) in entries.into_iter().enumerate() {
+            let handle = start_index + i;
+            let entry = self.table.get_or_create_entry(handle, alloc)?;
+
+            entry.set_occupied(flags as u32);
+            handles.push(handle);
+        }
+
+        self.len += count as u32;
+        Ok(handles)
+    }
+
+    pub fn insert_at<A: LeafAllocator>(
+        &mut self,
+        handle: usize,
+        flags: u32,
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<usize> {
+        if handle >= CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        FdTbl::<A>::sync_size(sync_fd, handle + 1, syscall::UPPER_FDTBL_TAG)?;
+
+        let entry = self.table.get_or_create_entry(handle, alloc)?;
+        let was_occupied = entry.is_occupied();
+
+        entry.set_occupied(flags);
+
+        if !was_occupied {
+            self.len += 1;
+        }
+
+        if handle == self.next_alloc_idx {
+            let mut next = handle + 1;
+            while next < CONTEXT_MAX_FILES as usize && self.is_occupied(next) {
+                next += 1;
+            }
+            self.next_alloc_idx = next;
+        }
+
+        Ok(handle)
+    }
+
+    pub fn bulk_insert_manual<A: LeafAllocator>(
+        &mut self,
+        entries: Vec<u32>,
+        handles: &[usize],
+        sync_fd: Option<&FdGuardUpper>,
+        alloc: &mut A,
+    ) -> Result<()> {
+        if handles.len() != entries.len() {
+            return Err(Error::new(EINVAL));
+        }
+        let count = entries.len();
+        if count == 0 {
+            return Ok(());
+        }
+        if self.len() + count > CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        self.validate_free_slots(handles)?;
+
+        let max_index = handles
+            .iter()
+            .map(|&h| Self::strip_tags(h))
+            .max()
+            .unwrap_or(0);
+        FdTbl::<A>::sync_size(sync_fd, max_index + 1, syscall::UPPER_FDTBL_TAG)?;
+
+        for (flags, &raw_handle) in entries.into_iter().zip(handles) {
+            let handle = Self::strip_tags(raw_handle);
+            let entry = self.table.get_or_create_entry(handle, alloc)?;
+
+            entry.set_occupied(flags);
+        }
+
+        self.len += count as u32;
+        Ok(())
+    }
+
+    pub fn remove(&mut self, handle: usize) -> Option<(u32, CapRights)> {
+        let handle = Self::strip_tags(handle);
+        if handle >= CONTEXT_MAX_FILES as usize {
+            return None;
+        }
+        let entry = self.table.get_mut(handle)?;
+
+        if !entry.is_occupied() {
+            return None;
+        }
+
+        let old_flags = entry.flags;
+        let old_rights = unsafe { entry.get_rights() };
+
+        entry.set_vacant(null_mut());
+
+        if handle < self.next_alloc_idx {
+            self.next_alloc_idx = handle;
+        }
+
+        self.len -= 1;
+        Some((old_flags, old_rights))
+    }
+
+    pub fn bulk_remove(&mut self, handles: &[usize]) -> Option<Vec<(u32, CapRights)>> {
+        self.validate_handles(handles).ok()?;
+        let files = handles
+            .iter()
+            .map(|&i| self.remove(i).expect("fd should exist"))
+            .collect();
+        Some(files)
+    }
+}
+
+pub struct FdTbl<A: LeafAllocator = HeapLeafAllocator> {
     fd: Option<FdGuardUpper>,
     posix_fdtbl: PosixFdTbl,
     upper_fdtbl: UpperFdTbl,
     active_count: usize,
+    allocator: A,
 }
 
-impl FdTbl {
-    pub const CONTEXT_MAX_FILES: u32 = 65_536;
-    pub const DEFAULT_CAPACITY: usize = usize::BITS as usize;
-
+impl FdTbl<HeapLeafAllocator> {
     #[expect(
         clippy::new_without_default,
-        reason = "default not expected for this type"
+        reason = "explicit initialization expected for runtime file table"
     )]
     pub const fn new() -> Self {
         Self {
@@ -937,6 +1778,7 @@ impl FdTbl {
             posix_fdtbl: PosixFdTbl::new(),
             upper_fdtbl: UpperFdTbl::new(),
             active_count: 0,
+            allocator: HeapLeafAllocator,
         }
     }
 
@@ -954,28 +1796,18 @@ impl FdTbl {
             )
         }?;
 
-        fdtbl.resize(Self::DEFAULT_CAPACITY);
-
         let mut reader = crate::proc::FileBufReader::from_fd(files_reader_fd);
         fdtbl.populate(&mut reader)?;
 
         // Manually mark the filetable_fd itself as occupied in userspace FILETABLE
         fdtbl.override_at(files_reader_fd, files_reader_fd)?;
-
         fdtbl.set_fd(filetable_fd);
 
         Ok(fdtbl)
     }
+}
 
-    pub fn with_capacity(capacity: usize, fd: FdGuardUpper) -> Self {
-        Self {
-            fd: Some(fd),
-            posix_fdtbl: PosixFdTbl::with_capacity(capacity),
-            upper_fdtbl: UpperFdTbl::with_capacity(capacity),
-            active_count: 0,
-        }
-    }
-
+impl<A: LeafAllocator> FdTbl<A> {
     pub fn fd(&self) -> Option<&FdGuardUpper> {
         self.fd.as_ref()
     }
@@ -988,21 +1820,8 @@ impl FdTbl {
         self.fd = Some(fd);
     }
 
-    pub fn resize(&mut self, size: usize) {
-        self.posix_fdtbl.resize(size);
-        self.upper_fdtbl.resize(size);
-    }
-
-    pub fn upper_capacity(&self) -> usize {
-        self.upper_fdtbl.capacity()
-    }
-
     pub fn upper_len(&self) -> usize {
         self.upper_fdtbl.len()
-    }
-
-    fn strip_tags(index: usize) -> usize {
-        index & !syscall::UPPER_FDTBL_TAG
     }
 
     fn is_upper(index: usize) -> bool {
@@ -1020,37 +1839,54 @@ impl FdTbl {
     pub fn get_fd_flags(&self, fd: usize) -> Result<usize> {
         if Self::is_upper(fd) {
             let flags = self.upper_fdtbl.get_flags(fd)?;
-            let mut raw_flags = 0;
-            if flags & (O_CLOEXEC as u32) != 0 {
-                raw_flags |= O_CLOEXEC;
-            }
-            Ok(raw_flags)
+            Ok((flags & O_CLOEXEC as u32) as usize)
         } else {
             let flags = self.posix_fdtbl.get_flags(fd)?;
-            let mut raw_flags = 0;
-            if flags.contains(FdFlags::CLOEXEC) {
-                raw_flags |= O_CLOEXEC;
-            }
-            Ok(raw_flags)
+            Ok((flags & O_CLOEXEC as u32) as usize)
         }
     }
 
-    pub fn set_fd_flags(&mut self, fd: usize, raw_flags: usize) -> Result<()> {
+    pub fn set_fd_flags(&mut self, fd: usize, flags: usize) -> Result<()> {
         if Self::is_upper(fd) {
             let old_flags = self.upper_fdtbl.get_flags(fd)?;
             let mut new_flags = old_flags & !(O_CLOEXEC as u32);
-            if raw_flags & O_CLOEXEC != 0 {
+            if flags & O_CLOEXEC != 0 {
                 new_flags |= O_CLOEXEC as u32;
             }
             self.upper_fdtbl.set_flags(fd, new_flags)?;
         } else {
-            let mut new_flags = FdFlags::empty();
-            if raw_flags & O_CLOEXEC != 0 {
-                new_flags.insert(FdFlags::CLOEXEC);
+            let old_flags = self.posix_fdtbl.get_flags(fd)?;
+            let mut new_flags = old_flags & !(O_CLOEXEC as u32);
+            if flags & O_CLOEXEC != 0 {
+                new_flags |= O_CLOEXEC as u32;
             }
             self.posix_fdtbl.set_flags(fd, new_flags)?;
         }
         Ok(())
+    }
+
+    pub fn get_rights(&self, fd: usize) -> Result<CapRights> {
+        if Self::is_upper(fd) {
+            self.upper_fdtbl.get_rights(fd)
+        } else {
+            self.posix_fdtbl.get_rights(fd)
+        }
+    }
+
+    pub fn limit_rights(&mut self, fd: usize, limit: CapRights) -> Result<()> {
+        if Self::is_upper(fd) {
+            self.upper_fdtbl.limit_rights(fd, limit)
+        } else {
+            self.posix_fdtbl.limit_rights(fd, limit)
+        }
+    }
+
+    pub fn check_rights(&self, fd: usize, required: CapRights) -> Result<()> {
+        if Self::is_upper(fd) {
+            self.upper_fdtbl.check_rights(fd, required)
+        } else {
+            self.posix_fdtbl.check_rights(fd, required)
+        }
     }
 
     fn sync_size(fd: Option<&FdGuardUpper>, new_size: usize, tag: usize) -> Result<()> {
@@ -1079,68 +1915,28 @@ impl FdTbl {
         let _ = self.remove(new_fd);
 
         if Self::is_upper(new_fd) {
-            let handle = Self::strip_tags(new_fd);
-            self.upper_fdtbl.insert_at(
-                handle,
-                UpperFdTbl::flags_into_entry(0),
-                self.fd.as_ref(),
-            )?;
+            let handle = UpperFdTbl::strip_tags(new_fd);
+            self.upper_fdtbl
+                .insert_at(handle, 0, self.fd.as_ref(), &mut self.allocator)?;
         } else {
-            self.posix_fdtbl.insert_at(
-                new_fd,
-                PosixFdTbl::flags_into_entry(0),
-                self.fd.as_ref(),
-            )?;
+            self.posix_fdtbl
+                .insert_at(new_fd, 0, self.fd.as_ref(), &mut self.allocator)?;
         }
 
-        self.active_count += 1;
+        self.active_count = self.posix_fdtbl.len() + self.upper_fdtbl.len();
+
         Ok(new_fd)
     }
-    pub fn add_posix(&mut self, entry: usize) -> Result<usize> {
-        if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
+
+    pub fn add_posix(&mut self, flags: u32) -> Result<usize> {
+        if self.active_count >= CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
         let out_idx = self
             .posix_fdtbl
-            .add(PosixFdTbl::flags_into_entry(entry), self.fd.as_ref())?;
-        self.active_count += 1;
-
-        Ok(out_idx)
-    }
-
-    pub fn insert_upper(&mut self, entry: usize) -> Result<usize> {
-        if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
-            return Err(Error::new(EMFILE));
-        }
-
-        let old_capacity = self.upper_fdtbl.capacity();
-
-        let out_idx = self
-            .upper_fdtbl
-            .insert(UpperFdTbl::flags_into_entry(entry), self.fd.as_ref())?;
-        self.active_count += 1;
-
-        Ok(out_idx)
-    }
-
-    pub fn insert_at_upper(&mut self, new_fd: usize, entry: usize) -> Result<usize> {
-        if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
-            return Err(Error::new(EMFILE));
-        }
-
-        let old_capacity = self.upper_fdtbl.capacity();
-        if !Self::is_upper(new_fd) {
-            return Err(Error::new(EINVAL));
-        }
-        let handle = Self::strip_tags(new_fd);
-
-        let out_idx = self.upper_fdtbl.insert_at(
-            handle,
-            UpperFdTbl::flags_into_entry(entry),
-            self.fd.as_ref(),
-        )?;
-        self.active_count += 1;
+            .add(flags, self.fd.as_ref(), &mut self.allocator)?;
+        self.active_count = self.posix_fdtbl.len() + self.upper_fdtbl.len();
 
         Ok(out_idx)
     }
@@ -1156,35 +1952,40 @@ impl FdTbl {
             return Ok(0);
         }
 
-        if self.active_count + cnt > Self::CONTEXT_MAX_FILES as usize {
+        if self.active_count + cnt > CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
-        if which & syscall::UPPER_FDTBL_TAG == 0 {
-            let old_capacity = self.posix_fdtbl.capacity();
+        let fd_ref = self.fd.as_ref();
+        let alloc = &mut self.allocator;
+        let entries = alloc::vec![flags; cnt];
 
-            let initial_flag = PosixFdTbl::flags_into_entry(flags);
-            let entries = alloc::vec![initial_flag; cnt];
-
-            let handles = self.posix_fdtbl.bulk_add_posix(entries, self.fd.as_ref())?;
-            self.active_count += cnt;
-
-            for (i, &handle) in handles.iter().enumerate() {
-                fd_slice[i] = handle;
-            }
+        if !Self::is_upper(which) {
+            let allocated_fds = self.posix_fdtbl.bulk_add_posix(entries, fd_ref, alloc)?;
+            fd_slice.copy_from_slice(&allocated_fds);
         } else {
-            let old_capacity = self.upper_fdtbl.capacity();
-
-            let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
-            let handles = self.upper_fdtbl.bulk_insert(entries, self.fd.as_ref())?;
-            self.active_count += cnt;
-
-            for (i, &handle) in handles.iter().enumerate() {
+            let allocated_fds = self.upper_fdtbl.bulk_insert(entries, fd_ref, alloc)?;
+            for (i, &handle) in allocated_fds.iter().enumerate() {
                 fd_slice[i] = handle | syscall::UPPER_FDTBL_TAG;
             }
         }
 
+        self.active_count = self.posix_fdtbl.len() + self.upper_fdtbl.len();
+
         Ok(cnt)
+    }
+
+    pub fn insert_upper(&mut self, flags: u32) -> Result<usize> {
+        if self.active_count >= CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        let out_idx = self
+            .upper_fdtbl
+            .insert(flags, self.fd.as_ref(), &mut self.allocator)?;
+        self.active_count = self.posix_fdtbl.len() + self.upper_fdtbl.len();
+
+        Ok(out_idx)
     }
 
     pub fn bulk_insert(
@@ -1202,735 +2003,53 @@ impl FdTbl {
             return self.bulk_add(which, fd_slice, flags);
         }
 
-        if self.active_count + cnt > Self::CONTEXT_MAX_FILES as usize {
+        if self.active_count + cnt > CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
-        if which & syscall::UPPER_FDTBL_TAG == 0 {
-            let old_capacity = self.posix_fdtbl.capacity();
+        let entries = alloc::vec![flags as u32; cnt];
 
-            let initial_flag = PosixFdTbl::flags_into_entry(flags);
-            let entries = alloc::vec![initial_flag; cnt];
+        let fd_ref = self.fd.as_ref();
+        let alloc = &mut self.allocator;
 
+        if !Self::is_upper(which) {
             self.posix_fdtbl
-                .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
-            self.active_count += cnt;
+                .bulk_insert_manual(entries, fd_slice, fd_ref, alloc)?;
         } else {
-            let old_capacity = self.upper_fdtbl.capacity();
-
-            let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
             self.upper_fdtbl
-                .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
-            self.active_count += cnt;
+                .bulk_insert_manual(entries, fd_slice, fd_ref, alloc)?;
         }
+
+        self.active_count = self.posix_fdtbl.len() + self.upper_fdtbl.len();
 
         Ok(cnt)
     }
 
     pub fn remove(&mut self, fd: usize) -> Result<()> {
-        if Self::is_upper(fd) {
-            let handle = Self::strip_tags(fd);
-            if self.upper_fdtbl.remove(handle).is_some() {
-                self.active_count -= 1;
-                Ok(())
-            } else {
-                Err(Error::new(EBADF))
-            }
+        let removed = if Self::is_upper(fd) {
+            let handle = UpperFdTbl::strip_tags(fd);
+            self.upper_fdtbl.remove(handle).is_some()
         } else {
-            if self.posix_fdtbl.remove(fd).is_some() {
-                self.active_count -= 1;
-                Ok(())
-            } else {
-                Err(Error::new(EBADF))
-            }
-        }
-    }
-}
-
-pub struct PosixFdTbl {
-    table: Vec<FdFlags>,
-    lowest_idx: u32,
-}
-
-bitflags::bitflags! {
-    #[derive(Clone, Copy, Default, PartialEq, Eq)]
-    pub struct FdFlags: u8 {
-        const VACANT   = 0;
-        const OCCUPIED = 1 << 0;
-        const CLOEXEC  = 1 << 1;
-        const CLOFORK  = 1 << 2;
-    }
-}
-
-impl PosixFdTbl {
-    #[expect(
-        clippy::new_without_default,
-        reason = "default not expected for this type"
-    )]
-    pub const fn new() -> Self {
-        Self {
-            table: Vec::new(),
-            lowest_idx: 0,
-        }
-    }
-
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            table: Vec::with_capacity(capacity),
-            lowest_idx: 0,
-        }
-    }
-
-    pub fn get_flags(&self, handle: usize) -> Result<FdFlags> {
-        self.table
-            .get(handle)
-            .copied()
-            .filter(|flags| flags.contains(FdFlags::OCCUPIED))
-            .ok_or(Error::new(EBADF))
-    }
-
-    pub fn set_flags(&mut self, handle: usize, flags: FdFlags) -> Result<()> {
-        if !self.is_occupied(handle) {
-            return Err(Error::new(EBADF));
-        }
-        let entry = self.table[handle];
-        self.table[handle] = (entry & FdFlags::OCCUPIED) | flags;
-        Ok(())
-    }
-
-    pub fn flags_into_entry(flags: usize) -> FdFlags {
-        let mut new_entry = FdFlags::OCCUPIED;
-        if flags & O_CLOEXEC != 0 {
-            new_entry.insert(FdFlags::CLOEXEC);
-        }
-        /* TODO: Support O_CLOFORK
-        if flags & syscall::O_CLOFORK != 0 {
-            new_entry.insert(FdFlags::CLOFORK);
-        }
-        */
-        new_entry
-    }
-
-    fn is_vacant(&self, handle: usize) -> bool {
-        self.table
-            .get(handle)
-            .is_none_or(|&flags| !flags.contains(FdFlags::OCCUPIED))
-    }
-
-    fn is_occupied(&self, handle: usize) -> bool {
-        self.table
-            .get(handle)
-            .is_some_and(|&flags| flags.contains(FdFlags::OCCUPIED))
-    }
-
-    pub fn resize(&mut self, size: usize) {
-        self.table.resize(size, FdFlags::VACANT);
-    }
-
-    pub fn capacity(&self) -> usize {
-        self.table.capacity()
-    }
-
-    pub fn len(&self) -> usize {
-        self.table
-            .iter()
-            .filter(|&&e| e.contains(FdFlags::OCCUPIED))
-            .count()
-    }
-
-    pub const fn is_empty(&self) -> bool {
-        self.table.is_empty()
-    }
-
-    pub fn with_transaction<T, F>(&mut self, rollback_len: usize, f: F) -> Result<T>
-    where
-        F: FnOnce(&mut Self) -> Result<T>,
-    {
-        match f(self) {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                self.table.truncate(rollback_len);
-                if (self.lowest_idx as usize) > self.table.len() {
-                    self.lowest_idx = self.table.len() as u32;
-                }
-                Err(e)
-            }
-        }
-    }
-
-    fn update_lowest_idx(&mut self, start_from: usize) {
-        let mut next_lowest = start_from;
-        while next_lowest < self.table.len() && self.is_occupied(next_lowest) {
-            next_lowest += 1;
-        }
-        self.lowest_idx = next_lowest as u32;
-    }
-
-    fn validate_handles(&self, handles: &[usize]) -> Result<()> {
-        let mut checked_handles = BTreeSet::new();
-        for &handle in handles {
-            if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
-                return Err(Error::new(EMFILE));
-            }
-            if !checked_handles.insert(handle) || !self.is_occupied(handle) {
-                return Err(Error::new(EBADF));
-            }
-        }
-        Ok(())
-    }
-
-    fn validate_free_slots(&self, handles: &[usize]) -> Result<()> {
-        let mut checked_handles = BTreeSet::new();
-        for &handle in handles {
-            if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
-                return Err(Error::new(EMFILE));
-            }
-            if !checked_handles.insert(handle) {
-                return Err(Error::new(EBADF));
-            }
-            if self.is_occupied(handle) {
-                return Err(Error::new(EEXIST));
-            }
-        }
-        Ok(())
-    }
-
-    pub fn find_free_posix_slots(&self, count: usize) -> Vec<usize> {
-        let mut free_slots = Vec::with_capacity(count);
-
-        for i in (self.lowest_idx as usize)..self.table.len() {
-            if self.is_vacant(i) {
-                free_slots.push(i);
-                if free_slots.len() == count {
-                    return free_slots;
-                }
-            }
-        }
-
-        let mut current_len = self.table.len();
-        while free_slots.len() < count {
-            free_slots.push(current_len);
-            current_len += 1;
-        }
-        free_slots
-    }
-
-    pub fn add(&mut self, flags: FdFlags, sync_fd: Option<&FdGuardUpper>) -> Result<usize> {
-        let handle = self.lowest_idx as usize;
-        let old_len = self.table.len();
-        let entry_flags = flags | FdFlags::OCCUPIED;
-
-        if handle >= old_len {
-            self.with_transaction(old_len, |this| {
-                let new_len = handle + 1;
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
-                this.table.push(entry_flags);
-                this.lowest_idx = (handle + 1) as u32;
-                Ok(handle)
-            })
-        } else {
-            self.table[handle] = entry_flags;
-            self.update_lowest_idx(handle + 1);
-            Ok(handle)
-        }
-    }
-
-    pub fn bulk_add_posix(
-        &mut self,
-        entries: Vec<FdFlags>,
-        sync_fd: Option<&FdGuardUpper>,
-    ) -> Result<Vec<usize>> {
-        let count = entries.len();
-        if count == 0 {
-            return Ok(Vec::new());
-        }
-
-        let handles = self.find_free_posix_slots(count);
-        let max_index = handles[count - 1];
-
-        if max_index >= FdTbl::CONTEXT_MAX_FILES as usize {
-            return Err(Error::new(EMFILE));
-        }
-
-        let old_len = self.table.len();
-        let new_len = if old_len <= max_index {
-            max_index + 1
-        } else {
-            old_len
+            self.posix_fdtbl.remove(fd).is_some()
         };
 
-        self.with_transaction(old_len, |this| {
-            if old_len != new_len {
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
-                this.resize(new_len);
-            }
-
-            for (&handle, flags) in handles.iter().zip(entries) {
-                this.table[handle] = flags | FdFlags::OCCUPIED;
-            }
-
-            let mut next_lowest = this.lowest_idx as usize;
-            while next_lowest < this.table.len() && this.is_occupied(next_lowest) {
-                next_lowest += 1;
-            }
-            this.lowest_idx = next_lowest as u32;
-
-            Ok(handles)
-        })
-    }
-
-    pub fn insert_at(
-        &mut self,
-        handle: usize,
-        flags: FdFlags,
-        sync_fd: Option<&FdGuardUpper>,
-    ) -> Result<usize> {
-        if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
-            return Err(Error::new(EMFILE));
-        }
-        let old_len = self.table.len();
-        let new_len = if handle >= old_len {
-            handle + 1
-        } else {
-            old_len
-        };
-        let entry_flags = flags | FdFlags::OCCUPIED;
-
-        self.with_transaction(old_len, |this| {
-            if handle >= old_len {
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
-                this.resize(handle + 1);
-            }
-            this.table[handle] = entry_flags;
-
-            if handle <= this.lowest_idx as usize {
-                this.update_lowest_idx(handle);
-            }
-            Ok(handle)
-        })
-    }
-
-    pub fn bulk_insert_manual(
-        &mut self,
-        entries: Vec<FdFlags>,
-        handles: &[usize],
-        sync_fd: Option<&FdGuardUpper>,
-    ) -> Result<()> {
-        if handles.len() != entries.len() {
-            return Err(Error::new(EINVAL));
-        }
-        let count = entries.len();
-        if count == 0 {
-            return Ok(());
-        }
-
-        self.validate_free_slots(handles)?;
-
-        let max_index = handles.iter().max().cloned().unwrap_or(0);
-        let old_len = self.table.len();
-        let new_len = if old_len <= max_index {
-            max_index + 1
-        } else {
-            old_len
-        };
-
-        self.with_transaction(old_len, |this| {
-            if old_len <= max_index {
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
-                this.resize(max_index + 1);
-            }
-
-            for (entry, &index) in entries.into_iter().zip(handles) {
-                this.table[index] = entry | FdFlags::OCCUPIED;
-            }
-
-            this.update_lowest_idx(0);
-
+        if removed {
+            self.active_count = self.posix_fdtbl.len() + self.upper_fdtbl.len();
             Ok(())
-        })
-    }
-
-    pub fn remove(&mut self, handle: usize) -> Option<FdFlags> {
-        if !self.is_occupied(handle) {
-            return None;
-        }
-
-        let old_entry = core::mem::replace(&mut self.table[handle], FdFlags::VACANT);
-
-        if (handle as u32) < self.lowest_idx {
-            self.lowest_idx = handle as u32;
-        }
-
-        Some(old_entry)
-    }
-
-    pub fn bulk_remove(&mut self, handles: &[usize]) -> Option<Vec<FdFlags>> {
-        self.validate_handles(handles).ok()?;
-
-        let files = handles
-            .iter()
-            .map(|&i| self.remove(i).expect("fd should exist"))
-            .collect();
-
-        Some(files)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FdTblEntry {
-    Vacant { next_vacant_idx: u32 },
-    Occupied { flag: u32 },
-}
-
-impl FdTblEntry {
-    pub fn new_occupied(flag: u32) -> Self {
-        Self::Occupied { flag }
-    }
-}
-
-pub struct UpperFdTbl {
-    table: Vec<FdTblEntry>,
-    len: u32,
-    first_vacant_idx: u32,
-}
-
-impl UpperFdTbl {
-    #[expect(
-        clippy::new_without_default,
-        reason = "default not expected for this type"
-    )]
-    pub const fn new() -> Self {
-        Self {
-            table: Vec::new(),
-            len: 0,
-            first_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
-        }
-    }
-
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            table: Vec::with_capacity(capacity),
-            len: 0,
-            first_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
-        }
-    }
-
-    pub fn get_flags(&self, handle: usize) -> Result<u32> {
-        let index = Self::strip_tags(handle);
-        match self.table.get(index) {
-            Some(FdTblEntry::Occupied { flag }) => Ok(*flag),
-            _ => Err(Error::new(EBADF)),
-        }
-    }
-
-    pub fn set_flags(&mut self, handle: usize, new_flag: u32) -> Result<()> {
-        let index = Self::strip_tags(handle);
-        match self.table.get_mut(index) {
-            Some(entry @ FdTblEntry::Occupied { .. }) => {
-                *entry = FdTblEntry::Occupied { flag: new_flag };
-                Ok(())
-            }
-            _ => Err(Error::new(EBADF)),
-        }
-    }
-
-    pub fn flags_into_entry(flags: usize) -> FdTblEntry {
-        FdTblEntry::new_occupied(flags as u32)
-    }
-
-    fn strip_tags(index: usize) -> usize {
-        index & !syscall::UPPER_FDTBL_TAG
-    }
-
-    pub fn resize(&mut self, size: usize) {
-        self.table.resize(
-            size,
-            FdTblEntry::Vacant {
-                next_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
-            },
-        );
-        self.rebuild_free_list();
-    }
-
-    pub fn capacity(&self) -> usize {
-        self.table.capacity()
-    }
-
-    pub fn len(&self) -> usize {
-        self.len as usize
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
-    pub fn with_transaction<T, F>(&mut self, rollback_len: usize, f: F) -> Result<T>
-    where
-        F: FnOnce(&mut Self) -> Result<T>,
-    {
-        match f(self) {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                self.table.truncate(rollback_len);
-                Err(e)
-            }
-        }
-    }
-
-    fn validate_handles(&self, handles: &[usize]) -> Result<()> {
-        let mut checked_handles = BTreeSet::new();
-        for &handle in handles {
-            let handle = Self::strip_tags(handle);
-            if Self::strip_tags(handle) >= FdTbl::CONTEXT_MAX_FILES as usize {
-                return Err(Error::new(EMFILE));
-            }
-            if !checked_handles.insert(handle) {
-                return Err(Error::new(EBADF)); // Duplicate handle
-            }
-            if !matches!(self.table.get(handle), Some(FdTblEntry::Occupied { .. })) {
-                return Err(Error::new(EBADF));
-            }
-        }
-        Ok(())
-    }
-
-    fn validate_free_slots(&self, handles: &[usize]) -> Result<()> {
-        let mut checked_handles = BTreeSet::new();
-        for &handle in handles {
-            let handle = Self::strip_tags(handle);
-            if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
-                return Err(Error::new(EMFILE));
-            }
-            if !checked_handles.insert(handle) {
-                return Err(Error::new(EBADF)); // Duplicate handle
-            }
-            if matches!(self.table.get(handle), Some(FdTblEntry::Occupied { .. })) {
-                return Err(Error::new(EEXIST));
-            }
-        }
-        Ok(())
-    }
-
-    fn find_free_block(&self, len: usize) -> usize {
-        let mut start = 0;
-        let mut count = 0;
-
-        for (i, entry) in self.table.iter().enumerate() {
-            if matches!(entry, FdTblEntry::Vacant { .. }) {
-                if count == 0 {
-                    start = i;
-                }
-                count += 1;
-                if count == len {
-                    return start;
-                }
-            } else {
-                count = 0;
-            }
-        }
-
-        if count == 0 { self.table.len() } else { start }
-    }
-
-    pub fn insert(&mut self, entry: FdTblEntry, sync_fd: Option<&FdGuardUpper>) -> Result<usize> {
-        let handle = self.first_vacant_idx as usize;
-
-        if self.first_vacant_idx == FdTbl::CONTEXT_MAX_FILES {
-            let old_len = self.table.len();
-            let new_len = old_len + 1;
-            self.with_transaction(old_len, |this| {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
-                this.table.push(entry);
-                this.len += 1;
-                Ok(old_len)
-            })
         } else {
-            if let FdTblEntry::Vacant { next_vacant_idx } = self.table[handle] {
-                self.first_vacant_idx = next_vacant_idx;
-                self.table[handle] = entry;
-                self.len += 1;
-                Ok(handle)
-            } else {
-                unreachable!();
-            }
+            Err(Error::new(EBADF))
         }
-    }
-
-    pub fn bulk_insert(
-        &mut self,
-        entries: Vec<FdTblEntry>,
-        sync_fd: Option<&FdGuardUpper>,
-    ) -> Result<Vec<usize>> {
-        let count = entries.len();
-        if count == 0 {
-            return Ok(Vec::new());
-        }
-        if self.len() + count > FdTbl::CONTEXT_MAX_FILES as usize {
-            return Err(Error::new(EMFILE));
-        }
-
-        let old_len = self.table.len();
-
-        let start_index = self.find_free_block(count);
-        let needed_len = start_index + count;
-
-        let new_len = if old_len < needed_len {
-            needed_len
-        } else {
-            old_len
-        };
-
-        self.with_transaction(old_len, |this| {
-            if old_len != new_len {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
-                this.resize(new_len);
-            }
-
-            let mut handles = Vec::with_capacity(count);
-            for (i, entry) in entries.into_iter().enumerate() {
-                let current_index = start_index + i;
-                this.table[current_index] = entry;
-                handles.push(current_index);
-            }
-
-            this.len += count as u32;
-
-            this.rebuild_free_list();
-
-            Ok(handles)
-        })
-    }
-
-    pub fn insert_at(
-        &mut self,
-        handle: usize,
-        entry: FdTblEntry,
-        sync_fd: Option<&FdGuardUpper>,
-    ) -> Result<usize> {
-        let old_len = self.table.len();
-        let new_len = if handle >= old_len {
-            handle + 1
-        } else {
-            old_len
-        };
-
-        self.with_transaction(old_len, |this| {
-            if handle >= old_len {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
-                this.resize(handle + 1);
-            }
-
-            let vacant = matches!(this.table[handle], FdTblEntry::Vacant { .. });
-            if vacant {
-                this.len += 1;
-            }
-
-            this.table[handle] = entry;
-
-            if vacant {
-                this.rebuild_free_list();
-            }
-            Ok(handle)
-        })
-    }
-
-    pub fn bulk_insert_manual(
-        &mut self,
-        entries: Vec<FdTblEntry>,
-        handles: &[usize],
-        sync_fd: Option<&FdGuardUpper>,
-    ) -> Result<()> {
-        if handles.len() != entries.len() {
-            return Err(Error::new(EINVAL));
-        }
-        let count = entries.len();
-        if count == 0 {
-            return Ok(());
-        }
-        if self.len() + count > FdTbl::CONTEXT_MAX_FILES as usize {
-            return Err(Error::new(EMFILE));
-        }
-
-        self.validate_free_slots(handles)?;
-
-        let max_index = handles
-            .iter()
-            .map(|&h| Self::strip_tags(h))
-            .max()
-            .unwrap_or(0);
-        let old_len = self.table.len();
-        let new_len = if old_len <= max_index {
-            max_index + 1
-        } else {
-            old_len
-        };
-
-        self.with_transaction(old_len, |this| {
-            if old_len <= max_index {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
-                this.resize(max_index + 1);
-            }
-
-            for (entry, &index) in entries.into_iter().zip(handles) {
-                this.table[Self::strip_tags(index)] = entry;
-            }
-
-            this.len += count as u32;
-
-            this.rebuild_free_list();
-
-            Ok(())
-        })
-    }
-
-    pub fn remove(&mut self, handle: usize) -> Option<FdTblEntry> {
-        if handle >= self.table.len() || matches!(self.table[handle], FdTblEntry::Vacant { .. }) {
-            return None;
-        }
-
-        let old_entry = core::mem::replace(
-            &mut self.table[handle],
-            FdTblEntry::Vacant {
-                next_vacant_idx: self.first_vacant_idx,
-            },
-        );
-        self.first_vacant_idx = handle as u32;
-        self.len -= 1;
-
-        Some(old_entry)
-    }
-
-    pub fn bulk_remove(&mut self, handles: &[usize]) -> Option<Vec<FdTblEntry>> {
-        self.validate_handles(handles).ok()?;
-
-        let files = handles
-            .iter()
-            .map(|&i| self.remove(i).expect("fd should exist"))
-            .collect();
-
-        Some(files)
-    }
-
-    fn rebuild_free_list(&mut self) {
-        let mut next_vacant = FdTbl::CONTEXT_MAX_FILES;
-        for i in (0..self.table.len()).rev() {
-            if let FdTblEntry::Vacant { next_vacant_idx } = &mut self.table[i] {
-                *next_vacant_idx = next_vacant;
-                next_vacant = i as u32;
-            }
-        }
-        self.first_vacant_idx = next_vacant;
     }
 }
 
-pub struct FdTblIter<'a> {
-    fdtbl: &'a FdTbl,
+pub struct FdTblIter<'a, A: LeafAllocator> {
+    fdtbl: &'a FdTbl<A>,
     stage: u8,
     cursor: usize,
 }
 
-impl<'a> FdTblIter<'a> {
-    fn new(fdtbl: &'a FdTbl) -> Self {
+impl<'a, A: LeafAllocator> FdTblIter<'a, A> {
+    fn new(fdtbl: &'a FdTbl<A>) -> Self {
         Self {
             fdtbl,
             stage: 0,
@@ -1939,51 +2058,35 @@ impl<'a> FdTblIter<'a> {
     }
 }
 
-impl<'a> Iterator for FdTblIter<'a> {
+impl<'a, A: LeafAllocator> Iterator for FdTblIter<'a, A> {
     type Item = (usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.stage {
                 0 => {
-                    let table = &self.fdtbl.posix_fdtbl.table;
-                    if self.cursor < table.len() {
+                    while self.cursor < CONTEXT_MAX_FILES as usize {
                         let idx = self.cursor;
                         self.cursor += 1;
 
-                        let internal_flags = table[idx];
-                        if internal_flags.contains(FdFlags::OCCUPIED) {
-                            let mut raw_flags = 0;
-                            if internal_flags.contains(FdFlags::CLOEXEC) {
-                                raw_flags |= O_CLOEXEC;
-                            }
-                            /*
-                            if internal_flags.contains(FdFlags::CLOFORK) {
-                                raw_flags |= syscall::O_CLOFORK;
-                            }
-                            */
-                            return Some((idx, raw_flags));
+                        if let Ok(flags) = self.fdtbl.posix_fdtbl.get_flags(idx) {
+                            return Some((idx, flags as usize));
                         }
-                    } else {
-                        self.stage = 1;
-                        self.cursor = 0;
                     }
+                    self.stage = 1;
+                    self.cursor = 0;
                 }
                 1 => {
-                    let table = &self.fdtbl.upper_fdtbl.table;
-                    if self.cursor < table.len() {
+                    while self.cursor < CONTEXT_MAX_FILES as usize {
                         let idx = self.cursor;
                         self.cursor += 1;
 
-                        if let FdTblEntry::Occupied { flag } = table[idx] {
-                            let raw_flags = flag as usize;
-
+                        if let Ok(flags) = self.fdtbl.upper_fdtbl.get_flags(idx) {
                             let full_fd = idx | syscall::UPPER_FDTBL_TAG;
-                            return Some((full_fd, raw_flags));
+                            return Some((full_fd, flags as usize));
                         }
-                    } else {
-                        self.stage = 2;
                     }
+                    self.stage = 2;
                 }
                 _ => return None,
             }
@@ -1991,17 +2094,17 @@ impl<'a> Iterator for FdTblIter<'a> {
     }
 }
 
-impl FdTbl {
-    pub fn iter(&self) -> FdTblIter<'_> {
+impl<'a, A: LeafAllocator> IntoIterator for &'a FdTbl<A> {
+    type Item = (usize, usize);
+    type IntoIter = FdTblIter<'a, A>;
+
+    fn into_iter(self) -> Self::IntoIter {
         FdTblIter::new(self)
     }
 }
 
-impl<'a> IntoIterator for &'a FdTbl {
-    type Item = (usize, usize);
-    type IntoIter = FdTblIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+impl<A: LeafAllocator> FdTbl<A> {
+    pub fn iter(&self) -> FdTblIter<'_, A> {
+        FdTblIter::new(self)
     }
 }
