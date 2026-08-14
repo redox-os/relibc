@@ -1052,6 +1052,10 @@ unsafe impl Send for InnerNode {}
 unsafe impl Sync for InnerNode {}
 
 impl InnerNode {
+    #[expect(
+        clippy::new_without_default,
+        reason = "explicit initialization expected for radix tree inner nodes"
+    )]
     pub const fn new() -> Self {
         Self {
             children: [null_mut(); NODE_SIZE],
@@ -1060,23 +1064,23 @@ impl InnerNode {
 }
 
 pub trait LeafAllocator {
-    fn alloc_leaf(&mut self) -> *mut LeafNode<NODE_SIZE>;
-    fn free_leaf(&mut self, ptr: *mut LeafNode<NODE_SIZE>);
-    fn alloc_fd(&mut self, init: FileDescriptor) -> *mut FileDescriptor;
-    fn free_fd(&mut self, ptr: *mut FileDescriptor);
+    unsafe fn alloc_leaf(&mut self) -> *mut LeafNode<NODE_SIZE>;
+    unsafe fn free_leaf(&mut self, ptr: *mut LeafNode<NODE_SIZE>);
+    unsafe fn alloc_fd(&mut self, init: FileDescriptor) -> *mut FileDescriptor;
+    unsafe fn free_fd(&mut self, ptr: *mut FileDescriptor);
 }
 
 pub struct HeapLeafAllocator;
 
 impl LeafAllocator for HeapLeafAllocator {
-    fn alloc_leaf(&mut self) -> *mut LeafNode<NODE_SIZE> {
+    unsafe fn alloc_leaf(&mut self) -> *mut LeafNode<NODE_SIZE> {
         let leaf = Box::new(LeafNode {
             entries: [null_mut(); NODE_SIZE],
         });
         Box::into_raw(leaf)
     }
 
-    fn free_leaf(&mut self, ptr: *mut LeafNode<NODE_SIZE>) {
+    unsafe fn free_leaf(&mut self, ptr: *mut LeafNode<NODE_SIZE>) {
         if !ptr.is_null() {
             unsafe {
                 let leaf = Box::from_raw(ptr);
@@ -1088,11 +1092,11 @@ impl LeafAllocator for HeapLeafAllocator {
             }
         }
     }
-    fn alloc_fd(&mut self, fd: FileDescriptor) -> *mut FileDescriptor {
+    unsafe fn alloc_fd(&mut self, fd: FileDescriptor) -> *mut FileDescriptor {
         Box::into_raw(Box::new(fd))
     }
 
-    fn free_fd(&mut self, ptr: *mut FileDescriptor) {
+    unsafe fn free_fd(&mut self, ptr: *mut FileDescriptor) {
         if !ptr.is_null() {
             unsafe {
                 let _ = Box::from_raw(ptr);
@@ -1166,7 +1170,7 @@ impl RadixFdTbl {
 
         let mut leaf_ptr = self.root.children[l1_idx];
         if leaf_ptr.is_null() {
-            leaf_ptr = alloc.alloc_leaf();
+            leaf_ptr = unsafe { alloc.alloc_leaf() };
             if leaf_ptr.is_null() {
                 return Err(Error::new(ENOMEM));
             }
@@ -1527,7 +1531,7 @@ impl UpperFdTbl {
 
     #[inline]
     fn is_occupied(&self, handle: usize) -> bool {
-        self.table.get(handle).map_or(false, |e| e.is_occupied())
+        self.table.get(handle).is_some_and(|e| e.is_occupied())
     }
 
     fn validate_handles(&self, handles: &[usize]) -> Result<()> {
