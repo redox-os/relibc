@@ -1038,8 +1038,8 @@ pub struct LeafNode<const N: usize> {
 
 const _: () = {
     assert!(
-        core::mem::size_of::<LeafNode<NODE_SIZE>>() == 4096,
-        "LeafNode size must be exactly 4KiB (1 Page)!"
+        core::mem::size_of::<LeafNode<NODE_SIZE>>() == syscall::PAGE_SIZE,
+        "LeafNode size must be exactly one page"
     );
 };
 
