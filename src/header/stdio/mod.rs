@@ -203,7 +203,7 @@ impl Read for FILE {
 
 impl BufRead for FILE {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        if self.read_buf.len() == 0 {
+        if self.read_buf.is_empty() {
             match &mut self.read_buf {
                 // Borrowed can only happen with size > 0 in `setvbuf`
                 Buffer::Borrowed(items) => unreachable!(),
