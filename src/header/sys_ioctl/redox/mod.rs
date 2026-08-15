@@ -1,6 +1,6 @@
 use core::{mem, ptr, slice};
-use redox_rt::proc::FdGuard;
-use syscall;
+use redox_protocols::protocol::TtyCall;
+use syscall::{self, flag::CallFlags};
 
 use crate::{
     error::{Errno, Result},
@@ -13,30 +13,42 @@ use crate::{
 
 use super::constants::*;
 
+// TODO: Find a better way to represent whether each call is read or write
+const REQ_READ: u64 = 0;
+const REQ_WRITE: u64 = 1;
+
 mod drm;
 
 // TODO: some of the structs passed as T have padding bytes, so casting to a byte slice is UB
 
-fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
-    let dup = FdGuard::new(redox_rt::sys::dup(fd as usize, name.as_bytes())?);
-
+fn sys_call_read<T>(fd: c_int, verb: TtyCall, t: &mut T) -> syscall::Result<usize> {
     let size = mem::size_of::<T>();
 
-    let bytes = dup.read(unsafe {
-        slice::from_raw_parts_mut(core::ptr::from_mut::<T>(t).cast::<u8>(), size)
-    })?;
+    let payload =
+        unsafe { slice::from_raw_parts_mut(core::ptr::from_mut::<T>(t).cast::<u8>(), size) };
+
+    let bytes = redox_rt::sys::sys_call_ro(
+        fd as usize,
+        payload,
+        CallFlags::READ,
+        &[verb as u64, REQ_READ],
+    )?;
 
     Ok(bytes / size)
 }
 
 // FIXME: unsound
-fn dup_write<T>(fd: c_int, name: &str, t: &T) -> Result<usize> {
-    let dup = FdGuard::new(redox_rt::sys::dup(fd as usize, name.as_bytes())?);
-
+fn sys_call_write<T>(fd: c_int, verb: TtyCall, t: &T) -> Result<usize> {
     let size = mem::size_of::<T>();
 
-    let bytes = dup
-        .write(unsafe { slice::from_raw_parts(core::ptr::from_ref::<T>(t).cast::<u8>(), size) })?;
+    let payload = unsafe { slice::from_raw_parts(core::ptr::from_ref::<T>(t).cast::<u8>(), size) };
+
+    let bytes = redox_rt::sys::sys_call_wo(
+        fd as usize,
+        payload,
+        CallFlags::WRITE,
+        &[verb as u64, REQ_WRITE],
+    )?;
 
     Ok(bytes / size)
 }
@@ -90,61 +102,67 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             };
             Sys::fcntl(fd, fcntl::F_SETFL, flags as c_ulonglong)?;
         }
+        // tcgetattr()
         TCGETS => {
             let termios = unsafe { &mut *out.cast::<termios::termios>() };
-            dup_read(fd, "termios", termios)?;
+            sys_call_read(fd, TtyCall::Termios, termios)?;
         }
         // TODO: give these different behaviors
         TCSETS | TCSETSW | TCSETSF => {
             let termios = unsafe { &*(out as *const termios::termios) };
-            dup_write(fd, "termios", termios)?;
+            sys_call_write(fd, TtyCall::Termios, termios)?;
         }
+        // tcflush()
         TCFLSH => {
             let queue = out as c_int;
-            dup_write(fd, "flush", &queue)?;
+            sys_call_write(fd, TtyCall::Flush, &queue)?;
         }
         // tcsendbreak() and tcdrain()
         TCSBRK => {
             // tcsendbreak == ioctl(TCSBRK, 0)
             // tcdrain == ioctl(TCSBRK, <nonzero>)
             let duration = out as c_int;
-            dup_write(fd, "sendbreak", &duration)?;
+            sys_call_write(fd, TtyCall::SendBreak, &duration)?;
         }
         // tcflow()
         TCXONC => {
             let arg = out as c_int;
-            dup_write(fd, "flow", &arg)?;
+            sys_call_write(fd, TtyCall::Flow, &arg)?;
         }
         TIOCSCTTY => {
             todo_skip!(0, "ioctl TIOCSCTTY");
         }
+        // tcgetpgrp()
         TIOCGPGRP => {
             let pgrp = unsafe { &mut *out.cast::<pid_t>() };
-            dup_read(fd, "pgrp", pgrp)?;
+            sys_call_read(fd, TtyCall::Pgrp, pgrp)?;
         }
+        // tcsetpgrp()
         TIOCSPGRP => {
-            let pgrp = unsafe { &*(out as *const pid_t) };
-            dup_write(fd, "pgrp", pgrp)?;
+            let pgrp = unsafe { *(out as *const pid_t) };
+            sys_call_write(fd, TtyCall::Pgrp, &pgrp)?;
         }
+        // tcgetwinsize()
         TIOCGWINSZ => {
             let winsize = unsafe { &mut *out.cast::<winsize>() };
-            dup_read(fd, "winsize", winsize)?;
+            sys_call_read(fd, TtyCall::Winsize, winsize)?;
         }
+        // tcsetwinsize()
         TIOCSWINSZ => {
             let winsize = unsafe { &*(out as *const winsize) };
-            dup_write(fd, "winsize", winsize)?;
+            sys_call_write(fd, TtyCall::Winsize, winsize)?;
         }
         TIOCGPTLCK => {
             let lock = unsafe { &mut *out.cast::<c_int>() };
-            dup_read(fd, "ptlock", lock)?;
+            sys_call_read(fd, TtyCall::PtLock, lock)?;
         }
         TIOCSPTLCK => {
-            let lock = unsafe { &*(out as *const c_int) };
-            dup_write(fd, "ptlock", lock)?;
+            let lock = unsafe { *(out as *const c_int) };
+            sys_call_write(fd, TtyCall::PtLock, &lock)?;
         }
         TIOCGPTN => {
             let name = unsafe { &mut *out.cast::<c_int>() };
-            dup_read(fd, "ptsname", name)?;
+            sys_call_read(fd, TtyCall::PtsName, name)?;
         }
         SIOCATMARK => {
             todo_skip!(0, "ioctl SIOCATMARK");
