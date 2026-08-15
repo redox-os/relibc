@@ -1,4 +1,5 @@
 use core::{mem, ptr, slice};
+use libredox::protocol::TtyCall;
 use syscall::{self, flag::CallFlags};
 
 use crate::{
@@ -16,24 +17,26 @@ mod drm;
 
 // TODO: some of the structs passed as T have padding bytes, so casting to a byte slice is UB
 
-fn sys_call_read<T>(fd: c_int, t: &mut T) -> syscall::Result<usize> {
+fn sys_call_read<T>(fd: c_int, verb: TtyCall, t: &mut T) -> syscall::Result<usize> {
     let size = mem::size_of::<T>();
 
     let payload =
         unsafe { slice::from_raw_parts_mut(core::ptr::from_mut::<T>(t).cast::<u8>(), size) };
 
-    let bytes = redox_rt::sys::sys_call_ro(fd as usize, payload, CallFlags::READ, &[])?;
+    let bytes =
+        redox_rt::sys::sys_call_ro(fd as usize, payload, CallFlags::READ, &[verb as u64, 0])?;
 
     Ok(bytes / size)
 }
 
 // FIXME: unsound
-fn sys_call_write<T>(fd: c_int, t: &T) -> Result<usize> {
+fn sys_call_write<T>(fd: c_int, verb: TtyCall, t: &T) -> Result<usize> {
     let size = mem::size_of::<T>();
 
     let payload = unsafe { slice::from_raw_parts(core::ptr::from_ref::<T>(t).cast::<u8>(), size) };
 
-    let bytes = redox_rt::sys::sys_call_wo(fd as usize, payload, CallFlags::WRITE, &[])?;
+    let bytes =
+        redox_rt::sys::sys_call_wo(fd as usize, payload, CallFlags::WRITE, &[verb as u64, 1])?;
 
     Ok(bytes / size)
 }
@@ -90,29 +93,29 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
         // tcgetattr()
         TCGETS => {
             let termios = unsafe { &mut *out.cast::<termios::termios>() };
-            sys_call_read(fd, termios)?;
+            sys_call_read(fd, TtyCall::Termios, termios)?;
         }
         // TODO: give these different behaviors
         TCSETS | TCSETSW | TCSETSF => {
             let termios = unsafe { &*(out as *const termios::termios) };
-            sys_call_write(fd, termios)?;
+            sys_call_write(fd, TtyCall::Termios, termios)?;
         }
         // tcflush()
         TCFLSH => {
             let queue = out as c_int;
-            sys_call_write(fd, &queue)?;
+            sys_call_write(fd, TtyCall::Flush, &queue)?;
         }
         // tcsendbreak() and tcdrain()
         TCSBRK => {
             // tcsendbreak == ioctl(TCSBRK, 0)
             // tcdrain == ioctl(TCSBRK, <nonzero>)
             let duration = out as c_int;
-            sys_call_write(fd, &duration)?;
+            sys_call_write(fd, TtyCall::SendBreak, &duration)?;
         }
         // tcflow()
         TCXONC => {
             let arg = out as c_int;
-            sys_call_write(fd, &arg)?;
+            sys_call_write(fd, TtyCall::Flow, &arg)?;
         }
         TIOCSCTTY => {
             todo_skip!(0, "ioctl TIOCSCTTY");
@@ -120,34 +123,34 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
         // tcgetpgrp()
         TIOCGPGRP => {
             let pgrp = unsafe { &mut *out.cast::<pid_t>() };
-            sys_call_read(fd, pgrp)?;
+            sys_call_read(fd, TtyCall::Pgrp, pgrp)?;
         }
         // tcsetpgrp()
         TIOCSPGRP => {
             let pgrp = unsafe { *(out as *const pid_t) };
-            sys_call_write(fd, &pgrp)?;
+            sys_call_write(fd, TtyCall::Pgrp, &pgrp)?;
         }
         // tcgetwinsize()
         TIOCGWINSZ => {
             let winsize = unsafe { &mut *out.cast::<winsize>() };
-            sys_call_read(fd, winsize)?;
+            sys_call_read(fd, TtyCall::Winsize, winsize)?;
         }
         // tcsetwinsize()
         TIOCSWINSZ => {
             let winsize = unsafe { &*(out as *const winsize) };
-            sys_call_write(fd, winsize)?;
+            sys_call_write(fd, TtyCall::Winsize, winsize)?;
         }
         TIOCGPTLCK => {
             let lock = unsafe { &mut *out.cast::<c_int>() };
-            sys_call_read(fd, lock)?;
+            sys_call_read(fd, TtyCall::PtLock, lock)?;
         }
         TIOCSPTLCK => {
             let lock = unsafe { *(out as *const c_int) };
-            sys_call_write(fd, &lock)?;
+            sys_call_write(fd, TtyCall::PtLock, &lock)?;
         }
         TIOCGPTN => {
             let name = unsafe { &mut *out.cast::<c_int>() };
-            sys_call_read(fd, name)?;
+            sys_call_read(fd, TtyCall::PtsName, name)?;
         }
         SIOCATMARK => {
             todo_skip!(0, "ioctl SIOCATMARK");
