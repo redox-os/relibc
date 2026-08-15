@@ -1,5 +1,5 @@
 use core::{mem, ptr, slice};
-use libredox::protocol::TtyCall;
+use redox_protocols::protocol::TtyCall;
 use syscall::{self, flag::CallFlags};
 
 use crate::{
