@@ -35,6 +35,7 @@ pub unsafe fn init() {
         has_enabled_cancelation: AtomicBool::new(false),
         has_queued_cancelation: AtomicBool::new(false),
         flags: PthreadFlags::empty().bits().into(),
+        name: Mutex::new([0; NAME_MAX_LEN]),
 
         //index: FIRST_THREAD_IDX,
 
@@ -69,12 +70,21 @@ bitflags::bitflags! {
     }
 }
 
+/// Maximum length of a thread name, including the terminating null byte.
+///
+/// Same limit as Linux, which programs using `pthread_setname_np` assume.
+pub const NAME_MAX_LEN: usize = 16;
+
 #[derive(Debug)]
 pub struct Pthread {
     pub(crate) waitval: Waitval<Retval>,
     pub(crate) has_queued_cancelation: AtomicBool,
     pub(crate) has_enabled_cancelation: AtomicBool,
     pub(crate) flags: AtomicUsize,
+
+    /// Null-terminated thread name, set by `pthread_setname_np`. Empty until a
+    /// name is assigned; threads do not inherit the creator's name.
+    pub(crate) name: Mutex<[u8; NAME_MAX_LEN]>,
 
     pub(crate) stack_base: *mut c_void,
     pub(crate) stack_size: usize,
