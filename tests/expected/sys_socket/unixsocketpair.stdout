@@ -4,3 +4,6 @@ parent: pong
 SOCK_DGRAM
 child:  ping
 parent: pong
+SOCK_SEQPACKET
+child:  ping
+parent: pong

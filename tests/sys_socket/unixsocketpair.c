@@ -55,5 +55,7 @@ int main(void) {
     socketpair_test(SOCK_STREAM);
     printf("SOCK_DGRAM\n");
     socketpair_test(SOCK_DGRAM);
+    printf("SOCK_SEQPACKET\n");
+    socketpair_test(SOCK_SEQPACKET);
     return 0;
 }

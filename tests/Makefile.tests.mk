@@ -152,6 +152,7 @@ EXPECT_NAMES=\
 	sys_socket/unixnonblock \
 	sys_socket/unixrecv \
 	sys_socket/unixrecvfrom \
+	sys_socket/unixseqpacket \
 	sys_socket/unixsocketpair \
 	sys_stat/chmod \
 	sys_stat/lstat \
