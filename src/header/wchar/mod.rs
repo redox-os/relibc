@@ -199,10 +199,15 @@ pub unsafe extern "C" fn getwchar() -> wint_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mbsinit.html>.
+///
+/// # Implementation
+/// `mbstate_t` carries no conversion state: the restartable conversion
+/// functions never store a partial sequence in it, so every object is in the
+/// initial conversion state and this always returns non-zero. It must stay in
+/// sync with `mbstate_t` should that ever gain fields.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mbsinit(ps: *const mbstate_t) -> c_int {
-    //Add a check for the state maybe
-    if ps.is_null() { 1 } else { 0 }
+pub unsafe extern "C" fn mbsinit(_ps: *const mbstate_t) -> c_int {
+    1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mbrlen.html>.
