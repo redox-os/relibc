@@ -137,7 +137,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             let pgrp = unsafe { &mut *out.cast::<pid_t>() };
             sys_call_read(fd, TtyCall::Pgrp, pgrp)?;
             if request == TIOCGSID {
-                pgrp = unistd::getsid(pgrp);
+                *pgrp = unistd::getsid(*pgrp);
             }
         }
         // tcsetpgrp()
