@@ -1012,11 +1012,13 @@ pub unsafe extern "C" fn ptsname_r(fildes: c_int, name: *mut c_char, namesize: s
                 let s = inner_name.as_ptr().cast();
                 unsafe { ptr::copy_nonoverlapping(s, name, len) };
                 // NUL-terminate the result.
-                unsafe { *(name.add(len + 1)) = 0 };
+                unsafe { *(name.add(len)) = 0 };
                 0
             }
         } else {
-            platform::ERRNO.get()
+            let errno = platform::ERRNO.get();
+            log::warn!("ptsname_r ioctl failure: {errno}");
+            errno
         }
     }
 }
