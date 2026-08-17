@@ -37,7 +37,6 @@ pub const TIOCGWINSZ: c_ulong = 0x5413;
 /// Set window size.
 pub const TIOCSWINSZ: c_ulong = 0x5414;
 
-//TODO: used by tcgetsid, not implemented yet on redox
 /// When successful, equivalent to `*argp = tcgetsid(fd)`.
 /// Get the session ID of the given terminal.
 pub const TIOCGSID: c_ulong = 0x5429;
