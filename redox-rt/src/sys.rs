@@ -954,7 +954,7 @@ pub struct FdTbl {
 
 impl FdTbl {
     pub const CONTEXT_MAX_FILES: u32 = 65_536;
-    pub const DEFAULT_CAPACITY: usize = usize::BITS as usize;
+    pub const DEFAULT_CAPACITY: usize = 64;
 
     #[expect(
         clippy::new_without_default,
@@ -1081,7 +1081,17 @@ impl FdTbl {
         Ok(())
     }
 
-    fn sync_size(fd: Option<&FdGuardUpper>, new_size: usize, tag: usize) -> Result<()> {
+    #[inline]
+    pub const fn align_size(needed_len: usize) -> usize {
+        if needed_len <= Self::DEFAULT_CAPACITY {
+            Self::DEFAULT_CAPACITY
+        } else {
+            needed_len.next_power_of_two()
+        }
+    }
+
+    fn sync_size(fd: Option<&FdGuardUpper>, new_size: usize, tag: usize) -> Result<usize> {
+        let aligned_size = Self::align_size(new_size);
         if let Some(fd) = fd {
             let res = fd.call_wo(
                 &[],
@@ -1089,7 +1099,7 @@ impl FdTbl {
                 &[
                     syscall::FileTableVerb::Resize as u64,
                     tag as u64,
-                    new_size as u64,
+                    aligned_size as u64,
                 ],
             );
             if let Err(err) = res {
@@ -1100,7 +1110,7 @@ impl FdTbl {
                 }
             }
         }
-        Ok(())
+        Ok(aligned_size)
     }
 
     pub fn override_at(&mut self, new_fd: usize) -> Result<Option<usize>> {
@@ -1443,9 +1453,9 @@ impl PosixFdTbl {
 
         if handle >= old_len {
             self.with_transaction(old_len, |this| {
-                let new_len = handle + 1;
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
-                this.table.push(entry_flags);
+                let new_len = FdTbl::sync_size(sync_fd, handle + 1, 0)?;
+                this.resize(new_len);
+                this.table[handle] = entry_flags;
                 this.lowest_idx = (handle + 1) as u32;
                 Ok(handle)
             })
@@ -1482,7 +1492,7 @@ impl PosixFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len != new_len {
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
+                let new_len = FdTbl::sync_size(sync_fd, new_len, 0)?;
                 this.resize(new_len);
             }
 
@@ -1519,8 +1529,8 @@ impl PosixFdTbl {
 
         self.with_transaction(old_len, |this| {
             if handle >= old_len {
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
-                this.resize(handle + 1);
+                let new_len = FdTbl::sync_size(sync_fd, new_len, 0)?;
+                this.resize(new_len);
             }
             this.table[handle] = entry_flags;
 
@@ -1557,8 +1567,8 @@ impl PosixFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len <= max_index {
-                FdTbl::sync_size(sync_fd, new_len, 0)?;
-                this.resize(max_index + 1);
+                let new_len = FdTbl::sync_size(sync_fd, new_len, 0)?;
+                this.resize(new_len);
             }
 
             for (entry, &index) in entries.into_iter().zip(handles) {
@@ -1670,7 +1680,6 @@ impl UpperFdTbl {
                 next_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
             },
         );
-        self.rebuild_free_list();
     }
 
     pub fn capacity(&self) -> usize {
@@ -1689,10 +1698,13 @@ impl UpperFdTbl {
     where
         F: FnOnce(&mut Self) -> Result<T>,
     {
+        let old_count = self.len;
         match f(self) {
             Ok(res) => Ok(res),
             Err(e) => {
                 self.table.truncate(rollback_len);
+                self.len = old_count;
+                self.rebuild_free_list();
                 Err(e)
             }
         }
@@ -1760,9 +1772,11 @@ impl UpperFdTbl {
             let old_len = self.table.len();
             let new_len = old_len + 1;
             self.with_transaction(old_len, |this| {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
-                this.table.push(entry);
+                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                this.resize(new_len);
+                self.table[old_len] = entry;
                 this.len += 1;
+                this.rebuild_free_list();
                 Ok(old_len)
             })
         } else {
@@ -1803,7 +1817,7 @@ impl UpperFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len != new_len {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
                 this.resize(new_len);
             }
 
@@ -1837,8 +1851,8 @@ impl UpperFdTbl {
 
         self.with_transaction(old_len, |this| {
             if handle >= old_len {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
-                this.resize(handle + 1);
+                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                this.resize(new_len);
             }
 
             let vacant = matches!(this.table[handle], FdTblEntry::Vacant { .. });
@@ -1888,8 +1902,8 @@ impl UpperFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len <= max_index {
-                FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
-                this.resize(max_index + 1);
+                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                this.resize(new_len);
             }
 
             for (entry, &index) in entries.into_iter().zip(handles) {
