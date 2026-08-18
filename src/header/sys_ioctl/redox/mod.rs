@@ -4,7 +4,7 @@ use syscall::{self, flag::CallFlags};
 
 use crate::{
     error::{Errno, Result},
-    header::{bits_winsize::winsize, errno::EINVAL, fcntl, termios},
+    header::{bits_winsize::winsize, errno::EINVAL, fcntl, termios, unistd},
     platform::{
         Pal, Sys,
         types::{c_int, c_ulong, c_ulonglong, c_void, pid_t},
@@ -132,10 +132,13 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
         TIOCSCTTY => {
             todo_skip!(0, "ioctl TIOCSCTTY");
         }
-        // tcgetpgrp()
-        TIOCGPGRP => {
+        // tcgetpgrp() and tcgetsid()
+        TIOCGPGRP | TIOCGSID => {
             let pgrp = unsafe { &mut *out.cast::<pid_t>() };
             sys_call_read(fd, TtyCall::Pgrp, pgrp)?;
+            if request == TIOCGSID {
+                *pgrp = unistd::getsid(*pgrp);
+            }
         }
         // tcsetpgrp()
         TIOCSPGRP => {
