@@ -3,7 +3,6 @@ use core::cell::UnsafeCell;
 
 use crate::{fs::File, header::pthread, io::LineWriter, platform::types::c_int};
 use alloc::vec::Vec;
-use arrayvec::ArrayVec;
 
 // TODO: Change FILE to allow const fn initialization?
 pub struct GlobalFile(UnsafeCell<FILE>);
@@ -23,7 +22,7 @@ impl GlobalFile {
             lock,
             file,
             flags: constants::F_PERM | flags,
-            read_buf: Buffer::Owned(ArrayVec::new_const()),
+            read_buf: Buffer::Owned(None),
             read_pos: 0,
             read_size: 0,
             unget: Vec::new(),

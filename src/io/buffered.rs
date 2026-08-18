@@ -746,6 +746,23 @@ impl<W: Write> Write for LineWriter<W> {
     }
 }
 
+impl<W: Write> From<BufWriter<W>> for LineWriter<W> {
+    fn from(value: BufWriter<W>) -> Self {
+        // TODO: this is fast, but is it correct?
+        let need_flush = value.buf.len() > 0;
+        Self {
+            inner: value,
+            need_flush,
+        }
+    }
+}
+
+impl<W: Write> From<LineWriter<W>> for BufWriter<W> {
+    fn from(value: LineWriter<W>) -> Self {
+        value.inner
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::string::String;
