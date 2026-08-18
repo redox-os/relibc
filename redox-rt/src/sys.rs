@@ -1750,7 +1750,7 @@ impl UpperFdTbl {
             self.with_transaction(old_len, |this| {
                 let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
                 this.resize(new_len);
-                self.table[old_len] = entry;
+                this.table[old_len] = entry;
                 this.len += 1;
                 this.rebuild_free_list();
                 Ok(old_len)
