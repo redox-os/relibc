@@ -185,7 +185,7 @@ impl Pal for Sys {
     }
 
     fn chdir(path: CStr) -> Result<()> {
-        let path = RedoxStr::new_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
         path::chdir(path)?;
         Ok(())
     }
@@ -770,7 +770,7 @@ impl Pal for Sys {
         if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
             return Err(Errno(EINVAL));
         }
-        let newpath = RedoxStr::new_c(newpath.to_cstr()).ok_or(Errno(EINVAL))?;
+        let newpath = RedoxStr::new_from_c(newpath.to_cstr()).ok_or(Errno(EINVAL))?;
 
         // By default, we don't follow the symlink if there is one.
         // We only follow it if AT_SYMLINK_FOLLOW is passed in flags.
@@ -950,7 +950,7 @@ impl Pal for Sys {
     }
 
     fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
-        let path = RedoxStr::new_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
 
         // POSIX states that umask should affect the following:
         //
@@ -1116,7 +1116,7 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let new_path = RedoxStr::new_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let new_path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
         // Fail if the target exists with RENAME_NOREPLACE.
         if flags & RENAME_NOREPLACE != 0
             && let Ok(fd) = libredox::openat(
@@ -1735,7 +1735,7 @@ impl Pal for Sys {
         if (flags & !AT_REMOVEDIR) != 0 {
             return Err(Errno(EINVAL));
         }
-        let path = RedoxStr::new_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
         let path = openat2_path(fd, path, 0)?;
         let path: Cow<'_, str> = path.into();
         redox_rt::sys::unlink(path, flags.try_into().map_err(|_| Errno(EINVAL))?)?;

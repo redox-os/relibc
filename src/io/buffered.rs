@@ -749,7 +749,7 @@ impl<W: Write> Write for LineWriter<W> {
 impl<W: Write> From<BufWriter<W>> for LineWriter<W> {
     fn from(value: BufWriter<W>) -> Self {
         // TODO: this is fast, but is it correct?
-        let need_flush = value.buf.len() > 0;
+        let need_flush = !value.buf.is_empty();
         Self {
             inner: value,
             need_flush,
