@@ -7,7 +7,6 @@ use alloc::{
     boxed::Box,
     vec::Vec,
 };
-use arrayvec::ArrayVec;
 use core::{
     cmp,
     ffi::VaList as va_list,
@@ -16,7 +15,6 @@ use core::{
     ops::{Deref, DerefMut},
     ptr, slice, str,
 };
-use zerocopy::FromZeros;
 
 use crate::{
     c_str::{CStr, Thin},
@@ -60,8 +58,21 @@ static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize +
 
 const BUFSIZ_USIZE: usize = BUFSIZ as usize;
 enum Buffer<'a> {
+    /// Borrowed from user-provided buffer
     Borrowed(&'a mut [u8]),
-    Owned(ArrayVec<u8, BUFSIZ_USIZE>),
+    /// Owned and maybe initialized
+    Owned(Option<Vec<u8>>),
+    /// Specifically disable buffering
+    Unbuffered,
+}
+
+impl Buffer<'_> {
+    pub fn need_init(&mut self) -> Option<&mut Vec<u8>> {
+        match self {
+            Buffer::Owned(x) if x.is_none() => x.as_mut(),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> Deref for Buffer<'a> {
@@ -70,7 +81,8 @@ impl<'a> Deref for Buffer<'a> {
     fn deref(&self) -> &Self::Target {
         match self {
             Buffer::Borrowed(inner) => inner,
-            Buffer::Owned(inner) => inner.borrow(),
+            Buffer::Owned(Some(inner)) => inner.borrow(),
+            _ => &[],
         }
     }
 }
@@ -79,7 +91,8 @@ impl<'a> DerefMut for Buffer<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             Buffer::Borrowed(inner) => inner,
-            Buffer::Owned(inner) => inner.borrow_mut(),
+            Buffer::Owned(Some(inner)) => inner.borrow_mut(),
+            _ => &mut [],
         }
     }
 }
@@ -119,6 +132,21 @@ impl<W: crate::io::Write> Writer for LineWriter<W> {
 pub enum FileInnerWriter {
     Buf(BufWriter<File>),
     Line(LineWriter<File>),
+}
+
+impl FileInnerWriter {
+    pub fn to_line_buffered(self) -> Self {
+        match self {
+            FileInnerWriter::Buf(buf_writer) => FileInnerWriter::Line(buf_writer.into()),
+            line => line,
+        }
+    }
+    pub fn to_byte_buffered(self) -> Self {
+        match self {
+            FileInnerWriter::Line(line_writer) => FileInnerWriter::Buf(line_writer.into()),
+            byte => byte,
+        }
+    }
 }
 
 impl Writer for FileInnerWriter {
@@ -203,15 +231,8 @@ impl Read for FILE {
 
 impl BufRead for FILE {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        if self.read_buf.is_empty() {
-            match &mut self.read_buf {
-                // Borrowed can only happen with size > 0 in `setvbuf`
-                Buffer::Borrowed(items) => unreachable!(),
-                Buffer::Owned(array_vec) => unsafe {
-                    array_vec.zero();
-                    array_vec.set_len(array_vec.capacity());
-                },
-            }
+        if let Some(vec) = self.read_buf.need_init() {
+            *vec = vec![0; BUFSIZ_USIZE];
         }
         if self.read_pos == self.read_size {
             self.read_size = match self.file.read(&mut self.read_buf) {
@@ -1307,22 +1328,32 @@ pub unsafe extern "C" fn setvbuf(
     mode: c_int,
     size: size_t,
 ) -> c_int {
+    // TODO: POSIX does not define what happen if there's pending buffer, so this function will drop it.
     let mut stream = unsafe { (*stream).lock() };
+    stream.flags |= F_SVB;
+    match mode {
+        _IONBF => {
+            stream.read_buf = Buffer::Unbuffered;
+            // Ignore buf and size
+            return 0;
+        }
+        // TODO: Should EINVAL if not `_IOFBF` or `_IOLBF`?
+        _ => {
+            // SAFETY: We take out stream.writer then immediately set again
+            let r = core::mem::replace(&mut stream.writer, unsafe { core::mem::zeroed() });
+            stream.writer = if mode == _IOLBF {
+                r.to_line_buffered()
+            } else {
+                r.to_byte_buffered()
+            };
+        }
+    }
     // Set a buffer of size `size` if no buffer is given
     stream.read_buf = if buf.is_null() || size == 0 {
-        // TODO: Make it unbuffered if _IONBF
-        if mode == _IONBF {
-            Buffer::Owned(ArrayVec::new())
-        } else {
-            let mut arr = ArrayVec::new();
-            arr.zero();
-            unsafe { arr.set_len(core::cmp::min(arr.capacity(), size)) };
-            Buffer::Owned(arr)
-        }
+        Buffer::Owned(if size == 0 { None } else { Some(vec![0; size]) })
     } else {
         Buffer::Borrowed(unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), size) })
     };
-    stream.flags |= F_SVB;
     0
 }
 
