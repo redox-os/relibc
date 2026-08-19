@@ -69,7 +69,10 @@ enum Buffer<'a> {
 impl Buffer<'_> {
     pub fn need_init(&mut self) -> Option<&mut Vec<u8>> {
         match self {
-            Buffer::Owned(x) if x.is_none() => x.as_mut(),
+            Buffer::Owned(x) if x.is_none() => {
+                *x = Some(Vec::new());
+                x.as_mut()
+            }
             _ => None,
         }
     }
