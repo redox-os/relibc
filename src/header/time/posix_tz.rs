@@ -58,7 +58,7 @@ impl<'a> PosixTz<'a> {
             result.timezone = Some(c_long::from(std_offset.unwrap_or(0)).clamp(-86400, 86400));
 
             // dst rules: same as std
-            let (dst, dst_offset, remaining) = PosixTz::collect_tz_and_offset(remaining);
+            let (dst, _, _) = PosixTz::collect_tz_and_offset(remaining);
             result.dst = dst;
 
             if !dst.is_empty() {

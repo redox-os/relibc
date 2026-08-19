@@ -85,7 +85,7 @@ pub unsafe extern "C" fn getdelim(
         let mut stream = (*stream).lock();
         match stream.read_until(delim, &mut buf) {
             Ok(ok) => ok,
-            Err(err) => {
+            Err(_) => {
                 stream.flags &= F_ERR;
                 return -1;
             }

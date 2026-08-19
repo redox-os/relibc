@@ -311,9 +311,8 @@ pub unsafe extern "C" fn scandir(
         return -1;
     }
 
-    let mut vec = match CVec::with_capacity(4) {
-        Ok(vec) => vec,
-        Err(err) => return -1,
+    let Ok(mut vec) = CVec::with_capacity(4) else {
+        return -1;
     };
 
     let old_errno = platform::ERRNO.get();

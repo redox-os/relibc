@@ -533,8 +533,8 @@ pub unsafe extern "C" fn getgrouplist(
 
         let mut parts = line.split(SEPARATOR);
 
-        let group_name = parts.next().unwrap_or("");
-        let group_password = parts.next().unwrap_or("");
+        let _group_name = parts.next().unwrap_or("");
+        let _group_password = parts.next().unwrap_or("");
         let group_id = parts.next().unwrap_or("-1").parse::<c_int>().unwrap();
         let members = parts
             .next()
