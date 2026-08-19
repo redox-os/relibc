@@ -3,13 +3,13 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/pthread.h.html>.
 
 use alloc::collections::LinkedList;
-use core::{cell::Cell, ptr::NonNull};
+use core::{cell::Cell, ffi::CStr, ptr, ptr::NonNull};
 
 use crate::{
     error::Errno,
-    header::{sched::sched_param, time::timespec},
+    header::{errno::ERANGE, sched::sched_param, time::timespec},
     platform::types::{
-        c_int, c_uchar, c_uint, c_void, clockid_t, pthread_attr_t, pthread_barrier_t,
+        c_char, c_int, c_uchar, c_uint, c_void, clockid_t, pthread_attr_t, pthread_barrier_t,
         pthread_barrierattr_t, pthread_key_t, pthread_mutex_t, pthread_mutexattr_t, pthread_once_t,
         pthread_rwlock_t, pthread_rwlockattr_t, pthread_t, size_t,
     },
@@ -208,6 +208,62 @@ pub unsafe extern "C" fn pthread_getschedparam(
         }
         Err(Errno(error)) => error,
     }
+}
+
+/// Store the name of `thread`, for use by debuggers and by
+/// [`pthread_getname_np`].
+///
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/pthread_setname_np.3.html>.
+///
+/// Upon success, returns `0`. Returns `ERANGE` if `name` (including its
+/// terminating null byte) is longer than [`pthread::NAME_MAX_LEN`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pthread_setname_np(thread: pthread_t, name: *const c_char) -> c_int {
+    let thread = unsafe { &*thread.cast::<pthread::Pthread>() };
+    let name = unsafe { CStr::from_ptr(name) }.to_bytes();
+
+    if name.len() >= pthread::NAME_MAX_LEN {
+        return ERANGE;
+    }
+
+    let mut stored = thread.name.lock();
+    stored.fill(0);
+    stored[..name.len()].copy_from_slice(name);
+
+    0
+}
+
+/// Retrieve the name previously set by [`pthread_setname_np`], as a
+/// null-terminated string. Threads start out unnamed, for which the empty
+/// string is returned.
+///
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/pthread_getname_np.3.html>.
+///
+/// Upon success, returns `0`. Returns `ERANGE` if the buffer is too small to
+/// hold the name and its terminating null byte.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pthread_getname_np(
+    thread: pthread_t,
+    name: *mut c_char,
+    len: size_t,
+) -> c_int {
+    let thread = unsafe { &*thread.cast::<pthread::Pthread>() };
+    let stored = thread.name.lock();
+    let stored_len = stored
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(stored.len());
+
+    if len <= stored_len {
+        return ERANGE;
+    }
+
+    unsafe {
+        ptr::copy_nonoverlapping(stored.as_ptr().cast::<c_char>(), name, stored_len);
+        name.add(stored_len).write(0);
+    }
+
+    0
 }
 
 pub mod tls;

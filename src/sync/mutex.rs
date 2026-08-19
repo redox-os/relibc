@@ -2,6 +2,7 @@ use super::{AtomicLock, AttemptStatus};
 use crate::platform::types::c_int;
 use core::{
     cell::UnsafeCell,
+    fmt,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicI32 as AtomicInt, Ordering},
 };
@@ -126,6 +127,17 @@ impl<T> Mutex<T> {
             mutex: self,
             content: unsafe { self.manual_lock() },
         }
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Mutex<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut debug = f.debug_struct("Mutex");
+        match self.try_lock() {
+            Some(guard) => debug.field("content", &*guard),
+            None => debug.field("content", &format_args!("<locked>")),
+        }
+        .finish()
     }
 }
 

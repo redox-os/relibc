@@ -189,6 +189,8 @@ unsafe fn inner_get_name_inner(
         unsafe { inner_af_unix(&buf[13..], address, address_len) };
     } else if buf.starts_with(b"/scheme/uds_stream/") {
         unsafe { inner_af_unix(&buf[18..], address, address_len) };
+    } else if buf.starts_with(b"/scheme/uds_seqpacket/") {
+        unsafe { inner_af_unix(&buf[21..], address, address_len) };
     } else if buf.starts_with(b"/scheme/uds_dgram/") {
         unsafe { inner_af_unix(&buf[17..], address, address_len) };
     } else {
@@ -212,6 +214,8 @@ fn socket_domain_type(socket: c_int) -> Result<(c_int, c_int)> {
             (AF_INET, SOCK_DGRAM)
         } else if buf.starts_with(b"/scheme/uds_stream/") {
             (AF_UNIX, SOCK_STREAM)
+        } else if buf.starts_with(b"/scheme/uds_seqpacket/") {
+            (AF_UNIX, SOCK_SEQPACKET)
         } else if buf.starts_with(b"/scheme/uds_dgram/") {
             (AF_UNIX, SOCK_DGRAM)
         } else {
@@ -1137,6 +1141,9 @@ impl PalSocket for Sys {
             (AF_UNIX, SOCK_STREAM) => {
                 redox_rt::sys::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
             }
+            (AF_UNIX, SOCK_SEQPACKET) => {
+                redox_rt::sys::open("/scheme/uds_seqpacket", flags | O_CREAT)? as c_int
+            }
             (AF_UNIX, SOCK_DGRAM) => {
                 redox_rt::sys::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int
             }
@@ -1148,8 +1155,13 @@ impl PalSocket for Sys {
         let (kind, flags) = socket_kind(kind);
 
         match (domain, kind) {
-            (AF_UNIX, SOCK_STREAM) => {
-                let listener = FdGuard::open("/scheme/uds_stream", flags | O_CREAT)?;
+            (AF_UNIX, SOCK_STREAM) | (AF_UNIX, SOCK_SEQPACKET) => {
+                let scheme = if kind == SOCK_SEQPACKET {
+                    "/scheme/uds_seqpacket"
+                } else {
+                    "/scheme/uds_stream"
+                };
+                let listener = FdGuard::open(scheme, flags | O_CREAT)?;
 
                 // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as

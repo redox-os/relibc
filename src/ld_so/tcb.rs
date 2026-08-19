@@ -12,7 +12,7 @@ use crate::{
     header::sys_mman,
     ld_so::linker::Linker,
     platform::{Pal, Sys},
-    pthread::{OsTid, Pthread},
+    pthread::{NAME_MAX_LEN, OsTid, Pthread},
     sync::{mutex::Mutex, waitval::Waitval},
 };
 
@@ -101,6 +101,7 @@ impl Tcb {
                     flags: Default::default(),
                     has_enabled_cancelation: AtomicBool::new(false),
                     has_queued_cancelation: AtomicBool::new(false),
+                    name: Mutex::new([0; NAME_MAX_LEN]),
                     stack_base: core::ptr::null_mut(),
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
