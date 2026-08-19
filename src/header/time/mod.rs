@@ -421,39 +421,53 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
         return -1;
     };
 
-    // POSIX TODO
-    let tz = time_zone().unwrap_or(Tz::UTC);
-    let isdst = unsafe { (*timeptr).tm_isdst };
-    let tz_datetime = match tz.from_local_datetime(&naive_local) {
-        MappedLocalTime::Single(datetime) => datetime,
-        MappedLocalTime::Ambiguous(early, late) => {
-            if isdst > 0 {
-                early
-            } else {
-                late
+    match time_zone() {
+        Some(tz) => { // IANA
+            let isdst = unsafe { (*timeptr).tm_isdst };
+            let tz_datetime = match tz.from_local_datetime(&naive_local) {
+                MappedLocalTime::Single(datetime) => datetime,
+                MappedLocalTime::Ambiguous(early, late) => {
+                    if isdst > 0 {
+                        early
+                    } else {
+                        late
+                    }
+                }
+                MappedLocalTime::None => {
+                    platform::ERRNO.set(EOVERFLOW);
+                    return -1;
+                }
+            };
+            let timestamp = tz_datetime.timestamp();
+        
+            unsafe { ptr::write(timeptr, datetime_to_tm(&tz_datetime)) };
+        
+            // Convert UTC time to local time
+            let (std_time, dst_time) = match tz.timestamp_opt(timestamp, 0) {
+                MappedLocalTime::Single(t) => (t, None),
+                // This variant contains the two possible results, in the order (earliest, latest).
+                MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
+                MappedLocalTime::None => return timestamp,
+            };
+            {
+                unsafe { set_timezone(&mut lock, &std_time, dst_time) };
             }
+        
+            timestamp
         }
-        MappedLocalTime::None => {
-            platform::ERRNO.set(EOVERFLOW);
-            return -1;
+        None => { // POSIX
+            // GOAL: Make a new TZ of UTC, get the timestamp, add/subtract the 'timezone'
+            let utc_datetime = naive_local.and_utc();
+            let timestamp = utc_datetime.timestamp();
+            
+            let tz_posix = get_current_time_zone();
+            let tz = PosixTz::parse(tz_posix);
+
+            unsafe { set_timezone_posix(&mut lock, &tz); }
+            let offset = unsafe { timezone };
+            timestamp + offset
         }
-    };
-    let timestamp = tz_datetime.timestamp();
-
-    unsafe { ptr::write(timeptr, datetime_to_tm(&tz_datetime)) };
-
-    // Convert UTC time to local time
-    let (std_time, dst_time) = match tz.timestamp_opt(timestamp, 0) {
-        MappedLocalTime::Single(t) => (t, None),
-        // This variant contains the two possible results, in the order (earliest, latest).
-        MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
-        MappedLocalTime::None => return timestamp,
-    };
-    {
-        unsafe { set_timezone(&mut lock, &std_time, dst_time) };
     }
-
-    timestamp
 }
 
 // FIXME seems redox-rt sys posix_nanosleep calls wrapper which disables signals
@@ -672,17 +686,7 @@ pub unsafe extern "C" fn tzset() {
             // POSIX
             let tz_posix = get_current_time_zone();
             let tz = PosixTz::parse(tz_posix);
-            unsafe {
-                // SAFETY: the caller is required to ensure access exclusively for the
-                // holder of `TIMEZONE_LOCK`.
-                lock.0 = Some(CString::new(tz.std).unwrap());
-                lock.1 = Some(CString::new(tz.dst).unwrap());
-
-                tzname.0[0] = lock.0.as_ref().unwrap().as_ptr().cast_mut();
-                tzname.0[1] = lock.1.as_ref().unwrap().as_ptr().cast_mut();
-                daylight = i32::from(tz.daylight);
-                timezone = tz.timezone.unwrap_or(0);
-            }
+            unsafe { set_timezone_posix(&mut lock, &tz); }
         }
     }
 }
@@ -877,6 +881,27 @@ unsafe fn set_timezone(
         }
 
         timezone = -c_long::from(ut_offset.fix().local_minus_utc());
+    }
+}
+
+/// # Safety
+/// The caller must ensure that `daylight`, `timezone` and `tzname` are not
+/// accessed by user code for the duration of the call (relibc functions are
+/// required to hold `TIMEZONE_LOCK` when accessing these).
+unsafe fn set_timezone_posix(
+    guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>, 
+    tz: &PosixTz<'_>
+) {
+    // SAFETY: the caller is required to ensure access exclusively for the
+    // holder of `TIMEZONE_LOCK`.
+    unsafe {
+        guard.0 = Some(CString::new(tz.std).unwrap());
+        guard.1 = Some(CString::new(tz.dst).unwrap());
+    
+        tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+        tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
+        daylight = i32::from(tz.daylight);
+        timezone = tz.timezone.unwrap_or(0);
     }
 }
 
