@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 // Copies the next CQE into `cqe`. Blocks the current process if the CQ is
 // empty.
@@ -73,10 +74,23 @@ static inline void redox_ring_fs_prep_write(struct fs_op_sqe* sqe, uint32_t file
 
 #define NR_ENTRIES 128U
 
-int main()
+int main(void)
 {
-    const char* disk_path = "/scheme/testing";
-    int test_fd = open("/scheme/testing/test.txt", O_CREAT | O_RDWR, 0600);
+    const char* disk_path = "/scheme/logging";
+    const char* test_file_path = "/scheme/logging/uring_test.txt";
+
+    if (access(disk_path, F_OK) == -1) {
+        fprintf(stderr, "failed to access '%s' (%s). Try running as root.\n", disk_path, strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+    int test_fd = open(test_file_path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    if (test_fd == -1) {
+        fprintf(stderr, "failed to open '%s' (%s)", test_file_path, strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+    printf("Opened test file '%s'\n", test_file_path);
 
     uint32_t sqe_size = sizeof(struct fs_op_sqe);
     uint32_t cqe_size = sizeof(struct fs_op_cqe);
@@ -90,7 +104,6 @@ int main()
         return 1;
     }
 
-    printf("ramfs\n");
     printf("Initializing ring (Dynamic alloc) on path '%s'...\n", disk_path);
     fflush(stdout);
 
