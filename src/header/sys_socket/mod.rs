@@ -7,6 +7,7 @@ use core::{mem, ptr};
 use crate::{
     error::ResultExt,
     header::{bits_safamily_t::sa_family_t, sys_uio::iovec},
+    out::Out,
     platform::{
         PalSocket, Sys,
         types::{c_char, c_int, c_long, c_uchar, c_uint, c_void, size_t, ssize_t},
@@ -176,8 +177,25 @@ pub unsafe extern "C" fn accept(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
+    let dst = if address.is_null() || address_len.is_null() {
+        None
+    } else {
+        Some(unsafe {
+            let len: usize = address_len.read().try_into().unwrap();
+            core::slice::from_raw_parts_mut(address.cast::<u8>(), len)
+        })
+    };
     trace_expr!(
-        unsafe { Sys::accept(socket, address, address_len) }.or_minus_one_errno(),
+        match Sys::accept(socket, dst) {
+            Ok((result, true_len)) => {
+                if let Some(len_out) = unsafe { address_len.as_mut() } {
+                    *len_out = true_len;
+                }
+
+                result
+            }
+            Err(err) => Err(err).or_minus_one_errno(),
+        },
         "accept({}, {:p}, {:p})",
         socket,
         address,
@@ -192,8 +210,10 @@ pub unsafe extern "C" fn bind(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
+    let address_raw =
+        unsafe { core::slice::from_raw_parts(address.cast::<u8>(), address_len as usize) };
     trace_expr!(
-        unsafe { Sys::bind(socket, address, address_len) }
+        Sys::bind(socket, address_raw)
             .map(|()| 0)
             .or_minus_one_errno(),
         "bind({}, {:p}, {})",
@@ -210,8 +230,10 @@ pub unsafe extern "C" fn connect(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
+    let address_raw =
+        unsafe { core::slice::from_raw_parts(address.cast::<u8>(), address_len as usize) };
     trace_expr!(
-        unsafe { Sys::connect(socket, address, address_len) }.or_minus_one_errno(),
+        Sys::connect(socket, address_raw).or_minus_one_errno(),
         "connect({}, {:p}, {})",
         socket,
         address,
@@ -226,10 +248,19 @@ pub unsafe extern "C" fn getpeername(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
+    let dst = unsafe {
+        let len: usize = address_len.read().try_into().unwrap();
+        core::slice::from_raw_parts_mut(address.cast::<u8>(), len)
+    };
+
     trace_expr!(
-        unsafe { Sys::getpeername(socket, address, address_len) }
-            .map(|()| 0)
-            .or_minus_one_errno(),
+        match Sys::getpeername(socket, dst) {
+            Ok(true_len) => {
+                unsafe { address_len.write(true_len) };
+                0
+            }
+            Err(err) => Err(err).or_minus_one_errno(),
+        },
         "getpeername({}, {:p}, {:p})",
         socket,
         address,
@@ -244,10 +275,19 @@ pub unsafe extern "C" fn getsockname(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
+    let dst = unsafe {
+        let len: usize = address_len.read().try_into().unwrap();
+        core::slice::from_raw_parts_mut(address.cast::<u8>(), len)
+    };
+
     trace_expr!(
-        unsafe { Sys::getsockname(socket, address, address_len) }
-            .map(|()| 0)
-            .or_minus_one_errno(),
+        match Sys::getsockname(socket, dst) {
+            Ok(true_len) => {
+                unsafe { address_len.write(true_len) };
+                0
+            }
+            Err(err) => Err(err).or_minus_one_errno(),
+        },
         "getsockname({}, {:p}, {:p})",
         socket,
         address,
@@ -264,10 +304,20 @@ pub unsafe extern "C" fn getsockopt(
     option_value: *mut c_void,
     option_len: *mut socklen_t,
 ) -> c_int {
+    let option_value = unsafe {
+        core::slice::from_raw_parts_mut(option_value.cast::<u8>(), option_len.read() as usize)
+    };
+
     trace_expr!(
-        unsafe { Sys::getsockopt(socket, level, option_name, option_value, option_len) }
-            .map(|()| 0)
-            .or_minus_one_errno(),
+        match Sys::getsockopt(socket, level, option_name, option_value) {
+            Ok(true_len) => {
+                unsafe {
+                    option_len.write(true_len);
+                }
+                0
+            }
+            Err(error) => Err(error).or_minus_one_errno(),
+        },
         "getsockopt({}, {}, {}, {:p}, {:p})",
         socket,
         level,
@@ -315,10 +365,25 @@ pub unsafe extern "C" fn recvfrom(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> ssize_t {
+    let buffer = unsafe { Out::from_raw_parts(buffer.cast::<u8>(), length) };
+    let address = if address.is_null() || address_len.is_null() {
+        None
+    } else {
+        Some(unsafe {
+            core::slice::from_raw_parts_mut(address.cast::<u8>(), address_len.read() as usize)
+        })
+    };
+
     trace_expr!(
-        unsafe { Sys::recvfrom(socket, buffer, length, flags, address, address_len) }
-            .map(|r| r as ssize_t)
-            .or_minus_one_errno(),
+        match Sys::recvfrom(socket, buffer, flags, address) {
+            Ok((bytes_read, addr_len)) => {
+                if let Some(len_out) = unsafe { address_len.as_mut() } {
+                    *len_out = addr_len;
+                }
+                bytes_read as ssize_t
+            }
+            Err(err) => Err(err).or_minus_one_errno(),
+        },
         "recvfrom({}, {:p}, {}, {:#x}, {:p}, {:p})",
         socket,
         buffer,
@@ -366,8 +431,16 @@ pub unsafe extern "C" fn sendto(
     dest_addr: *const sockaddr,
     dest_len: socklen_t,
 ) -> ssize_t {
+    let message = unsafe { core::slice::from_raw_parts(message.cast::<u8>(), length) };
+
+    let dest_addr = if dest_addr.is_null() {
+        None
+    } else {
+        Some(unsafe { core::slice::from_raw_parts(dest_addr.cast::<u8>(), dest_len as usize) })
+    };
+
     trace_expr!(
-        unsafe { Sys::sendto(socket, message, length, flags, dest_addr, dest_len) }
+        Sys::sendto(socket, message, flags, dest_addr)
             .map(|w| w as ssize_t)
             .or_minus_one_errno(),
         "sendto({}, {:p}, {}, {:#x}, {:p}, {})",
@@ -389,8 +462,11 @@ pub unsafe extern "C" fn setsockopt(
     option_value: *const c_void,
     option_len: socklen_t,
 ) -> c_int {
+    let option_value =
+        unsafe { core::slice::from_raw_parts(option_value.cast::<u8>(), option_len as usize) };
+
     trace_expr!(
-        unsafe { Sys::setsockopt(socket, level, option_name, option_value, option_len) }
+        Sys::setsockopt(socket, level, option_name, option_value)
             .map(|()| 0)
             .or_minus_one_errno(),
         "setsockopt({}, {}, {}, {:p}, {})",
@@ -412,7 +488,7 @@ pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     trace_expr!(
-        unsafe { Sys::socket(domain, kind, protocol) }.or_minus_one_errno(),
+        Sys::socket(domain, kind, protocol).or_minus_one_errno(),
         "socket({}, {}, {})",
         domain,
         kind,

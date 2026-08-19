@@ -25,40 +25,38 @@ use crate::{
         fcntl,
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         signal::SIGPIPE,
-        string::strnlen,
         sys_select::timeval,
         sys_socket::{
             CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
-            constants::*, msghdr, sockaddr, socklen_t,
+            constants::*, msghdr, socklen_t,
         },
         sys_uio::iovec,
         sys_un::sockaddr_un,
     },
+    out::Out,
 };
 
-unsafe fn bind_or_connect(
-    op: SocketCall,
-    socket: c_int,
-    address: *const sockaddr,
-    address_len: socklen_t,
-) -> Result<usize, Errno> {
-    if (address_len as usize) < mem::size_of::<sa_family_t>() {
-        return Err(Errno(EINVAL));
-    }
+fn extract_sa_family(address_raw: &[u8]) -> Result<c_int> {
+    // TODO: It's likely a logic error (valid to panic) if smaller than sa_family_t, but checking
+    // this probably has no important perf impact.
+    let sa_family_bytes = address_raw
+        .get(..size_of::<sa_family_t>())
+        .ok_or(Errno(EINVAL))?;
+    let sa_family = <[u8; size_of::<sa_family_t>()]>::try_from(sa_family_bytes).unwrap();
+    Ok(sa_family_t::from_ne_bytes(sa_family).into())
+}
 
-    let path = match c_int::from(unsafe { (*address).sa_family }) {
+fn bind_or_connect(op: SocketCall, socket: c_int, address_raw: &[u8]) -> Result<usize, Errno> {
+    let path = match extract_sa_family(address_raw)? {
         AF_INET => {
-            if (address_len as usize) != mem::size_of::<sockaddr_in>() {
+            if address_raw.len() != mem::size_of::<sockaddr_in>() {
                 return Err(Errno(EINVAL));
             }
 
-            let data = unsafe { &*address.cast::<sockaddr_in>() };
-            let addr = unsafe {
-                slice::from_raw_parts(
-                    (&raw const data.sin_addr.s_addr).cast::<u8>(),
-                    mem::size_of_val(&data.sin_addr.s_addr),
-                )
-            };
+            let data: &sockaddr_in = plain::from_bytes(address_raw).unwrap();
+            // NOTE: ne_bytes is *native* endian, as can be seen below with the indexing
+            let addr = data.sin_addr.s_addr.to_ne_bytes();
+
             let port = in_port_t::from_be(data.sin_port);
 
             match op {
@@ -92,45 +90,40 @@ unsafe fn bind_or_connect(
     Ok(fd)
 }
 
-pub unsafe fn bind_or_connect_into(
+pub fn bind_or_connect_into(
     op: SocketCall,
     socket: c_int,
-    address: *const sockaddr,
-    address_len: socklen_t,
+    address_raw: &[u8],
 ) -> Result<c_int, Errno> {
     // Duplicate the socket, and then duplicate the copy back to the original fd
-    let fd = FdGuard::new(unsafe { bind_or_connect(op, socket, address, address_len) }?);
+    let fd = FdGuard::new(bind_or_connect(op, socket, address_raw)?);
     redox_rt::sys::dup2(fd.as_raw_fd(), socket as usize, &[])?;
     Ok(0)
 }
 
-unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut socklen_t) {
-    let data = unsafe { &mut *address.cast::<sockaddr_un>() };
+fn inner_af_unix(buf: &[u8], address_dst: &mut [u8]) -> socklen_t {
+    let mut src_bytes = [0_u8; size_of::<sockaddr_un>()];
+    let src: &mut sockaddr_un = plain::from_mut_bytes(&mut src_bytes).unwrap();
 
-    data.sun_family = AF_UNIX as c_ushort;
+    src.sun_family = AF_UNIX as c_ushort;
 
-    let path = unsafe {
-        slice::from_raw_parts_mut((&raw mut data.sun_path).cast::<u8>(), data.sun_path.len())
-    };
+    let src_to_copy = buf.len().min(src.sun_path.len());
+    // (assumes c_char is layout compatible with u8)
+    src.sun_path[..src_to_copy]
+        .copy_from_slice(plain::slice_from_bytes(&buf[..src_to_copy]).unwrap());
+    // sun_path[to_copy..] automatically zero-filled
 
-    let mut len = cmp::min(path.len(), buf.len());
-    path[..len].copy_from_slice(&buf[..len]);
-    if len < path.len() {
-        path[len] = 0;
-        len += 1;
-    }
+    let true_len = mem::offset_of!(sockaddr_un, sun_path) as socklen_t + src_to_copy as socklen_t;
 
-    unsafe {
-        *address_len = mem::offset_of!(sockaddr_un, sun_path) as socklen_t + len as socklen_t
-    };
+    let dst_to_copy = address_dst.len().min(true_len as usize);
+    address_dst[..dst_to_copy].copy_from_slice(&src_bytes[..dst_to_copy]);
+
+    true_len
 }
 
-unsafe fn inner_af_inet(
-    local: bool,
-    buf: &[u8],
-    address: *mut sockaddr,
-    address_len: *mut socklen_t,
-) {
+/// Copies address data bytes to address_dst, truncating if necessary, and always returns the
+/// length of the true value.
+fn inner_af_inet(local: bool, buf: &[u8], address_dst: &mut [u8]) -> socklen_t {
     let mut parts = buf.split(|c| *c == b'/');
     if local {
         // Skip the remote part
@@ -165,32 +158,31 @@ unsafe fn inner_af_inet(
 
         ..sockaddr_in::default()
     };
-    let len = cmp::min(unsafe { *address_len } as usize, mem::size_of_val(&ret));
+    // TODO: safe transmute
+    let address_src = unsafe {
+        core::slice::from_raw_parts((&raw const ret).cast::<u8>(), size_of::<sockaddr_in>())
+    };
+    let to_copy = address_src.len().min(address_dst.len());
+    address_dst[..to_copy].copy_from_slice(&address_src[..to_copy]);
 
-    unsafe {
-        ptr::copy_nonoverlapping((&raw const ret).cast::<u8>(), address.cast::<u8>(), len);
-        *address_len = len as socklen_t;
-    }
+    size_of::<sockaddr_in>().try_into().unwrap()
 }
 
-unsafe fn inner_get_name_inner(
-    local: bool,
-    address: *mut sockaddr,
-    address_len: *mut socklen_t,
-    buf: &[u8],
-) -> Result<()> {
-    if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
-        unsafe { inner_af_inet(local, &buf[4..], address, address_len) };
+/// Takes a destination buffer which it copies possibly truncated to, always returns the true
+/// length.
+fn inner_get_name_inner(local: bool, address_dst: &mut [u8], buf: &[u8]) -> Result<socklen_t> {
+    Ok(if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
+        inner_af_inet(local, &buf[4..], address_dst)
     } else if buf.starts_with(b"/scheme/tcp/") || buf.starts_with(b"/scheme/udp/") {
-        unsafe { inner_af_inet(local, &buf[12..], address, address_len) };
+        inner_af_inet(local, &buf[12..], address_dst)
     } else if buf.starts_with(b"chan:") {
-        unsafe { inner_af_unix(&buf[5..], address, address_len) };
+        inner_af_unix(&buf[5..], address_dst)
     } else if buf.starts_with(b"/scheme/chan/") {
-        unsafe { inner_af_unix(&buf[13..], address, address_len) };
+        inner_af_unix(&buf[13..], address_dst)
     } else if buf.starts_with(b"/scheme/uds_stream/") {
-        unsafe { inner_af_unix(&buf[18..], address, address_len) };
+        inner_af_unix(&buf[18..], address_dst)
     } else if buf.starts_with(b"/scheme/uds_dgram/") {
-        unsafe { inner_af_unix(&buf[17..], address, address_len) };
+        inner_af_unix(&buf[17..], address_dst)
     } else {
         // Socket doesn't belong to any scheme
         log::trace!(
@@ -198,8 +190,7 @@ unsafe fn inner_get_name_inner(
             str::from_utf8(buf)
         );
         return Err(Errno(ENOTSOCK));
-    }
-    Ok(())
+    })
 }
 
 fn socket_domain_type(socket: c_int) -> Result<(c_int, c_int)> {
@@ -233,6 +224,9 @@ fn socket_kind(mut kind: c_int) -> (c_int, usize) {
     (kind, flags)
 }
 
+// TODO: use the `ioslice` crate here to make this safe, but it may need to be modified to
+// guarantee the format to be (pointer, length), which we could statically assert matches relibc's
+// iovec definition
 unsafe fn serialize_payload_to_stream(
     msg_stream: &mut Vec<u8>,
     iovs: &[iovec],
@@ -334,14 +328,23 @@ unsafe fn deserialize_name_from_stream(
         }
         if !mhdr.msg_name.is_null() && mhdr.msg_namelen > 0 {
             let name_buffer = &msg_stream[*cursor..*cursor + name_len_in_stream];
-            (unsafe {
+            /*(unsafe {
                 inner_get_name_inner(
                     false,
                     mhdr.msg_name.cast::<sockaddr>(),
                     &raw mut mhdr.msg_namelen,
                     name_buffer,
                 )
-            })?;
+            })?;*/
+
+            let name_dst = unsafe {
+                core::slice::from_raw_parts_mut(
+                    mhdr.msg_name.cast::<u8>(),
+                    mhdr.msg_namelen.try_into().unwrap(),
+                )
+            };
+            let true_len = inner_get_name_inner(false, name_dst, name_buffer)?;
+            mhdr.msg_namelen = true_len;
         }
         *cursor += name_len_in_stream;
     } else {
@@ -537,53 +540,36 @@ unsafe fn deserialize_ancillary_data_from_stream(
 }
 
 impl PalSocket for Sys {
-    unsafe fn accept(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<c_int> {
+    fn accept(socket: c_int, address_dst_opt: Option<&mut [u8]>) -> Result<(c_int, socklen_t)> {
         let stream = redox_rt::sys::dup(socket as usize, b"listen")?;
-        if !address.is_null()
-            && !address_len.is_null()
-            && let Err(err) = unsafe { Self::getpeername(stream as c_int, address, address_len) }
-        {
-            let _ = redox_rt::sys::close(stream);
-            return Err(err);
-        }
-        Ok(stream as c_int)
+        let true_addr_len = match address_dst_opt {
+            Some(address_dst) => match Self::getpeername(stream as c_int, address_dst) {
+                Ok(len) => len,
+                Err(err) => {
+                    let _ = redox_rt::sys::close(stream);
+                    return Err(err);
+                }
+            },
+            None => 0,
+        };
+        Ok((stream as c_int, true_addr_len))
     }
 
-    unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
-        match c_int::from(unsafe { (*address).sa_family }) {
+    fn bind(socket: c_int, address_raw: &[u8]) -> Result<()> {
+        match extract_sa_family(address_raw)? {
             AF_INET => {
-                (unsafe { bind_or_connect_into(SocketCall::Bind, socket, address, address_len) })?;
+                (bind_or_connect_into(SocketCall::Bind, socket, address_raw))?;
             }
             AF_UNIX => {
-                let data = unsafe { &*address.cast::<sockaddr_un>() };
+                let path_bytes = address_raw
+                    .get(mem::offset_of!(sockaddr_un, sun_path)..)
+                    .ok_or(Errno(EINVAL))?;
+                let path_len = path_bytes
+                    .iter()
+                    .position(|c| *c == 0)
+                    .unwrap_or(path_bytes.len());
+                let path = str::from_utf8(&path_bytes[..path_len]).map_err(|_| Errno(EINVAL))?;
 
-                // NOTE: It's UB to access data in given address that exceeds
-                // the given address length.
-
-                let maxlen = cmp::min(
-                    // Max path length of the full-sized struct
-                    data.sun_path.len(),
-                    // Length inferred from given addrlen
-                    address_len as usize - data.path_offset(),
-                );
-                let len = cmp::min(
-                    // The maximum length of the address
-                    maxlen,
-                    // The first NUL byte, if any
-                    // FIXME applying clippy suggestion fails to compile
-                    #[expect(clippy::borrow_as_ptr)]
-                    unsafe {
-                        strnlen(&data.sun_path as *const _, maxlen as size_t)
-                    },
-                );
-
-                let addr =
-                    unsafe { slice::from_raw_parts((&raw const data.sun_path).cast::<u8>(), len) };
-                let path = str::from_utf8(addr).map_err(|_| Errno(EINVAL))?;
                 log::trace!("bind(): path: {:?}", path);
 
                 let path = RedoxStr::new(path).ok_or(Errno(EINVAL))?;
@@ -639,41 +625,17 @@ impl PalSocket for Sys {
         Ok(())
     }
 
-    unsafe fn connect(
-        socket: c_int,
-        address: *const sockaddr,
-        address_len: socklen_t,
-    ) -> Result<c_int> {
-        match c_int::from(unsafe { (*address).sa_family }) {
-            AF_INET => unsafe {
-                bind_or_connect_into(SocketCall::Connect, socket, address, address_len)
-            },
+    fn connect(socket: c_int, address_raw: &[u8]) -> Result<c_int> {
+        match extract_sa_family(address_raw)? {
+            AF_INET => bind_or_connect_into(SocketCall::Connect, socket, address_raw),
             AF_UNIX => {
-                let data = unsafe { &*address.cast::<sockaddr_un>() };
+                let path_bytes = address_raw
+                    .get(mem::offset_of!(sockaddr_un, sun_path)..)
+                    .ok_or(Errno(EINVAL))?;
+                let path_cstr =
+                    CStr::from_chars_until_nul(path_bytes).map_err(|_| Errno(EINVAL))?;
 
-                // NOTE: It's UB to access data in given address that exceeds
-                // the given address length.
-
-                let maxlen = cmp::min(
-                    // Max path length of the full-sized struct
-                    data.sun_path.len(),
-                    // Length inferred from given addrlen
-                    address_len as usize - data.path_offset(),
-                );
-                let len = cmp::min(
-                    // The maximum length of the address
-                    maxlen,
-                    // The first NUL byte, if any
-                    // FIXME applying clippy suggestion fails to compile
-                    #[expect(clippy::borrow_as_ptr)]
-                    unsafe {
-                        strnlen(&data.sun_path as *const _, maxlen as size_t)
-                    },
-                );
-
-                let path = unsafe { CStr::from_ptr(data.sun_path.as_ptr()) };
-
-                let socket_file_fd = Sys::open(path, fcntl::O_RDWR, 0)?;
+                let socket_file_fd = Sys::open(path_cstr, fcntl::O_RDWR, 0)?;
                 let socket_file_fd = FdGuard::new(socket_file_fd as usize);
 
                 const TOKEN_BUF_SIZE: usize = 16;
@@ -695,18 +657,12 @@ impl PalSocket for Sys {
                 )?;
                 Result::<c_int, Errno>::Ok(0)
             }
-            AF_UNSPEC => unsafe {
-                bind_or_connect_into(SocketCall::Connect, socket, address, address_len)
-            },
+            AF_UNSPEC => bind_or_connect_into(SocketCall::Connect, socket, address_raw),
             _ => Err(Errno(EAFNOSUPPORT)),
         }
     }
 
-    unsafe fn getpeername(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<()> {
+    fn getpeername(socket: c_int, address_dst: &mut [u8]) -> Result<socklen_t> {
         let mut buf = [0; 256];
         let len = redox_rt::sys::sys_call_ro(
             socket as usize,
@@ -715,92 +671,69 @@ impl PalSocket for Sys {
             &[SocketCall::GetPeerName as u64],
         )?;
 
-        unsafe { inner_get_name_inner(false, address, address_len, &buf[..len]) }
+        inner_get_name_inner(false, address_dst, &buf[..len])
     }
 
-    unsafe fn getsockname(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<()> {
+    fn getsockname(socket: c_int, address_dst: &mut [u8]) -> Result<socklen_t> {
         let mut buf = [0; 256];
         let len = syscall::fpath(socket as usize, &mut buf)?;
 
-        unsafe { inner_get_name_inner(true, address, address_len, &buf[..len]) }
+        inner_get_name_inner(true, address_dst, &buf[..len])
     }
 
-    unsafe fn getsockopt(
+    fn getsockopt(
         socket: c_int,
         level: c_int,
         option_name: c_int,
-        option_value: *mut c_void,
-        option_len_ptr: *mut socklen_t,
-    ) -> Result<()> {
-        if option_len_ptr.is_null() {
-            return Err(Errno(EFAULT));
+        option_value: &mut [u8],
+    ) -> Result<socklen_t> {
+        fn option_c_int(option_value: &mut [u8]) -> Result<&mut c_int> {
+            let bytes = option_value
+                .get_mut(..size_of::<c_int>())
+                .ok_or(Errno(EINVAL))?;
+            Ok(plain::from_mut_bytes(bytes).unwrap())
         }
-        let option_len = (unsafe { *option_len_ptr }) as usize;
-
-        let option_c_int = || -> Result<&mut c_int> {
-            if option_value.is_null() {
-                return Err(Errno(EFAULT));
-            }
-
-            if option_len < mem::size_of::<c_int>() {
-                return Err(Errno(EINVAL));
-            }
-
-            Ok(unsafe { &mut *option_value.cast::<c_int>() })
-        };
 
         // TODO convert back to match when we support more levels
         if level == SOL_SOCKET {
             match option_name {
                 SO_DOMAIN => {
-                    let option = option_c_int()?;
+                    let option = option_c_int(option_value)?;
                     *option = socket_domain_type(socket)?.0;
-                    unsafe { *option_len_ptr = mem::size_of::<c_int>() as socklen_t };
-                    return Ok(());
+                    return Ok(size_of::<c_int>() as socklen_t);
                 }
                 SO_ERROR => {
-                    let option = option_c_int()?;
+                    let option = option_c_int(option_value)?;
                     //TODO: Socket nonblock connection error
                     *option = 0;
-                    unsafe { *option_len_ptr = mem::size_of::<c_int>() as socklen_t };
-                    return Ok(());
+                    return Ok(size_of::<c_int>() as socklen_t);
                 }
                 SO_TYPE => {
-                    let option = option_c_int()?;
+                    let option = option_c_int(option_value)?;
                     *option = socket_domain_type(socket)?.1;
-                    unsafe { *option_len_ptr = mem::size_of::<c_int>() as socklen_t };
-                    return Ok(());
+                    return Ok(size_of::<c_int>() as socklen_t);
                 }
                 _ => {
                     let metadata = [SocketCall::GetSockOpt as u64, option_name as u64];
-                    let payload =
-                        unsafe { slice::from_raw_parts_mut(option_value.cast::<u8>(), option_len) };
                     let call_flags = CallFlags::empty();
-                    unsafe {
-                        *option_len_ptr = redox_rt::sys::sys_call_ro(
-                            socket as usize,
-                            payload,
-                            CallFlags::empty(),
-                            &metadata,
-                        )? as socklen_t;
-                    }
-                    return Ok(());
+                    let true_len = redox_rt::sys::sys_call_ro(
+                        socket as usize,
+                        option_value,
+                        CallFlags::empty(),
+                        &metadata,
+                    )? as socklen_t;
+                    return Ok(true_len);
                 }
             }
         }
 
         todo_skip!(
             0,
-            "getsockopt({}, {}, {}, {:p}, {:p})",
+            "getsockopt({}, {}, {}, {:#x?})",
             socket,
             level,
             option_name,
             option_value,
-            option_len_ptr
         );
         Err(Errno(ENOSYS))
     }
@@ -810,31 +743,29 @@ impl PalSocket for Sys {
         Ok(())
     }
 
-    unsafe fn recvfrom(
+    fn recvfrom(
         socket: c_int,
-        buf: *mut c_void,
-        len: size_t,
+        mut buf: Out<[u8]>,
         flags: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<usize> {
-        if address.is_null() && flags == 0 {
-            Self::read(socket, unsafe {
-                slice::from_raw_parts_mut(buf.cast::<u8>(), len)
-            })
+        mut address_raw: Option<&mut [u8]>,
+    ) -> Result<(usize, socklen_t)> {
+        if address_raw.is_none() && flags == 0 {
+            // TODO: Sys::read should also take Out
+            let bytes_read = Self::read(socket, unsafe {
+                slice::from_raw_parts_mut(buf.as_mut_ptr().as_mut_ptr(), buf.as_mut_ptr().len())
+            })?;
+            Ok((bytes_read, 0))
         } else {
             // Convert to recvmsg
             let mut iov = iovec {
-                iov_base: buf,
-                iov_len: len,
+                iov_base: buf.as_mut_ptr().as_mut_ptr().cast(),
+                iov_len: buf.as_mut_ptr().len(),
             };
             let mut msg = msghdr {
-                msg_name: address.cast::<c_void>(),
-                msg_namelen: if !address_len.is_null() {
-                    unsafe { *address_len }
-                } else {
-                    0
-                },
+                msg_name: address_raw
+                    .as_mut()
+                    .map_or_else(core::ptr::null_mut, |a| a.as_mut_ptr().cast::<c_void>()),
+                msg_namelen: address_raw.map_or(0, |a| a.len()) as socklen_t,
                 msg_iov: &raw mut iov,
                 msg_iovlen: 1,
                 msg_control: ptr::null_mut(),
@@ -842,10 +773,7 @@ impl PalSocket for Sys {
                 msg_flags: 0,
             };
             let count = unsafe { Self::recvmsg(socket, &raw mut msg, flags) }?;
-            if !address_len.is_null() {
-                unsafe { *address_len = msg.msg_namelen };
-            }
-            Ok(count)
+            Ok((count, msg.msg_namelen))
         }
     }
 
@@ -988,14 +916,7 @@ impl PalSocket for Sys {
         Ok(actual_payload_bytes_serialized)
     }
 
-    unsafe fn sendto(
-        socket: c_int,
-        buf: *const c_void,
-        len: size_t,
-        flags: c_int,
-        dest_addr: *const sockaddr,
-        dest_len: socklen_t,
-    ) -> Result<usize> {
+    fn sendto(socket: c_int, buf: &[u8], flags: c_int, dest_addr: Option<&[u8]>) -> Result<usize> {
         // MSG_NOSIGNAL controls SIGPIPE delivery in relibc, not socket I/O.
         let no_signal = flags & MSG_NOSIGNAL != 0;
         let flags = flags & !MSG_NOSIGNAL;
@@ -1004,12 +925,14 @@ impl PalSocket for Sys {
         let result = if flags != 0 {
             // Convert to sendmsg
             let mut iov = iovec {
-                iov_base: buf.cast_mut(),
-                iov_len: len,
+                iov_base: buf.as_ptr().cast::<c_void>().cast_mut(),
+                iov_len: buf.len(),
             };
             let msg = msghdr {
-                msg_name: dest_addr as *mut c_void,
-                msg_namelen: dest_len,
+                msg_name: dest_addr.map_or_else(core::ptr::null_mut, |a| {
+                    a.as_ptr().cast::<c_void>().cast_mut()
+                }),
+                msg_namelen: dest_addr.map_or(0, |l| l.len() as socklen_t),
                 msg_iov: &raw mut iov,
                 msg_iovlen: 1,
                 msg_control: ptr::null_mut(),
@@ -1017,20 +940,18 @@ impl PalSocket for Sys {
                 msg_flags: 0,
             };
             unsafe { Self::sendmsg(socket, &raw const msg, flags) }
-        } else if dest_addr.is_null() || dest_len == 0 {
-            Self::write(socket, unsafe {
-                slice::from_raw_parts(buf.cast::<u8>(), len)
-            })
-        } else {
-            match unsafe { bind_or_connect(SocketCall::Connect, socket, dest_addr, dest_len) } {
+        } else if let Some(dest) = dest_addr
+            && !dest.is_empty()
+        {
+            match bind_or_connect(SocketCall::Connect, socket, dest) {
                 Ok(fd) => {
                     let fd = FdGuard::new(fd);
-                    Self::write(fd.as_c_fd().unwrap(), unsafe {
-                        slice::from_raw_parts(buf.cast::<u8>(), len)
-                    })
+                    Self::write(fd.as_c_fd().unwrap(), buf)
                 }
                 Err(error) => Err(error),
             }
+        } else {
+            Self::write(socket, buf)
         };
 
         match result {
@@ -1045,23 +966,17 @@ impl PalSocket for Sys {
         }
     }
 
-    unsafe fn setsockopt(
+    fn setsockopt(
         socket: c_int,
         level: c_int,
         option_name: c_int,
-        option_value: *const c_void,
-        option_len: socklen_t,
+        option_value: &[u8],
     ) -> Result<()> {
         let set_timeout = |timeout_name: &[u8]| -> Result<()> {
-            if option_value.is_null() {
-                return Err(Errno(EFAULT));
-            }
-
-            if (option_len as usize) < mem::size_of::<timeval>() {
-                return Err(Errno(EINVAL));
-            }
-
-            let timeval = unsafe { &*option_value.cast::<timeval>() };
+            let bytes = option_value
+                .get(..size_of::<timeval>())
+                .ok_or(Errno(EINVAL))?;
+            let timeval: &timeval = plain::from_bytes(bytes).unwrap();
 
             let fd = FdGuard::new(redox_rt::sys::dup(socket as usize, timeout_name)?);
 
@@ -1085,13 +1000,10 @@ impl PalSocket for Sys {
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 _ => {
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
-                    let payload = unsafe {
-                        slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize)
-                    };
                     let call_flags = CallFlags::empty();
-                    redox_rt::sys::sys_call_rw(
+                    redox_rt::sys::sys_call_wo(
                         socket as usize,
-                        payload,
+                        option_value,
                         CallFlags::empty(),
                         &metadata,
                     )?;
@@ -1102,12 +1014,11 @@ impl PalSocket for Sys {
 
         todo_skip!(
             0,
-            "setsockopt({}, {}, {}, {:p}, {}) - unknown option",
+            "setsockopt({}, {}, {}, {:#x?}) - unknown option",
             socket,
             level,
             option_name,
             option_value,
-            option_len
         );
         Ok(())
     }
@@ -1118,7 +1029,7 @@ impl PalSocket for Sys {
         Ok(())
     }
 
-    unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
+    fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
         if domain != AF_INET && domain != AF_UNIX {
             return Err(Errno(EAFNOSUPPORT));
         }
