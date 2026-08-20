@@ -40,7 +40,6 @@ impl GlobalFile {
 // statics need to be Sync
 unsafe impl Sync for GlobalFile {}
 
-// TODO: Allow const fn initialization of FILE
 static DEFAULT_STDIN: GlobalFile = GlobalFile::new(0, constants::F_NOWR);
 static DEFAULT_STDOUT: GlobalFile = GlobalFile::new(1, constants::F_NORD);
 static DEFAULT_STDERR: GlobalFile = GlobalFile::new(2, constants::F_NORD);

@@ -30,7 +30,7 @@ use crate::{
         string::{self, strlen, strncpy},
         unistd,
     },
-    io::{self, BufRead, BufWriter, LineWriter, Read, Write},
+    io::{self, BufRead, BufWriter, IntoInnerError, LineWriter, Read, Write},
     out::Out,
     platform::{
         self, ERRNO, Pal, Sys, WriteByte,
@@ -135,19 +135,50 @@ impl<W: crate::io::Write> Writer for LineWriter<W> {
 pub enum FileInnerWriter {
     Buf(BufWriter<File>),
     Line(LineWriter<File>),
+    Unbuffered(File),
 }
 
 impl FileInnerWriter {
     pub fn to_line_buffered(self) -> Self {
         match self {
             FileInnerWriter::Buf(buf_writer) => FileInnerWriter::Line(buf_writer.into()),
+            FileInnerWriter::Unbuffered(writer) => FileInnerWriter::Line(LineWriter::new(writer)),
             line => line,
         }
     }
     pub fn to_byte_buffered(self) -> Self {
         match self {
             FileInnerWriter::Line(line_writer) => FileInnerWriter::Buf(line_writer.into()),
+            FileInnerWriter::Unbuffered(writer) => FileInnerWriter::Buf(BufWriter::new(writer)),
             byte => byte,
+        }
+    }
+    pub fn to_unbuffered(self) -> Self {
+        let writer = match self {
+            FileInnerWriter::Line(line_writer) => line_writer.into_inner(),
+            FileInnerWriter::Buf(buf_writer) => buf_writer.into_inner(),
+            unbuf => return unbuf,
+        };
+        FileInnerWriter::Unbuffered(match writer {
+            Ok(writer) => writer,
+            Err(IntoInnerError(writer, e)) => {
+                log::warn!("to_unbuffered flush failure: {e:?}");
+                writer
+            }
+        })
+    }
+    pub fn capacity(&self) -> usize {
+        match self {
+            Self::Line(line_writer) => line_writer.inner.buf.capacity(),
+            Self::Buf(buf_writer) => buf_writer.buf.capacity(),
+            Self::Unbuffered(_) => 0,
+        }
+    }
+    pub fn set_capacity(&mut self, cap: usize) {
+        match self {
+            Self::Line(line_writer) => line_writer.inner.buf = Vec::with_capacity(cap),
+            Self::Buf(buf_writer) => buf_writer.buf = Vec::with_capacity(cap),
+            Self::Unbuffered(_) => {} // no op
         }
     }
 }
@@ -157,6 +188,7 @@ impl Writer for FileInnerWriter {
         match self {
             FileInnerWriter::Buf(buf_writer) => buf_writer.purge(),
             FileInnerWriter::Line(line_writer) => line_writer.purge(),
+            FileInnerWriter::Unbuffered(_) => {} // no op
         }
     }
 }
@@ -166,6 +198,7 @@ impl Pending for FileInnerWriter {
         match self {
             FileInnerWriter::Buf(buf_writer) => buf_writer.pending(),
             FileInnerWriter::Line(line_writer) => line_writer.pending(),
+            FileInnerWriter::Unbuffered(_) => 0, // no op
         }
     }
 }
@@ -175,6 +208,7 @@ impl crate::io::Write for FileInnerWriter {
         match self {
             FileInnerWriter::Buf(buf_writer) => buf_writer.write(buf),
             FileInnerWriter::Line(line_writer) => line_writer.write(buf),
+            FileInnerWriter::Unbuffered(file) => file.write(buf),
         }
     }
 
@@ -182,6 +216,7 @@ impl crate::io::Write for FileInnerWriter {
         match self {
             FileInnerWriter::Buf(buf_writer) => buf_writer.flush(),
             FileInnerWriter::Line(line_writer) => line_writer.flush(),
+            FileInnerWriter::Unbuffered(file) => file.flush(),
         }
     }
 }
@@ -1334,29 +1369,31 @@ pub unsafe extern "C" fn setvbuf(
     // TODO: POSIX does not define what happen if there's pending buffer, so this function will drop it.
     let mut stream = unsafe { (*stream).lock() };
     stream.flags |= F_SVB;
-    match mode {
-        _IONBF => {
-            stream.read_buf = Buffer::Unbuffered;
-            // Ignore buf and size
-            return 0;
+    let size = if size == 0 { BUFSIZ_USIZE } else { size };
+
+    stream.read_buf = if mode != _IONBF {
+        // TODO: read_buf does not support line mode
+        if buf.is_null() {
+            Buffer::Owned(Some(vec![0; size]))
+        } else {
+            Buffer::Borrowed(unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), size) })
         }
-        // TODO: Should EINVAL if not `_IOFBF` or `_IOLBF`?
-        _ => {
-            // SAFETY: We take out stream.writer then immediately set again
-            let r = core::mem::replace(&mut stream.writer, unsafe { core::mem::zeroed() });
-            stream.writer = if mode == _IOLBF {
-                r.to_line_buffered()
-            } else {
-                r.to_byte_buffered()
-            };
-        }
-    }
-    // Set a buffer of size `size` if no buffer is given
-    stream.read_buf = if buf.is_null() || size == 0 {
-        Buffer::Owned(if size == 0 { None } else { Some(vec![0; size]) })
     } else {
-        Buffer::Borrowed(unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), size) })
+        Buffer::Unbuffered
     };
+
+    // SAFETY: We take out stream.writer then immediately set again
+    let writer = core::mem::replace(&mut stream.writer, unsafe { core::mem::zeroed() });
+    stream.writer = match mode {
+        _IONBF => writer.to_unbuffered(),
+        _IOLBF => writer.to_line_buffered(),
+        _IOFBF => writer.to_byte_buffered(),
+        // TODO: Should EINVAL?
+        _ => writer,
+    };
+    // TODO: does not support borrowing buf
+    stream.writer.set_capacity(size);
+
     0
 }
 

@@ -333,7 +333,7 @@ pub struct BufWriter<W: Write> {
 /// };
 /// ```
 #[derive(Debug)]
-pub struct IntoInnerError<W>(W, Error);
+pub struct IntoInnerError<W>(pub W, pub Error);
 
 impl<W: Write> BufWriter<W> {
     /// Creates a new `BufWriter` with a default buffer capacity. The default is currently 8 KB,
@@ -411,9 +411,10 @@ impl<W: Write> BufWriter<W> {
         let mut written = 0;
         let len = self.buf.len();
         let mut ret = Ok(());
+        let writer = self.inner.as_mut().unwrap();
         while written < len {
             self.panicked = true;
-            let r = self.inner.as_mut().unwrap().write(&self.buf[written..]);
+            let r = writer.write(&self.buf[written..]);
             self.panicked = false;
 
             match r {
@@ -463,7 +464,8 @@ impl<W: Write> BufWriter<W> {
     ///
     /// # Errors
     ///
-    /// An `Err` will be returned if an error occurs while flushing the buffer.
+    /// An `Err` will be returned if an error occurs while flushing the buffer,
+    /// the pending buffer will be dropped in that case.
     ///
     /// # Examples
     ///
@@ -476,20 +478,27 @@ impl<W: Write> BufWriter<W> {
     /// // unwrap the TcpStream and flush the buffer
     /// let stream = buffer.into_inner().unwrap();
     /// ```
-    pub fn into_inner(mut self) -> Result<W, IntoInnerError<BufWriter<W>>> {
-        match self.flush_buf() {
-            Err(e) => Err(IntoInnerError(self, e)),
-            Ok(()) => Ok(self.inner.take().unwrap()),
+    pub fn into_inner(mut self) -> Result<W, IntoInnerError<W>> {
+        let r = self.flush_buf();
+        let inner = self.inner.take().unwrap();
+        match r {
+            Err(e) => Err(IntoInnerError(inner, e)),
+            Ok(()) => Ok(inner),
         }
     }
 }
 
 impl<W: Write> Write for BufWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if self.buf.len() + buf.len() > self.buf.capacity() {
+        let mut cap = self.buf.capacity();
+        if cap == 0 {
+            self.buf = Vec::with_capacity(DEFAULT_BUF_SIZE);
+            cap = DEFAULT_BUF_SIZE;
+        }
+        if self.buf.len() + buf.len() > cap {
             self.flush_buf()?;
         }
-        if buf.len() >= self.buf.capacity() {
+        if buf.len() >= cap {
             self.panicked = true;
             let r = self.inner.as_mut().unwrap().write(buf);
             self.panicked = false;
@@ -701,6 +710,10 @@ impl<W: Write> LineWriter<W> {
     /// ```
     pub fn get_mut(&mut self) -> &mut W {
         self.inner.get_mut()
+    }
+
+    pub fn into_inner(self) -> Result<W, IntoInnerError<W>> {
+        self.inner.into_inner()
     }
 }
 
