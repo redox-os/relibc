@@ -468,6 +468,9 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
             unsafe {
                 set_timezone_posix(&mut lock, &tz);
             }
+            #[cfg(target_pointer_width = "64")]
+            let offset = unsafe { timezone };
+            #[cfg(target_pointer_width = "32")]
             let offset = unsafe { i64::from(timezone) };
             timestamp + offset
         }
