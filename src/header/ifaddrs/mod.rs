@@ -59,6 +59,7 @@ pub unsafe extern "C" fn freeifaddrs(mut ifa: *mut ifaddrs) {
 /// The data returned by `getifaddrs()` is dynamically allocated and should
 /// be freed using `freeifaddrs()` when no longer needed.
 #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn getifaddrs(ifap: *mut *mut ifaddrs) -> c_int {
     //TODO: implement getifaddrs
     platform::ERRNO.set(errno::ENOSYS);

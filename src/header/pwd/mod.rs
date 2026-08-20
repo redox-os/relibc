@@ -309,7 +309,6 @@ pub unsafe extern "C" fn getpwuid_r(
     size: size_t,
     result: *mut *mut passwd,
 ) -> c_int {
-    let slice = unsafe { core::slice::from_raw_parts_mut(buf.cast::<u8>(), size) };
     unsafe {
         mux(
             pwd_lookup(

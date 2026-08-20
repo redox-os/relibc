@@ -213,7 +213,7 @@ impl<'a, T> IntoIterator for &'a mut CVec<T> {
 
 impl Write for CVec<u8> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.extend_from_slice(buf).map_err(|err| {
+        self.extend_from_slice(buf).map_err(|_| {
             io::Error::new(
                 io::ErrorKind::Other,
                 "AllocStringWriter::write failed to allocate",

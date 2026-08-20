@@ -93,10 +93,10 @@ impl Kind for Wide {
     fn c2r(c: Self::C) -> Self::Char {
         c as _
     }
-    fn chars_from_bytes(b: &[u8]) -> Option<&[Self::Char]> {
+    fn chars_from_bytes(_: &[u8]) -> Option<&[Self::Char]> {
         None
     }
-    fn chars_to_bytes(c: &[Self::Char]) -> Option<&[u8]> {
+    fn chars_to_bytes(_: &[Self::Char]) -> Option<&[u8]> {
         None
     }
 }

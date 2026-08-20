@@ -137,7 +137,7 @@ impl OwnedGrp {
 fn split(buf: &mut [u8]) -> Option<group> {
     let gr_gid = match buf[0..mem::size_of::<gid_t>()].try_into() {
         Ok(buf) => gid_t::from_ne_bytes(buf),
-        Err(err) => return None,
+        Err(_) => return None,
     };
 
     // Get address of buffer for fixing up gr_mem
@@ -505,7 +505,7 @@ pub unsafe extern "C" fn setgrent() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrouplist(
     user: *const c_char,
-    group: gid_t,
+    _group: gid_t,
     groups: *mut gid_t,
     ngroups: *mut c_int,
 ) -> c_int {
