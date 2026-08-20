@@ -48,7 +48,7 @@ const INTERFACES: &[if_nameindex] = &[
 /// # Safety
 /// this is a no-op: the list returned by if_nameindex() is a ref to a constant
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn if_freenameindex(s: *mut if_nameindex) {}
+pub unsafe extern "C" fn if_freenameindex(_s: *mut if_nameindex) {}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/if_indextoname.html>.
 ///
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn if_freenameindex(s: *mut if_nameindex) {}
 /// Returns NULL in case of not found + ERRNO being set to ENXIO.
 /// Currently only checks against inteface index 1.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn if_indextoname(idx: c_uint, buf: *mut c_char) -> *const c_char {
+pub unsafe extern "C" fn if_indextoname(idx: c_uint, _buf: *mut c_char) -> *const c_char {
     if idx == 1 {
         return IF_STUB_INTERFACE;
     }

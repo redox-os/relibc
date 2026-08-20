@@ -706,7 +706,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
 
     helpers::_fdopen(fd, unsafe { CStr::from_ptr(mode) })
         .map(Box::into_raw)
-        .inspect_err(|err| {
+        .inspect_err(|_| {
             // TODO: guard type
             if let Ok(()) = Sys::close(fd) {}; // TODO handle error
         })
@@ -1150,12 +1150,12 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
             if write {
                 match unistd::dup2(pipes[0], 0) {
                     0 => {}
-                    e => unsafe { stdlib::exit(127) },
+                    _ => unsafe { stdlib::exit(127) },
                 }
             } else {
                 match unistd::dup2(pipes[1], 1) {
                     1 => {}
-                    e => unsafe { stdlib::exit(127) },
+                    _ => unsafe { stdlib::exit(127) },
                 }
             }
 

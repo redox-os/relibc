@@ -307,7 +307,7 @@ pub unsafe extern "C" fn gethostbyaddr(
             H_ERRNO.set(HOST_NOT_FOUND);
             ptr::null_mut()
         }
-        Err(e) => {
+        Err(_) => {
             // TODO: Better error separation in lookup_addr
             H_ERRNO.set(NO_RECOVERY);
             ptr::null_mut()
@@ -380,12 +380,9 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
         }
     }
 
-    let host = match lookup_host(name_str) {
-        Ok(lookuphost) => lookuphost,
-        Err(e) => {
-            H_ERRNO.set(NO_RECOVERY);
-            return ptr::null_mut();
-        }
+    let Ok(host) = lookup_host(name_str) else {
+        H_ERRNO.set(NO_RECOVERY);
+        return ptr::null_mut();
     };
     let Some(host_addr) = host.into_iter().next() else {
         H_ERRNO.set(HOST_NOT_FOUND);
@@ -422,6 +419,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn getnetbyaddr(net: u32, net_type: c_int) -> *mut netent {
     unimplemented!();
 }
@@ -708,8 +706,6 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
     }
     let mut rlb = RawLineBuffer::new(unsafe { SERVDB });
     rlb.seek(unsafe { S_POS });
-
-    let r: Box<str> = Box::default();
 
     loop {
         let r = match rlb.next() {

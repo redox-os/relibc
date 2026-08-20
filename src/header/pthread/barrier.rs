@@ -69,7 +69,8 @@ pub unsafe extern "C" fn pthread_barrier_init(
     attr: *const pthread_barrierattr_t,
     count: c_uint,
 ) -> c_int {
-    let attr = unsafe { attr.cast::<RlctBarrierAttr>().as_ref() }
+    // TODO should check if null. If not null should use this value to initialize the barrier.
+    let _attr = unsafe { attr.cast::<RlctBarrierAttr>().as_ref() }
         .copied()
         .unwrap_or_default();
 
