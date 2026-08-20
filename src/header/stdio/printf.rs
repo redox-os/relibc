@@ -631,7 +631,7 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
         self.format = first_percent.split_first().expect("must be %").1;
 
         let mut peekahead = self.format;
-        let index = pop_index(&mut peekahead).inspect(|i| {
+        let index = pop_index(&mut peekahead).inspect(|_| {
             self.format = peekahead;
         });
 
@@ -766,7 +766,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
 
     for section in iterator {
         let arg = match section {
-            Ok(PrintfFmt::Plain(text)) => continue,
+            Ok(PrintfFmt::Plain(_)) => continue,
             Ok(PrintfFmt::Arg(arg)) => arg,
             Err(()) => return Ok(-1),
         };
@@ -866,8 +866,8 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_char(i) => i.to_string(),
-                    VaArg::c_double(i) => panic!("this should not be possible"),
-                    VaArg::c_longdouble(i) => panic!("this should not be possible"),
+                    VaArg::c_double(_) => panic!("this should not be possible"),
+                    VaArg::c_longdouble(_) => panic!("this should not be possible"),
                     VaArg::c_int(i) => i.to_string(),
                     VaArg::c_long(i) => i.to_string(),
                     VaArg::c_longlong(i) => i.to_string(),
@@ -917,8 +917,8 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_char(i) => fmt_int::<_, T>(fmt, i as c_uchar),
-                    VaArg::c_double(i) => panic!("this should not be possible"),
-                    VaArg::c_longdouble(i) => panic!("this should not be possible"),
+                    VaArg::c_double(_) => panic!("this should not be possible"),
+                    VaArg::c_longdouble(_) => panic!("this should not be possible"),
                     VaArg::c_int(i) => fmt_int::<_, T>(fmt, i as c_uint),
                     VaArg::c_long(i) => fmt_int::<_, T>(fmt, i as c_ulong),
                     VaArg::c_longlong(i) => fmt_int::<_, T>(fmt, i as c_ulonglong),

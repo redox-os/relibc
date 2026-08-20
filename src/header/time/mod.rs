@@ -236,6 +236,7 @@ pub extern "C" fn clock() -> clock_t {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getcpuclockid.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn clock_getcpuclockid(pid: pid_t, clock_id: *mut clockid_t) -> c_int {
     unimplemented!();
 }
@@ -258,6 +259,7 @@ pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_nanosleep.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn clock_nanosleep(
     clock_id: clockid_t,
     flags: c_int,
@@ -314,6 +316,7 @@ pub unsafe extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getdate.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
     unimplemented!();
 }
@@ -581,6 +584,7 @@ pub unsafe extern "C" fn timer_delete(timerid: timer_t) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
     unimplemented!();
 }

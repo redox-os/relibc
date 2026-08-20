@@ -61,7 +61,6 @@ impl InnerRwLock {
             ) {
                 Ok(_) => break,
                 Err(actual) => {
-                    let expected = actual;
                     let expected = if actual & COUNT_MASK != EXCLUSIVE {
                         // Set the exclusive bit, but only if we're waiting for readers, to avoid
                         // reader starvation by overprioritizing write locks.

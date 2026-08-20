@@ -52,17 +52,15 @@ pub unsafe extern "C" fn strptime(
     tm: *mut tm,
 ) -> *mut c_char {
     // Validate inputs
-    let Some(buf_ptr) = NonNull::new(buf.cast::<c_void>().cast_mut()) else {
+    if NonNull::new(buf.cast::<c_void>().cast_mut()).is_none() {
         return ptr::null_mut();
-    };
-    //
-    let Some(fmt_ptr) = NonNull::new(format.cast::<c_void>().cast_mut()) else {
+    }
+    if NonNull::new(format.cast::<c_void>().cast_mut()).is_none() {
         return ptr::null_mut();
-    };
-
-    let Some(tm_ptr) = NonNull::new(tm) else {
+    }
+    if NonNull::new(tm).is_none() {
         return ptr::null_mut();
-    };
+    }
 
     // Convert raw pointers into slices/strings.
     let input_str = unsafe {
