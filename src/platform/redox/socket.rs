@@ -169,7 +169,7 @@ unsafe fn inner_af_inet(
 
     unsafe {
         ptr::copy_nonoverlapping((&raw const ret).cast::<u8>(), address.cast::<u8>(), len);
-        *address_len = mem::offset_of!(sockaddr_in, sin_addr) as socklen_t + len as socklen_t;
+        *address_len = len as socklen_t;
     }
 }
 
