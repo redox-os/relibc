@@ -235,6 +235,7 @@ unsafe extern "C" fn new_thread_shim(
         redox_rt::signal::setup_sighandler(&tcb.os_specific, false);
     }
 
+    #[cfg(target_os = "redox")]
     let procmask = unsafe { (&*synchronization_mutex).as_ptr().read() };
 
     unsafe { tcb.copy_masters() }.unwrap();
@@ -413,6 +414,7 @@ pub fn set_cancel_state(state: c_int) -> Result<c_int, Errno> {
     })
 }
 pub fn set_cancel_type(ty: c_int) -> Result<c_int, Errno> {
+    #[expect(unused_variables, reason = "function not yet fully implemented")]
     let this_thread = current_thread().expect("current thread not present");
 
     // TODO
@@ -424,10 +426,12 @@ pub fn set_cancel_type(ty: c_int) -> Result<c_int, Errno> {
     }
     Ok(header::PTHREAD_CANCEL_DEFERRED)
 }
+#[expect(unused_variables, reason = "function not yet fully implemented")]
 pub fn get_cpu_clkid(thread: &Pthread) -> Result<clockid_t, Errno> {
     // TODO
     Err(Errno(ENOENT))
 }
+#[expect(unused_variables, reason = "function not yet fully implemented")]
 pub fn get_sched_param(thread: &Pthread) -> Result<(clockid_t, sched_param), Errno> {
     // TODO should be possible to return sched_param
     Err(Errno(ENOSYS))
