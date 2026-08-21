@@ -19,18 +19,21 @@ pub struct aiocb {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aio_read.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn aio_read(aiocbp: *mut aiocb) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aio_write.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn aio_write(aiocbp: *mut aiocb) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lio_listio.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn lio_listio(
     mode: c_int,
     list: *const *const aiocb,
@@ -42,24 +45,28 @@ pub unsafe extern "C" fn lio_listio(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aio_error.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn aio_error(aiocbp: *const aiocb) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aio_return.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn aio_return(aiocbp: *mut aiocb) -> ssize_t {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aio_cancel.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn aio_cancel(fildes: c_int, aiocbp: *mut aiocb) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aio_suspend.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn aio_suspend(
     list: *const *const aiocb,
     nent: c_int,
@@ -70,6 +77,7 @@ pub unsafe extern "C" fn aio_suspend(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aio_fsync.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn aio_fsync(operation: c_int, aiocbp: *mut aiocb) -> c_int {
     unimplemented!();
 }

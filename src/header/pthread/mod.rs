@@ -277,8 +277,8 @@ pub unsafe extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> 
 // Not in latest POSIX, mark as depreciated?
 /// See <https://pubs.opengroup.org/onlinepubs/000095399/functions/pthread_setconcurrency.html>.
 #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "Redox and Linux threads are 1:1, not M:N.")]
 pub extern "C" fn pthread_setconcurrency(concurrency: c_int) -> c_int {
-    // Redox and Linux threads are 1:1, not M:N.
     0
 }
 

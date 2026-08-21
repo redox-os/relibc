@@ -177,7 +177,7 @@ struct DirEntry {
     is_dir: bool,
 }
 
-unsafe extern "C" fn default_errfunc(epath: *const c_char, eerrno: c_int) -> c_int {
+unsafe extern "C" fn default_errfunc(_epath: *const c_char, _eerrno: c_int) -> c_int {
     0
 }
 

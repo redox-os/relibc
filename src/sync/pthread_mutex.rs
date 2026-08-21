@@ -34,8 +34,8 @@ const SPIN_COUNT: usize = 0;
 impl RlctMutex {
     pub(crate) const fn new(attr: &RlctMutexAttr) -> Result<Self, Errno> {
         let RlctMutexAttr {
-            prioceiling,
-            protocol,
+            prioceiling: _,
+            protocol: _,
             pshared: _,
             robust,
             ty,
