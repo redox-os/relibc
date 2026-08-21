@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, string::ToString, vec::Vec};
+use alloc::{string::ToString, vec::Vec};
 use core::{mem, ptr};
 
 use crate::{
@@ -60,8 +60,8 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
         let packet_data = packet.compile();
         let packet_data_len = packet_data.len();
 
-        let packet_data_box = packet_data.into_boxed_slice();
-        let packet_data_ptr = Box::into_raw(packet_data_box).cast::<c_void>();
+        let mut packet_data_box = packet_data.into_boxed_slice();
+        let packet_data_ptr: *mut c_void = packet_data_box.as_mut_ptr().cast::<c_void>();
 
         let dest = sockaddr_in {
             sin_family: AF_INET as u16,
@@ -77,17 +77,10 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
                 return Err(EIO);
             }
             if sys_socket::send(sock, packet_data_ptr, packet_data_len, 0) < 0 {
-                #[expect(clippy::from_raw_with_void_ptr, reason = "intentional")]
-                drop(Box::from_raw(packet_data_ptr));
                 return Err(EIO);
             }
             sock
         };
-
-        unsafe {
-            #[expect(clippy::from_raw_with_void_ptr, reason = "intentional")]
-            drop(Box::from_raw(packet_data_ptr));
-        }
 
         let mut buf = vec![0u8; 65536];
         let buf_ptr = buf.as_mut_ptr().cast::<c_void>();
@@ -162,8 +155,8 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
 
         let packet_data = packet.compile();
         let packet_data_len = packet_data.len();
-        let packet_data_box = packet_data.into_boxed_slice();
-        let packet_data_ptr = Box::into_raw(packet_data_box).cast::<c_void>();
+        let mut packet_data_box = packet_data.into_boxed_slice();
+        let packet_data_ptr = packet_data_box.as_mut_ptr().cast::<c_void>();
 
         let dest = sockaddr_in {
             sin_family: AF_INET as u16,
@@ -186,11 +179,6 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
             if sys_socket::send(sock, packet_data_ptr, packet_data_len, 0) < 0 {
                 return Err(EIO);
             }
-        }
-
-        unsafe {
-            #[expect(clippy::from_raw_with_void_ptr, reason = "intentional")]
-            drop(Box::from_raw(packet_data_ptr));
         }
 
         let mut buf = [0u8; 65536];
