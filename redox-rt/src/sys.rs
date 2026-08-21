@@ -659,9 +659,10 @@ pub fn dup(fd: usize, buf: &[u8]) -> Result<usize> {
 pub fn dup2(fd: usize, newfd: usize, buf: &[u8]) -> Result<usize> {
     let _siglock = tmp_disable_signals();
 
-    let out = {
+    let prev_flags = {
         let mut guard = FILETABLE.lock();
-        guard.override_at(fd, newfd)?
+        guard.get_fd_flags(fd)?;
+        guard.override_at(newfd)?
     };
 
     let res = unsafe {
@@ -676,17 +677,23 @@ pub fn dup2(fd: usize, newfd: usize, buf: &[u8]) -> Result<usize> {
 
     if res.is_err() {
         let mut guard = FILETABLE.lock();
-        let _ = guard.remove(out);
+        match prev_flags {
+            Some(flags) => {
+                let _ = guard.set_fd_flags(newfd, flags);
+            }
+            None => {
+                let _ = guard.remove(newfd);
+            }
+        }
         return res;
     }
 
-    Ok(out)
+    Ok(newfd)
 }
 
 pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let _siglock = tmp_disable_signals();
     let path = path.as_ref();
-    let fcntl_flags = flags & syscall::O_FCNTL_MASK;
     let redox_path = RedoxPath::from_absolute(path).ok_or(Error::new(EINVAL))?;
     let (_, reference) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
     let root_fd = FdGuard::new(openat_into_upper(
@@ -773,7 +780,7 @@ pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
         if actual_fd != out {
             let mut guard = FILETABLE.lock();
             let _ = guard.remove(out);
-            guard.override_at(actual_fd, actual_fd)?;
+            guard.override_at(actual_fd)?;
             if cloexec_flag != 0 {
                 guard.set_fd_flags(actual_fd, cloexec_flag)?;
             }
@@ -893,8 +900,6 @@ pub fn dup_into_upper_raw(fd: usize, buf: &[u8]) -> Result<usize> {
 pub fn close(fd: usize) -> Result<usize> {
     let _siglock = tmp_disable_signals();
 
-    let is_upper = (fd & syscall::UPPER_FDTBL_TAG) != 0;
-
     let res = unsafe { syscall::syscall1(syscall::SYS_CLOSE, fd) };
 
     if res.is_ok() || res.err().is_some_and(|e| e.errno == EBADF) {
@@ -960,7 +965,7 @@ impl FdTbl {
         fdtbl.populate(&mut reader)?;
 
         // Manually mark the filetable_fd itself as occupied in userspace FILETABLE
-        fdtbl.override_at(files_reader_fd, files_reader_fd)?;
+        fdtbl.override_at(files_reader_fd)?;
 
         fdtbl.set_fd(filetable_fd);
 
@@ -1011,8 +1016,7 @@ impl FdTbl {
 
     pub(crate) fn populate(&mut self, reader: &mut crate::proc::FileBufReader) -> Result<()> {
         while let Some(fd) = reader.read_le_u64()? {
-            let fd = fd as usize;
-            self.override_at(fd, fd)?;
+            self.override_at(fd as usize)?;
         }
         Ok(())
     }
@@ -1075,7 +1079,9 @@ impl FdTbl {
         Ok(())
     }
 
-    pub fn override_at(&mut self, fd: usize, new_fd: usize) -> Result<usize> {
+    pub fn override_at(&mut self, new_fd: usize) -> Result<Option<usize>> {
+        let prev_flags = self.get_fd_flags(new_fd).ok();
+
         let _ = self.remove(new_fd);
 
         if Self::is_upper(new_fd) {
@@ -1094,8 +1100,10 @@ impl FdTbl {
         }
 
         self.active_count += 1;
-        Ok(new_fd)
+
+        Ok(prev_flags)
     }
+
     pub fn add_posix(&mut self, entry: usize) -> Result<usize> {
         if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
@@ -1114,8 +1122,6 @@ impl FdTbl {
             return Err(Error::new(EMFILE));
         }
 
-        let old_capacity = self.upper_fdtbl.capacity();
-
         let out_idx = self
             .upper_fdtbl
             .insert(UpperFdTbl::flags_into_entry(entry), self.fd.as_ref())?;
@@ -1129,7 +1135,6 @@ impl FdTbl {
             return Err(Error::new(EMFILE));
         }
 
-        let old_capacity = self.upper_fdtbl.capacity();
         if !Self::is_upper(new_fd) {
             return Err(Error::new(EINVAL));
         }
@@ -1161,8 +1166,6 @@ impl FdTbl {
         }
 
         if which & syscall::UPPER_FDTBL_TAG == 0 {
-            let old_capacity = self.posix_fdtbl.capacity();
-
             let initial_flag = PosixFdTbl::flags_into_entry(flags);
             let entries = alloc::vec![initial_flag; cnt];
 
@@ -1173,8 +1176,6 @@ impl FdTbl {
                 fd_slice[i] = handle;
             }
         } else {
-            let old_capacity = self.upper_fdtbl.capacity();
-
             let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
             let handles = self.upper_fdtbl.bulk_insert(entries, self.fd.as_ref())?;
             self.active_count += cnt;
@@ -1207,8 +1208,6 @@ impl FdTbl {
         }
 
         if which & syscall::UPPER_FDTBL_TAG == 0 {
-            let old_capacity = self.posix_fdtbl.capacity();
-
             let initial_flag = PosixFdTbl::flags_into_entry(flags);
             let entries = alloc::vec![initial_flag; cnt];
 
@@ -1216,8 +1215,6 @@ impl FdTbl {
                 .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
             self.active_count += cnt;
         } else {
-            let old_capacity = self.upper_fdtbl.capacity();
-
             let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
             self.upper_fdtbl
                 .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
