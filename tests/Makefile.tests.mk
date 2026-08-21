@@ -336,6 +336,13 @@ VARIED_NAMES=\
 	waitpid_multiple \
 	$(FAILING_TESTS)
 
+ifeq ($(IS_REDOX),1)
+VARIED_NAMES+=\
+	redox_syscall \
+	redox_ring \
+	redox_ring_dyn \
+	redox_ring_ramfs
+endif
 
 # Tests that only working with when ld.so exist
 DYNAMIC_ONLY_EXPECT_NAMES=\
