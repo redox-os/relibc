@@ -310,11 +310,11 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
         old_filetable_fd = guard.take();
         guard.set_fd(new_filetable_fd);
         guard
-            .override_at(args.new_thr_fd.as_raw_fd(), args.new_thr_fd.as_raw_fd())
+            .override_at(args.new_thr_fd.as_raw_fd())
             .expect("failed to add new_thr_fd");
         if let Some(new_proc_fd) = args.new_proc_fd.as_ref() {
             guard
-                .override_at(new_proc_fd.as_raw_fd(), new_proc_fd.as_raw_fd())
+                .override_at(new_proc_fd.as_raw_fd())
                 .expect("failed to add new_proc_fd");
         }
         if let Some(ref old) = old_filetable_fd {
