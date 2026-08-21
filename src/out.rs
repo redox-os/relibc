@@ -225,7 +225,7 @@ impl<T: ?Sized> fmt::Debug for Out<'_, T> {
 pub unsafe trait OutProject {}
 
 impl<'a, T: ?Sized> Out<'a, T> {
-    pub unsafe fn with_lifetime_of<'b, U: ?Sized>(mut self, u: &'b U) -> Out<'b, T> {
+    pub unsafe fn with_lifetime_of<'b, U: ?Sized>(mut self, _: &'b U) -> Out<'b, T> {
         unsafe { Out::nonnull(self.as_mut_ptr()) }
     }
 }

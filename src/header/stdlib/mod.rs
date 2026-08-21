@@ -326,6 +326,7 @@ pub extern "C" fn drand48() -> c_double {
 /// Specifications Issue 6, and the function was removed in Issue 7.
 #[deprecated]
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn ecvt(
     value: c_double,
     ndigit: c_int,
@@ -393,6 +394,7 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
 /// Specifications Issue 6, and the function was removed in Issue 7.
 #[deprecated]
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn fcvt(
     value: c_double,
     ndigit: c_int,
@@ -415,6 +417,7 @@ pub unsafe extern "C" fn free(ptr: *mut c_void) {
 /// Specifications Issue 6, and the function was removed in Issue 7.
 #[deprecated]
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn gcvt(value: c_double, ndigit: c_int, buf: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
@@ -521,7 +524,7 @@ pub unsafe extern "C" fn getsubopt(
 /// # Implementation
 /// This is a no-op and unconditionally returns 0 indicating success.
 #[unsafe(no_mangle)]
-pub extern "C" fn grantpt(fildes: c_int) -> c_int {
+pub extern "C" fn grantpt(_fildes: c_int) -> c_int {
     0
 }
 
@@ -1246,6 +1249,7 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getenv.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn secure_getenv(name: *const c_char) -> *mut c_char {
     unimplemented!();
 }
@@ -1345,6 +1349,7 @@ pub unsafe extern "C" fn setenv(
 /// Specifications Issue 8.
 #[deprecated]
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn setkey(key: *const c_char) {
     unimplemented!();
 }
