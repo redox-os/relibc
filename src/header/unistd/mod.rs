@@ -195,6 +195,7 @@ pub unsafe extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) 
 /// Issue 5, and removed in Issue 6.
 #[deprecated]
 #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn chroot(path: *const c_char) -> c_int {
     // TODO: Implement
     platform::ERRNO.set(crate::header::errno::EPERM);
@@ -291,6 +292,7 @@ pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dup.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn dup3(fildes: c_int, fildes2: c_int, flag: c_int) -> c_int {
     unimplemented!();
 }
@@ -565,6 +567,7 @@ pub extern "C" fn getegid() -> gid_t {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getentropy.html>.
 // #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn getentropy(buffer: *mut c_void, length: size_t) -> c_int {
     unimplemented!();
 }
@@ -646,6 +649,7 @@ pub unsafe extern "C" fn getlogin() -> *mut c_char {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getlogin.html>.
 #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
     //TODO: Determine correct getlogin result on Redox
     platform::ERRNO.set(errno::ENOENT);
@@ -941,7 +945,7 @@ pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_close.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn posix_close(fildes: c_int, flag: c_int) -> c_int {
+pub extern "C" fn posix_close(fildes: c_int, _flag: c_int) -> c_int {
     // Since we do not define `POSIX_CLOSE_RESTART`, this function is
     // equivalent to `close`. In the future when we move file descriptors
     // to userspace, it would only make sense to define `POSIX_CLOSE_RESTART`

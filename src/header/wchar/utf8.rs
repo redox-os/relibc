@@ -45,7 +45,7 @@ fn utf8_char_width(b: u8) -> usize {
 }
 
 //It's guaranteed that we don't have any nullpointers here
-pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
+pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, _ps: *mut mbstate_t) -> usize {
     let size = utf8_char_width(unsafe { CCharPtrToU8::from_const(s) });
     if size > n {
         platform::ERRNO.set(errno::EILSEQ);
@@ -75,7 +75,7 @@ pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mb
 }
 
 //It's guaranteed that we don't have any nullpointers here
-pub unsafe fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize {
+pub unsafe fn wcrtomb(s: *mut c_char, wc: wchar_t, _ps: *mut mbstate_t) -> usize {
     let dc = char::from_u32(wc as u32);
 
     if dc.is_none() {

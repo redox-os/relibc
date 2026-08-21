@@ -312,7 +312,8 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(LSEEK, fd, off, SEEK_SET) })?;
         Ok(())
     }
-    unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
+    // FIXME use offset or remove it
+    unsafe fn dent_reclen_offset(this_dent: &[u8], _offset: usize) -> Option<(u16, u64)> {
         let dent = this_dent.as_ptr().cast::<dirent>();
         Some((unsafe { (*dent).d_reclen }, unsafe { (*dent).d_off } as u64))
     }
@@ -841,6 +842,7 @@ impl Pal for Sys {
         e_raw(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }).is_ok()
     }
 
+    #[expect(unused_variables, reason = "function not yet implemented")]
     unsafe fn spawn(
         program: CStr,
         fac: Option<&crate::header::spawn::posix_spawn_file_actions_t>,

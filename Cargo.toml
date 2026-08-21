@@ -63,7 +63,7 @@ unused_imports = "deny"
 unused_must_use = "deny"
 unused_mut = "deny"
 unused_unsafe = "deny"
-unused_variables = "allow" # TODO review occurrences
+unused_variables = "deny"
 
 [lints]
 workspace = true

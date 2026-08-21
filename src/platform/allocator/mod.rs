@@ -42,6 +42,10 @@ unsafe impl GlobalAlloc for Allocator {
     }
 
     #[inline]
+    #[expect(
+        unused_variables,
+        reason = "Layout part of GlobalAlloc trait but Dlmalloc free() doesn't require it"
+    )]
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         unsafe { (*self.get()).lock().free(ptr) }
     }

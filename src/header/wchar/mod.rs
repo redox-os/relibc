@@ -32,7 +32,12 @@ mod wscanf;
 
 pub use utf8::get_char_encoded_length;
 
+// TODO actually hold some state
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/wchar.h.html>.
+///
+/// A complete object type other than an array type that can hold the
+/// conversion state necessary to convert between sequences of (possibly
+/// multi-byte) characters and wide characters.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mbstate_t;
@@ -209,9 +214,11 @@ pub unsafe extern "C" fn mbsinit(ps: *const mbstate_t) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mbrlen(s: *const c_char, n: size_t, ps: *mut mbstate_t) -> size_t {
     static mut INTERNAL: mbstate_t = mbstate_t;
-    unsafe { mbrtowc(ptr::null_mut(), s, n, &raw mut INTERNAL) }
+    let ps = if ps.is_null() { &raw mut INTERNAL } else { ps };
+    unsafe { mbrtowc(ptr::null_mut(), s, n, ps) }
 }
 
+// TODO non-UTF8 support
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mbrtowc.html>.
 ///
 /// Only works for UTF8 at the moment.
@@ -224,9 +231,7 @@ pub unsafe extern "C" fn mbrtowc(
 ) -> size_t {
     static mut INTERNAL: mbstate_t = mbstate_t;
 
-    if ps.is_null() {
-        let ps = &raw mut INTERNAL;
-    }
+    let ps = if ps.is_null() { &raw mut INTERNAL } else { ps };
     if s.is_null() {
         let xs: [c_char; 1] = [0];
         unsafe { utf8::mbrtowc(pwc, ptr::from_ref::<c_char>(&xs[0]), 1, ps) }
@@ -248,9 +253,7 @@ pub unsafe extern "C" fn mbsnrtowcs(
 ) -> size_t {
     static mut INTERNAL: mbstate_t = mbstate_t;
 
-    if ps.is_null() {
-        let ps = &raw mut INTERNAL;
-    }
+    let ps = if ps.is_null() { &raw mut INTERNAL } else { ps };
 
     let mut src = unsafe { *src_ptr };
 
@@ -413,6 +416,7 @@ pub unsafe extern "C" fn wprintf(format: *const wchar_t, __valist: ...) -> c_int
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfwprintf.html>.
 #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub unsafe extern "C" fn vswprintf(
     s: *mut wchar_t,
     n: size_t,
@@ -448,6 +452,7 @@ pub unsafe extern "C" fn wcpncpy(d: *mut wchar_t, s: *const wchar_t, n: size_t) 
     unsafe { (wcsncpy(d, s, n)).add(wcsnlen(s, n)) }
 }
 
+// TODO non-UTF8 support
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcrtomb.html>.
 ///
 /// widechar to multibyte.
@@ -563,6 +568,7 @@ pub unsafe extern "C" fn wcscspn(wcs: *const wchar_t, set: *const wchar_t) -> si
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsftime.html>.
 #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn wcsftime(
     wcs: *mut wchar_t,
     maxsize: size_t,
@@ -958,6 +964,7 @@ pub unsafe extern "C" fn wcswidth(pwcs: *const wchar_t, n: size_t) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsxfrm.html>.
 #[unsafe(no_mangle)]
+#[expect(unused_variables, reason = "function not yet implemented")]
 pub extern "C" fn wcsxfrm(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> size_t {
     todo_skip!(0, "wcsxfrm is not implemented");
     0
