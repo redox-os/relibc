@@ -227,6 +227,36 @@ pub fn clock_gettime(clock: usize, mut tp: Out<timespec>) -> Result<()> {
     Ok(())
 }
 
+unsafe fn get_mem_policy(policy: *mut u8) -> Result<()> {
+    debug_assert!(!policy.is_null());
+    let policy =
+        unsafe { slice::from_raw_parts_mut(policy, size_of::<syscall::data::NumaMemoryPolicy>()) };
+
+    let thread_fd = redox_rt::RtTcb::current().thread_fd();
+    let addrspace_fd = thread_fd.dup(b"addrspace")?;
+    addrspace_fd.call_ro(
+        policy,
+        syscall::CallFlags::READ,
+        &[syscall::flag::NumaVerb::MemPolicy as u64],
+    )?;
+    Ok(())
+}
+
+unsafe fn set_mem_policy(policy: *const u8) -> Result<()> {
+    debug_assert!(!policy.is_null());
+    let policy = unsafe { slice::from_raw_parts(policy, size_of::<u64>()) };
+
+    let thread_fd = redox_rt::RtTcb::current().thread_fd();
+    let addrspace_fd = thread_fd.dup(b"addrspace")?;
+
+    addrspace_fd.call_wo(
+        policy,
+        syscall::CallFlags::WRITE,
+        &[syscall::flag::NumaVerb::MemPolicy as u64],
+    )?;
+    Ok(())
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_open_v1(
     path_base: *const u8,
@@ -716,4 +746,14 @@ pub unsafe extern "C" fn redox_relpathat_v0(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fcntl_v0(fd: usize, cmd: usize, arg: usize) -> RawResult {
     Error::mux(redox_rt::sys::fcntl(fd, cmd, arg))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_numa_set_mem_policy_v0(policy: *const u8) -> RawResult {
+    Error::mux(unsafe { set_mem_policy(policy).map(|()| 0) })
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_numa_get_mem_policy_v0(policy: *mut u8) -> RawResult {
+    Error::mux(unsafe { get_mem_policy(policy).map(|()| 0) })
 }
