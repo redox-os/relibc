@@ -8,10 +8,11 @@ use crate::platform::types::{suseconds_t, time_t};
 /// <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
 #[repr(C)]
 #[allow(non_camel_case_types)]
-#[derive(Default)]
+#[derive(Default, CheckVsLibcCrate)]
 pub struct timeval {
     /// Seconds.
     pub tv_sec: time_t,
     /// Microseconds.
     pub tv_usec: suseconds_t,
 }
+unsafe impl plain::Plain for timeval {}
