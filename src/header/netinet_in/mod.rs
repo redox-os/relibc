@@ -36,6 +36,7 @@ pub struct sockaddr_in {
     pub sin_addr: in_addr,
     pub sin_zero: [c_char; 8],
 }
+unsafe impl plain::Plain for sockaddr_in {}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 #[repr(C)]
@@ -46,6 +47,7 @@ pub struct sockaddr_in6 {
     pub sin6_addr: in6_addr,
     pub sin6_scope_id: u32,
 }
+unsafe impl plain::Plain for sockaddr_in6 {}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 #[repr(C)]

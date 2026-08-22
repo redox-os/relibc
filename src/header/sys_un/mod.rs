@@ -15,12 +15,4 @@ pub struct sockaddr_un {
     /// Socket pathname storage.
     pub sun_path: [c_char; 108],
 }
-
-impl sockaddr_un {
-    pub fn path_offset(&self) -> usize {
-        let base = core::ptr::from_ref(self) as usize;
-        let path = &raw const self.sun_path as usize;
-        log::trace!("base: {:#X}, path: {:#X}", base, path);
-        path - base
-    }
-}
+unsafe impl plain::Plain for sockaddr_un {}

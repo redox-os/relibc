@@ -1,71 +1,68 @@
 use super::{Sys, e_raw};
 use crate::{
     error::Result,
-    header::sys_socket::{msghdr, sockaddr, socklen_t},
-    platform::{
-        PalSocket,
-        types::{c_int, c_void, size_t},
-    },
+    header::sys_socket::{msghdr, socklen_t},
+    out::Out,
+    platform::{PalSocket, types::c_int},
 };
 
 impl PalSocket for Sys {
-    unsafe fn accept(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<c_int> {
-        Ok(e_raw(syscall!(ACCEPT, socket, address, address_len))? as c_int)
+    fn accept(socket: c_int, address_dst: Option<&mut [u8]>) -> Result<(c_int, socklen_t)> {
+        let mut len = address_dst.as_ref().map_or(0, |a| a.len()) as socklen_t;
+
+        let socket = e_raw(unsafe {
+            syscall!(
+                ACCEPT,
+                socket,
+                address_dst.map_or(core::ptr::null_mut(), |a| a.as_mut_ptr()),
+                &raw mut len
+            )
+        })? as c_int;
+        Ok((socket, len))
     }
 
-    unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
-        e_raw(syscall!(BIND, socket, address, address_len))?;
+    fn bind(socket: c_int, address_raw: &[u8]) -> Result<()> {
+        e_raw(unsafe { syscall!(BIND, socket, address_raw.as_ptr(), address_raw.len()) })?;
         Ok(())
     }
 
-    unsafe fn connect(
-        socket: c_int,
-        address: *const sockaddr,
-        address_len: socklen_t,
-    ) -> Result<c_int> {
-        Ok(e_raw(syscall!(CONNECT, socket, address, address_len))? as c_int)
+    fn connect(socket: c_int, address_raw: &[u8]) -> Result<c_int> {
+        Ok(
+            e_raw(unsafe { syscall!(CONNECT, socket, address_raw.as_ptr(), address_raw.len()) })?
+                as c_int,
+        )
     }
 
-    unsafe fn getpeername(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<()> {
-        e_raw(syscall!(GETPEERNAME, socket, address, address_len))?;
-        Ok(())
+    fn getpeername(socket: c_int, address_dst: &mut [u8]) -> Result<socklen_t> {
+        let mut len = address_dst.len() as socklen_t;
+        e_raw(unsafe { syscall!(GETPEERNAME, socket, address_dst.as_mut_ptr(), &raw mut len) })?;
+        Ok(len)
     }
 
-    unsafe fn getsockname(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<()> {
-        e_raw(syscall!(GETSOCKNAME, socket, address, address_len))?;
-        Ok(())
+    fn getsockname(socket: c_int, address_dst: &mut [u8]) -> Result<socklen_t> {
+        let mut len = address_dst.len() as socklen_t;
+        e_raw(unsafe { syscall!(GETSOCKNAME, socket, address_dst.as_mut_ptr(), &raw mut len) })?;
+        Ok(len)
     }
 
-    unsafe fn getsockopt(
+    fn getsockopt(
         socket: c_int,
         level: c_int,
         option_name: c_int,
-        option_value: *mut c_void,
-        option_len: *mut socklen_t,
-    ) -> Result<()> {
+        option_value: &mut [u8],
+    ) -> Result<socklen_t> {
+        let mut len = option_value.len() as socklen_t;
         e_raw(unsafe {
             syscall!(
                 GETSOCKOPT,
                 socket,
                 level,
                 option_name,
-                option_value,
-                option_len
+                option_value.as_mut_ptr(),
+                &raw mut len
             )
         })?;
-        Ok(())
+        Ok(len)
     }
 
     fn listen(socket: c_int, backlog: c_int) -> Result<()> {
@@ -73,23 +70,27 @@ impl PalSocket for Sys {
         Ok(())
     }
 
-    unsafe fn recvfrom(
+    fn recvfrom(
         socket: c_int,
-        buf: *mut c_void,
-        len: size_t,
+        mut buf: Out<[u8]>,
         flags: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> Result<usize> {
-        e_raw(syscall!(
-            RECVFROM,
-            socket,
-            buf,
-            len,
-            flags,
-            address,
-            address_len
-        ))
+        address_raw: Option<&mut [u8]>,
+    ) -> Result<(usize, socklen_t)> {
+        let mut len = address_raw.as_ref().map_or(0, |a| a.len()) as socklen_t;
+
+        let bytes_read = e_raw(unsafe {
+            syscall!(
+                RECVFROM,
+                socket,
+                buf.as_mut_ptr().as_mut_ptr(),
+                buf.len(),
+                flags,
+                address_raw.map_or(core::ptr::null_mut(), |a| a.as_mut_ptr()),
+                &raw mut len
+            )
+        })?;
+
+        Ok((bytes_read, len))
     }
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
@@ -100,25 +101,25 @@ impl PalSocket for Sys {
         e_raw(syscall!(SENDMSG, socket, msg, flags))
     }
 
-    unsafe fn sendto(
-        socket: c_int,
-        buf: *const c_void,
-        len: size_t,
-        flags: c_int,
-        dest_addr: *const sockaddr,
-        dest_len: socklen_t,
-    ) -> Result<usize> {
-        e_raw(syscall!(
-            SENDTO, socket, buf, len, flags, dest_addr, dest_len
-        ))
+    fn sendto(socket: c_int, buf: &[u8], flags: c_int, dest: Option<&[u8]>) -> Result<usize> {
+        e_raw(unsafe {
+            syscall!(
+                SENDTO,
+                socket,
+                buf.as_ptr(),
+                buf.len(),
+                flags,
+                dest.map_or(core::ptr::null(), |d| d.as_ptr()),
+                dest.map_or(0, |d| d.len())
+            )
+        })
     }
 
-    unsafe fn setsockopt(
+    fn setsockopt(
         socket: c_int,
         level: c_int,
         option_name: c_int,
-        option_value: *const c_void,
-        option_len: socklen_t,
+        option_value: &[u8],
     ) -> Result<()> {
         e_raw(unsafe {
             syscall!(
@@ -126,8 +127,8 @@ impl PalSocket for Sys {
                 socket,
                 level,
                 option_name,
-                option_value,
-                option_len
+                option_value.as_ptr(),
+                option_value.len()
             )
         })?;
         Ok(())
@@ -138,8 +139,8 @@ impl PalSocket for Sys {
         Ok(())
     }
 
-    unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
-        Ok(e_raw(syscall!(SOCKET, domain, kind, protocol))? as c_int)
+    fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
+        Ok(e_raw(unsafe { syscall!(SOCKET, domain, kind, protocol) })? as c_int)
     }
 
     fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> Result<()> {
