@@ -554,7 +554,8 @@ impl Pal for Sys {
         Ok(())
     }
     // NOTE: fn is unsafe, but this just means we can assume more things. impl is safe
-    unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
+    // FIXME use offset or remove it
+    unsafe fn dent_reclen_offset(this_dent: &[u8], _offset: usize) -> Option<(u16, u64)> {
         let mut header = DirentHeader::default();
         header.copy_from_slice(this_dent.get(..size_of::<DirentHeader>())?);
 
@@ -791,7 +792,7 @@ impl Pal for Sys {
         Ok(syscall::lseek(fd as usize, offset as isize, whence as usize)? as off_t)
     }
 
-    fn mkdirat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
+    fn mkdirat(dir_fd: c_int, path_name: CStr, _mode: mode_t) -> Result<()> {
         File::createat(
             dir_fd,
             path_name,
@@ -810,18 +811,18 @@ impl Pal for Sys {
         )
     }
 
-    fn mknodat(dir_fd: c_int, path_name: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
+    fn mknodat(dir_fd: c_int, path_name: CStr, mode: mode_t, _dev: dev_t) -> Result<()> {
         File::createat(dir_fd, path_name, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode)?;
         Ok(())
     }
 
+    #[expect(unused_variables, reason = "Redox never swaps")]
     unsafe fn mlock(addr: *const c_void, len: usize) -> Result<()> {
-        // Redox never swaps
         Ok(())
     }
 
+    #[expect(unused_variables, reason = "Redox never swaps")]
     unsafe fn mlockall(flags: c_int) -> Result<()> {
-        // Redox never swaps
         Ok(())
     }
 
@@ -857,6 +858,7 @@ impl Pal for Sys {
         } as *mut c_void)
     }
 
+    #[expect(unused_variables, reason = "function not yet implemented")]
     unsafe fn mremap(
         addr: *mut c_void,
         len: usize,
@@ -896,8 +898,8 @@ impl Pal for Sys {
         */
     }
 
+    #[expect(unused_variables, reason = "Redox never swaps")]
     unsafe fn munlock(addr: *const c_void, len: usize) -> Result<()> {
-        // Redox never swaps
         Ok(())
     }
 
@@ -1119,7 +1121,7 @@ impl Pal for Sys {
         let new_path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
         // Fail if the target exists with RENAME_NOREPLACE.
         if flags & RENAME_NOREPLACE != 0
-            && let Ok(fd) = libredox::openat(
+            && let Ok(_) = libredox::openat(
                 new_dir,
                 new_path.clone(),
                 fcntl::O_PATH | fcntl::O_CLOEXEC,
@@ -1212,7 +1214,7 @@ impl Pal for Sys {
         let mut cwd = path::clone_cwd().unwrap_or_default();
         let mut cwd_fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
         let proc_fd = child.proc_fd.unwrap();
-        let curr_proc_fd = redox_rt::current_proc_fd();
+        let _curr_proc_fd = redox_rt::current_proc_fd(); // TODO use this variable?
         let cur_filetable_fd = RtTcb::current().thread_fd().dup_into_upper(b"filetable")?;
         let file_table = cur_filetable_fd.dup_into_upper(b"copy")?;
 
@@ -1758,7 +1760,7 @@ impl Pal for Sys {
 
         // First, allow ptrace to handle waitpid
         // TODO: Handle special PIDs here (such as -1)
-        let state = ptrace::init_state();
+        let _state = ptrace::init_state();
         // TODO: Fix ptrace deadlock seen during openposixtestsuite signals tests
         // let mut sessions = state.sessions.lock();
         // if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
@@ -1834,6 +1836,7 @@ impl Pal for Sys {
 }
 
 impl Sys {
+    #[expect(unused_variables, reason = "unfinished implementation")]
     fn relative_to_absolute_foffset(
         fd: usize,
         whence: c_short,
@@ -1857,7 +1860,7 @@ impl Sys {
                 Ok((start, len))
             }
             // FIXME: andypython: SEEK_CUR, SEEK_END
-            c => {
+            _ => {
                 log::warn!(
                     "Sys::relative_to_absolute_foffset: whence={whence} not yet implemented"
                 );

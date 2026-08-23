@@ -172,6 +172,8 @@ pub unsafe extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
     #[cfg(target_os = "redox")]
     {
         //TODO
+        // used to suppress unused_variables lint, remove when redox implemented
+        let _not_used_yet_redox = termios_p;
         0
     }
 }
@@ -194,6 +196,8 @@ pub unsafe extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
     #[cfg(target_os = "redox")]
     {
         //TODO
+        // used to suppress unused_variables lint, remove when redox implemented
+        let _not_used_yet_redox = termios_p;
         0
     }
 }
@@ -215,6 +219,8 @@ pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) ->
             0
         }
         _ => {
+            // used to suppress unused_variables lint, remove when redox implemented
+            let _not_used_yet_redox = termios_p;
             platform::ERRNO.set(errno::EINVAL);
             -1
         }
@@ -238,6 +244,8 @@ pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) ->
             0
         }
         _ => {
+            // used to suppress unused_variables lint, remove when redox implemented
+            let _not_used_yet_redox = termios_p;
             platform::ERRNO.set(errno::EINVAL);
             -1
         }

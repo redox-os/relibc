@@ -117,6 +117,7 @@ pub fn get_session(
 }
 
 #[cfg(target_arch = "aarch64")]
+#[expect(unused_variables, reason = "function not yet implemented")]
 unsafe fn inner_ptrace(
     request: c_int,
     pid: pid_t,
@@ -128,6 +129,7 @@ unsafe fn inner_ptrace(
 }
 
 #[cfg(target_arch = "x86")]
+#[expect(unused_variables, reason = "function not yet implemented")]
 unsafe fn inner_ptrace(
     request: c_int,
     pid: pid_t,
@@ -142,7 +144,7 @@ unsafe fn inner_ptrace(
 unsafe fn inner_ptrace(
     request: c_int,
     pid: pid_t,
-    addr: *mut c_void,
+    _addr: *mut c_void, // FIXME addr not used
     data: *mut c_void,
 ) -> io::Result<c_int> {
     let state = init_state();
@@ -266,6 +268,7 @@ unsafe fn inner_ptrace(
 }
 
 #[cfg(target_arch = "riscv64")]
+#[expect(unused_variables, reason = "function not yet implemented")]
 fn inner_ptrace(
     request: c_int,
     pid: pid_t,

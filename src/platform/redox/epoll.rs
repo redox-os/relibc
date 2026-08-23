@@ -100,7 +100,8 @@ impl PalEpoll for Sys {
             return Err(Errno(EINVAL));
         }
 
-        let timer_opt = if timeout != -1 {
+        // FIXME use this variable?
+        let _timer_opt = if timeout != -1 {
             Some(register_timeout(epfd, timeout)?)
         } else {
             None
