@@ -473,6 +473,7 @@ pub unsafe fn manually_enter_trampoline() {
     }
 }
 
+#[expect(unused_variables, reason = "function not yet fully implemented")]
 pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
     PosixStackt {
         sp: core::ptr::null_mut(), // TODO

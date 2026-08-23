@@ -293,8 +293,6 @@ pub fn dir_path_and_fd_path(
     socket_path: RedoxStr<'_>,
 ) -> Result<(RedoxPath<'_>, RedoxReference<'_>)> {
     let _siglock = tmp_disable_signals();
-    let cwd_guard = CWD.read();
-    let cwd_path = cwd_guard.as_ref().map(|c| &c.redox);
     let redox_path = openat2_path(fcntl::AT_FDCWD, socket_path, 0)?;
 
     let (scheme, ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
@@ -334,7 +332,8 @@ impl FileLock {
 
 impl Drop for FileLock {
     fn drop(&mut self) {
-        let fd = self.0;
+        // FIXME should fd be fed into the flock call below?
+        let _fd = self.0;
         self.0 = -1;
         let _ = Sys::flock(self.0, sys_file::LOCK_UN);
     }

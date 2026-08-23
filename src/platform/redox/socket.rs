@@ -195,7 +195,8 @@ fn inner_get_name_inner(local: bool, address_dst: &mut [u8], buf: &[u8]) -> Resu
 
 fn socket_domain_type(socket: c_int) -> Result<(c_int, c_int)> {
     let mut buf = [0; 256];
-    let len = syscall::fpath(socket as usize, &mut buf)?;
+    // FIXME use len for something?
+    let _len = syscall::fpath(socket as usize, &mut buf)?;
     Ok(
         if buf.starts_with(b"tcp:") || buf.starts_with(b"/scheme/tcp/") {
             (AF_INET, SOCK_STREAM)
@@ -360,7 +361,6 @@ unsafe fn deserialize_payload_from_stream(
     iovs: &[iovec],
     whole_iov_size: usize,
     cursor: &mut usize,
-    test: u8,
 ) -> Result<usize> {
     let full_payload_len_from_scheme = read_num::<usize>(&msg_stream[*cursor..])?;
     *cursor += mem::size_of::<usize>();
@@ -715,7 +715,6 @@ impl PalSocket for Sys {
                 }
                 _ => {
                     let metadata = [SocketCall::GetSockOpt as u64, option_name as u64];
-                    let call_flags = CallFlags::empty();
                     let true_len = redox_rt::sys::sys_call_ro(
                         socket as usize,
                         option_value,
@@ -738,8 +737,8 @@ impl PalSocket for Sys {
         Err(Errno(ENOSYS))
     }
 
+    #[expect(unused_variables, reason = "Redox has no need to listen")]
     fn listen(socket: c_int, backlog: c_int) -> Result<()> {
-        // Redox has no need to listen
         Ok(())
     }
 
@@ -842,7 +841,6 @@ impl PalSocket for Sys {
                 iovs_slice,
                 whole_iov_size,
                 &mut cursor,
-                0u8,
             )
         }?;
 
@@ -906,7 +904,8 @@ impl PalSocket for Sys {
         // Send the message stream.
         let metadata = [SocketCall::SendMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
-        let written = redox_rt::sys::sys_call_rw(
+        // FIXME use written to check against payload?
+        let _written = redox_rt::sys::sys_call_rw(
             socket as usize,
             msg_stream.as_mut_slice(),
             call_flags,
@@ -1000,7 +999,6 @@ impl PalSocket for Sys {
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 _ => {
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
-                    let call_flags = CallFlags::empty();
                     redox_rt::sys::sys_call_wo(
                         socket as usize,
                         option_value,
@@ -1029,7 +1027,8 @@ impl PalSocket for Sys {
         Ok(())
     }
 
-    fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
+    // FIXME use protocol variable
+    fn socket(domain: c_int, kind: c_int, _protocol: c_int) -> Result<c_int> {
         if domain != AF_INET && domain != AF_UNIX {
             return Err(Errno(EAFNOSUPPORT));
         }

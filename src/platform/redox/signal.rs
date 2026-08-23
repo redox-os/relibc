@@ -46,6 +46,7 @@ const _: () = {
 
 impl PalSignal for Sys {
     #[allow(deprecated)]
+    #[expect(unused_variables, reason = "setitimer not implemented")]
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
         let path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
@@ -89,7 +90,7 @@ impl PalSignal for Sys {
     }
 
     #[allow(deprecated)]
-    fn setitimer(which: c_int, _new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
+    fn setitimer(_which: c_int, _new: &itimerval, _old: Option<&mut itimerval>) -> Result<()> {
         // TODO: setitimer is no longer part of POSIX and should not be implemented in Redox
         // Change the platform-independent implementation to use POSIX timers.
         // For Redox, the timer should probably use "/scheme/time"

@@ -531,8 +531,9 @@ pub unsafe fn __redox_ring_queue_init_params_with_path(
     params.sq_entries = setup_params.nr_sq_entries;
     params.cq_entries = setup_params.nr_cq_entries;
 
-    let sq_size = params.sq_entries as usize * sqe_size as usize + mem::size_of::<FfiRingHeader>();
-    let cq_size = params.cq_entries as usize * cqe_size as usize + mem::size_of::<FfiRingHeader>();
+    // FIXME use these two variables?
+    let _sq_size = params.sq_entries as usize * sqe_size as usize + mem::size_of::<FfiRingHeader>();
+    let _cq_size = params.cq_entries as usize * cqe_size as usize + mem::size_of::<FfiRingHeader>();
 
     let mut fd_buf = [usize::MAX; 3]; // [sq_shm_fd, cq_shm_fd, pipe_fd]
     let fd_bytes = unsafe {
