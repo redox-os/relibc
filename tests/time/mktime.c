@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "test_helpers.h"
@@ -23,6 +24,36 @@ int check(time_t input) {
         return 1;
     }
     return 0;
+}
+
+time_t try_mktime(const char* posix) {
+    setenv("TZ", posix, 1);
+    tzset();
+
+    struct tm t_posix = { 0 };
+    t_posix.tm_year = 2024 - 1900;
+    t_posix.tm_mon = 0;
+    t_posix.tm_mday = 1;
+    t_posix.tm_hour = 12;
+    t_posix.tm_min = 0;
+    t_posix.tm_sec = 0;
+
+    return mktime(&t_posix);
+}
+void check_invalid(time_t result, const char* std, long time, long _timezone) {
+    if (
+        result != time ||
+        timezone != _timezone ||
+        strcmp(tzname[0], std) != 0
+    ) {
+        printf(
+            "ERROR: %s != %s OR %ld != %ld OR %ld != %ld\n",
+            tzname[0], std,
+            result, time,
+            timezone, _timezone
+        );
+        // exit(EXIT_FAILURE);
+    }
 }
 
 int main(void) {
@@ -70,22 +101,75 @@ int main(void) {
         printf("gmtoff_ignored = %d\n", result != (time_t)-1);
     }
 
-    // POSIX example:
-    // setenv("TZ", "EST5", 1);
-    // tzset();
+    // ===== POSIX =====
+    time_t result = try_mktime("EST5");
+    check_invalid(result, "EST", 1704128400, 18000);
 
-    // struct tm t_posix = { 0 };
-    // t_posix.tm_year = 2024 - 1900;
-    // t_posix.tm_mon = 0;
-    // t_posix.tm_mday = 1;
-    // t_posix.tm_hour = 12;
-    // t_posix.tm_min = 0;
-    // t_posix.tm_sec = 0;
+    // No value
+    result = try_mktime("");
+    check_invalid(result, "UTC", 1704110400, 0);
 
-    // time_t result = mktime(&t_posix);
+    // Negative
+    result = try_mktime("EST-5");
+    check_invalid(result, "EST", 1704092400, -18000);
 
-    // ERROR_IF(mktime, result, != 1704128400);
-    // ERROR_IF(mktime, timezone, != 18000);
-    // printf("POSIX tzname[0] should be EST: %s\n", tzname[0]);
+    // No offset
+    result = try_mktime("JST");
+    check_invalid(result, "JST", 1704110400, 0);
 
+    // longer than 3 chars & fake timezone test
+    result = try_mktime("SMNTH-5");
+    check_invalid(result, "SMNTH", 1704092400, -18000);
+
+    // Invalid POSIX test (shorter than 3 chars)
+    result = try_mktime("SM5NTH5");
+    check_invalid(result, "", 1704110400, 0);
+
+    // Clamp test
+    result = try_mktime("CST-100");
+    check_invalid(result, "CST", 1704024000, -86400);
+
+    // Explicit +
+    result = try_mktime("CDT+5");
+    check_invalid(result, "CDT", 1704128400, 18000);
+
+    // Minutes included
+    result = try_mktime("IST-5:30");
+    check_invalid(result, "IST", 1704090600, -19800);
+
+    // Seconds included
+    result = try_mktime("FAKE5:00:30");
+    check_invalid(result, "FAKE", 1704128430, 18030);
+
+    // Explicit + with 0
+    result = try_mktime("JST+0");
+    check_invalid(result, "JST", 1704110400, 0);
+
+    // Full POSIX
+    result = try_mktime("EST5EDT,M3.2.0/2,M11.1.0/2");
+    check_invalid(result, "EST", 1704128400, 18000);
+
+    // POSIX without time
+    result = try_mktime("EST5EDT,M3.2.0,M11.1.0");
+    check_invalid(result, "EST", 1704128400, 18000);
+
+    // dst empty test
+    result = try_mktime("EST5,M3.2.0,M11.1.0");
+    check_invalid(result, "EST", 1704128400, 18000);
+
+    // end empty test
+    result = try_mktime("EST5EDT,M3.2.0/2");
+    check_invalid(result, "EST", 1704128400, 18000);
+
+    // dst & end empty test
+    result = try_mktime("EST5,M3.2.0");
+    check_invalid(result, "EST", 1704128400, 18000);
+
+    // start empty test
+    result = try_mktime("EST5EDT,,M3.2.0/2");
+    check_invalid(result, "EST", 1704128400, 18000);
+
+    // dst & start empty test
+    result = try_mktime("EST5,,M3.2.0/2");
+    check_invalid(result, "EST", 1704128400, 18000);
 }
