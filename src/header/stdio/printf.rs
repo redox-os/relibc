@@ -234,7 +234,7 @@ impl VaArg {
     }
 
     #[cfg(target_arch = "riscv64")]
-    unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
+    unsafe fn extract_longdouble(_ap: &mut core::ffi::VaList) -> c_longdouble {
         todo_skip!(0, "long double in variadic printf is not supported");
         0u128
     }
