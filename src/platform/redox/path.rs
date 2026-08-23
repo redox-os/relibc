@@ -293,7 +293,6 @@ pub fn dir_path_and_fd_path(
     socket_path: RedoxStr<'_>,
 ) -> Result<(RedoxPath<'_>, RedoxReference<'_>)> {
     let _siglock = tmp_disable_signals();
-    let cwd_guard = CWD.read();
     let redox_path = openat2_path(fcntl::AT_FDCWD, socket_path, 0)?;
 
     let (scheme, ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
