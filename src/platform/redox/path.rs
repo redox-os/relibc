@@ -294,8 +294,6 @@ pub fn dir_path_and_fd_path(
 ) -> Result<(RedoxPath<'_>, RedoxReference<'_>)> {
     let _siglock = tmp_disable_signals();
     let cwd_guard = CWD.read();
-    // FIXME should this be used somewhere?
-    let _cwd_path = cwd_guard.as_ref().map(|c| &c.redox);
     let redox_path = openat2_path(fcntl::AT_FDCWD, socket_path, 0)?;
 
     let (scheme, ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
