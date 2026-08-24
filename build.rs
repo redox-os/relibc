@@ -4,17 +4,12 @@ use std::{env, fs};
 
 fn main() {
     let _crate_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-    let target = env::var("TARGET").unwrap();
 
     println!("cargo:rerun-if-changed=src/c");
 
     let mut cc_builder = &mut cc::Build::new();
 
     cc_builder = cc_builder.flag("-nostdinc").flag("-nostdlib");
-
-    if target.starts_with("aarch64") {
-        cc_builder = cc_builder.flag("-mno-outline-atomics")
-    }
 
     cc_builder
         .flag("-fno-stack-protector")
