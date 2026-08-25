@@ -207,22 +207,19 @@ impl Pal for Sys {
             _ => return Err(Errno(EINVAL)),
         };
         let timerfd = FdGuard::open(path, syscall::O_RDONLY)?;
-        let mut redox_res = timespec::default();
-        let buffer = unsafe {
-            slice::from_raw_parts_mut(
-                (&raw mut redox_res).cast::<u8>(),
-                mem::size_of::<timespec>(),
-            )
-        };
+        let mut redox_res = syscall::TimeSpec::default();
+        let buffer_len = mem::size_of::<syscall::TimeSpec>();
+        let buffer =
+            unsafe { slice::from_raw_parts_mut((&raw mut redox_res).cast::<u8>(), buffer_len) };
 
         let bytes_read = redox_rt::sys::posix_read(timerfd.as_raw_fd(), buffer)?;
 
-        if bytes_read < mem::size_of::<timespec>() {
+        if bytes_read < buffer_len {
             return Err(Errno(EIO));
         }
 
         if let Some(mut res) = res {
-            res.write(redox_res);
+            res.write((&redox_res).into());
         }
 
         Ok(())
