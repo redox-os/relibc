@@ -45,7 +45,16 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
         }
     };
     log::trace!("chdir({:?}): {:?}", redox.as_reference().as_ref(), fd);
-    let fd = fd?;
+    let fd = match fd {
+        Ok(fd) => fd,
+        Err(e) if e == Error::new(EXDEV) => {
+            let link_path =
+                read_interscheme_link_content(None, &redox.as_reference().as_ref(), false);
+            let link_path = openat2_path(fcntl::AT_FDCWD, link_path?, 0)?;
+            FdGuard::new(resolve_interscheme_symlink(link_path, O_STAT)?).to_upper()?
+        }
+        Err(e) => return Err(e),
+    };
     let mut stat = Stat::default();
     if fd.fstat(&mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
         return Err(Error::new(ENOTDIR));
@@ -138,13 +147,13 @@ fn open_absolute(path: &str, flags: usize) -> Result<usize> {
     }
 }
 
-// Read symlink content
-fn read_link_content<'b>(
+// Read symlink across schemes content
+fn read_interscheme_link_content<'b>(
     dirfd: Option<&FdGuard>,
     path: &str,
     is_relative: bool,
 ) -> Result<RedoxStr<'b>> {
-    let resolve_flags = O_CLOEXEC | O_SYMLINK | O_RDONLY;
+    let resolve_flags = O_CLOEXEC | O_SYMLINK;
     let fd = match (is_relative, dirfd) {
         (false, _) => FdGuard::open(path, resolve_flags),
         (true, None) => current_dir()?
@@ -155,38 +164,44 @@ fn read_link_content<'b>(
         (true, Some(dirfd)) => dirfd.openat(path, resolve_flags, 0),
     };
     log::trace!(
-        "read_link_content ({:?} {:?} {}): {:?}",
+        "read_interscheme_link_content ({:?} {:?} {}): {:?}",
         dirfd,
         path,
         is_relative,
         fd
     );
 
-    let mut resolve_buf = [0_u8; limits::PATH_MAX + 1];
-    let count = fd?.read(&mut resolve_buf)?;
-    if count == resolve_buf.len() {
-        return Err(Error::new(ENAMETOOLONG));
-    }
+    let mut resolve_buf = [0_u8; limits::PATH_MAX];
+    let count = Sys::fpath(fd?.as_c_fd().unwrap(), &mut resolve_buf)?;
 
-    // If the symbolic link path is non-UTF8, it cannot be opened, and is thus
-    // considered a "dangling symbolic link".
-    let path = core::str::from_utf8(&resolve_buf[..count]).map_err(|_| Error::new(ENOENT))?;
-    RedoxStr::new(path.to_string()).ok_or(Error::new(EBADF))
+    // ENOENT: If the symbolic link path is non-UTF8, it cannot be opened,
+    // and is thus considered a "dangling symbolic link".
+    RedoxStr::new_from_buf(&resolve_buf, count)
+        .map(|s| s.into_owned())
+        .ok_or(Error::new(ENOENT))
 }
 
-/// Resolve symlink and open as a fd. Requires `current_path_string` as canonicalized.
-fn resolve_sym_links<'a>(mut current_path_string: RedoxPath<'a>, flags: usize) -> Result<usize> {
-    // Sym resolve loop
+/// Resolve symlink across schemes and open as a fd. Requires `current_path_string` as canonicalized.
+fn resolve_interscheme_symlink<'a>(
+    mut current_path_string: RedoxPath<'a>,
+    flags: usize,
+) -> Result<usize> {
+    // TODO: using SYMLOOP_MAX is incorrect, as this loop is only happening for symlink between schemes
     for _ in 0..limits::SYMLOOP_MAX {
         let dirname = current_path_string.dirname();
         let cow: Cow<'_, str> = current_path_string.into();
         let initial_res = open_absolute(&cow, flags);
-        log::trace!("resolve_sym_links({:?}): {:?}", cow, initial_res);
+        trace_log!(
+            "resolve_interscheme_symlink({:?}, {}): {:?}",
+            cow,
+            decode_open_flags(flags),
+            initial_res
+        );
         match initial_res {
             Ok(fd) => return Ok(fd),
             Err(e) if e == Error::new(EXDEV) => {
                 // dirfd is None because it's canonicalized
-                let link_target = read_link_content(None, &cow, false)?;
+                let link_target = read_interscheme_link_content(None, &cow, false)?;
                 current_path_string = dirname.canonicalize_as_cwd(link_target);
             }
             Err(e) => return Err(e),
@@ -233,15 +248,15 @@ pub fn openat(dirfd: c_int, path: RedoxStr<'_>, flags: usize) -> Result<usize> {
         Ok(fd) => Ok(fd),
         Err(e) if e == Error::new(EXDEV) => {
             let (link_path, dirfd) = if dirfd == fcntl::AT_FDCWD {
-                let link_path = read_link_content(None, &path, true);
+                let link_path = read_interscheme_link_content(None, &path, true);
                 (link_path, dirfd)
             } else {
                 let fd = ManuallyDrop::new(FdGuard::new(dirfd as usize));
-                let link_path = read_link_content(Some(&fd), &path, true);
+                let link_path = read_interscheme_link_content(Some(&fd), &path, true);
                 (link_path, ManuallyDrop::into_inner(fd).take() as i32)
             };
             let link_path = openat2_path(dirfd, link_path?, 0)?;
-            resolve_sym_links(link_path, flags)
+            resolve_interscheme_symlink(link_path, flags)
         }
         Err(e) => Err(e),
     }
@@ -280,9 +295,9 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
     match initial_res {
         Ok(fd) => Ok(fd),
         Err(e) if e == Error::new(EXDEV) => {
-            let link_path = read_link_content(None, &path, is_relative);
+            let link_path = read_interscheme_link_content(None, &path, is_relative);
             let link_path = openat2_path(fcntl::AT_FDCWD, link_path?, 0)?;
-            resolve_sym_links(link_path, flags)
+            resolve_interscheme_symlink(link_path, flags)
         }
         Err(e) => Err(e),
     }
@@ -299,7 +314,7 @@ pub fn dir_path_and_fd_path(
     if ref_path.as_ref().is_empty() {
         return Err(Error::new(EINVAL));
     }
-    let ref_path = RedoxReference::new(ref_path.to_string()).unwrap();
+    let ref_path = ref_path.into_owned();
     let dir_to_open = ref_path.clone().dirname();
     Ok((scheme.canonicalize_as_scheme(dir_to_open.into()), ref_path))
 }
@@ -368,11 +383,15 @@ pub(super) fn openat2_path(
         };
         Ok(redox_path)
     } else {
-        let mut buf = [0; limits::PATH_MAX];
-        let len = Sys::fpath(dirfd, &mut buf)?;
-        // SAFETY: fpath checks then copies valid UTF8.
-        let dir = unsafe { str::from_utf8_unchecked(&buf[..len]) };
-        let dir = RedoxPath::from_absolute(dir).ok_or(Errno(EBADF))?;
+        let mut buf: ArrayString<{ limits::PATH_MAX }> = ArrayString::zero_filled();
+        let dir = unsafe {
+            // SAFETY: Sys::fpath is using RedoxPath::from_absolute_buf already
+            let res = Sys::fpath(dirfd, buf.as_bytes_mut())?;
+            buf.set_len(res);
+            RedoxStr::new_unchecked(buf.as_str())
+                .abs()
+                .ok_or(Errno(EBADF))
+        }?;
         Ok(dir.canonicalize_as_cwd(path))
     }
 }
