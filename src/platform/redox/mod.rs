@@ -13,7 +13,7 @@ use redox_rt::{
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, ESRCH, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
+    self, ESRCH, EXDEV, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
     data::{Map, TimeSpec as redox_timespec},
     dirent::DirentHeader,
 };
@@ -781,6 +781,7 @@ impl Pal for Sys {
 
         let file = File::openat(fd1, oldpath, oflags)?;
         let newpath: Cow<'_, str> = openat2_path(fd2, newpath, 0)?.into();
+        // TODO: Does not work for interscheme symlink, try to copy from frename
         syscall::flink(*file as usize, newpath)?;
         Ok(())
     }
@@ -1070,26 +1071,21 @@ impl Pal for Sys {
         let mut buf = [0; limits::PATH_MAX];
         let count = syscall::fpath(fildes as usize, &mut buf)?;
 
-        let redox_path = str::from_utf8(&buf[..count])
-            .ok()
-            .and_then(redox_path::RedoxPath::from_absolute)
-            .ok_or(Errno(EINVAL))?;
-
-        let (scheme, reference) = redox_path.as_parts().ok_or(Errno(EINVAL))?;
+        let redox_path = redox_path::RedoxPath::from_absolute_buf(&buf, count)
+            .ok_or(Errno(EINVAL))?
+            .to_standard();
 
         let mut cursor = io::Cursor::new(out);
-        let res = match scheme.as_ref() {
-            "file" => write!(cursor, "/{}", reference.as_ref().trim_start_matches('/')),
-            _ => write!(
-                cursor,
-                "/scheme/{}/{}",
-                scheme.as_ref(),
-                reference.as_ref().trim_start_matches('/')
-            ),
-        };
-        match res {
+        match write!(cursor, "{}", redox_path.as_ref()) {
             Ok(()) => Ok(cursor.position() as usize),
-            Err(_err) => Err(Errno(ENAMETOOLONG)),
+            Err(err) => {
+                log::warn!(
+                    "fpath is too long for buffer: {:?} {:?}",
+                    redox_path.as_ref(),
+                    err
+                );
+                Err(Errno(ENAMETOOLONG))
+            }
         }
     }
 
@@ -1098,7 +1094,7 @@ impl Pal for Sys {
             dirfd,
             path,
             0,
-            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
+            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_NOFOLLOW | fcntl::O_CLOEXEC,
         )?;
         Sys::read(*file, out)
     }
@@ -1115,28 +1111,40 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let new_path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
         // Fail if the target exists with RENAME_NOREPLACE.
         if flags & RENAME_NOREPLACE != 0
-            && let Ok(_) = libredox::openat(
-                new_dir,
-                new_path.clone(),
-                fcntl::O_PATH | fcntl::O_CLOEXEC,
-                0,
-            )
-            .map(FdGuard::new)
+            && let Ok(_) =
+                libredox::openat(new_dir, path.clone(), fcntl::O_PATH | fcntl::O_CLOEXEC, 0)
+                    .map(FdGuard::new)
         {
             return Err(Errno(EEXIST));
         }
 
-        // oflags are the same as Sys::rename above.
+        // TODO: A flag to prevent this function to not automatically resolve EXDEV, to have a fast path function like unlinkat
         let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
 
-        let target: Cow<'_, str> = openat2_path(new_dir, new_path, 0)?.into();
-        // I'm avoiding Sys::rename to avoid reallocating a CString from a String.
-        syscall::frename(*source as usize, target)
-            .map(|_| ())
-            .map_err(Into::into)
+        // to ensure rename working across scheme, new_dir need to be adjusted to the parent of new_path
+        let (mut new_path_dir, Some(new_path_file)) = path.dirname_split() else {
+            return Err(Errno(EINVAL));
+        };
+        if new_path_dir.is_empty() {
+            new_path_dir = RedoxStr::new(".").unwrap();
+        }
+        trace_log!("renameat2 split {new_path_dir:?} {new_path_file:?}");
+        let new_path_parent = openat2_path(new_dir, new_path_dir, 0)?;
+        let target_dir =
+            File::new(libredox::openat(new_dir, new_path_parent.into(), fcntl::O_PATH, 0)? as _);
+        let target: Cow<'_, str> = openat2_path(*target_dir, new_path_file.into(), 0)?.into();
+        let r = syscall::frename(*source as usize, &target).map(|_| ());
+        trace_log!(
+            "renameat2 ({old_dir}, {:?}, {new_dir}, {:?}): [{:?}] {:?}",
+            old_path.to_string_lossy(),
+            new_path.to_string_lossy(),
+            target,
+            r
+        );
+        r.map_err(Into::into)
     }
 
     fn sched_yield() -> Result<()> {
@@ -1734,11 +1742,46 @@ impl Pal for Sys {
         if (flags & !AT_REMOVEDIR) != 0 {
             return Err(Errno(EINVAL));
         }
-        let path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
-        let path = openat2_path(fd, path, 0)?;
-        let path: Cow<'_, str> = path.into();
-        redox_rt::sys::unlink(path, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
-        Ok(())
+        let flags: usize = flags.try_into().map_err(|_| Errno(EINVAL))?;
+
+        let target = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let target: Cow<'_, str> = openat2_path(fd, target, 0)?.into();
+        let r = redox_rt::sys::unlink(&target, flags).map(|_| ());
+        trace_log!(
+            "unlinkat ({fd}, {:?}, {:x}): [{:?}] {:?}",
+            path.to_string_lossy(),
+            flags,
+            &target,
+            r
+        );
+
+        if matches!(r, Err(Error { errno: EXDEV })) {
+            // slower path to make this work across scheme
+
+            // SAFETY: Already converted to RedoxStr before.
+            let target = unsafe { RedoxStr::new_unchecked(target) };
+            let (mut new_path_dir, Some(new_path_file)) = target.dirname_split() else {
+                return Err(Errno(EINVAL));
+            };
+            if new_path_dir.is_empty() {
+                new_path_dir = RedoxStr::new(".").unwrap();
+            }
+            let target_dir = File::new(libredox::openat(fd, new_path_dir, fcntl::O_PATH, 0)? as _);
+            let target2: Cow<'_, str> = openat2_path(*target_dir, new_path_file.into(), 0)?.into();
+            let r = redox_rt::sys::unlink(&target2, flags).map(|_| ());
+            trace_log!(
+                "unlinkat ({}, {:?}, {:x}): [{:?}] {:?}",
+                *target_dir,
+                &target,
+                flags,
+                &target2,
+                r
+            );
+            r
+        } else {
+            r
+        }
+        .map_err(Into::into)
     }
 
     #[expect(clippy::unnecessary_literal_unwrap, reason = "res needs refactoring")]

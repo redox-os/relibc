@@ -72,7 +72,7 @@ workspace = true
 bitflags = "2"
 ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
-redox-path = "0.4.0"
+redox-path = "0.4.1"
 redox_protocols = { package = "libredox", version = "0.1.20", default-features = false, features = ["protocol"] }
 redox_syscall = "0.9.1"
 
