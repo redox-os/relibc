@@ -338,9 +338,6 @@ VARIED_NAMES=\
 
 ifeq ($(IS_REDOX),1)
 VARIED_NAMES+=\
-	redox_syscall \
-	redox_ring \
-	redox_ring_dyn \
 	redox_ring_ramfs
 endif
 
