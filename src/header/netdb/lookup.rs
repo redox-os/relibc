@@ -55,7 +55,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, Errno> {
 
     let mut dest = [0_u8; size_of::<sockaddr_in>()];
     *plain::from_mut_bytes(&mut dest).unwrap() = sockaddr_in {
-        sin_family: AF_INET as u16,
+        sin_family: u16::try_from(AF_INET).expect("AF_INET is positive and below u16::MAX"),
         sin_port: htons(53),
         sin_addr: in_addr { s_addr: dns_addr },
         ..Default::default()
@@ -126,7 +126,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, Errno> {
 
         let mut dest_addr = [0_u8; size_of::<sockaddr_in>()];
         *plain::from_mut_bytes(&mut dest_addr).unwrap() = sockaddr_in {
-            sin_family: AF_INET as u16,
+            sin_family: u16::try_from(AF_INET).expect("AF_INET is positive and below u16::MAX"),
             sin_port: htons(53),
             sin_addr: in_addr { s_addr: dns_addr },
             ..Default::default()

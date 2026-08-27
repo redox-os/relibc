@@ -132,6 +132,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// that byte and a `CStr` starting at that byte.
     #[inline]
     #[doc(alias = "strchrnul")]
+    #[allow(clippy::type_complexity)]
     pub fn find_get_subslice_or_all(
         self,
         c: impl Into<T::Char>,

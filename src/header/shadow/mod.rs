@@ -101,6 +101,7 @@ pub struct spwd {
     pub sp_flag: c_ulong,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 enum Error {
     EOF,

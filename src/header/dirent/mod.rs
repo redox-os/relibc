@@ -373,7 +373,9 @@ pub unsafe extern "C" fn scandir(
             )
         };
 
-        len as c_int
+        // TODO should we panic here instead?
+        // seems unlikely the vec will contain more than i32::MAX entries
+        c_int::try_from(len).unwrap_or(c_int::MAX)
     }
 }
 
