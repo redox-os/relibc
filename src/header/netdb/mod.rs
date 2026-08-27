@@ -9,8 +9,8 @@ use core::{cell::Cell, fmt::Write, mem, net::Ipv4Addr, ptr, str};
 use alloc::{boxed::Box, str::SplitWhitespace, string::ToString, vec::Vec};
 
 use crate::{
-    c_str::{CStr, CString},
-    error::ResultExt,
+    c_str::{CStr, OwnedThinCStr},
+    error::{Errno, ResultExt},
     header::{
         arpa_inet::inet_aton,
         bits_arpainet::{htons, ntohl},
@@ -30,8 +30,6 @@ use crate::{
     },
     raw_cell::RawCell,
 };
-
-use crate::header::netinet_in::sockaddr_in6;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -87,6 +85,8 @@ pub struct servent {
 #[repr(C)]
 #[derive(Debug)]
 pub struct addrinfo {
+    // NOTE: the soundness assumptions we make here is the fields here can only be accessed by safe
+    // code through conversion to/from the wrapped type
     ai_flags: c_int,           /* AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST */
     ai_family: c_int,          /* PF_xxx */
     ai_socktype: c_int,        /* SOCK_xxx */
@@ -96,6 +96,51 @@ pub struct addrinfo {
     ai_addr: *mut sockaddr,    /* binary address */
     ai_next: *mut addrinfo,    /* next structure in linked list */
 }
+struct WrappedAddrInfo {
+    flags: c_int,
+    family: c_int,
+    socktype: c_int,
+    protocol: c_int,
+    sockaddr: Box<[u8]>,
+    canonname: Option<OwnedThinCStr>,
+}
+impl addrinfo {
+    fn from_wrapped(wrapped: WrappedAddrInfo) -> Self {
+        Self {
+            ai_flags: wrapped.flags,
+            ai_family: wrapped.family,
+            ai_socktype: wrapped.socktype,
+            ai_protocol: wrapped.protocol,
+            ai_addrlen: wrapped.sockaddr.len().try_into().unwrap(),
+            ai_canonname: wrapped
+                .canonname
+                .map_or_else(core::ptr::null_mut, |s| s.into_ptr()),
+            ai_addr: Box::into_raw(wrapped.sockaddr).as_mut_ptr().cast(),
+            ai_next: core::ptr::null_mut(),
+        }
+    }
+    fn into_wrapped(self) -> (WrappedAddrInfo, Option<Box<Self>>) {
+        let next = if self.ai_next.is_null() {
+            None
+        } else {
+            Some(unsafe { Box::from_raw(self.ai_next) })
+        };
+        let wrapped = WrappedAddrInfo {
+            flags: self.ai_flags,
+            family: self.ai_family,
+            socktype: self.ai_socktype,
+            protocol: self.ai_protocol,
+            sockaddr: unsafe {
+                Box::from_raw(core::ptr::slice_from_raw_parts_mut(
+                    self.ai_addr.cast::<u8>(),
+                    self.ai_addrlen.try_into().unwrap(),
+                ))
+            },
+            canonname: unsafe { OwnedThinCStr::from_nullable_ptr(self.ai_canonname.cast()) },
+        };
+        (wrapped, next)
+    }
+}
 
 pub const AI_PASSIVE: c_int = 0x0001;
 pub const AI_CANONNAME: c_int = 0x0002;
@@ -104,6 +149,29 @@ pub const AI_V4MAPPED: c_int = 0x0008;
 pub const AI_ALL: c_int = 0x0010;
 pub const AI_ADDRCONFIG: c_int = 0x0020;
 pub const AI_NUMERICSERV: c_int = 0x0400;
+
+#[repr(i32)]
+#[allow(non_camel_case_types)]
+enum AddrInfoErr {
+    EAI_BADFLAGS = -1,
+    EAI_NONAME = -2,
+    EAI_AGAIN = -3,
+    EAI_FAIL = -4,
+    EAI_NODATA = -5,
+    EAI_FAMILY = -6,
+    EAI_SOCKTYPE = -7,
+    EAI_SERVICE = -8,
+    EAI_ADDRFAMILY = -9,
+    EAI_MEMORY = -10,
+    EAI_SYSTEM = -11,
+    EAI_OVERFLOW = -12,
+}
+impl From<Errno> for AddrInfoErr {
+    fn from(value: Errno) -> Self {
+        value.sync();
+        Self::EAI_SYSTEM
+    }
+}
 
 pub const EAI_BADFLAGS: c_int = -1;
 pub const EAI_NONAME: c_int = -2;
@@ -832,13 +900,99 @@ pub unsafe extern "C" fn setservent(stayopen: c_int) {
     }
 }
 
+fn getaddrinfo_inner(
+    node_opt: Option<CStr>,
+    service_opt: Option<CStr>,
+    hints_opt: Option<&addrinfo>,
+) -> Result<Box<addrinfo>, AddrInfoErr> {
+    //TODO: Use hints
+    let mut ai_flags = hints_opt.map_or(0, |hints| hints.ai_flags);
+    let mut ai_family; // = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
+    let ai_socktype = hints_opt.map_or(0, |hints| hints.ai_socktype);
+    let mut ai_protocol; // = hints_opt.map_or(0, |hints| hints.ai_protocol);
+
+    let mut port = 0;
+    if let Some(service) = service_opt {
+        //TODO: Support other service definitions as well as AI_NUMERICSERV
+        if let Ok(service) = str::from_utf8(service.to_bytes())
+            && let Ok(ok) = service.parse::<u16>()
+        {
+            port = ok;
+        }
+    }
+    let node_cstr = node_opt.unwrap_or_else(|| {
+        //TODO: Optimize by bypassing string parsing
+        if ai_flags & AI_PASSIVE > 0 {
+            c"0.0.0.0".into()
+        } else {
+            c"127.0.0.1".into()
+        }
+    });
+    let node = str::from_utf8(node_cstr.to_bytes()).map_err(|_| AddrInfoErr::EAI_NONAME)?;
+
+    let lookuphost = if ai_flags & AI_NUMERICHOST > 0 {
+        let s_addr = parse_ipv4_string(node).ok_or(AddrInfoErr::EAI_NONAME)?;
+
+        vec![in_addr { s_addr }]
+    } else {
+        lookup_host(node)?
+    };
+
+    let mut first_info: Option<Box<addrinfo>> = None;
+    let mut last_info: Option<&mut addrinfo> = None;
+
+    for in_addr in lookuphost {
+        ai_family = AF_INET;
+        ai_protocol = 0;
+
+        let mut sockaddr = vec![0_u8; size_of::<sockaddr_in>()].into_boxed_slice();
+
+        *plain::from_mut_bytes(&mut sockaddr).unwrap() = sockaddr_in {
+            sin_family: ai_family as sa_family_t,
+            sin_port: htons(port),
+            sin_addr: in_addr,
+            sin_zero: [0; 8],
+        };
+
+        let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
+            if node_opt.is_none() {
+                return Err(AddrInfoErr::EAI_BADFLAGS);
+            }
+            ai_flags &= !AI_CANONNAME;
+            Some(OwnedThinCStr::from(node_cstr))
+        } else {
+            None
+        };
+
+        let addrinfo = Box::new(addrinfo::from_wrapped(WrappedAddrInfo {
+            flags: ai_flags,
+            family: ai_family,
+            socktype: ai_socktype,
+            protocol: ai_protocol,
+            sockaddr,
+            canonname: ai_canonname,
+        }));
+
+        if let Some(last) = last_info {
+            let new_last = Box::leak(addrinfo);
+            last.ai_next = new_last;
+            last_info = Some(new_last);
+        } else {
+            first_info = Some(addrinfo);
+            last_info = first_info.as_deref_mut();
+        }
+    }
+
+    first_info.ok_or(AddrInfoErr::EAI_FAIL)
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/freeaddrinfo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getaddrinfo(
     node: *const c_char,
     service: *const c_char,
     hints: *const addrinfo,
-    res: *mut *mut addrinfo,
+    res_out: *mut *mut addrinfo,
 ) -> c_int {
     let node_opt = unsafe { CStr::from_nullable_ptr(node) };
     let service_opt = unsafe { CStr::from_nullable_ptr(service) };
@@ -849,99 +1003,26 @@ pub unsafe extern "C" fn getaddrinfo(
         Some(unsafe { &*hints })
     };
 
+    #[cfg(not(feature = "no_trace"))]
     log::trace!(
         "getaddrinfo({:?}, {:?}, {:?})",
-        node_opt.map(|c| unsafe { str::from_utf8_unchecked(c.to_bytes()) }),
-        service_opt.map(|c| unsafe { str::from_utf8_unchecked(c.to_bytes()) }),
+        node_opt.map(|c| alloc::string::String::from_utf8_lossy(c.to_bytes())),
+        service_opt.map(|c| alloc::string::String::from_utf8_lossy(c.to_bytes())),
         hints_opt
     );
 
-    //TODO: Use hints
-    let mut ai_flags = hints_opt.map_or(0, |hints| hints.ai_flags);
-    let mut ai_family; // = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
-    let ai_socktype = hints_opt.map_or(0, |hints| hints.ai_socktype);
-    let mut ai_protocol; // = hints_opt.map_or(0, |hints| hints.ai_protocol);
-
-    unsafe { *res = ptr::null_mut() };
-
-    let mut port = 0;
-    if let Some(service) = service_opt {
-        //TODO: Support other service definitions as well as AI_NUMERICSERV
-        match unsafe { str::from_utf8_unchecked(service.to_bytes()) }.parse::<u16>() {
-            Ok(ok) => port = ok,
-            Err(_err) => (),
+    match getaddrinfo_inner(node_opt, service_opt, hints_opt) {
+        Ok(list_first) => unsafe {
+            res_out.write(Box::into_raw(list_first));
+            0
+        },
+        Err(err) => {
+            unsafe {
+                res_out.write(core::ptr::null_mut());
+            }
+            err as c_int
         }
     }
-    let node = node_opt.unwrap_or_else(|| {
-        //TODO: Optimize by bypassing string parsing
-        if ai_flags & AI_PASSIVE > 0 {
-            c"0.0.0.0".into()
-        } else {
-            c"127.0.0.1".into()
-        }
-    });
-
-    let lookuphost = if ai_flags & AI_NUMERICHOST > 0 {
-        match parse_ipv4_string(unsafe { str::from_utf8_unchecked(node.to_bytes()) }) {
-            Some(s_addr) => vec![in_addr { s_addr }],
-            None => {
-                return EAI_NONAME;
-            }
-        }
-    } else {
-        match lookup_host(unsafe { str::from_utf8_unchecked(node.to_bytes()) }) {
-            Ok(lookuphost) => lookuphost,
-            Err(e) => {
-                platform::ERRNO.set(e);
-                return EAI_SYSTEM;
-            }
-        }
-    };
-
-    for in_addr in lookuphost {
-        ai_family = AF_INET;
-        ai_protocol = 0;
-
-        let ai_addr = Box::into_raw(Box::new(sockaddr_in {
-            sin_family: ai_family as sa_family_t,
-            sin_port: htons(port),
-            sin_addr: in_addr,
-            sin_zero: [0; 8],
-        }))
-        .cast::<sockaddr>();
-
-        let ai_addrlen = mem::size_of::<sockaddr_in>() as socklen_t;
-
-        let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
-            if node_opt.is_none() {
-                return EAI_BADFLAGS;
-            }
-            ai_flags &= !AI_CANONNAME;
-            node.to_owned_cstring().into_raw()
-        } else {
-            ptr::null_mut()
-        };
-
-        let addrinfo = Box::new(addrinfo {
-            ai_flags: 0,
-            ai_family,
-            ai_socktype,
-            ai_protocol,
-            ai_addrlen,
-            ai_canonname,
-            ai_addr,
-            ai_next: ptr::null_mut(),
-        });
-        unsafe {
-            let mut indirect = res;
-            while !(*indirect).is_null() {
-                indirect = &raw mut (**indirect).ai_next;
-            }
-            *indirect = Box::into_raw(addrinfo)
-        }
-    }
-
-    0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getnameinfo.html>.
@@ -1042,23 +1123,10 @@ pub unsafe extern "C" fn getnameinfo(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/freeaddrinfo.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
-    let mut ai = res;
-    while !ai.is_null() {
-        let bai = unsafe { Box::from_raw(ai) };
-        if !bai.ai_canonname.is_null() {
-            drop(unsafe { CString::from_raw(bai.ai_canonname) });
-        }
-        if !bai.ai_addr.is_null() {
-            if bai.ai_addrlen == mem::size_of::<sockaddr_in>() as socklen_t {
-                unsafe { drop(Box::from_raw(bai.ai_addr.cast::<sockaddr_in>())) };
-            } else if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() as socklen_t {
-                unsafe { drop(Box::from_raw(bai.ai_addr.cast::<sockaddr_in6>())) };
-            } else {
-                todo_skip!(0, "freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);
-            }
-        }
-        ai = bai.ai_next;
+pub extern "C" fn freeaddrinfo(mut res: Box<addrinfo>) {
+    // all deallocations are done automagically here using RAII
+    while let (_wrapped, Some(next)) = res.into_wrapped() {
+        res = next;
     }
 }
 
