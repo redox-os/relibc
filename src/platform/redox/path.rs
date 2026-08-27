@@ -49,7 +49,7 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
         Ok(fd) => fd,
         Err(e) if e == Error::new(EXDEV) => {
             let link_path =
-                read_interscheme_link_content(None, &redox.as_reference().as_ref(), false);
+                read_interscheme_link_content(None, redox.as_reference().as_ref(), false);
             let link_path = openat2_path(fcntl::AT_FDCWD, link_path?, 0)?;
             FdGuard::new(resolve_interscheme_symlink(link_path, O_STAT)?).to_upper()?
         }
@@ -65,12 +65,8 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
 }
 
 pub fn fchdir(fd: c_int) -> Result<()> {
-    let mut buf = CwdPath::zero_filled();
-    unsafe {
-        // SAFETY: Sys::fpath is using str::from_utf8 already
-        let res = Sys::fpath(fd, buf.as_bytes_mut())?;
-        buf.set_len(res);
-    }
+    let mut buf = [0; limits::PATH_MAX];
+    let buf = standard_fpath(fd, &mut buf)?;
     let fd = FdGuard::new(redox_rt::sys::fcntl(
         fd as usize,
         syscall::F_DUPFD,
@@ -78,7 +74,7 @@ pub fn fchdir(fd: c_int) -> Result<()> {
     )?)
     .to_upper()
     .unwrap();
-    set_cwd_manual(buf, fd)?;
+    set_cwd_manual(to_cwd_path(buf.as_ref())?, fd)?;
     Ok(())
 }
 
@@ -109,6 +105,15 @@ pub fn current_dir() -> Result<ReadGuard<'static, Option<Cwd<'static>>>> {
     }
 
     Ok(guard)
+}
+
+/// Get standard UNIX path from fpath of a fildes
+pub fn standard_fpath<'a>(fildes: c_int, buf: &'a mut [u8]) -> Result<RedoxReference<'a>> {
+    let count = syscall::fpath(fildes as usize, &mut *buf)?;
+
+    Ok(redox_path::RedoxPath::from_absolute_buf(buf, count)
+        .ok_or(Errno(EINVAL))?
+        .to_standard())
 }
 
 pub type CwdPath = ArrayString<{ limits::PATH_MAX }>;
