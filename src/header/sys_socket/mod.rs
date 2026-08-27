@@ -365,8 +365,8 @@ pub unsafe extern "C" fn recvfrom(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> ssize_t {
-    let buffer = unsafe { Out::from_raw_parts(buffer.cast::<u8>(), length) };
-    let address = if address.is_null() || address_len.is_null() {
+    let buffer_out = unsafe { Out::from_raw_parts(buffer.cast::<u8>(), length) };
+    let address_slice = if address.is_null() || address_len.is_null() {
         None
     } else {
         Some(unsafe {
@@ -375,7 +375,7 @@ pub unsafe extern "C" fn recvfrom(
     };
 
     trace_expr!(
-        match Sys::recvfrom(socket, buffer, flags, address) {
+        match Sys::recvfrom(socket, buffer_out, flags, address_slice) {
             Ok((bytes_read, addr_len)) => {
                 if let Some(len_out) = unsafe { address_len.as_mut() } {
                     *len_out = addr_len;
@@ -433,14 +433,14 @@ pub unsafe extern "C" fn sendto(
 ) -> ssize_t {
     let message = unsafe { core::slice::from_raw_parts(message.cast::<u8>(), length) };
 
-    let dest_addr = if dest_addr.is_null() {
+    let dest_addr_slice = if dest_addr.is_null() {
         None
     } else {
         Some(unsafe { core::slice::from_raw_parts(dest_addr.cast::<u8>(), dest_len as usize) })
     };
 
     trace_expr!(
-        Sys::sendto(socket, message, flags, dest_addr)
+        Sys::sendto(socket, message, flags, dest_addr_slice)
             .map(|w| w as ssize_t)
             .or_minus_one_errno(),
         "sendto({}, {:p}, {}, {:#x}, {:p}, {})",

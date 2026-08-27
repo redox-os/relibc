@@ -1,8 +1,8 @@
 //! Nul-terminated byte strings.
 
-use core::{marker::PhantomData, ptr::NonNull, str::Utf8Error};
+use core::{alloc::Layout, marker::PhantomData, ptr::NonNull, str::Utf8Error};
 
-use alloc::{borrow::Cow, string::String};
+use alloc::{borrow::Cow, boxed::Box, string::String};
 
 use crate::platform::types::{c_char, wchar_t};
 
@@ -324,3 +324,56 @@ pub struct FromCharsWithNulError;
 pub struct FromCharsUntilNulError;
 
 pub use alloc::ffi::CString;
+
+/// Owned variant of CStr, allocated by the global allocator used by Rust (which currently is the
+/// same as malloc/free for relibc).
+#[repr(transparent)]
+pub struct OwnedThinCStr {
+    ptr: NonNull<c_char>,
+}
+impl OwnedThinCStr {
+    #[inline]
+    pub const unsafe fn from_ptr(ptr: *mut c_char) -> Self {
+        Self {
+            ptr: unsafe { NonNull::new_unchecked(ptr) },
+        }
+    }
+    #[inline]
+    pub unsafe fn from_nullable_ptr(ptr: *mut c_char) -> Option<Self> {
+        Some(Self {
+            ptr: NonNull::new(ptr)?,
+        })
+    }
+    #[inline]
+    pub const fn as_cstr(&self) -> CStr<'_> {
+        unsafe { CStr::from_ptr(self.ptr.as_ptr()) }
+    }
+    pub const fn into_ptr(self) -> *mut c_char {
+        let ptr = self.ptr.as_ptr();
+        core::mem::forget(self);
+        ptr
+    }
+}
+impl From<CString> for OwnedThinCStr {
+    fn from(value: CString) -> Self {
+        unsafe { Self::from_ptr(value.into_raw()) }
+    }
+}
+impl From<CStr<'_>> for OwnedThinCStr {
+    fn from(value: CStr<'_>) -> Self {
+        let owned = Box::<[u8]>::from(value.to_bytes());
+        unsafe { Self::from_ptr(Box::into_raw(owned).as_mut_ptr().cast()) }
+    }
+}
+impl Drop for OwnedThinCStr {
+    fn drop(&mut self) {
+        unsafe {
+            // TODO: Getting the length can be ignored if we know it was allocated with malloc and
+            // (len-unaware) free. But the guarantee that the Rust and C allocators are identical
+            // in relibc, must be documented better in that case.
+            let len = CStr::from_ptr(self.ptr.as_ptr()).len();
+            let layout = Layout::array::<u8>(len).unwrap();
+            alloc::alloc::dealloc(self.ptr.as_ptr().cast(), layout);
+        }
+    }
+}
