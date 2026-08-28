@@ -1428,18 +1428,21 @@ pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
     }
 }
 
-pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if unsafe { *s } != 0 && unsafe { *s } == ByteLiteral::cast_cchar(b'0') {
-        if let Some((val, idx, overflow)) = unsafe { convert_integer(CStr::from_ptr(s.add(1)), 8) }
-        {
-            Some((val, idx + 1, overflow))
+pub fn convert_octal(s: CStr) -> Option<(c_ulong, isize, bool)> {
+    let (first, next) = s.split_first()?;
+
+    if first != b'0' {
+        return None;
+    }
+
+    Some(
+        if let Some((val, idx, overflow)) = convert_integer(next, 8) {
+            (val, idx + 1, overflow)
         } else {
             // in case the prefix is not actually a prefix
-            Some((0, 1, false))
-        }
-    } else {
-        None
-    }
+            (0, 1, false)
+        },
+    )
 }
 
 pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
@@ -1455,7 +1458,7 @@ pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     }
 }
 
-pub unsafe fn convert_integer(mut s: CStr, base: c_int) -> Option<(c_ulong, isize, bool)> {
+pub fn convert_integer(mut s: CStr, base: c_int) -> Option<(c_ulong, isize, bool)> {
     // -1 means the character is invalid
     #[rustfmt::skip]
     const LOOKUP_TABLE: [c_long; 256] = [

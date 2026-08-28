@@ -274,11 +274,11 @@ macro_rules! strto_impl {
         let res = match $base {
             0 => unsafe { detect_base(num_str) }.and_then(|($base, i)| {
                 idx += i;
-                unsafe { convert_integer(CStr::from_ptr(num_str.offset(i)), $base) }
+                convert_integer(unsafe { CStr::from_ptr(num_str.offset(i)) }, $base)
             }),
-            8 => unsafe { convert_octal(num_str) },
+            8 => convert_octal(unsafe { CStr::from_ptr(num_str) }),
             16 => unsafe { convert_hex(num_str) },
-            _ => unsafe { convert_integer(CStr::from_ptr(num_str), $base) },
+            _ => convert_integer(unsafe { CStr::from_ptr(num_str) }, $base),
         };
 
         // check for error parsing octal/hex prefix
