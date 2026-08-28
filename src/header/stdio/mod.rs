@@ -1384,15 +1384,20 @@ pub unsafe extern "C" fn setvbuf(
 
     // SAFETY: We take out stream.writer then immediately set again
     let writer = core::mem::replace(&mut stream.writer, unsafe { core::mem::zeroed() });
-    stream.writer = match mode {
-        _IONBF => writer.to_unbuffered(),
-        _IOLBF => writer.to_line_buffered(),
-        _IOFBF => writer.to_byte_buffered(),
-        // TODO: Should EINVAL?
-        _ => writer,
-    };
+    let dummy_writer = core::mem::replace(
+        &mut stream.writer,
+        match mode {
+            _IONBF => writer.to_unbuffered(),
+            _IOLBF => writer.to_line_buffered(),
+            _IOFBF => writer.to_byte_buffered(),
+            // TODO: Should EINVAL?
+            _ => writer,
+        },
+    );
     // TODO: does not support borrowing buf
     stream.writer.set_capacity(size);
+    // do not drop the zeroed() fake writer
+    core::mem::forget(dummy_writer);
 
     0
 }
