@@ -794,13 +794,6 @@ impl Linker {
         let debug = self.config.debug_flags.contains(DebugFlags::LOAD);
 
         if name == "libc.so.6" || name == "libc.so" {
-            if debug {
-                println!(
-                    "[ld.so]: loading libc.so.6 (aka. ld.so) at {:#?}",
-                    self.me.base
-                );
-            }
-
             let (me, master) = DSO::from_raw(
                 self.me.base,
                 self.me.dyns,
@@ -809,6 +802,15 @@ impl Linker {
                 self.next_tls_module_id,
                 self.tls_size.next_multiple_of(16),
             );
+
+            if debug {
+                let bounds = me.find_bounds(self.me.phdrs);
+
+                eprintln!(
+                    "[ld.so]: loading object: libc.so.6 (aka. ld.so) at {:#x}:{:#x} (pie: {})",
+                    bounds.0, bounds.1, me.pie,
+                );
+            }
 
             self.tls_size = master.offset;
             self.next_tls_module_id += 1;
