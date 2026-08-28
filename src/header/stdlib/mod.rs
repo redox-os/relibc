@@ -1430,7 +1430,8 @@ pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
 
 pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if unsafe { *s } != 0 && unsafe { *s } == ByteLiteral::cast_cchar(b'0') {
-        if let Some((val, idx, overflow)) = unsafe { convert_integer(s.add(1), 8) } {
+        if let Some((val, idx, overflow)) = unsafe { convert_integer(CStr::from_ptr(s.add(1)), 8) }
+        {
             Some((val, idx + 1, overflow))
         } else {
             // in case the prefix is not actually a prefix
@@ -1447,14 +1448,14 @@ pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
             && (unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'x')
                 || unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'X')))
     {
-        unsafe { convert_integer(s.add(2), 16) }
+        unsafe { convert_integer(CStr::from_ptr(s.add(2)), 16) }
             .map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
-        unsafe { convert_integer(s, 16) }
+        unsafe { convert_integer(CStr::from_ptr(s), 16) }
     }
 }
 
-pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
+pub unsafe fn convert_integer(mut s: CStr, base: c_int) -> Option<(c_ulong, isize, bool)> {
     // -1 means the character is invalid
     #[rustfmt::skip]
     const LOOKUP_TABLE: [c_long; 256] = [
@@ -1480,11 +1481,11 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
     let mut idx = 0;
     let mut overflowed = false;
 
-    loop {
+    while let Some((c, next_s)) = s.split_first() {
         // `-1 as usize` is usize::MAX
         // `-1 as u8 as usize` is u8::MAX
         // It extends by the sign bit unless we cast it to unsigned first.
-        let val = LOOKUP_TABLE[CCharToU8::cast(unsafe { *s.offset(idx) }) as usize];
+        let val = LOOKUP_TABLE[usize::from(c)];
         if val == -1 || val as c_int >= base {
             break;
         } else {
@@ -1499,6 +1500,7 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
                 overflowed = true;
             }
 
+            s = next_s;
             idx += 1;
         }
     }

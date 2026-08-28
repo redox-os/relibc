@@ -220,6 +220,8 @@ macro_rules! strto_impl {
     (
         $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:ident, $endptr:ident, $base:ident
     ) => {{
+        use $crate::c_str::CStr;
+
         // ensure these are constants
         const CHECK_SIGN: bool = $signed;
         const MAX_VAL: $rettype = $maxval;
@@ -272,11 +274,11 @@ macro_rules! strto_impl {
         let res = match $base {
             0 => unsafe { detect_base(num_str) }.and_then(|($base, i)| {
                 idx += i;
-                unsafe { convert_integer(num_str.offset(i), $base) }
+                unsafe { convert_integer(CStr::from_ptr(num_str.offset(i)), $base) }
             }),
             8 => unsafe { convert_octal(num_str) },
             16 => unsafe { convert_hex(num_str) },
-            _ => unsafe { convert_integer(num_str, $base) },
+            _ => unsafe { convert_integer(CStr::from_ptr(num_str), $base) },
         };
 
         // check for error parsing octal/hex prefix
