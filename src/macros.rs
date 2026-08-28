@@ -272,7 +272,7 @@ macro_rules! strto_impl {
         // convert the string to a number
         let num_str = unsafe { $s.offset(idx) };
         let res = match $base {
-            0 => unsafe { detect_base(num_str) }.and_then(|($base, i)| {
+            0 => detect_base(unsafe { CStr::from_ptr(num_str) }).and_then(|($base, i)| {
                 idx += i;
                 convert_integer(unsafe { CStr::from_ptr(num_str.offset(i)) }, $base)
             }),

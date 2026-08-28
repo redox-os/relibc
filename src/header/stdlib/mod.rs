@@ -12,7 +12,7 @@ use rand_xorshift::XorShiftRng;
 
 use crate::{
     c_str::CStr,
-    casting::{ByteLiteral, CCharToU8},
+    casting::ByteLiteral,
     error::{Errno, ResultExt},
     fs::File,
     header::{
@@ -1409,23 +1409,16 @@ pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
     }
 }
 
-pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
-    let first = CCharToU8::cast(unsafe { *s });
-    match first {
-        0 => None,
-        b'0' => {
-            let second = CCharToU8::cast(unsafe { *s.add(1) });
-            if second == b'X' || second == b'x' {
-                Some((16, 2))
-            } else if (b'0'..=b'7').contains(&second) {
-                Some((8, 1))
-            } else {
-                // in this case, the prefix (0) is going to be the number
-                Some((8, 0))
-            }
-        }
-        _ => Some((10, 0)),
-    }
+pub fn detect_base(s: CStr) -> Option<(c_int, isize)> {
+    let (first, next) = s.split_first()?;
+
+    Some(match (first, next.split_first()) {
+        (b'0', Some((b'x' | b'X', _))) => (16, 2),
+        (b'0', Some((b'0'..=b'7', _))) => (8, 1),
+        // in this case, the prefix (0) is going to be the number
+        (b'0', None) => (8, 0),
+        (_, _) => (10, 0),
+    })
 }
 
 pub fn convert_octal(s: CStr) -> Option<(c_ulong, isize, bool)> {
