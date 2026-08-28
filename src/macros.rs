@@ -277,7 +277,7 @@ macro_rules! strto_impl {
                 convert_integer(unsafe { CStr::from_ptr(num_str.offset(i)) }, $base)
             }),
             8 => convert_octal(unsafe { CStr::from_ptr(num_str) }),
-            16 => unsafe { convert_hex(num_str) },
+            16 => convert_hex(unsafe { CStr::from_ptr(num_str) }),
             _ => convert_integer(unsafe { CStr::from_ptr(num_str) }, $base),
         };
 

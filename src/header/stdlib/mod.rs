@@ -1445,16 +1445,15 @@ pub fn convert_octal(s: CStr) -> Option<(c_ulong, isize, bool)> {
     )
 }
 
-pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if (unsafe { *s } != 0 && unsafe { *s } == ByteLiteral::cast_cchar(b'0'))
-        && (unsafe { *s.add(1) } != 0
-            && (unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'x')
-                || unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'X')))
+pub fn convert_hex(s: CStr) -> Option<(c_ulong, isize, bool)> {
+    let (first, next) = s.split_first()?;
+
+    if first == b'0'
+        && let Some((b'x' | b'X', next)) = next.split_first()
     {
-        unsafe { convert_integer(CStr::from_ptr(s.add(2)), 16) }
-            .map(|(val, idx, overflow)| (val, idx + 2, overflow))
+        convert_integer(next, 16).map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
-        unsafe { convert_integer(CStr::from_ptr(s), 16) }
+        convert_integer(s, 16)
     }
 }
 
