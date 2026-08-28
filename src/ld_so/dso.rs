@@ -747,6 +747,36 @@ impl DSO {
         ))
     }
 
+    pub fn find_bounds(&self, phdrs: &[ProgramHeader]) -> (usize, usize) {
+        let mut bounds_opt: Option<(usize, usize)> = None;
+
+        // TODO: copied from DSO::mmap_and_copy, reuse this function there?
+        for ph in phdrs.iter() {
+            if ph.p_type(NativeEndian) == elf::PT_LOAD {
+                let align = ph.p_align(NativeEndian).max(1);
+                let voff = ph.p_vaddr(NativeEndian) % align;
+                let vaddr = (ph.p_vaddr(NativeEndian) - voff) as usize;
+                let vsize = (ph.p_memsz(NativeEndian) + voff).next_multiple_of(align) as usize;
+
+                if let Some(ref mut bounds) = bounds_opt {
+                    bounds.0 = bounds.0.min(vaddr);
+                    bounds.1 = bounds.1.max(vaddr + vsize);
+                } else {
+                    bounds_opt = Some((vaddr, vaddr + vsize));
+                }
+            }
+        }
+
+        let bounds = bounds_opt.unwrap_or((0, 0));
+        let base_addr = self.base;
+
+        let load_start = base_addr.addr() + if self.pie { bounds.0 } else { 0 };
+        let load_size = bounds.1 - bounds.0;
+        let load_end = load_start + load_size;
+
+        (load_start, load_end)
+    }
+
     fn parse_dynamic<'a>(
         path: &str,
         mmap: *const u8,
