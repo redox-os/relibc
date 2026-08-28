@@ -1400,28 +1400,28 @@ pub unsafe extern "C" fn srandom(seed: c_uint) {
     unsafe { random_state.seed(seed) };
 }
 
-pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
-    match ch {
-        0 => None,
-        ch if ch == ByteLiteral::cast_cchar(b'+') => Some((true, 1)),
-        ch if ch == ByteLiteral::cast_cchar(b'-') => Some((false, 1)),
-        _ => Some((true, 0)),
-    }
-}
-
-pub fn detect_base(s: CStr) -> Option<(c_int, isize)> {
-    let (first, next) = s.split_first()?;
-
-    Some(match (first, next.split_first()) {
-        (b'0', Some((b'x' | b'X', _))) => (16, 2),
-        (b'0', Some((b'0'..=b'7', _))) => (8, 1),
-        // in this case, the prefix (0) is going to be the number
-        (b'0', None) => (8, 0),
-        (_, _) => (10, 0),
+pub fn parse_sign(orig: CStr) -> Option<(bool, CStr)> {
+    let (first, advanced) = orig.split_first()?;
+    Some(match first {
+        b'+' => (true, advanced),
+        b'-' => (false, advanced),
+        _ => (true, orig),
     })
 }
 
-pub fn convert_octal(s: CStr) -> Option<(c_ulong, isize, bool)> {
+pub fn detect_base(s: CStr) -> Option<(c_int, CStr)> {
+    let (first, adv1) = s.split_first()?;
+
+    Some(match (first, adv1.split_first()) {
+        (b'0', Some((b'x' | b'X', adv2))) => (16, adv2),
+        (b'0', Some((b'0'..=b'7', _))) => (8, adv1),
+        // in this case, the prefix (0) is going to be the number
+        (b'0', None) => (8, s),
+        (_, _) => (10, s),
+    })
+}
+
+pub fn convert_octal(s: CStr) -> Option<(c_ulong, CStr, bool)> {
     let (first, next) = s.split_first()?;
 
     if first != b'0' {
@@ -1429,28 +1429,28 @@ pub fn convert_octal(s: CStr) -> Option<(c_ulong, isize, bool)> {
     }
 
     Some(
-        if let Some((val, idx, overflow)) = convert_integer(next, 8) {
-            (val, idx + 1, overflow)
+        if let Some((val, next, overflow)) = convert_integer(next, 8) {
+            (val, next, overflow)
         } else {
             // in case the prefix is not actually a prefix
-            (0, 1, false)
+            (0, next, false)
         },
     )
 }
 
-pub fn convert_hex(s: CStr) -> Option<(c_ulong, isize, bool)> {
+pub fn convert_hex(s: CStr) -> Option<(c_ulong, CStr, bool)> {
     let (first, next) = s.split_first()?;
 
     if first == b'0'
         && let Some((b'x' | b'X', next)) = next.split_first()
     {
-        convert_integer(next, 16).map(|(val, idx, overflow)| (val, idx + 2, overflow))
+        convert_integer(next, 16).map(|(val, next, overflow)| (val, next, overflow))
     } else {
         convert_integer(s, 16)
     }
 }
 
-pub fn convert_integer(mut s: CStr, base: c_int) -> Option<(c_ulong, isize, bool)> {
+pub fn convert_integer(orig_s: CStr, base: c_int) -> Option<(c_ulong, CStr, bool)> {
     // -1 means the character is invalid
     #[rustfmt::skip]
     const LOOKUP_TABLE: [c_long; 256] = [
@@ -1472,8 +1472,8 @@ pub fn convert_integer(mut s: CStr, base: c_int) -> Option<(c_ulong, isize, bool
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     ];
 
+    let mut s = orig_s;
     let mut num: c_ulong = 0;
-    let mut idx = 0;
     let mut overflowed = false;
 
     while let Some((c, next_s)) = s.split_first() {
@@ -1496,12 +1496,11 @@ pub fn convert_integer(mut s: CStr, base: c_int) -> Option<(c_ulong, isize, bool
             }
 
             s = next_s;
-            idx += 1;
         }
     }
 
-    if idx > 0 {
-        Some((num, idx, overflowed))
+    if s.as_ptr() != orig_s.as_ptr() {
+        Some((num, s, overflowed))
     } else {
         None
     }
@@ -1533,7 +1532,15 @@ pub unsafe extern "C" fn strtol(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_long {
-    strto_impl!(c_long, true, c_long::MAX, c_long::MIN, nptr, endptr, base)
+    strto_impl!(
+        c_long,
+        true,
+        c_long::MAX,
+        c_long::MIN,
+        unsafe { CStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
+        base
+    )
 }
 
 // TODO: strtold(), when long double is available
@@ -1556,8 +1563,8 @@ pub unsafe extern "C" fn strtoll(
         true,
         c_longlong::MAX,
         c_longlong::MIN,
-        nptr,
-        endptr,
+        unsafe { CStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
         base
     )
 }
@@ -1580,8 +1587,8 @@ pub unsafe extern "C" fn strtoul(
         false,
         c_ulong::MAX,
         c_ulong::MIN,
-        str,
-        endptr,
+        unsafe { CStr::from_ptr(str) },
+        unsafe { endptr.as_mut() },
         base
     )
 }
@@ -1604,8 +1611,8 @@ pub unsafe extern "C" fn strtoull(
         false,
         c_ulonglong::MAX,
         c_ulonglong::MIN,
-        str,
-        endptr,
+        unsafe { CStr::from_ptr(str) },
+        unsafe { endptr.as_mut() },
         base
     )
 }

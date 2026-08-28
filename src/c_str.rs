@@ -396,6 +396,15 @@ impl<'a> CStr<'a> {
     pub fn from_bytes_until_nul(bytes: &'a [u8]) -> Result<Self, FromCharsUntilNulError> {
         Self::from_chars_until_nul(bytes)
     }
+
+    pub fn trim_start_whitespace(mut self) -> Self {
+        while let Some((c, next)) = self.split_first()
+            && crate::header::ctype::isspace(c.into()) != 0
+        {
+            self = next;
+        }
+        self
+    }
 }
 
 unsafe impl<T: Kind> Send for NulStr<'_, T> {}
