@@ -777,11 +777,15 @@ pub unsafe extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
 #[unsafe(no_mangle)]
 pub extern "C" fn isatty(fildes: c_int) -> c_int {
     let mut t = termios::termios::default();
-    if unsafe { termios::tcgetattr(fildes, &raw mut t) == 0 } {
-        1
-    } else {
-        0
-    }
+    trace_expr!(
+        if unsafe { termios::tcgetattr(fildes, &raw mut t) } == 0 {
+            1
+        } else {
+            0
+        },
+        "isatty({})",
+        fildes
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lchown.html>.
