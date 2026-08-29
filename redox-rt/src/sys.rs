@@ -827,7 +827,13 @@ pub fn std_fs_call_rw<T: Call>(
     sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
 }
 pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
-    std_fs_call_ro(fd, stat, &StdFsCallMeta::new(StdFsCallKind::Fstat, 0, 0))
+    let res = std_fs_call_ro(fd, stat, &StdFsCallMeta::new(StdFsCallKind::Fstat, 0, 0));
+    if res.is_ok() {
+        stat.st_dev =
+            unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, syscall::F_GET_SCHEMEID, 0) }?
+                as u64;
+    }
+    res
 }
 
 pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
