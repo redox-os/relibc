@@ -192,7 +192,7 @@ impl CCharToU8 {
     }
 }
 
-/// A trait intended to indicate infallible transformations. This is required
+/// A trait intended to indicate infallible transformations. This is useful
 /// for us as we have no plans to support platforms below 32-bit.
 pub trait FromExt<T>: Sized {
     fn relibc_from(value: T) -> Self;
