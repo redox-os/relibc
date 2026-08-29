@@ -208,6 +208,16 @@ impl FromExt<i32> for u16 {
     }
 }
 
+impl FromExt<u32> for usize {
+    /// Infallible cast of `u32` to `usize`.
+    ///
+    /// # Panics
+    /// If the `u32` value is larger than the platform specific `usize` value.
+    fn inf_from(value: u32) -> Self {
+        Self::try_from(value).expect("should be within bounds")
+    }
+}
+
 impl FromExt<u64> for usize {
     /// Infallible cast of `u64` to `usize`.
     ///
