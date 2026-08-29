@@ -1,8 +1,11 @@
-//! Casting between types that differ per architecture.
+//! Casting between different types.
 //!
 //! These abstractions allow us to contain architecture specific code in a
-//! central location reducing verbosity around the codebase and easing
-//! maintenance.
+//! central location reducing verbosity around the codebase, easing
+//! maintenance and improving readability.
+//!
+//! They also allow the elimination of `as` casts for platforms we do not plan
+//! to support.
 
 use crate::platform::types::c_char;
 
@@ -186,5 +189,21 @@ impl CCharToU8 {
             return input;
         }
         panic!("Arch not supported!")
+    }
+}
+
+/// A trait intended to indicate infallible transformations. This is useful
+/// for us as we have no plans to support platforms below 32-bit.
+pub trait FromExt<T>: Sized {
+    fn relibc_from(value: T) -> Self;
+}
+
+impl FromExt<u32> for usize {
+    /// Infallible cast of `u32` to `usize`.
+    ///
+    /// # Panics
+    /// If the `u32` value is larger than the platform specific `usize` value.
+    fn relibc_from(value: u32) -> Self {
+        Self::try_from(value).expect("should be within bounds")
     }
 }

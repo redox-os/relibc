@@ -130,6 +130,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     }
     /// Look for the closest occurence of `c`, and if found, split the string into a slice up to
     /// that byte and a `CStr` starting at that byte.
+    #[allow(clippy::type_complexity)]
     #[inline]
     #[doc(alias = "strchrnul")]
     pub fn find_get_subslice_or_all(

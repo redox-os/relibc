@@ -120,7 +120,9 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 
     // Early exit if there are fds, and all are closed (revents = POLLNVAL)
     if closed > 0 && closed == fds.len() {
-        return closed as i32;
+        // TODO should we panic if fd.len() is greater than i32::MAX instead?
+        // seems unlikely we'll be dealing with that many file descriptors
+        return i32::try_from(closed).unwrap_or(i32::MAX);
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
@@ -128,7 +130,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         Sys::epoll_pwait(
             *ep,
             events.as_mut_ptr(),
-            events.len() as c_int,
+            c_int::try_from(events.len()).expect("events len below i32::MAX"),
             timeout,
             sigmask,
         )

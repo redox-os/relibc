@@ -329,6 +329,7 @@ impl Tcb {
     /// ```
     ///
     /// For x86_64, the ABI page is not used.
+    #[allow(clippy::type_complexity)]
     #[cfg(any(target_os = "linux", target_os = "redox"))]
     unsafe fn os_new(
         size: usize,
