@@ -469,12 +469,11 @@ pub unsafe extern "C" fn setsockopt(
         Sys::setsockopt(socket, level, option_name, option_value)
             .map(|()| 0)
             .or_minus_one_errno(),
-        "setsockopt({}, {}, {}, {:p}, {})",
+        "setsockopt({}, {}, {}, {:?})",
         socket,
         level,
         option_name,
         option_value,
-        option_len
     )
 }
 

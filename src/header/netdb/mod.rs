@@ -1007,11 +1007,10 @@ pub unsafe extern "C" fn getaddrinfo(
         Some(unsafe { &*hints })
     };
 
-    #[cfg(not(feature = "no_trace"))]
-    log::trace!(
+    trace_log!(
         "getaddrinfo({:?}, {:?}, {:?})",
-        node_opt.map(|c| alloc::string::String::from_utf8_lossy(c.to_bytes())),
-        service_opt.map(|c| alloc::string::String::from_utf8_lossy(c.to_bytes())),
+        node_opt,
+        service_opt,
         hints_opt
     );
 
