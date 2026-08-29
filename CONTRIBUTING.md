@@ -51,6 +51,7 @@ pub extern "C" unsafe fn some_interface_function(arg: Arg) -> c_int {
 over this:
 
 ```rust
+// (where the impl is located)
 fn some_implementation_function(arg: Arg) -> c_int {
     if arg == 0 {
         0
