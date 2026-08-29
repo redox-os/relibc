@@ -124,7 +124,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    match unsafe {
+    let r = unsafe {
         Sys::epoll_pwait(
             *ep,
             events.as_mut_ptr(),
@@ -132,7 +132,14 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
             timeout,
             sigmask,
         )
-    } {
+    };
+    trace_log!(
+        "poll_epoll({}, {:?}, {timeout}) = {:?}",
+        *ep,
+        fds.iter().map(|s| s.fd).collect::<alloc::vec::Vec<_>>(),
+        r,
+    );
+    match r {
         Ok(res) => {
             for event in events.iter().take(res) {
                 let pi = unsafe { event.data.u64 as usize };
@@ -177,19 +184,13 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 /// Note: Uses epoll internally.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
-    trace_expr!(
-        unsafe {
-            poll_epoll(
-                slice::from_raw_parts_mut(fds, nfds as usize),
-                timeout,
-                ptr::null_mut(),
-            )
-        },
-        "poll({:p}, {}, {})",
-        fds,
-        nfds,
-        timeout,
-    )
+    unsafe {
+        poll_epoll(
+            slice::from_raw_parts_mut(fds, nfds as usize),
+            timeout,
+            ptr::null_mut(),
+        )
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ppoll.html>.
@@ -218,18 +219,11 @@ pub unsafe extern "C" fn ppoll(
             ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
         }
     };
-    trace_expr!(
-        unsafe {
-            poll_epoll(
-                slice::from_raw_parts_mut(fds, nfds as usize),
-                timeout,
-                sigmask,
-            )
-        },
-        "ppoll({:p}, {}, {:p}, {:p})",
-        fds,
-        nfds,
-        tmo_p,
-        sigmask
-    )
+    unsafe {
+        poll_epoll(
+            slice::from_raw_parts_mut(fds, nfds as usize),
+            timeout,
+            sigmask,
+        )
+    }
 }

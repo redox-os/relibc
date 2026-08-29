@@ -36,7 +36,7 @@ use crate::{
             self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
             F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
-        limits,
+        limits::{self},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
         sys_file,
@@ -236,12 +236,15 @@ impl Pal for Sys {
     }
 
     fn close(fd: c_int) -> Result<()> {
-        redox_rt::sys::close(fd as usize)?;
-        Ok(())
+        let r = redox_rt::sys::close(fd as usize).map(|_| ());
+        trace_log!("close({fd}) = {:?}", r);
+        r.map_err(Errno::from)
     }
 
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
-        Ok(redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
+        let r = redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[]);
+        trace_log!("dup2({fd1}, {fd2}) = {:?}", r);
+        Ok(r? as c_int)
     }
 
     fn exit(status: c_int) -> ! {
@@ -344,22 +347,32 @@ impl Pal for Sys {
                 match i32::from(flock.l_type) {
                     F_UNLCK => {
                         let meta = StdFsCallMeta::new(StdFsCallKind::Unlock, start, len);
-                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
-                        return Ok(0);
+                        let r = syscall::std_fs_call(fd as usize, &mut [], &meta);
+                        trace_log!(
+                            "fcntl({fd}, {} | F_UNLCK, [{start:x}:{:x}]#{}) = {r:?}",
+                            if is_ofd { "F_OFD_SETLK" } else { "F_SETLK" },
+                            len + start,
+                            flock.l_pid
+                        );
+                        return r.map(|_| 0).map_err(Errno::from);
                     }
 
                     F_RDLCK | F_WRLCK => {
+                        let is_wrclk = i32::from(flock.l_type) == F_WRLCK;
                         let meta = StdFsCallMeta::new(
                             StdFsCallKind::Lock,
                             start,
-                            len | if i32::from(flock.l_type) == F_WRLCK {
-                                1 << 63
-                            } else {
-                                0
-                            },
+                            len | if is_wrclk { 1 << 63 } else { 0 },
                         );
-                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
-                        return Ok(0);
+                        let r = syscall::std_fs_call(fd as usize, &mut [], &meta);
+                        trace_log!(
+                            "fcntl({fd}, {} | {}, [{start:x}:{:x}]#{}) = {r:?}",
+                            if is_ofd { "F_OFD_SETLK" } else { "F_SETLK" },
+                            if is_wrclk { "F_WRLCK" } else { "F_RDLCK" },
+                            len + start,
+                            flock.l_pid
+                        );
+                        return r.map(|_| 0).map_err(Errno::from);
                     }
 
                     _ => return Err(Errno(EINVAL)),
@@ -454,7 +467,14 @@ impl Pal for Sys {
         // TODO: Find way to avoid lock.
         let _guard = CLONE_LOCK.write();
 
-        Ok(redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
+        let r = redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed);
+
+        #[cfg(not(feature = "no_trace"))]
+        if !matches!(r, Ok(0)) {
+            trace_log!("fork() = {r:?}");
+        }
+
+        Ok(r? as pid_t)
     }
 
     fn fstatat(dirfd: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
@@ -475,14 +495,8 @@ impl Pal for Sys {
         }
 
         let file = openat2(dirfd, path, flags, fcntl::O_PATH)?;
-        // Close the file descriptor after fstat(2) regardless of success or failure.
-        let fstat_res = unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr()) };
-        let close_res = redox_rt::sys::close(*file as usize);
-        if let Err(err) = fstat_res {
-            return Err(err.into());
-        }
-        close_res?;
-        Ok(fstat_res?)
+        unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr())? };
+        Ok(())
     }
 
     fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {
@@ -781,7 +795,6 @@ impl Pal for Sys {
 
         let file = File::openat(fd1, oldpath, oflags)?;
         let newpath: Cow<'_, str> = openat2_path(fd2, newpath, 0)?.into();
-        // TODO: Does not work for interscheme symlink, try to copy from frename
         syscall::flink(*file as usize, newpath)?;
         Ok(())
     }
@@ -965,7 +978,9 @@ impl Pal for Sys {
     }
 
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
-        fds.write(extra::pipe2(flags as usize)?);
+        let r = extra::pipe2(flags as usize);
+        trace_log!("pipe2({flags:x}) = {:?}", r);
+        fds.write(r?);
         Ok(())
     }
 
@@ -1069,19 +1084,28 @@ impl Pal for Sys {
         // Since this is used by realpath, it converts from the old format to the new one for
         // compatibility reasons
         let mut buf = [0; limits::PATH_MAX];
-        let redox_path = path::standard_fpath(fildes, &mut buf)?;
+        let count = syscall::fpath(fildes as usize, &mut buf)?;
+
+        let redox_path = str::from_utf8(&buf[..count])
+            .ok()
+            .and_then(redox_path::RedoxPath::from_absolute)
+            .ok_or(Errno(EINVAL))?;
+
+        let (scheme, reference) = redox_path.as_parts().ok_or(Errno(EINVAL))?;
 
         let mut cursor = io::Cursor::new(out);
-        match write!(cursor, "{}", redox_path.as_ref()) {
+        let res = match scheme.as_ref() {
+            "file" => write!(cursor, "/{}", reference.as_ref().trim_start_matches('/')),
+            _ => write!(
+                cursor,
+                "/scheme/{}/{}",
+                scheme.as_ref(),
+                reference.as_ref().trim_start_matches('/')
+            ),
+        };
+        match res {
             Ok(()) => Ok(cursor.position() as usize),
-            Err(err) => {
-                log::warn!(
-                    "fpath is too long for buffer: {:?} {:?}",
-                    redox_path.as_ref(),
-                    err
-                );
-                Err(Errno(ENAMETOOLONG))
-            }
+            Err(_err) => Err(Errno(ENAMETOOLONG)),
         }
     }
 
@@ -1090,7 +1114,7 @@ impl Pal for Sys {
             dirfd,
             path,
             0,
-            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_NOFOLLOW | fcntl::O_CLOEXEC,
+            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
         )?;
         Sys::read(*file, out)
     }
@@ -1127,7 +1151,6 @@ impl Pal for Sys {
         if new_path_dir.is_empty() {
             new_path_dir = RedoxStr::new(".").unwrap();
         }
-        trace_log!("renameat2 split {new_path_dir:?} {new_path_file:?}");
         let new_path_parent = openat2_path(new_dir, new_path_dir, 0)?;
         let target_dir =
             File::new(libredox::openat(new_dir, new_path_parent.into(), fcntl::O_PATH, 0)? as _);

@@ -49,7 +49,10 @@ fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> Result<c_int, Errno> {
-        Sys::open(c"/scheme/event".into(), O_RDWR | flags, 0)
+        match redox_rt::sys::open("/scheme/event", (O_RDWR | flags) as usize) {
+            Ok(fd) => Ok(fd as c_int),
+            Err(e) => Err(Errno::from(e)),
+        }
     }
 
     unsafe fn epoll_ctl(

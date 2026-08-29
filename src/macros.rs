@@ -117,7 +117,6 @@ macro_rules! trace_expr {
 
 // log::trace! but functions inside them will
 // not be evaluated or compiled unless enabled
-#[cfg(target_os = "redox")] // currently only used in redox
 macro_rules! trace_log {
     ($($arg:tt)+) => {
         #[cfg(not(feature = "no_trace"))]
