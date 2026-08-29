@@ -151,7 +151,7 @@ impl Drop for File {
     fn drop(&mut self) {
         if !self.reference {
             if let Err(e) = Sys::close(self.fd) {
-                log::warn!("File {} is dropped externally: {e:?}", self.fd);
+                log::warn!("Close did not succeed: {e:?}");
             }
         }
     }
