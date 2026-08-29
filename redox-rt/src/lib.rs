@@ -175,9 +175,9 @@ pub unsafe fn initialize_freestanding(this_thr_fd: FdGuardUpper) -> &'static FdG
     )
     .expect("failed to open filetable-binary");
 
-    *current_filetable() =
-        FdTbl::from_binary_fd(FdGuard::new(cur_filetable_fd).to_upper().unwrap())
-            .expect("failed to populate fds");
+    current_filetable()
+        .init_from_fd(FdGuard::new(cur_filetable_fd).to_upper().unwrap())
+        .expect("failed to populate fds");
 
     // Make sure to use ptr::write to prevent dropping the existing FdGuard
     page.os_specific.thr_fd.get().write(Some(this_thr_fd));
@@ -306,15 +306,16 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
 
     let old_filetable_fd;
     {
-        let mut guard = current_filetable();
-        old_filetable_fd = guard.take();
-        guard.set_fd(new_filetable_fd);
+        let fdtbl = current_filetable();
+        old_filetable_fd = fdtbl.take();
+        fdtbl.set_fd(new_filetable_fd);
+        let mut guard = fdtbl.inner.lock();
         guard
-            .override_at(args.new_thr_fd.as_raw_fd())
+            .override_at(args.new_thr_fd.as_raw_fd(), None)
             .expect("failed to add new_thr_fd");
         if let Some(new_proc_fd) = args.new_proc_fd.as_ref() {
             guard
-                .override_at(new_proc_fd.as_raw_fd())
+                .override_at(new_proc_fd.as_raw_fd(), None)
                 .expect("failed to add new_proc_fd");
         }
         if let Some(ref old) = old_filetable_fd {
@@ -358,9 +359,9 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
     drop(old_filetable_fd);
 }
 
-static FILETABLE: Mutex<FdTbl> = Mutex::new(FdTbl::new());
+pub static FILETABLE: FdTbl = FdTbl::new();
 
 #[inline]
-pub fn current_filetable() -> crate::sync::MutexGuard<'static, FdTbl> {
-    FILETABLE.lock()
+pub fn current_filetable() -> &'static FdTbl {
+    &FILETABLE
 }
