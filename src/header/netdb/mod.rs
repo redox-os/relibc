@@ -801,7 +801,8 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
         };
         unsafe {
             SERV_PORT = Some(u32::from(htons(
-                atoi(port.as_mut_slice().as_mut_ptr().cast::<c_char>()) as u16,
+                u16::try_from(atoi(port.as_mut_slice().as_mut_ptr().cast::<c_char>()))
+                    .expect("port number should not exceed u16::MAX"),
             )) as i32)
         };
         let proto = match split.next() {
