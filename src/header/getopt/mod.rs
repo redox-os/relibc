@@ -96,7 +96,8 @@ pub unsafe extern "C" fn getopt_long(
                             unsafe {
                                 optind += 1;
                                 if !longindex.is_null() {
-                                    *longindex = i as c_int;
+                                    *longindex =
+                                        c_int::try_from(i).expect("impractical to exceed i32::MAX");
                                 }
                             }
 

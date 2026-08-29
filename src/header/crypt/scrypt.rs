@@ -47,7 +47,8 @@ fn dencode_uint(value: &str) -> Option<c_uint> {
 ///
 /// * `Option<(c_uchar, c_uint, c_uint, String)>` - Returns a tuple containing the settings if successful, otherwise None
 fn read_setting(setting: &str) -> Option<(c_uchar, c_uint, c_uint, String)> {
-    let nlog2 = to_digit(setting.chars().next()?, 30)? as c_uchar;
+    let nlog2 =
+        c_uchar::try_from(to_digit(setting.chars().next()?, 30)?).expect("always below u8::MAX");
     let r = dencode_uint(&setting[1..6])?;
     let p = dencode_uint(&setting[6..11])?;
 

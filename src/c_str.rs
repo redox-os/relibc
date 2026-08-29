@@ -133,6 +133,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     #[allow(clippy::type_complexity)]
     #[inline]
     #[doc(alias = "strchrnul")]
+    #[allow(clippy::type_complexity)]
     pub fn find_get_subslice_or_all(
         self,
         c: impl Into<T::Char>,
