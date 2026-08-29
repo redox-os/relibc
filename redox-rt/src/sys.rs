@@ -781,12 +781,11 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     )?);
     let reference_str = reference.as_ref();
     unsafe {
-        syscall::syscall4(
-            syscall::SYS_UNLINKAT,
-            root_fd.as_raw_fd(),
-            reference_str.as_ptr() as usize,
+        root_fd.as_raw_fd().raw_call(
+            reference_str.as_ptr(),
             reference_str.len(),
-            flags,
+            CallFlags::STD_FS | CallFlags::WRITE,
+            &StdFsCallMeta::new(StdFsCallKind::Unlinkat, flags as u64, 0),
         )
     }
 }
