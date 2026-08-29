@@ -37,6 +37,7 @@ pub trait Kind: private::Sealed + Copy + 'static {
     unsafe fn strlen(s: *const Self::C) -> usize;
     unsafe fn strchr(s: *const Self::C, c: Self::C) -> *const Self::C;
     unsafe fn strchrnul(s: *const Self::C, c: Self::C) -> *const Self::C;
+    unsafe fn strncmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering;
 }
 impl Kind for Thin {
     type C = c_char;
@@ -53,6 +54,9 @@ impl Kind for Thin {
     }
     unsafe fn strchrnul(s: *const c_char, c: c_char) -> *const c_char {
         unsafe { crate::header::string::strchrnul(s, c.into()) }
+    }
+    unsafe fn strncmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering {
+        unsafe { crate::header::string::strncmp(s1, s2, n) }.cmp(&0)
     }
     fn r2c(c: u8) -> c_char {
         c as _
@@ -87,6 +91,9 @@ impl Kind for Wide {
         }
         s
     }
+    unsafe fn strncmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering {
+        unsafe { crate::header::wchar::wcsncmp(s1, s2, n) }.cmp(&0)
+    }
     fn r2c(c: Self::Char) -> Self::C {
         c as _
     }
@@ -101,7 +108,10 @@ impl Kind for Wide {
     }
 }
 
-/// Safe wrapper for immutable borrowed C strings, guaranteed to be the same layout as `*const u8`.
+/// Safe wrapper for immutable borrowed C strings, guaranteed to be the same layout as `*const u8`
+/// (nonnull).
+///
+/// As such, `Option<CStr>` is also guaranteed to be layout-compatible with nullable `*const u8`.
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct NulStr<'a, T: Kind> {
@@ -264,8 +274,91 @@ impl<'a, T: Kind> NulStr<'a, T> {
         self.to_chars().len()
     }
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.first() == T::NUL
+    }
+
+    /// Advances this pointer by `n`, simultaneously getting the slice
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `n` is less than `self.len() + 1`.
+    #[inline]
+    pub unsafe fn advance_unchecked(self, n: usize) -> (&'a [T::Char], Self) {
+        debug_assert!(n < self.len() + 1, "UB");
+
+        let until = unsafe { core::slice::from_raw_parts(self.as_ptr().cast::<T::Char>(), n) };
+        let then = unsafe { Self::from_ptr(self.as_ptr().add(n)) };
+
+        (until, then)
+    }
+    /// If the string starts with `prefix`, return `Some(next)`.
+    #[inline]
+    pub fn strip_prefix(self, prefix: &[T::Char]) -> Option<Self> {
+        self.strip_prefix_full(prefix).map(|(_, n)| n)
+    }
+
+    /// If the string starts with `prefix`, return `Some((prefix_slice, next))`, otherwise return
+    /// `None`.
+    ///
+    /// It's a logic error for the prefix to contain NUL bytes.
+    #[inline]
+    pub fn strip_prefix_full(self, prefix: &[T::Char]) -> Option<(&'a [T::Char], Self)> {
+        assert!(!prefix.iter().any(|c| *c == T::NUL));
+
+        // SAFETY:
+        //
+        // - strncmp can never read `prefix` out-of-bounds as it's already limited by its length
+        // - strncmp will never read `self` out-of-bounds as it respects the NUL terminator
+        if unsafe { T::strncmp(self.as_ptr(), prefix.as_ptr().cast::<T::C>(), prefix.len()) }
+            != core::cmp::Ordering::Equal
+        {
+            return None;
+        }
+        // SAFETY: We already know `prefix.len()` bytes of `self` equal `prefix`, so obviously we
+        // can advance by at least that. It's required that the prefix does not contain any NUL bytes, for this to be valid.
+        Some(unsafe { self.advance_unchecked(prefix.len()) })
+    }
+
+    /// Casts a slice of strings to raw pointers, valid because of memory layout compatibility.
+    #[inline]
+    pub fn strs_to_raw(slice: &[Self]) -> &[*const c_char] {
+        // SAFETY: CStr/WStr are guaranteed to have the same memory layout as *const c_char
+        // pointers, which is a superset of the valid bit patterns &[Self] can have.
+        unsafe { core::slice::from_raw_parts(slice.as_ptr().cast::<*const c_char>(), slice.len()) }
+    }
+    /// Casts a slice of optional-strings to raw pointers, valid because of memory layout compatibility.
+    #[inline]
+    pub fn opt_strs_to_raw(opt_slice: &[Option<Self>]) -> &[*const c_char] {
+        // SAFETY: same as in strs_to_raw, except being a "weaker" superset since opt_slice can
+        // have None, i.e. NULL.
+        unsafe {
+            core::slice::from_raw_parts(opt_slice.as_ptr().cast::<*const c_char>(), opt_slice.len())
+        }
+    }
+    // TODO: (unsafe) strs_to_raw_mut, opt_strs_to_raw_mut?
+
+    /// Upgrades a slice of raw pointers into a slice of strings.
+    ///
+    /// # Safety
+    ///
+    /// - for each string `s` in `raw`, it must be safe to call `Self::from_ptr(s)`, i.e. it must
+    /// be valid and nonnull
+    pub unsafe fn strs_from_raw(raw: &[*const c_char]) -> &[Self] {
+        // SAFETY: layout compatible, and caller guarantees each element in `raw` is valid as a
+        // CStr/WStr
+        unsafe { core::slice::from_raw_parts(raw.as_ptr().cast::<Self>(), raw.len()) }
+    }
+    /// Upgrades a slice of raw pointers into a slice of optional-strings.
+    ///
+    /// # Safety
+    ///
+    /// - for each string `s` in `raw`, it must be safe to call `Self::from_nullable_ptr(s)`, i.e. it must
+    /// be valid or null
+    pub unsafe fn opt_strs_from_raw(raw: &[*const c_char]) -> &[Option<Self>] {
+        // SAFETY: layout compatible, and caller guarantees each element in `raw` is valid as an
+        // Option<CStr/WStr>
+        unsafe { core::slice::from_raw_parts(raw.as_ptr().cast::<Option<Self>>(), raw.len()) }
     }
 }
 impl<'a> CStr<'a> {
