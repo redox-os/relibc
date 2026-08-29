@@ -344,9 +344,9 @@ fn stage2(
                 let filetable_guard = redox_rt::proc::FdGuard::new(filetable_fd)
                     .to_upper()
                     .expect("failed to move filetable fd to upper table");
-                *redox_rt::current_filetable() =
-                    redox_rt::sys::FdTbl::from_binary_fd(filetable_guard)
-                        .expect("failed to initialize FILETABLE");
+                redox_rt::current_filetable()
+                    .init_from_fd(filetable_guard)
+                    .expect("failed to initialize FILETABLE");
             }
         }
 

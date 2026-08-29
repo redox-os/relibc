@@ -97,7 +97,7 @@ pub fn bind_or_connect_into(
 ) -> Result<c_int, Errno> {
     // Duplicate the socket, and then duplicate the copy back to the original fd
     let fd = FdGuard::new(bind_or_connect(op, socket, address_raw)?);
-    redox_rt::sys::dup2(fd.as_raw_fd(), socket as usize, &[])?;
+    redox_rt::sys::dup2(fd.as_raw_fd(), socket as usize)?;
     Ok(0)
 }
 

@@ -6,7 +6,7 @@ use core::{
 
 use ioslice::IoSlice;
 use syscall::{
-    Call, CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
+    Call, CallFlags, EINVAL, ERESTART, FileTableVerb, StdFsCallKind, TimeSpec,
     data::StdFsCallMeta,
     error::{self, EAGAIN, EBADF, EEXIST, EINTR, EMFILE, ENODEV, ESRCH, Error, Result},
 };
@@ -14,11 +14,13 @@ use syscall::{
 pub use redox_path::RedoxPath;
 
 use crate::{
-    DYNAMIC_PROC_INFO, DynamicProcInfo, FILETABLE, RtTcb, Tcb,
+    DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
+    current_filetable,
     proc::{FdGuard, FdGuardUpper},
     read_proc_meta,
     signal::tmp_disable_signals,
+    sync::Mutex,
 };
 use alloc::{collections::btree_set::BTreeSet, vec::Vec};
 use redox_protocols::protocol::{
@@ -224,8 +226,11 @@ pub fn sys_call_ro<T: Call>(
     } else {
         0
     };
-
-    FILETABLE.lock().bulk_insert(which, fd_slice, entry_flags)?;
+    {
+        let mut fdtbl_guard = current_filetable().inner.lock();
+        let fd_guard = current_filetable().fd.lock();
+        fdtbl_guard.bulk_insert(which, fd_slice, entry_flags, fd_guard.as_ref())?;
+    }
 
     if is_automated {
         backup_handles.extend_from_slice(fd_slice);
@@ -241,7 +246,7 @@ pub fn sys_call_ro<T: Call>(
     };
 
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         for &handle in &backup_handles {
             let _ = guard.remove(handle);
         }
@@ -289,7 +294,7 @@ pub fn sys_call_wo<T: Call>(
     };
 
     if res.is_ok() && !flags.contains(CallFlags::FD_CLONE) {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         for &handle in fd_slice {
             let _ = guard.remove(handle);
         }
@@ -592,8 +597,10 @@ fn openat_into_posix<T: AsRef<str>>(
     let path = path.as_ref();
 
     let out = {
-        let mut guard = FILETABLE.lock();
-        guard.add_posix(flags)?
+        let mut fdtbl_guard = current_filetable().inner.lock();
+        let fd_guard = current_filetable().fd.lock();
+
+        fdtbl_guard.add_posix(flags, fd_guard.as_ref())?
     };
 
     let res = unsafe {
@@ -609,7 +616,7 @@ fn openat_into_posix<T: AsRef<str>>(
     };
 
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         let _ = guard.remove(out);
         return res;
     }
@@ -633,8 +640,9 @@ pub fn dup(fd: usize, buf: &[u8]) -> Result<usize> {
     let _siglock = tmp_disable_signals();
 
     let out = {
-        let mut guard = FILETABLE.lock();
-        guard.add_posix(0)?
+        let mut fdtbl_guard = current_filetable().inner.lock();
+        let fd_guard = current_filetable().fd.lock();
+        fdtbl_guard.add_posix(0, fd_guard.as_ref())?
     };
 
     let res = unsafe {
@@ -648,47 +656,116 @@ pub fn dup(fd: usize, buf: &[u8]) -> Result<usize> {
     };
 
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         let _ = guard.remove(out);
         return res;
     }
 
     Ok(out)
 }
+pub fn dup2(fd: usize, newfd: usize) -> Result<usize> {
+    fdcntl(fd, Some(newfd), FileTableVerb::Dup2, 0)
+}
 
-pub fn dup2(fd: usize, newfd: usize, buf: &[u8]) -> Result<usize> {
+pub fn fdcntl(
+    fd: usize,
+    new_fd: Option<usize>,
+    cmd: FileTableVerb,
+    target: usize,
+) -> Result<usize> {
+    if matches!(
+        cmd,
+        FileTableVerb::Close | FileTableVerb::Resize | FileTableVerb::Refresh
+    ) {
+        return Err(Error::new(EINVAL));
+    }
     let _siglock = tmp_disable_signals();
 
-    let prev_flags = {
-        let mut guard = FILETABLE.lock();
-        guard.get_fd_flags(fd)?;
-        guard.override_at(newfd)?
-    };
+    let fd_guard = current_filetable().fd.lock();
+    let mut old_flags = None;
+    let out;
 
-    let res = unsafe {
-        syscall::syscall4(
-            syscall::SYS_DUP2,
-            fd,
-            newfd,
-            buf.as_ptr() as usize,
-            buf.len(),
+    {
+        let mut fdtbl_guard = current_filetable().inner.lock();
+
+        let _ = fdtbl_guard.get_fd_flags(fd)?;
+
+        out = match cmd {
+            FileTableVerb::Dup2 | FileTableVerb::Move => {
+                let target_fd = if let Some(nfd) = new_fd {
+                    if cmd == FileTableVerb::Dup2 && fd == nfd {
+                        return Ok(fd);
+                    }
+                    nfd
+                } else {
+                    fdtbl_guard.get_lowest_available_slot(target)?
+                };
+
+                old_flags = fdtbl_guard.get_fd_flags(target_fd).ok();
+
+                fdtbl_guard.override_at(target_fd, fd_guard.as_ref())?;
+                target_fd
+            }
+            FileTableVerb::Swap => {
+                let target_fd = if let Some(nfd) = new_fd {
+                    nfd
+                } else {
+                    fdtbl_guard.get_lowest_available_slot(target)?
+                };
+                let _ = fdtbl_guard.get_fd_flags(target_fd)?;
+                target_fd
+            }
+            _ => return Err(Error::new(EINVAL)),
+        };
+    }
+
+    let res = {
+        let Some(ref sync_fd) = *fd_guard else {
+            return Err(Error::new(EBADF));
+        };
+        sync_fd.call_wo(
+            [(fd).to_ne_bytes(), (out).to_ne_bytes()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<u8>>()
+                .as_slice(),
+            syscall::CallFlags::empty(),
+            &[cmd as u64],
         )
     };
 
+    let mut fdtbl_guard = current_filetable().inner.lock();
+
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
-        match prev_flags {
-            Some(flags) => {
-                let _ = guard.set_fd_flags(newfd, flags);
+        match cmd {
+            FileTableVerb::Dup2 | FileTableVerb::Move => {
+                if let Some(flags) = old_flags {
+                    let _ = fdtbl_guard.set_fd_flags(out, flags);
+                } else {
+                    let _ = fdtbl_guard.remove(out);
+                }
             }
-            None => {
-                let _ = guard.remove(newfd);
-            }
+            _ => {}
         }
         return res;
     }
 
-    Ok(newfd)
+    match cmd {
+        FileTableVerb::Swap => {
+            if let (Ok(fd_flags), Ok(target_flags)) =
+                (fdtbl_guard.get_fd_flags(fd), fdtbl_guard.get_fd_flags(out))
+            {
+                let _ = fdtbl_guard.set_fd_flags(fd, target_flags);
+                let _ = fdtbl_guard.set_fd_flags(out, fd_flags);
+            }
+        }
+        FileTableVerb::Move => {
+            let _ = fdtbl_guard.remove(fd);
+        }
+        _ => {}
+    }
+
+    Ok(out)
 }
 
 pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
@@ -754,53 +831,60 @@ pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
 }
 
 pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
-    if cmd == syscall::F_DUPFD || cmd == F_DUPFD_CLOEXEC {
+    if cmd == redox_protocols::protocol::F_DUPFD || cmd == F_DUPFD_CLOEXEC {
         let _siglock = tmp_disable_signals();
 
         let cloexec_flag = if cmd == F_DUPFD_CLOEXEC { O_CLOEXEC } else { 0 };
 
         let out = {
-            let mut guard = FILETABLE.lock();
+            let mut fdtbl_guard = current_filetable().inner.lock();
+            let fd_guard = current_filetable().fd.lock();
             if arg & syscall::UPPER_FDTBL_TAG != 0 {
-                guard.insert_upper(cloexec_flag)? | syscall::UPPER_FDTBL_TAG
+                fdtbl_guard.insert_upper(cloexec_flag, fd_guard.as_ref())?
+                    | syscall::UPPER_FDTBL_TAG
             } else {
-                guard.add_posix(cloexec_flag)?
+                fdtbl_guard.add_posix(cloexec_flag, fd_guard.as_ref())?
             }
         };
 
-        let res = unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, syscall::F_DUPFD, out) };
+        let res = unsafe {
+            syscall::syscall4(
+                syscall::SYS_DUP_INTO,
+                fd,
+                core::ptr::null::<u8>() as usize,
+                0,
+                out,
+            )
+        };
 
         if res.is_err() {
-            let mut guard = FILETABLE.lock();
+            let mut guard = current_filetable().inner.lock();
             let _ = guard.remove(out);
             return res;
         }
 
         let actual_fd = res.unwrap();
         if actual_fd != out {
-            let mut guard = FILETABLE.lock();
-            let _ = guard.remove(out);
-            guard.override_at(actual_fd)?;
+            let mut fdtbl_guard = current_filetable().inner.lock();
+            let fd_guard = current_filetable().fd.lock();
+            let _ = fdtbl_guard.remove(out);
+            fdtbl_guard.override_at(actual_fd, fd_guard.as_ref())?;
             if cloexec_flag != 0 {
-                guard.set_fd_flags(actual_fd, cloexec_flag)?;
+                fdtbl_guard.set_fd_flags(actual_fd, cloexec_flag)?;
             }
         }
 
         return Ok(actual_fd);
     }
 
-    if cmd == syscall::F_GETFD {
+    if cmd == redox_protocols::protocol::F_GETFD {
         let _siglock = tmp_disable_signals();
-        return FILETABLE.lock().get_fd_flags(fd);
+        return current_filetable().inner.lock().get_fd_flags(fd);
     }
 
-    if cmd == syscall::F_SETFD {
+    if cmd == redox_protocols::protocol::F_SETFD {
         let _siglock = tmp_disable_signals();
-
-        let res = unsafe { syscall::syscall3(syscall::SYS_FCNTL, fd, cmd, arg) };
-        res?;
-
-        FILETABLE.lock().set_fd_flags(fd, arg)?;
+        current_filetable().inner.lock().set_fd_flags(fd, arg)?;
         return Ok(0);
     }
 
@@ -817,8 +901,9 @@ pub fn openat_into_upper<T: AsRef<str>>(
     let path = path.as_ref();
 
     let out_idx = {
-        let mut guard = FILETABLE.lock();
-        guard.insert_upper(flags)?
+        let mut fdtbl_guard = current_filetable().inner.lock();
+        let fd_guard = current_filetable().fd.lock();
+        fdtbl_guard.insert_upper(flags, fd_guard.as_ref())?
     };
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
@@ -835,7 +920,7 @@ pub fn openat_into_upper<T: AsRef<str>>(
     };
 
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         let _ = guard.remove(out);
         return res;
     }
@@ -847,8 +932,9 @@ pub fn dup_into_upper(fd: usize, buf: &[u8]) -> Result<usize> {
     let _siglock = tmp_disable_signals();
 
     let out_idx = {
-        let mut guard = FILETABLE.lock();
-        guard.insert_upper(0)?
+        let mut fdtbl_guard = current_filetable().inner.lock();
+        let fd_guard = current_filetable().fd.lock();
+        fdtbl_guard.insert_upper(0, fd_guard.as_ref())?
     };
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
@@ -863,7 +949,7 @@ pub fn dup_into_upper(fd: usize, buf: &[u8]) -> Result<usize> {
     };
 
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         let _ = guard.remove(out);
         return res;
     }
@@ -873,8 +959,9 @@ pub fn dup_into_upper(fd: usize, buf: &[u8]) -> Result<usize> {
 
 pub fn dup_into_upper_raw(fd: usize, buf: &[u8]) -> Result<usize> {
     let out_idx = {
-        let mut guard = FILETABLE.lock();
-        guard.insert_upper(0)?
+        let mut fdtbl_guard = current_filetable().inner.lock();
+        let fd_guard = current_filetable().fd.lock();
+        fdtbl_guard.insert_upper(0, fd_guard.as_ref())?
     };
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
@@ -889,7 +976,7 @@ pub fn dup_into_upper_raw(fd: usize, buf: &[u8]) -> Result<usize> {
     };
 
     if res.is_err() {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         let _ = guard.remove(out);
         return res;
     }
@@ -903,7 +990,7 @@ pub fn close(fd: usize) -> Result<usize> {
     let res = unsafe { syscall::syscall1(syscall::SYS_CLOSE, fd) };
 
     if res.is_ok() || res.err().is_some_and(|e| e.errno == EBADF) {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         let _ = guard.remove(fd);
     }
 
@@ -914,7 +1001,7 @@ pub fn close_raw(fd: usize) -> Result<usize> {
     let res = unsafe { syscall::syscall1(syscall::SYS_CLOSE, fd) };
 
     if res.is_ok() || res.err().is_some_and(|e| e.errno == EBADF) {
-        let mut guard = FILETABLE.lock();
+        let mut guard = current_filetable().inner.lock();
         let _ = guard.remove(fd);
     }
 
@@ -922,13 +1009,53 @@ pub fn close_raw(fd: usize) -> Result<usize> {
 }
 
 pub struct FdTbl {
-    fd: Option<FdGuardUpper>,
+    pub fd: Mutex<Option<FdGuardUpper>>,
+    pub inner: Mutex<FdTblInner>,
+}
+
+impl FdTbl {
+    pub const fn new() -> Self {
+        Self {
+            fd: Mutex::new(None),
+            inner: Mutex::new(FdTblInner::new()),
+        }
+    }
+    pub fn init_from_fd(&self, filetable_fd: FdGuardUpper) -> Result<()> {
+        let mut inner = FdTblInner::new();
+        filetable_fd.call_wo(&[], CallFlags::empty(), &[FileTableVerb::Refresh as u64])?;
+
+        inner.resize(FdTblInner::DEFAULT_CAPACITY);
+
+        let mut reader = crate::proc::FileBufReader::from_fd(filetable_fd.as_raw_fd());
+        inner.populate(&mut reader)?;
+
+        *self.fd.lock() = Some(filetable_fd);
+        *self.inner.lock() = inner;
+
+        Ok(())
+    }
+
+    pub fn set_fd(&self, fd: FdGuardUpper) {
+        *self.fd.lock() = Some(fd);
+    }
+
+    pub fn fd(&self) -> crate::sync::MutexGuard<'_, Option<FdGuardUpper>> {
+        self.fd.lock()
+    }
+
+    pub fn take(&self) -> Option<FdGuardUpper> {
+        let mut fd = self.fd.lock();
+        fd.take()
+    }
+}
+
+pub struct FdTblInner {
     posix_fdtbl: PosixFdTbl,
     upper_fdtbl: UpperFdTbl,
     active_count: usize,
 }
 
-impl FdTbl {
+impl FdTblInner {
     pub const CONTEXT_MAX_FILES: u32 = 65_536;
     pub const DEFAULT_CAPACITY: usize = 64;
 
@@ -938,59 +1065,10 @@ impl FdTbl {
     )]
     pub const fn new() -> Self {
         Self {
-            fd: None,
             posix_fdtbl: PosixFdTbl::new(),
             upper_fdtbl: UpperFdTbl::new(),
             active_count: 0,
         }
-    }
-
-    pub fn from_binary_fd(filetable_fd: FdGuardUpper) -> Result<Self> {
-        let mut fdtbl = Self::new();
-        let files_reader_fd = filetable_fd.as_raw_fd();
-        let buf = b"refresh";
-        unsafe {
-            syscall::syscall4(
-                syscall::SYS_DUP2,
-                files_reader_fd,
-                files_reader_fd,
-                buf.as_ptr() as usize,
-                buf.len(),
-            )
-        }?;
-
-        fdtbl.resize(Self::DEFAULT_CAPACITY);
-
-        let mut reader = crate::proc::FileBufReader::from_fd(files_reader_fd);
-        fdtbl.populate(&mut reader)?;
-
-        // Manually mark the filetable_fd itself as occupied in userspace FILETABLE
-        fdtbl.override_at(files_reader_fd)?;
-
-        fdtbl.set_fd(filetable_fd);
-
-        Ok(fdtbl)
-    }
-
-    pub fn with_capacity(capacity: usize, fd: FdGuardUpper) -> Self {
-        Self {
-            fd: Some(fd),
-            posix_fdtbl: PosixFdTbl::with_capacity(capacity),
-            upper_fdtbl: UpperFdTbl::with_capacity(capacity),
-            active_count: 0,
-        }
-    }
-
-    pub fn fd(&self) -> Option<&FdGuardUpper> {
-        self.fd.as_ref()
-    }
-
-    pub fn take(&mut self) -> Option<FdGuardUpper> {
-        self.fd.take()
-    }
-
-    pub fn set_fd(&mut self, fd: FdGuardUpper) {
-        self.fd = Some(fd);
     }
 
     pub fn resize(&mut self, size: usize) {
@@ -1006,17 +1084,17 @@ impl FdTbl {
         self.upper_fdtbl.len()
     }
 
-    fn strip_tags(index: usize) -> usize {
+    pub fn strip_tags(index: usize) -> usize {
         index & !syscall::UPPER_FDTBL_TAG
     }
 
-    fn is_upper(index: usize) -> bool {
+    pub fn is_upper(index: usize) -> bool {
         (index & syscall::UPPER_FDTBL_TAG) != 0
     }
 
     pub(crate) fn populate(&mut self, reader: &mut crate::proc::FileBufReader) -> Result<()> {
         while let Some(fd) = reader.read_le_u64()? {
-            self.override_at(fd as usize)?;
+            self.override_at(fd as usize, None)?;
         }
         Ok(())
     }
@@ -1073,7 +1151,7 @@ impl FdTbl {
                 &[],
                 CallFlags::empty(),
                 &[
-                    syscall::FileTableVerb::Resize as u64,
+                    FileTableVerb::Resize as u64,
                     tag as u64,
                     aligned_size as u64,
                 ],
@@ -1089,24 +1167,22 @@ impl FdTbl {
         Ok(aligned_size)
     }
 
-    pub fn override_at(&mut self, new_fd: usize) -> Result<Option<usize>> {
+    pub fn override_at(
+        &mut self,
+        new_fd: usize,
+        sync_fd: Option<&FdGuardUpper>,
+    ) -> Result<Option<usize>> {
         let prev_flags = self.get_fd_flags(new_fd).ok();
 
         let _ = self.remove(new_fd);
 
         if Self::is_upper(new_fd) {
             let handle = Self::strip_tags(new_fd);
-            self.upper_fdtbl.insert_at(
-                handle,
-                UpperFdTbl::flags_into_entry(0),
-                self.fd.as_ref(),
-            )?;
+            self.upper_fdtbl
+                .insert_at(handle, UpperFdTbl::flags_into_entry(0), sync_fd)?;
         } else {
-            self.posix_fdtbl.insert_at(
-                new_fd,
-                PosixFdTbl::flags_into_entry(0),
-                self.fd.as_ref(),
-            )?;
+            self.posix_fdtbl
+                .insert_at(new_fd, PosixFdTbl::flags_into_entry(0), sync_fd)?;
         }
 
         self.active_count += 1;
@@ -1114,33 +1190,60 @@ impl FdTbl {
         Ok(prev_flags)
     }
 
-    pub fn add_posix(&mut self, entry: usize) -> Result<usize> {
+    pub fn get_lowest_available_slot(&self, which: usize) -> Result<usize> {
+        if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        let raw_idx = if Self::is_upper(which) {
+            self.upper_fdtbl.next_available_index()
+        } else {
+            self.posix_fdtbl.next_available_index()
+        };
+
+        if raw_idx >= Self::CONTEXT_MAX_FILES as usize {
+            return Err(Error::new(EMFILE));
+        }
+
+        if Self::is_upper(which) {
+            Ok(raw_idx | syscall::UPPER_FDTBL_TAG)
+        } else {
+            Ok(raw_idx)
+        }
+    }
+
+    pub fn add_posix(&mut self, entry: usize, sync_fd: Option<&FdGuardUpper>) -> Result<usize> {
         if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
         let out_idx = self
             .posix_fdtbl
-            .add(PosixFdTbl::flags_into_entry(entry), self.fd.as_ref())?;
+            .add(PosixFdTbl::flags_into_entry(entry), sync_fd)?;
         self.active_count += 1;
 
         Ok(out_idx)
     }
 
-    pub fn insert_upper(&mut self, entry: usize) -> Result<usize> {
+    pub fn insert_upper(&mut self, entry: usize, sync_fd: Option<&FdGuardUpper>) -> Result<usize> {
         if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
         let out_idx = self
             .upper_fdtbl
-            .insert(UpperFdTbl::flags_into_entry(entry), self.fd.as_ref())?;
+            .insert(UpperFdTbl::flags_into_entry(entry), sync_fd)?;
         self.active_count += 1;
 
         Ok(out_idx)
     }
 
-    pub fn insert_at_upper(&mut self, new_fd: usize, entry: usize) -> Result<usize> {
+    pub fn insert_at_upper(
+        &mut self,
+        new_fd: usize,
+        entry: usize,
+        sync_fd: Option<&FdGuardUpper>,
+    ) -> Result<usize> {
         if self.active_count >= Self::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
@@ -1150,11 +1253,9 @@ impl FdTbl {
         }
         let handle = Self::strip_tags(new_fd);
 
-        let out_idx = self.upper_fdtbl.insert_at(
-            handle,
-            UpperFdTbl::flags_into_entry(entry),
-            self.fd.as_ref(),
-        )?;
+        let out_idx =
+            self.upper_fdtbl
+                .insert_at(handle, UpperFdTbl::flags_into_entry(entry), sync_fd)?;
         self.active_count += 1;
 
         Ok(out_idx)
@@ -1165,6 +1266,7 @@ impl FdTbl {
         which: usize,
         fd_slice: &mut [usize],
         flags: usize,
+        sync_fd: Option<&FdGuardUpper>,
     ) -> Result<usize> {
         let cnt = fd_slice.len();
         if cnt == 0 {
@@ -1179,7 +1281,7 @@ impl FdTbl {
             let initial_flag = PosixFdTbl::flags_into_entry(flags);
             let entries = alloc::vec![initial_flag; cnt];
 
-            let handles = self.posix_fdtbl.bulk_add_posix(entries, self.fd.as_ref())?;
+            let handles = self.posix_fdtbl.bulk_add_posix(entries, sync_fd)?;
             self.active_count += cnt;
 
             for (i, &handle) in handles.iter().enumerate() {
@@ -1187,7 +1289,7 @@ impl FdTbl {
             }
         } else {
             let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
-            let handles = self.upper_fdtbl.bulk_insert(entries, self.fd.as_ref())?;
+            let handles = self.upper_fdtbl.bulk_insert(entries, sync_fd)?;
             self.active_count += cnt;
 
             for (i, &handle) in handles.iter().enumerate() {
@@ -1203,6 +1305,7 @@ impl FdTbl {
         which: usize,
         fd_slice: &mut [usize],
         flags: usize,
+        sync_fd: Option<&FdGuardUpper>,
     ) -> Result<usize> {
         let cnt = fd_slice.len();
         if cnt == 0 {
@@ -1210,7 +1313,7 @@ impl FdTbl {
         }
 
         if fd_slice[0] == usize::MAX {
-            return self.bulk_add(which, fd_slice, flags);
+            return self.bulk_add(which, fd_slice, flags, sync_fd);
         }
 
         if self.active_count + cnt > Self::CONTEXT_MAX_FILES as usize {
@@ -1222,12 +1325,12 @@ impl FdTbl {
             let entries = alloc::vec![initial_flag; cnt];
 
             self.posix_fdtbl
-                .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
+                .bulk_insert_manual(entries, fd_slice, sync_fd)?;
             self.active_count += cnt;
         } else {
             let entries = alloc::vec![UpperFdTbl::flags_into_entry(flags); cnt];
             self.upper_fdtbl
-                .bulk_insert_manual(entries, fd_slice, self.fd.as_ref())?;
+                .bulk_insert_manual(entries, fd_slice, sync_fd)?;
             self.active_count += cnt;
         }
 
@@ -1365,6 +1468,14 @@ impl PosixFdTbl {
         }
     }
 
+    pub fn next_available_index(&self) -> usize {
+        let mut idx = self.lowest_idx as usize;
+        while idx < self.table.len() && self.is_occupied(idx) {
+            idx += 1;
+        }
+        idx
+    }
+
     fn update_lowest_idx(&mut self, start_from: usize) {
         let mut next_lowest = start_from;
         while next_lowest < self.table.len() && self.is_occupied(next_lowest) {
@@ -1376,7 +1487,7 @@ impl PosixFdTbl {
     fn validate_handles(&self, handles: &[usize]) -> Result<()> {
         let mut checked_handles = BTreeSet::new();
         for &handle in handles {
-            if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
+            if handle >= FdTblInner::CONTEXT_MAX_FILES as usize {
                 return Err(Error::new(EMFILE));
             }
             if !checked_handles.insert(handle) || !self.is_occupied(handle) {
@@ -1389,7 +1500,7 @@ impl PosixFdTbl {
     fn validate_free_slots(&self, handles: &[usize]) -> Result<()> {
         let mut checked_handles = BTreeSet::new();
         for &handle in handles {
-            if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
+            if handle >= FdTblInner::CONTEXT_MAX_FILES as usize {
                 return Err(Error::new(EMFILE));
             }
             if !checked_handles.insert(handle) {
@@ -1429,7 +1540,7 @@ impl PosixFdTbl {
 
         if handle >= old_len {
             self.with_transaction(old_len, |this| {
-                let new_len = FdTbl::sync_size(sync_fd, handle + 1, 0)?;
+                let new_len = FdTblInner::sync_size(sync_fd, handle + 1, 0)?;
                 this.resize(new_len);
                 this.table[handle] = entry_flags;
                 this.lowest_idx = (handle + 1) as u32;
@@ -1455,7 +1566,7 @@ impl PosixFdTbl {
         let handles = self.find_free_posix_slots(count);
         let max_index = handles[count - 1];
 
-        if max_index >= FdTbl::CONTEXT_MAX_FILES as usize {
+        if max_index >= FdTblInner::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
@@ -1468,7 +1579,7 @@ impl PosixFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len != new_len {
-                let new_len = FdTbl::sync_size(sync_fd, new_len, 0)?;
+                let new_len = FdTblInner::sync_size(sync_fd, new_len, 0)?;
                 this.resize(new_len);
             }
 
@@ -1492,7 +1603,7 @@ impl PosixFdTbl {
         flags: FdFlags,
         sync_fd: Option<&FdGuardUpper>,
     ) -> Result<usize> {
-        if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
+        if handle >= FdTblInner::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
         let old_len = self.table.len();
@@ -1505,7 +1616,7 @@ impl PosixFdTbl {
 
         self.with_transaction(old_len, |this| {
             if handle >= old_len {
-                let new_len = FdTbl::sync_size(sync_fd, new_len, 0)?;
+                let new_len = FdTblInner::sync_size(sync_fd, new_len, 0)?;
                 this.resize(new_len);
             }
             this.table[handle] = entry_flags;
@@ -1543,7 +1654,7 @@ impl PosixFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len <= max_index {
-                let new_len = FdTbl::sync_size(sync_fd, new_len, 0)?;
+                let new_len = FdTblInner::sync_size(sync_fd, new_len, 0)?;
                 this.resize(new_len);
             }
 
@@ -1610,7 +1721,7 @@ impl UpperFdTbl {
         Self {
             table: Vec::new(),
             len: 0,
-            first_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
+            first_vacant_idx: FdTblInner::CONTEXT_MAX_FILES,
         }
     }
 
@@ -1618,7 +1729,7 @@ impl UpperFdTbl {
         Self {
             table: Vec::with_capacity(capacity),
             len: 0,
-            first_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
+            first_vacant_idx: FdTblInner::CONTEXT_MAX_FILES,
         }
     }
 
@@ -1653,7 +1764,7 @@ impl UpperFdTbl {
         self.table.resize(
             size,
             FdTblEntry::Vacant {
-                next_vacant_idx: FdTbl::CONTEXT_MAX_FILES,
+                next_vacant_idx: FdTblInner::CONTEXT_MAX_FILES,
             },
         );
     }
@@ -1686,11 +1797,19 @@ impl UpperFdTbl {
         }
     }
 
+    pub fn next_available_index(&self) -> usize {
+        if self.first_vacant_idx == FdTblInner::CONTEXT_MAX_FILES {
+            self.table.len()
+        } else {
+            self.first_vacant_idx as usize
+        }
+    }
+
     fn validate_handles(&self, handles: &[usize]) -> Result<()> {
         let mut checked_handles = BTreeSet::new();
         for &handle in handles {
             let handle = Self::strip_tags(handle);
-            if Self::strip_tags(handle) >= FdTbl::CONTEXT_MAX_FILES as usize {
+            if Self::strip_tags(handle) >= FdTblInner::CONTEXT_MAX_FILES as usize {
                 return Err(Error::new(EMFILE));
             }
             if !checked_handles.insert(handle) {
@@ -1707,7 +1826,7 @@ impl UpperFdTbl {
         let mut checked_handles = BTreeSet::new();
         for &handle in handles {
             let handle = Self::strip_tags(handle);
-            if handle >= FdTbl::CONTEXT_MAX_FILES as usize {
+            if handle >= FdTblInner::CONTEXT_MAX_FILES as usize {
                 return Err(Error::new(EMFILE));
             }
             if !checked_handles.insert(handle) {
@@ -1744,11 +1863,11 @@ impl UpperFdTbl {
     pub fn insert(&mut self, entry: FdTblEntry, sync_fd: Option<&FdGuardUpper>) -> Result<usize> {
         let handle = self.first_vacant_idx as usize;
 
-        if self.first_vacant_idx == FdTbl::CONTEXT_MAX_FILES {
+        if self.first_vacant_idx == FdTblInner::CONTEXT_MAX_FILES {
             let old_len = self.table.len();
             let new_len = old_len + 1;
             self.with_transaction(old_len, |this| {
-                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                let new_len = FdTblInner::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
                 this.resize(new_len);
                 this.table[old_len] = entry;
                 this.len += 1;
@@ -1776,7 +1895,7 @@ impl UpperFdTbl {
         if count == 0 {
             return Ok(Vec::new());
         }
-        if self.len() + count > FdTbl::CONTEXT_MAX_FILES as usize {
+        if self.len() + count > FdTblInner::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
@@ -1793,7 +1912,7 @@ impl UpperFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len != new_len {
-                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                let new_len = FdTblInner::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
                 this.resize(new_len);
             }
 
@@ -1827,7 +1946,7 @@ impl UpperFdTbl {
 
         self.with_transaction(old_len, |this| {
             if handle >= old_len {
-                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                let new_len = FdTblInner::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
                 this.resize(new_len);
             }
 
@@ -1858,7 +1977,7 @@ impl UpperFdTbl {
         if count == 0 {
             return Ok(());
         }
-        if self.len() + count > FdTbl::CONTEXT_MAX_FILES as usize {
+        if self.len() + count > FdTblInner::CONTEXT_MAX_FILES as usize {
             return Err(Error::new(EMFILE));
         }
 
@@ -1878,7 +1997,7 @@ impl UpperFdTbl {
 
         self.with_transaction(old_len, |this| {
             if old_len <= max_index {
-                let new_len = FdTbl::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
+                let new_len = FdTblInner::sync_size(sync_fd, new_len, syscall::UPPER_FDTBL_TAG)?;
                 this.resize(new_len);
             }
 
@@ -1923,7 +2042,7 @@ impl UpperFdTbl {
     }
 
     fn rebuild_free_list(&mut self) {
-        let mut next_vacant = FdTbl::CONTEXT_MAX_FILES;
+        let mut next_vacant = FdTblInner::CONTEXT_MAX_FILES;
         for i in (0..self.table.len()).rev() {
             if let FdTblEntry::Vacant { next_vacant_idx } = &mut self.table[i] {
                 *next_vacant_idx = next_vacant;
@@ -1935,13 +2054,13 @@ impl UpperFdTbl {
 }
 
 pub struct FdTblIter<'a> {
-    fdtbl: &'a FdTbl,
+    fdtbl: &'a FdTblInner,
     stage: u8,
     cursor: usize,
 }
 
 impl<'a> FdTblIter<'a> {
-    fn new(fdtbl: &'a FdTbl) -> Self {
+    fn new(fdtbl: &'a FdTblInner) -> Self {
         Self {
             fdtbl,
             stage: 0,
@@ -2002,13 +2121,13 @@ impl<'a> Iterator for FdTblIter<'a> {
     }
 }
 
-impl FdTbl {
+impl FdTblInner {
     pub fn iter(&self) -> FdTblIter<'_> {
         FdTblIter::new(self)
     }
 }
 
-impl<'a> IntoIterator for &'a FdTbl {
+impl<'a> IntoIterator for &'a FdTblInner {
     type Item = (usize, usize);
     type IntoIter = FdTblIter<'a>;
 

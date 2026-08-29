@@ -71,8 +71,8 @@ bitflags = "2"
 ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.4.0"
-redox_protocols = { package = "libredox", version = "0.1.20", default-features = false, features = ["protocol"] }
-redox_syscall = "0.9.2"
+redox_protocols = { package = "libredox", version = "0.1.22", default-features = false, features = ["protocol"] }
+redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "rm-redundant-dup" }
 
 [build-dependencies]
 cc = "1"
@@ -107,7 +107,7 @@ libm = "0.2"
 log = "0.4"
 spin = "0.9.8"
 argon2 = "0.5.3"
-redox-rings = { git = "https://gitlab.redox-os.org/redox-os/redox-rings.git", default-features = false, features = ["sync"] }
+redox-rings = { git = "https://gitlab.redox-os.org/Ibuki.O/redox-rings.git", branch = "update-crates", default-features = false, features = ["sync"] }
 redox-buffer-pool = { git = "https://gitlab.redox-os.org/redox-os/redox-buffer-pool.git", default-features = false, features = ["redox", "spinning"]}
 
 zerocopy = { version = "0.8.55", features = ["derive"] }
@@ -131,7 +131,7 @@ sc = "0.2.7"
 redox_syscall.workspace = true
 redox-rt = { path = "redox-rt" }
 redox-path.workspace = true
-redox_event = { version = "0.4.8", default-features = false, features = ["redox_syscall"] }
+redox_event = { git = "https://gitlab.redox-os.org/Ibuki.O/event.git", branch = "rm-fcntl-fd", default-features = false, features = ["redox_syscall"] }
 ioslice.workspace = true
 redox-ioctl = { path = "redox-ioctl" }
 redox_protocols.workspace = true
