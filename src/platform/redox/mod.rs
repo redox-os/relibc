@@ -6,14 +6,14 @@ use core::{
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
-use redox_path::RedoxStr;
+use redox_path::{RedoxReference, RedoxStr};
 use redox_protocols::protocol::{WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, ESRCH, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
+    self, ESRCH, EXDEV, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
     data::{Map, TimeSpec as redox_timespec},
     dirent::DirentHeader,
 };
@@ -236,12 +236,15 @@ impl Pal for Sys {
     }
 
     fn close(fd: c_int) -> Result<()> {
-        redox_rt::sys::close(fd as usize)?;
-        Ok(())
+        let r = redox_rt::sys::close(fd as usize).map(|_| ());
+        trace_log!("close({fd}) = {:?}", r);
+        r.map_err(Errno::from)
     }
 
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
-        Ok(redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
+        let r = redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[]);
+        trace_log!("dup2({fd1}, {fd2}) = {:?}", r);
+        Ok(r? as c_int)
     }
 
     fn exit(status: c_int) -> ! {
@@ -344,22 +347,32 @@ impl Pal for Sys {
                 match i32::from(flock.l_type) {
                     F_UNLCK => {
                         let meta = StdFsCallMeta::new(StdFsCallKind::Unlock, start, len);
-                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
-                        return Ok(0);
+                        let r = syscall::std_fs_call(fd as usize, &mut [], &meta);
+                        trace_log!(
+                            "fcntl({fd}, {} | F_UNLCK, [{start:x}:{:x}]#{}) = {r:?}",
+                            if is_ofd { "F_OFD_SETLK" } else { "F_SETLK" },
+                            len + start,
+                            flock.l_pid
+                        );
+                        return r.map(|_| 0).map_err(Errno::from);
                     }
 
                     F_RDLCK | F_WRLCK => {
+                        let is_wrclk = i32::from(flock.l_type) == F_WRLCK;
                         let meta = StdFsCallMeta::new(
                             StdFsCallKind::Lock,
                             start,
-                            len | if i32::from(flock.l_type) == F_WRLCK {
-                                1 << 63
-                            } else {
-                                0
-                            },
+                            len | if is_wrclk { 1 << 63 } else { 0 },
                         );
-                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
-                        return Ok(0);
+                        let r = syscall::std_fs_call(fd as usize, &mut [], &meta);
+                        trace_log!(
+                            "fcntl({fd}, {} | {}, [{start:x}:{:x}]#{}) = {r:?}",
+                            if is_ofd { "F_OFD_SETLK" } else { "F_SETLK" },
+                            if is_wrclk { "F_WRLCK" } else { "F_RDLCK" },
+                            len + start,
+                            flock.l_pid
+                        );
+                        return r.map(|_| 0).map_err(Errno::from);
                     }
 
                     _ => return Err(Errno(EINVAL)),
@@ -454,7 +467,14 @@ impl Pal for Sys {
         // TODO: Find way to avoid lock.
         let _guard = CLONE_LOCK.write();
 
-        Ok(redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
+        let r = redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed);
+
+        #[cfg(not(feature = "no_trace"))]
+        if !matches!(r, Ok(0)) {
+            trace_log!("fork() = {r:?}");
+        }
+
+        Ok(r? as pid_t)
     }
 
     fn fstatat(dirfd: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
@@ -958,7 +978,9 @@ impl Pal for Sys {
     }
 
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
-        fds.write(extra::pipe2(flags as usize)?);
+        let r = extra::pipe2(flags as usize);
+        trace_log!("pipe2({flags:x}) = {:?}", r);
+        fds.write(r?);
         Ok(())
     }
 
@@ -1109,28 +1131,39 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let new_path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
         // Fail if the target exists with RENAME_NOREPLACE.
         if flags & RENAME_NOREPLACE != 0
-            && let Ok(_) = libredox::openat(
-                new_dir,
-                new_path.clone(),
-                fcntl::O_PATH | fcntl::O_CLOEXEC,
-                0,
-            )
-            .map(FdGuard::new)
+            && let Ok(_) =
+                libredox::openat(new_dir, path.clone(), fcntl::O_PATH | fcntl::O_CLOEXEC, 0)
+                    .map(FdGuard::new)
         {
             return Err(Errno(EEXIST));
         }
 
-        // oflags are the same as Sys::rename above.
+        // TODO: A flag to prevent this function to not automatically resolve EXDEV, to have a fast path function like unlinkat
         let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
 
-        let target: Cow<'_, str> = openat2_path(new_dir, new_path, 0)?.into();
-        // I'm avoiding Sys::rename to avoid reallocating a CString from a String.
-        syscall::frename(*source as usize, target)
-            .map(|_| ())
-            .map_err(Into::into)
+        // to ensure rename working across scheme, new_dir need to be adjusted to the parent of new_path
+        let (mut new_path_dir, Some(new_path_file)) = path.dirname_split() else {
+            return Err(Errno(EINVAL));
+        };
+        if new_path_dir.is_empty() {
+            new_path_dir = RedoxStr::new(".").unwrap();
+        }
+        let new_path_parent = openat2_path(new_dir, new_path_dir, 0)?;
+        let target_dir =
+            File::new(libredox::openat(new_dir, new_path_parent.into(), fcntl::O_PATH, 0)? as _);
+        let target: Cow<'_, str> = openat2_path(*target_dir, new_path_file.into(), 0)?.into();
+        let r = syscall::frename(*source as usize, &target).map(|_| ());
+        trace_log!(
+            "renameat2 ({old_dir}, {:?}, {new_dir}, {:?}): [{:?}] {:?}",
+            old_path.to_string_lossy(),
+            new_path.to_string_lossy(),
+            target,
+            r
+        );
+        r.map_err(Into::into)
     }
 
     fn sched_yield() -> Result<()> {
@@ -1728,11 +1761,44 @@ impl Pal for Sys {
         if (flags & !AT_REMOVEDIR) != 0 {
             return Err(Errno(EINVAL));
         }
-        let path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
-        let path = openat2_path(fd, path, 0)?;
-        let path: Cow<'_, str> = path.into();
-        redox_rt::sys::unlink(path, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
-        Ok(())
+        let flags: usize = flags.try_into().map_err(|_| Errno(EINVAL))?;
+
+        let target = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let target = openat2_path(fd, target, 0)?.to_standard();
+        let r = redox_rt::sys::unlink(target.as_ref(), flags).map(|_| ());
+        trace_log!(
+            "unlinkat ({fd}, {:?}, {:x}): [{:?}] {:?}",
+            path.to_string_lossy(),
+            flags,
+            &target,
+            r
+        );
+
+        if matches!(r, Err(Error { errno: EXDEV })) {
+            // slower code path to make this work across scheme
+            let (mut new_path_dir, Some(new_path_file)) = target.dirname_split() else {
+                return Err(Errno(EINVAL));
+            };
+            if new_path_dir.as_ref().is_empty() {
+                new_path_dir = RedoxReference::new(".").unwrap();
+            }
+            let target_dir =
+                File::new(libredox::openat(fd, new_path_dir.into(), fcntl::O_PATH, 0)? as _);
+            let target2: Cow<'_, str> = openat2_path(*target_dir, new_path_file.into(), 0)?.into();
+            let r = redox_rt::sys::unlink(&target2, flags).map(|_| ());
+            trace_log!(
+                "unlinkat ({}, {:?}, {:x}): [{:?}] {:?}",
+                *target_dir,
+                &target,
+                flags,
+                &target2,
+                r
+            );
+            r
+        } else {
+            r
+        }
+        .map_err(Into::into)
     }
 
     #[expect(clippy::unnecessary_literal_unwrap, reason = "res needs refactoring")]
