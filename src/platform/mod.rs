@@ -45,6 +45,7 @@ pub mod types;
 pub static ERRNO: Cell<c_int> = Cell::new(0);
 
 /// The `argv` argument available to a program's `main` function.
+// TODO: change remaining static mut to RawCell
 pub static mut argv: *mut *mut c_char = ptr::null_mut();
 pub static inner_argv: RawCell<Vec<*mut c_char>> = RawCell::new(Vec::new());
 pub static mut program_invocation_name: *mut c_char = ptr::null_mut();
