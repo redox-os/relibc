@@ -62,13 +62,9 @@ pub fn fchdir(fd: c_int) -> Result<()> {
         let res = Sys::fpath(fd, buf.as_bytes_mut())?;
         buf.set_len(res);
     }
-    let fd = FdGuard::new(redox_rt::sys::fcntl(
-        fd as usize,
-        syscall::F_DUPFD,
-        syscall::UPPER_FDTBL_TAG,
-    )?)
-    .to_upper()
-    .unwrap();
+    let fd = FdGuard::new(redox_rt::sys::dup_into_upper(fd as usize, &[])?)
+        .to_upper()
+        .unwrap();
     set_cwd_manual(buf, fd)?;
     Ok(())
 }

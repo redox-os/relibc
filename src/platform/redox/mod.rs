@@ -243,7 +243,7 @@ impl Pal for Sys {
     }
 
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
-        let r = redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[]);
+        let r = redox_rt::sys::dup2(fd1 as usize, fd2 as usize);
         trace_log!("dup2({fd1}, {fd2}) = {:?}", r);
         Ok(r? as c_int)
     }
@@ -1381,7 +1381,7 @@ impl Pal for Sys {
 
         {
             let fds_to_close = {
-                let guard = redox_rt::current_filetable();
+                let guard = redox_rt::current_filetable().inner.lock();
                 let mut fds = alloc::vec::Vec::new();
                 for (fd, flags) in guard.iter() {
                     if flags & redox_protocols::protocol::O_CLOEXEC

@@ -4,7 +4,8 @@ use crate::{
     error::{Errno, ResultExt},
     platform::types::*,
 };
-use syscall::{F_SETFD, F_SETFL, O_RDONLY, O_WRONLY, error::*};
+use redox_protocols::protocol::F_SETFD;
+use syscall::{F_SETFL, O_RDONLY, O_WRONLY, error::*};
 
 pub use redox_rt::proc::FdGuard;
 
