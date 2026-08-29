@@ -80,7 +80,7 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
 
 #[expect(unsafe_op_in_unsafe_fn)]
 unsafe fn adjust_stack(sp: &'static mut Stack) {
-    let mut argv = sp.argv() as *mut usize;
+    let mut argv = sp.argv_raw() as *mut usize;
 
     // Move arguments
     loop {
@@ -118,7 +118,7 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
             break;
         }
     }
-    sp.argc -= 1;
+    sp.set_argc(sp.argc() - 1);
 }
 
 fn resolve_path_name(
@@ -385,7 +385,7 @@ fn stage2(
 
     // We get the arguments, the environment, and the auxilary vector
     let (argv, envs, auxv) = unsafe {
-        let argv_start = sp.argv() as *mut usize;
+        let argv_start = sp.argv_raw() as *mut usize;
         let (argv, argv_end) = get_argv(argv_start);
         let (envs, envs_end) = get_env(argv_end.add(1));
         let auxv = get_auxvs(envs_end.add(1));
@@ -420,7 +420,7 @@ fn stage2(
         println!("envs: {:#?}", envs);
         println!("auxv: {:#x?}", auxv);
 
-        if sp.argc < 2 {
+        if sp.argc() < 2 {
             eprintln!("ld.so [executable] [arguments...]");
             unistd::_exit(1);
         }

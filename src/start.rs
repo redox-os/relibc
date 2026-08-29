@@ -1,32 +1,65 @@
 //! Startup code.
 
-use alloc::vec::Vec;
-use core::{intrinsics, ptr};
+use alloc::{boxed::Box, vec::Vec};
+use core::{intrinsics, marker::PhantomData, ptr};
 
 use crate::{
+    c_str::CStr,
     header::{libgen, stdlib},
     ld_so::{self},
     platform::{self, Pal, Sys, get_auxvs, types::*},
 };
 
 #[repr(C)]
-pub struct Stack {
-    pub argc: isize,
-    pub argv0: *const c_char,
+pub struct Stack<'a> {
+    argc: isize,
+    argv0: *const c_char,
+    _marker: PhantomData<&'a [u8]>,
 }
 
-impl Stack {
-    pub fn argv(&self) -> *const *const c_char {
+impl<'a> Stack<'a> {
+    pub fn argc(&self) -> isize {
+        self.argc
+    }
+    pub unsafe fn set_argc(&mut self, new: isize) {
+        self.argc = new;
+    }
+    pub fn argv_raw(&self) -> *const *const c_char {
         ptr::from_ref(&self.argv0)
     }
+    pub fn argv_with_last_null(&self) -> &'a [Option<CStr<'a>>] {
+        // SAFETY: safe by construction of this struct
+        unsafe {
+            let raw_cstrs = core::slice::from_raw_parts(
+                self.argv_raw(),
+                usize::try_from(self.argc).unwrap() + 1,
+            );
+            CStr::opt_strs_from_raw(raw_cstrs)
+        }
+    }
 
-    pub fn envp(&self) -> *const *const c_char {
-        unsafe { self.argv().offset(self.argc + 1) }
+    pub fn envp_raw(&self) -> *const *const c_char {
+        unsafe { self.argv_raw().offset(self.argc + 1) }
+    }
+    pub fn envp_with_last_null(&self) -> &'a [Option<CStr<'a>>] {
+        let mut count = 0;
+        // TODO: use NullTerminated iterator
+        let mut base = self.envp_raw();
+        while unsafe { !base.read().is_null() } {
+            base = unsafe { base.add(1) };
+            count += 1;
+        }
+
+        // SAFETY: safe by construction of this struct
+        unsafe {
+            let raw_cstrs = core::slice::from_raw_parts(self.envp_raw(), count + 1);
+            CStr::opt_strs_from_raw(raw_cstrs)
+        }
     }
 
     pub fn auxv(&self) -> *const (usize, usize) {
         unsafe {
-            let mut envp = self.envp();
+            let mut envp = self.envp_raw();
             while !(*envp).is_null() {
                 envp = envp.add(1);
             }
@@ -35,34 +68,30 @@ impl Stack {
     }
 }
 
-unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut c_char> {
-    use crate::header::string::strlen;
-
-    let mut vec = Vec::with_capacity(len + 1);
-    let mut lengths = Vec::with_capacity(len);
+fn copy_string_array(array_with_nul: &[Option<CStr>]) -> Vec<*mut c_char> {
+    let array_without_nul = &array_with_nul[..array_with_nul.len() - 1];
+    let mut vec = Vec::with_capacity(array_with_nul.len());
+    let mut lengths = Vec::with_capacity(array_without_nul.len());
     let mut size = 0;
-    for i in 0..len {
-        let item = unsafe { *array.add(i) };
-        lengths.push(unsafe { strlen(item) } + 1);
-        size += lengths[i];
+
+    for item in array_without_nul {
+        let this_len = item.expect("non-trailing NULL").len() + 1;
+        lengths.push(this_len);
+        size += this_len;
     }
 
     // Programs unfortunately rely on the strings being contiguous in memory. For example:
     // https://github.com/libuv/libuv/blob/12d0dd48e3c6baf1e2f0d9f85f11f0ef58285d6f/src/unix/proctitle.c#L87
     let mut offset = 0;
-    let buf = unsafe { platform::alloc(size).cast::<c_char>() };
+    let buf = Box::leak(vec![0_u8; size].into_boxed_slice());
 
-    #[expect(clippy::needless_range_loop)]
-    for i in 0..len {
-        let dest_buf = unsafe { buf.add(offset) };
-        let item = unsafe { *array.add(i) };
-        let len = lengths[i];
+    for (len, item_opt) in lengths.into_iter().zip(array_without_nul) {
+        let item = item_opt.expect("non-trailing NULL");
 
-        unsafe {
-            ptr::copy_nonoverlapping(item, dest_buf, len);
-        }
+        let dst = &mut buf[offset..][..len];
+        dst.copy_from_slice(item.to_bytes_with_nul());
 
-        vec.push(dest_buf);
+        vec.push(dst.as_mut_ptr().cast());
         offset += len;
     }
     vec.push(ptr::null_mut());
@@ -181,9 +210,9 @@ pub unsafe extern "C" fn relibc_start_v1(
     };
 
     // Set up argc and argv
-    let argc = sp.argc;
-    let argv = sp.argv();
-    unsafe { platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize)) };
+    let argc = sp.argc();
+    let argv = sp.argv_with_last_null();
+    unsafe { platform::inner_argv.unsafe_set(copy_string_array(argv)) };
     unsafe { platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr() };
     // Special code for program_invocation_name and program_invocation_short_name
     if let Some(arg) = unsafe { platform::inner_argv.unsafe_ref() }.first() {
@@ -193,14 +222,9 @@ pub unsafe extern "C" fn relibc_start_v1(
     // We check for NULL here since ld.so might already have initialized it for us, and we don't
     // want to overwrite it if constructors in .init_array of dependency libraries have called
     // setenv.
+    let envp = sp.envp_with_last_null();
     if unsafe { platform::environ }.is_null() {
-        // Set up envp
-        let envp = sp.envp();
-        let mut len = 0;
-        while !(unsafe { *envp.add(len) }).is_null() {
-            len += 1;
-        }
-        unsafe { platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len)) };
+        unsafe { platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp)) };
         unsafe { platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr() };
     }
 
@@ -211,6 +235,18 @@ pub unsafe extern "C" fn relibc_start_v1(
         if unsafe { crate::platform::logger::init().is_err() } {
             log::error!("Logger has already been initialised");
         }
+    }
+
+    // (It would technically have been equally valid to just allow the option to be set to "1".)
+    if let Some(opt) = envp
+        .iter()
+        .filter_map(|x| *x)
+        .find_map(|var| var.strip_prefix(b"RELIBC_DEBUG_COMMIT_HASH="))
+        && matches!(opt.to_bytes(), b"1" | b"true")
+    {
+        let commit_hash =
+            option_env!("RELIBC_COMMIT_HASH").unwrap_or("(unknown; not set by build.rs)");
+        log::info!("Relibc commit hash: {commit_hash}");
     }
 
     // Run preinit array
