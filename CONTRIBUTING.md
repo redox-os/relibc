@@ -78,7 +78,7 @@ pub extern "C" unsafe fn some_interface_function(arg: Arg) -> c_int {
 
 ### Use safe wrappers over raw C types and patterns, where possible
 
-Some interfaces like `getenv` and `environ` will be inherently unsafe and are mostly impractical to create safe wrappers for. However, in many situations, even C-style invariants like NUL-terminated strings and arrays can be safely encoded in Rust. In particular, we can use the `CStr` and `WStr` wrappers for C strings, `NulTerminated<T>` for nul-terminated arrays, `Out<T>` for the possibly uninitialized "out-pointer" pattern, and of course regular Rust slices. For example (the actual standard and code is a bit different), prefer this
+Some interfaces like `getenv` and `environ` will be inherently unsafe and are mostly impractical to create safe wrappers for. However, in many situations, even C-style invariants like NUL-terminated strings and arrays can be safely encoded in Rust. In particular, we can use the `CStr` and `WStr` wrappers for C strings, `NulTerminated<T>` for nul-terminated arrays, `Out<T>` for the possibly uninitialized "out-pointer" pattern, and of course regular Rust slices. For example (the actual standard and code is a bit different), prefer this:
 
 ```rust
 fn getsockname_impl(socket: c_int, address_dst: Out<[u8]>, some_extra_field: Option<CStr<'_>>) -> Result<socklen_t> {
