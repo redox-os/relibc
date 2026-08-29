@@ -475,14 +475,8 @@ impl Pal for Sys {
         }
 
         let file = openat2(dirfd, path, flags, fcntl::O_PATH)?;
-        // Close the file descriptor after fstat(2) regardless of success or failure.
-        let fstat_res = unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr()) };
-        let close_res = redox_rt::sys::close(*file as usize);
-        if let Err(err) = fstat_res {
-            return Err(err.into());
-        }
-        close_res?;
-        Ok(fstat_res?)
+        unsafe { libredox::fstat(*file as usize, buf.as_mut_ptr())? };
+        Ok(())
     }
 
     fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {

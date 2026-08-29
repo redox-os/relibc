@@ -150,7 +150,9 @@ impl Deref for File {
 impl Drop for File {
     fn drop(&mut self) {
         if !self.reference {
-            let _ = Sys::close(self.fd);
+            if let Err(e) = Sys::close(self.fd) {
+                log::warn!("Close did not succeed: {e:?}");
+            }
         }
     }
 }
