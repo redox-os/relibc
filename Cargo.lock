@@ -516,7 +516,7 @@ dependencies = [
 [[package]]
 name = "redox_syscall"
 version = "0.10.0"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=rm-redundant-dup#9de92e97b03dc104966d055b27f5da44af91ecce"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=rm-redundant-dup#6ca6bb559129641880f99d0b87569e8578bc1441"
 dependencies = [
  "bitflags",
 ]
