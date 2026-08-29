@@ -15,7 +15,6 @@ use core::{
 use alloc::string::{FromUtf8Error, String};
 
 use crate::{
-    casting::FromExt,
     error::ResultExt,
     fs::File,
     header::{errno, fcntl, limits, string::strlen},
@@ -578,7 +577,7 @@ pub unsafe extern "C" fn getgrouplist(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
-    let mut count = c_int::relibc_from(groups.len());
+    let mut count = c_int::try_from(groups.len()).expect("NGROUPS_MAX below i32::MAX");
     if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &raw mut count) < 0 } {
         return -1;
     }

@@ -4,8 +4,8 @@
 //! central location reducing verbosity around the codebase, easing
 //! maintenance and improving readability.
 //!
-//! They also allow the elimination of `as` casts in cases where the user is
-//! certain that the transformation between types is within intended bounds.
+//! They also allow the elimination of `as` casts for platforms we do not plan
+//! to support.
 
 use crate::platform::types::c_char;
 
@@ -192,20 +192,10 @@ impl CCharToU8 {
     }
 }
 
-// A trait intended to indicate infallible transformations when we know the
-// value is within the expected bounds.
+/// A trait intended to indicate infallible transformations. This is required
+/// for us as we have no plans to support platforms below 32-bit.
 pub trait FromExt<T>: Sized {
     fn relibc_from(value: T) -> Self;
-}
-
-impl FromExt<i32> for u16 {
-    /// Infallible cast of `i32` to `u16`.
-    ///
-    /// # Panics
-    /// If the `i32` value is negative or larger than `u16::MAX`.
-    fn relibc_from(value: i32) -> Self {
-        Self::try_from(value).expect("should be within bounds")
-    }
 }
 
 impl FromExt<u32> for usize {
@@ -214,46 +204,6 @@ impl FromExt<u32> for usize {
     /// # Panics
     /// If the `u32` value is larger than the platform specific `usize` value.
     fn relibc_from(value: u32) -> Self {
-        Self::try_from(value).expect("should be within bounds")
-    }
-}
-
-impl FromExt<u64> for usize {
-    /// Infallible cast of `u64` to `usize`.
-    ///
-    /// # Panics
-    /// If the `u64` value is larger than the platform specific `usize` value.
-    fn relibc_from(value: u64) -> Self {
-        Self::try_from(value).expect("should be within bounds")
-    }
-}
-
-impl FromExt<usize> for u8 {
-    /// Infallible cast of `usize` to `u8`.
-    ///
-    /// # Panics
-    /// If the `usize` value is larger than `u8::MAX`.
-    fn relibc_from(value: usize) -> Self {
-        Self::try_from(value).expect("should be within bounds")
-    }
-}
-
-impl FromExt<usize> for u16 {
-    /// Infallible cast of `usize` to `u16`.
-    ///
-    /// # Panics
-    /// If the `usize` value is larger than `u16::MAX`.
-    fn relibc_from(value: usize) -> Self {
-        Self::try_from(value).expect("should be within bounds")
-    }
-}
-
-impl FromExt<usize> for i32 {
-    /// Infallible cast of `usize` to `i32`.
-    ///
-    /// # Panics
-    /// If the `usize` value is larger than `i32::MAX`.
-    fn relibc_from(value: usize) -> Self {
         Self::try_from(value).expect("should be within bounds")
     }
 }

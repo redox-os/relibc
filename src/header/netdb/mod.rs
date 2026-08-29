@@ -10,7 +10,6 @@ use alloc::{boxed::Box, str::SplitWhitespace, string::ToString, vec::Vec};
 
 use crate::{
     c_str::{CStr, OwnedThinCStr},
-    casting::FromExt,
     error::{Errno, ResultExt},
     header::{
         arpa_inet::inet_aton,
@@ -801,9 +800,10 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
             None => continue,
         };
         unsafe {
-            SERV_PORT = Some(u32::from(htons(u16::relibc_from(atoi(
-                port.as_mut_slice().as_mut_ptr().cast::<c_char>(),
-            )))) as i32)
+            SERV_PORT = Some(u32::from(htons(
+                u16::try_from(atoi(port.as_mut_slice().as_mut_ptr().cast::<c_char>()))
+                    .expect("port number should not exceed u16::MAX"),
+            )) as i32)
         };
         let proto = match split.next() {
             Some(proto) => proto.bytes().chain(Some(b'\0')).collect(),
