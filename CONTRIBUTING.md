@@ -18,21 +18,105 @@ any optimisation.
     `unimplemented!()` and hop right in!
 - If you notice any missing functionality, feel free to add it in
 
-## Code style
+## Code style and philosophy
 
 We have a `rustfmt.toml` in the root directory of relibc. Please run `./fmt.sh`
 before sending in any merge requests as it will automatically format your code.
 
-With regards to general style:
+Rust gives a powerful advantage over C in that the type system can encode a much richer set of constraints, enabling the compiler to (almost fully) be able to give guarantees that safe code in a properly constructed codebase, can't cause any Undefined Behavior. While a libc implementation obviously requires unsafe at most places it provides C-compatible interfaces, relibc has recently become much better at using abstractions that can reduce the risk of UB and logic errors, by being more Rust-like. It's thus recommended to try moving as much unsafe and C-isms as possible to the "leaf functions". Some of the building blocks for this are still being developed though, or are not yet as ergonomic, so contributions are of course welcome!
 
-### Where applicable, prefer using references to raw pointers
+### Use Rust-like error handling
 
-This is most obvious when looking at `stdio` functions. If raw pointers were
-used instead of references, then the resulting code would be significantly
-uglier. Instead try to check for pointer being valid with `pointer::as_ref()`
-and `pointer::as_mut()` and then immediately use those references instead.
+We provide the `Errno` error type, which is a very thin wrapper over the possible C-style error numbers that can be returned. This means the internal implementations usually never need to access `errno` or return raw error codes, etc.
 
-Internal functions should always take references.
+Prefer this:
+
+```rust
+// (where the impl is located)
+fn some_implementation_function(arg: Arg) -> Result<(), Errno> {
+    if arg == 0 {
+        Ok(())
+    } else {
+        Err(Errno(EOPNOTSUPP))
+    }
+}
+
+// (where the header module is located)
+#[no_mangle]
+pub extern "C" unsafe fn some_interface_function(arg: Arg) -> c_int {
+    some_implementation_function(arg).or_minus_one_errno()
+}
+```
+
+over this:
+
+```rust
+// (where the impl is located)
+fn some_implementation_function(arg: Arg) -> c_int {
+    if arg == 0 {
+        0
+    } else {
+        platform::ERRNO.set(-EOPNOTSUPP);
+        -1
+    }
+}
+
+// (where the header module is located)
+#[no_mangle]
+pub extern "C" unsafe fn some_interface_function(arg: Arg) -> c_int {
+    some_implementation_function(arg)
+}
+```
+
+Even in small functions, it can sometimes be good to create a closure and then immediately call it, i.e.
+```rust
+#[no_mangle]
+pub extern "C" unsafe fn some_interface_function(arg: Arg) -> c_int {
+    (|| {
+        Err(Errno(EOPNOTSUPP))
+    })().or_minus_one_errno()
+}
+```
+
+### Use safe wrappers over raw C types and patterns, where possible
+
+Some interfaces like `getenv` and `environ` will be inherently unsafe and are mostly impractical to create safe wrappers for. However, in many situations, even C-style invariants like NUL-terminated strings and arrays can be safely encoded in Rust. In particular, we can use the `CStr` and `WStr` wrappers for C strings, `NulTerminated<T>` for nul-terminated arrays, `Out<T>` for the possibly uninitialized "out-pointer" pattern, and of course regular Rust slices. For example (the actual standard and code is a bit different), prefer this:
+
+```rust
+fn getsockname_impl(socket: c_int, address_dst: Out<[u8]>, some_extra_field: Option<CStr<'_>>) -> Result<socklen_t> {
+    // ...
+    let true_value: Vec<u8> = get_true_value()?;
+    address_dst.copy_common_length_from_slice(&true_value);
+    Ok(true_value)
+}
+
+// Interface is used to get the name of a socket. It takes a buffer whose length can be read from the pointer, which is then used to return the true length to allow buffer enlargement etc if needed. The return value is just used for error handling here.
+#[no_mangle]
+pub extern "C" unsafe fn getsockname_c(socket: c_int, address_buf: *mut c_void, address_len_inout: *mut socklen_t, some_extra_field: *const c_char) -> c_int {
+    // unsafe is restricted to C-adjacent code...
+    let dst = unsafe { Out::from_raw_parts_mut(address_buf.cast(), address_len_inout.read() as _) };
+    let some_extra_field = unsafe { CStr::from_nullable_ptr(some_extra_field) };
+
+    let res = getsockname_impl(socket, dst);
+    if let Ok(true_len) = res {
+        unsafe {
+            address_len_inout.write(true_len);
+        }
+    }
+    // ... as is errno
+    res.or_minus_one_errno()
+}
+```
+
+over simply forwarding these C-isms to the implementation.
+
+### Make public structs/typedefs opaque when the standard does not specify its fields
+
+For type definitions like `FILE *` and `pthread_t` etc., there's no requirement by POSIX that C code can access its fields, and hence it will be advantageous to declare an internal Rust struct that can use C-incompatible safe types like `String`, `Vec<T>`, `File` etc, and an outside opaque struct whose length and alignment matches.
+
+This should be preferred over using raw pointer equivalents, even though it can be a bit more verbose. The C implementation functions will then always dereference e.g. `FILE *` into e.g. `&File`. See the `FILE *`, `pthread_t` <-> `Pthread` definitions for how this can be done. It's usually good to also reserve some space as ABI breakage will require header upstream crates to be patched, but it's always possible (at some perf cost) to make it larger by boxing.
+
+Of course, if the standard *does* require individual fields of a particular struct to be accessible, or if the struct needs to be accessed with macros, this may not be possible.
 
 ### Use the c types exposed in our platform module instead of Rust's inbuilt integer types
 
@@ -43,12 +127,9 @@ being 32 bits instead of 64. If you use the types in platform, then we can
 guarantee that your code will "just work" should we port relibc to a different
 architecture.
 
-### Use our internal functions
+### Use our other functions
 
-If you need to use a C string, don't reinvent the wheel. We have functions in
-the platform module that convert C strings to Rust slices.
-
-We also have structures that wrap files, wrap writable strings, and wrap various
+We have structures that wrap files, wrap writable strings, and wrap various
 other commonly used things that you should use instead of rolling your own.
 
 ## Sending merge requests
