@@ -27,7 +27,7 @@ Rust gives a powerful advantage over C in that the type system can encode a much
 
 ### Use Rust-like error handling
 
-We provide the `Errno` error type, which is a very thin wrapper over the possible C-style error numbers that can be returned. This means the internal implementations usually never need to access `errno` or return
+We provide the `Errno` error type, which is a very thin wrapper over the possible C-style error numbers that can be returned. This means the internal implementations usually never need to access `errno` or return raw error codes, etc.
 
 Prefer this:
 
