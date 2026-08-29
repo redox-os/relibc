@@ -1,3 +1,4 @@
+use crate::casting::FromExt;
 use alloc::string::{String, ToString};
 
 use sha_crypt::{
@@ -114,12 +115,12 @@ pub fn crypt_sha(passw: &[u8], setting: &str, cipher: ShaType) -> Option<String>
 
     if let Ok(enc) = match cipher {
         ShaType::Sha256 => {
-            let params = Sha256Params::new(rounds as usize)
+            let params = Sha256Params::new(usize::inf_from(rounds))
                 .unwrap_or(Sha256Params::new(ROUNDS_DEFAULT).unwrap());
             sha256_crypt_b64(passw, setting.as_bytes(), &params)
         }
         ShaType::Sha512 => {
-            let params = Sha512Params::new(rounds as usize)
+            let params = Sha512Params::new(usize::inf_from(rounds))
                 .unwrap_or(Sha512Params::new(ROUNDS_DEFAULT).unwrap());
             sha512_crypt_b64(passw, setting.as_bytes(), &params)
         }

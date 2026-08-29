@@ -5,6 +5,7 @@
 use core::{mem, ptr, slice};
 
 use crate::{
+    casting::FromExt,
     error::Errno,
     fs::File,
     header::{
@@ -120,7 +121,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 
     // Early exit if there are fds, and all are closed (revents = POLLNVAL)
     if closed > 0 && closed == fds.len() {
-        return closed as i32;
+        return i32::inf_from(closed);
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
@@ -128,7 +129,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         Sys::epoll_pwait(
             *ep,
             events.as_mut_ptr(),
-            events.len() as c_int,
+            c_int::inf_from(events.len()),
             timeout,
             sigmask,
         )

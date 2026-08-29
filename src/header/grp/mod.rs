@@ -15,6 +15,7 @@ use core::{
 use alloc::string::{FromUtf8Error, String};
 
 use crate::{
+    casting::FromExt,
     error::ResultExt,
     fs::File,
     header::{errno, fcntl, limits, string::strlen},
@@ -107,6 +108,7 @@ pub struct group {
     pub gr_mem: *mut *mut c_char,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 enum Error {
     EOF,
@@ -576,7 +578,7 @@ pub unsafe extern "C" fn getgrouplist(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
-    let mut count = groups.len() as c_int;
+    let mut count = c_int::inf_from(groups.len());
     if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &raw mut count) < 0 } {
         return -1;
     }

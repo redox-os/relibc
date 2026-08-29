@@ -8,6 +8,8 @@
 use alloc::string::{String, ToString};
 use core::str;
 
+use crate::casting::FromExt;
+
 use libm::{fabs, pow, round, trunc};
 
 extern crate alloc;
@@ -73,7 +75,7 @@ fn apply_grouping(int_str: &str, monetary: &LocaleMonetaryInfo) -> String {
     for (count, c) in int_str.chars().enumerate() {
         if count > 0 {
             let current_group = current_grouping[group_idx.min(current_grouping.len() - 1)];
-            if current_group > 0 && (count as u8).is_multiple_of(current_group) {
+            if current_group > 0 && (u8::inf_from(count)).is_multiple_of(current_group) {
                 grouped.push_str(separator);
                 if group_idx + 1 < current_grouping.len() {
                     group_idx += 1;

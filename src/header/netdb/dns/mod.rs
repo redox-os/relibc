@@ -9,6 +9,7 @@
 // except according to those terms.
 
 pub use self::{answer::DnsAnswer, query::DnsQuery};
+use crate::casting::FromExt;
 
 use alloc::{string::String, vec::Vec};
 
@@ -41,14 +42,14 @@ impl Dns {
 
         push_n16!(self.transaction_id);
         push_n16!(self.flags);
-        push_n16!(self.queries.len() as u16);
-        push_n16!(self.answers.len() as u16);
+        push_n16!(u16::inf_from(self.queries.len()));
+        push_n16!(u16::inf_from(self.answers.len()));
         push_n16!(0);
         push_n16!(0);
 
         for query in self.queries.iter() {
             for part in query.name.split('.') {
-                push_u8!(part.len() as u8);
+                push_u8!(u8::inf_from(part.len()));
                 data.extend_from_slice(part.as_bytes());
             }
             push_u8!(0);
