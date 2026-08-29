@@ -61,6 +61,7 @@ fn some_implementation_function(arg: Arg) -> c_int {
     }
 }
 
+// (where the header module is located)
 #[no_mangle]
 pub extern "C" unsafe fn some_interface_function(arg: Arg) -> c_int {
     some_implementation_function(arg)
