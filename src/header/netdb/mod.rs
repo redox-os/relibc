@@ -801,7 +801,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
             None => continue,
         };
         unsafe {
-            SERV_PORT = Some(u32::from(htons(u16::inf_from(atoi(
+            SERV_PORT = Some(u32::from(htons(u16::relibc_from(atoi(
                 port.as_mut_slice().as_mut_ptr().cast::<c_char>(),
             )))) as i32)
         };

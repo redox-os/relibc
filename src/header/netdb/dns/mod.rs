@@ -42,14 +42,14 @@ impl Dns {
 
         push_n16!(self.transaction_id);
         push_n16!(self.flags);
-        push_n16!(u16::inf_from(self.queries.len()));
-        push_n16!(u16::inf_from(self.answers.len()));
+        push_n16!(u16::relibc_from(self.queries.len()));
+        push_n16!(u16::relibc_from(self.answers.len()));
         push_n16!(0);
         push_n16!(0);
 
         for query in self.queries.iter() {
             for part in query.name.split('.') {
-                push_u8!(u8::inf_from(part.len()));
+                push_u8!(u8::relibc_from(part.len()));
                 data.extend_from_slice(part.as_bytes());
             }
             push_u8!(0);

@@ -195,7 +195,7 @@ impl CCharToU8 {
 // A trait intended to indicate infallible transformations when we know the
 // value is within the expected bounds.
 pub trait FromExt<T>: Sized {
-    fn inf_from(value: T) -> Self;
+    fn relibc_from(value: T) -> Self;
 }
 
 impl FromExt<i32> for u16 {
@@ -203,7 +203,7 @@ impl FromExt<i32> for u16 {
     ///
     /// # Panics
     /// If the `i32` value is negative or larger than `u16::MAX`.
-    fn inf_from(value: i32) -> Self {
+    fn relibc_from(value: i32) -> Self {
         Self::try_from(value).expect("should be within bounds")
     }
 }
@@ -213,7 +213,7 @@ impl FromExt<u32> for usize {
     ///
     /// # Panics
     /// If the `u32` value is larger than the platform specific `usize` value.
-    fn inf_from(value: u32) -> Self {
+    fn relibc_from(value: u32) -> Self {
         Self::try_from(value).expect("should be within bounds")
     }
 }
@@ -223,7 +223,7 @@ impl FromExt<u64> for usize {
     ///
     /// # Panics
     /// If the `u64` value is larger than the platform specific `usize` value.
-    fn inf_from(value: u64) -> Self {
+    fn relibc_from(value: u64) -> Self {
         Self::try_from(value).expect("should be within bounds")
     }
 }
@@ -233,7 +233,7 @@ impl FromExt<usize> for u8 {
     ///
     /// # Panics
     /// If the `usize` value is larger than `u8::MAX`.
-    fn inf_from(value: usize) -> Self {
+    fn relibc_from(value: usize) -> Self {
         Self::try_from(value).expect("should be within bounds")
     }
 }
@@ -243,7 +243,7 @@ impl FromExt<usize> for u16 {
     ///
     /// # Panics
     /// If the `usize` value is larger than `u16::MAX`.
-    fn inf_from(value: usize) -> Self {
+    fn relibc_from(value: usize) -> Self {
         Self::try_from(value).expect("should be within bounds")
     }
 }
@@ -253,7 +253,7 @@ impl FromExt<usize> for i32 {
     ///
     /// # Panics
     /// If the `usize` value is larger than `i32::MAX`.
-    fn inf_from(value: usize) -> Self {
+    fn relibc_from(value: usize) -> Self {
         Self::try_from(value).expect("should be within bounds")
     }
 }

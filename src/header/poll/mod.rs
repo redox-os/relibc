@@ -121,7 +121,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 
     // Early exit if there are fds, and all are closed (revents = POLLNVAL)
     if closed > 0 && closed == fds.len() {
-        return i32::inf_from(closed);
+        return i32::relibc_from(closed);
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
@@ -129,7 +129,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         Sys::epoll_pwait(
             *ep,
             events.as_mut_ptr(),
-            c_int::inf_from(events.len()),
+            c_int::relibc_from(events.len()),
             timeout,
             sigmask,
         )
