@@ -56,7 +56,7 @@ impl crypt_data {
 }
 
 fn gen_salt() -> Option<String> {
-    let mut rng = SmallRng::seed_from_u64(unsafe { rand() as u64 });
+    let mut rng = SmallRng::seed_from_u64(unsafe { u64::from(rand().cast_unsigned()) });
     let mut bytes = [0u8; Salt::RECOMMENDED_LENGTH];
     rng.fill_bytes(&mut bytes);
     Some(SaltString::encode_b64(&bytes).ok()?.as_str().to_string())

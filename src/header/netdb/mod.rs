@@ -949,7 +949,7 @@ fn getaddrinfo_inner(
         let mut sockaddr = vec![0_u8; size_of::<sockaddr_in>()].into_boxed_slice();
 
         *plain::from_mut_bytes(&mut sockaddr).unwrap() = sockaddr_in {
-            sin_family: ai_family as sa_family_t,
+            sin_family: sa_family_t::try_from(ai_family).expect("AF_INET is positive"),
             sin_port: htons(port),
             sin_addr: in_addr,
             sin_zero: [0; 8],

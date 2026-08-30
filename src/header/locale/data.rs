@@ -242,12 +242,14 @@ impl GlobalLocaleData {
     }
 
     pub fn get_name(&self, category: i32) -> Option<&CString> {
-        self.names.get(category as usize)
+        self.names
+            .get(usize::try_from(category).expect("all category constants are positive"))
     }
     pub fn set_name(&mut self, category: i32, name: CString) -> Option<&CString> {
-        if self.names.get(category as usize).is_some() {
-            self.names[category as usize] = name;
-            self.names.get(category as usize)
+        let category = usize::try_from(category).expect("all category constants are positive");
+        if self.names.get(category).is_some() {
+            self.names[category] = name;
+            self.names.get(category)
         } else {
             None
         }
