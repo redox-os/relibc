@@ -11,28 +11,30 @@ use crate::{
         Pal, Sys,
         types::{c_uint, clockid_t},
     },
-    sync::FutexAtomicTy,
+    // sync::FutexAtomicTy,
 };
 
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 pub struct Semaphore {
-    count: AtomicU32,
+    count: AtomicU64,
 }
 
 impl Semaphore {
     pub const fn new(value: c_uint) -> Self {
         Self {
-            count: AtomicU32::new(value),
+            count: AtomicU64::new(value as _),
         }
     }
 
     // TODO: Acquire-Release ordering?
 
     pub fn post(&self, count: c_uint) {
-        self.count.fetch_add(count, Ordering::SeqCst);
+        self.count.fetch_add(count as _, Ordering::SeqCst);
         // TODO: notify one?
-        crate::sync::futex_wake(&self.count, i32::MAX);
+        unsafe {
+            let _ = Sys::futex_wake((&self.count).as_ptr() as *mut u32, u32::MAX);
+        }
     }
 
     pub fn try_wait(&self) -> bool {
@@ -68,14 +70,14 @@ impl Semaphore {
                     CLOCK_REALTIME => timespec_realtime_to_monotonic(timeout)?,
                     _ => return Err(Errno(errno::EINVAL)),
                 };
-                unsafe { Sys::futex_wait(self.count.ptr(), 0, Some(&relative))? };
+                unsafe { Sys::futex_wait64(self.count.as_ptr(), 0, Some(&relative))? };
             } else {
                 // Use futex to wait for the next change, without a timeout
-                unsafe { Sys::futex_wait(self.count.ptr(), 0, None)? };
+                unsafe { Sys::futex_wait64(self.count.as_ptr(), 0, None)? };
             }
         }
     }
     pub fn value(&self) -> c_uint {
-        self.count.load(Ordering::SeqCst)
+        self.count.load(Ordering::SeqCst) as _
     }
 }

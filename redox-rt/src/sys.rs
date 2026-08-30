@@ -159,6 +159,23 @@ pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpe
         .map(|_| ())
     })
 }
+
+#[inline]
+pub unsafe fn sys_futex_wait64(addr: *mut u64, val: u64, deadline: Option<&TimeSpec>) -> Result<()> {
+    wrapper(true, false, || {
+        unsafe {
+            syscall::syscall5(
+                syscall::SYS_FUTEX,
+                addr as usize,
+                syscall::FUTEX_WAIT64,
+                val as usize,
+                deadline.map_or(0, |d| core::ptr::from_ref(d) as usize),
+                0,
+            )
+        }
+        .map(|_| ())
+    })
+}
 #[inline]
 pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     unsafe {

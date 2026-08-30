@@ -157,6 +157,8 @@ pub trait Pal {
 
     unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()>;
 
+    unsafe fn futex_wait64(addr: *mut u64, val: u64, deadline: Option<&timespec>) -> Result<()>;
+
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32>;
 
     /// Platform implementation of [`futimens()`](crate::header::sys_stat::futimens) from [`sys/stat.h`](crate::header::sys_stat).
