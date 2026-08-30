@@ -8,7 +8,7 @@ use crate::{
         stdio, string,
         unistd::{optarg, opterr, optind, optopt},
     },
-    platform::types::{c_char, c_int, size_t},
+    platform::types::{c_char, c_int},
 };
 use core::ptr;
 
@@ -92,7 +92,9 @@ pub unsafe extern "C" fn getopt_long(
                             end += 1;
                         }
 
-                        if unsafe { string::strncmp(current_arg, opt.name, end as size_t) == 0 } {
+                        if unsafe {
+                            string::strncmp(current_arg, opt.name, end.cast_unsigned()) == 0
+                        } {
                             unsafe {
                                 optind += 1;
                                 if !longindex.is_null() {

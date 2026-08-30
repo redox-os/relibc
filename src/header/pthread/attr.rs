@@ -294,9 +294,6 @@ pub unsafe extern "C" fn pthread_attr_setdetachstate(
 /// Upon success, returns `0`. Upon failure, returns an error number to
 /// indicate the error.
 ///
-/// # Implementation
-/// Always succeeds, so will never return an error number.
-///
 /// # Safety
 /// It is undefined behaviour if `attr` is not initialized.
 #[unsafe(no_mangle)]
@@ -304,10 +301,15 @@ pub unsafe extern "C" fn pthread_attr_setguardsize(
     attr: *mut pthread_attr_t,
     guardsize: c_int,
 ) -> c_int {
-    unsafe {
-        (*attr.cast::<RlctAttr>()).guardsize = guardsize as _;
+    if guardsize < 0 {
+        crate::header::errno::EINVAL
+    } else {
+        unsafe {
+            (*attr.cast::<RlctAttr>()).guardsize =
+                usize::try_from(guardsize).expect("already checked for negative values");
+        }
+        0
     }
-    0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_attr_setinheritsched.html>.

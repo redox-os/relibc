@@ -35,7 +35,12 @@ pub unsafe extern "C" fn preadv(
         return -1;
     }
 
-    let iovs = unsafe { slice::from_raw_parts(iov, iovcnt as usize) };
+    let iovs = unsafe {
+        slice::from_raw_parts(
+            iov,
+            usize::try_from(iovcnt).expect("value positive and below usize::MAX"),
+        )
+    };
     let mut vec = unsafe { gather(iovs) };
 
     let ret = unsafe { unistd::pread(fd, vec.as_mut_ptr().cast::<c_void>(), vec.len(), offset) };
@@ -63,7 +68,12 @@ pub unsafe extern "C" fn pwritev(
         return -1;
     }
 
-    let iovs = unsafe { slice::from_raw_parts(iov, iovcnt as usize) };
+    let iovs = unsafe {
+        slice::from_raw_parts(
+            iov,
+            usize::try_from(iovcnt).expect("value positive and below usize::MAX"),
+        )
+    };
     let vec = unsafe { gather(iovs) };
 
     unsafe { unistd::pwrite(fd, vec.as_ptr().cast::<c_void>(), vec.len(), offset) }
