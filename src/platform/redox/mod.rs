@@ -6,7 +6,7 @@ use core::{
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
-use redox_path::RedoxStr;
+use redox_path::{RedoxReference, RedoxStr};
 use redox_protocols::protocol::{WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
@@ -36,7 +36,7 @@ use crate::{
             self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
             F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
-        limits::{self},
+        limits,
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
         sys_file,
@@ -1063,11 +1063,7 @@ impl Pal for Sys {
         // Since this is used by realpath, it converts from the old format to the new one for
         // compatibility reasons
         let mut buf = [0; limits::PATH_MAX];
-        let count = syscall::fpath(fildes as usize, &mut buf)?;
-
-        let redox_path = redox_path::RedoxPath::from_absolute_buf(&buf, count)
-            .ok_or(Errno(EINVAL))?
-            .to_standard();
+        let redox_path = path::standard_fpath(fildes, &mut buf)?;
 
         let mut cursor = io::Cursor::new(out);
         match write!(cursor, "{}", redox_path.as_ref()) {
@@ -1088,7 +1084,7 @@ impl Pal for Sys {
             dirfd,
             path,
             0,
-            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_NOFOLLOW | fcntl::O_CLOEXEC,
+            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
         )?;
         Sys::read(*file, out)
     }
@@ -1739,8 +1735,8 @@ impl Pal for Sys {
         let flags: usize = flags.try_into().map_err(|_| Errno(EINVAL))?;
 
         let target = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
-        let target: Cow<'_, str> = openat2_path(fd, target, 0)?.into();
-        let r = redox_rt::sys::unlink(&target, flags).map(|_| ());
+        let target = openat2_path(fd, target, 0)?.to_standard();
+        let r = redox_rt::sys::unlink(target.as_ref(), flags).map(|_| ());
         trace_log!(
             "unlinkat ({fd}, {:?}, {:x}): [{:?}] {:?}",
             path.to_string_lossy(),
@@ -1750,17 +1746,15 @@ impl Pal for Sys {
         );
 
         if matches!(r, Err(Error { errno: EXDEV })) {
-            // slower path to make this work across scheme
-
-            // SAFETY: Already converted to RedoxStr before.
-            let target = unsafe { RedoxStr::new_unchecked(target) };
+            // slower code path to make this work across scheme
             let (mut new_path_dir, Some(new_path_file)) = target.dirname_split() else {
                 return Err(Errno(EINVAL));
             };
-            if new_path_dir.is_empty() {
-                new_path_dir = RedoxStr::new(".").unwrap();
+            if new_path_dir.as_ref().is_empty() {
+                new_path_dir = RedoxReference::new(".").unwrap();
             }
-            let target_dir = File::new(libredox::openat(fd, new_path_dir, fcntl::O_PATH, 0)? as _);
+            let target_dir =
+                File::new(libredox::openat(fd, new_path_dir.into(), fcntl::O_PATH, 0)? as _);
             let target2: Cow<'_, str> = openat2_path(*target_dir, new_path_file.into(), 0)?.into();
             let r = redox_rt::sys::unlink(&target2, flags).map(|_| ());
             trace_log!(
