@@ -233,9 +233,6 @@ VARIED_NAMES=\
 	includes \
 	kill-waitpid \
 	limits \
-	net/if \
-	netdb/getaddrinfo \
-	netdb/getaddrinfo_null \
 	pthread/timedwait \
 	pty/forkpty \
 	psignal \
@@ -332,6 +329,9 @@ VARIED_NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	net/if \
+	netdb/getaddrinfo \
+	netdb/getaddrinfo_null \
 	waitpid \
 	waitpid_multiple \
 	$(FAILING_TESTS)
