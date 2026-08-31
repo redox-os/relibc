@@ -181,6 +181,7 @@ pub fn sys_call_ro<T: Call>(
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
+    let flags = flags | fd.extra_flags();
     if !flags.contains(CallFlags::FD) {
         return unsafe {
             fd.raw_call(
@@ -262,6 +263,7 @@ pub fn sys_call_wo<T: Call>(
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
+    let flags = flags | fd.extra_flags();
     if !flags.contains(CallFlags::FD) {
         return unsafe {
             fd.raw_call(
@@ -308,6 +310,7 @@ pub fn sys_call_rw<T: Call>(
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
+    let flags = flags | fd.extra_flags();
     unsafe {
         fd.raw_call(
             payload.as_mut_ptr(),
@@ -833,6 +836,24 @@ pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
                 as u64;
     }
     res
+}
+
+pub fn frenameat(fd: usize, dirfd: usize, path: &str, flags: u32) -> Result<()> {
+    std_fs_call_wo(
+        &[fd, dirfd][..],
+        path.as_bytes(),
+        &StdFsCallMeta::new(StdFsCallKind::Frenameat, flags as u64, 0),
+    )
+    .map(|_| ())
+}
+
+pub fn flinkat(fd: usize, dirfd: usize, path: &str, flags: u32) -> Result<()> {
+    std_fs_call_wo(
+        &[fd, dirfd][..],
+        path.as_bytes(),
+        &StdFsCallMeta::new(StdFsCallKind::Flinkat, flags as u64, 0),
+    )
+    .map(|_| ())
 }
 
 pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {

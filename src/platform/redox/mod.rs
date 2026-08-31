@@ -29,7 +29,7 @@ use crate::{
     fs::File,
     header::{
         errno::{
-            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
+            EBADF, EBADFD, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
             ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
@@ -774,9 +774,18 @@ impl Pal for Sys {
         }
 
         let file = File::openat(fd1, oldpath, oflags)?;
-        let newpath: Cow<'_, str> = openat2_path(fd2, newpath, 0)?.into();
-        syscall::flink(*file as usize, newpath)?;
-        Ok(())
+
+        let target_dirfd = if fd2 == fcntl::AT_FDCWD {
+            let cwd_guard = path::current_dir()?;
+            let cwd = cwd_guard.as_ref().unwrap();
+            cwd.fd.as_raw_fd() as usize
+        } else {
+            fd2 as usize
+        };
+
+        let newpath: Cow<'_, str> = newpath.into();
+        redox_rt::sys::flinkat(*file as usize, target_dirfd, &newpath, flags as u32)
+            .map_err(Into::into)
     }
 
     fn lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
@@ -1109,28 +1118,21 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let new_path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
-        // Fail if the target exists with RENAME_NOREPLACE.
-        if flags & RENAME_NOREPLACE != 0
-            && let Ok(_) = libredox::openat(
-                new_dir,
-                new_path.clone(),
-                fcntl::O_PATH | fcntl::O_CLOEXEC,
-                0,
-            )
-            .map(FdGuard::new)
-        {
-            return Err(Errno(EEXIST));
-        }
+        let newpath = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
 
         // oflags are the same as Sys::rename above.
         let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
 
-        let target: Cow<'_, str> = openat2_path(new_dir, new_path, 0)?.into();
-        // I'm avoiding Sys::rename to avoid reallocating a CString from a String.
-        syscall::frename(*source as usize, target)
-            .map(|_| ())
-            .map_err(Into::into)
+        let new_dirfd = if new_dir == fcntl::AT_FDCWD {
+            let cwd_guard = path::current_dir()?;
+            let cwd = cwd_guard.as_ref().unwrap();
+            cwd.fd.as_raw_fd() as usize
+        } else {
+            new_dir as usize
+        };
+
+        let target: Cow<'_, str> = newpath.into();
+        redox_rt::sys::frenameat(*source as usize, new_dirfd, &target, flags).map_err(Into::into)
     }
 
     fn sched_yield() -> Result<()> {
