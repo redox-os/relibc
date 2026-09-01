@@ -139,11 +139,11 @@ impl<R: Seek> BufReader<R> {
     pub fn seek_relative(&mut self, offset: i64) -> io::Result<()> {
         let pos = self.pos as u64;
         if offset < 0 {
-            if let Some(new_pos) = pos.checked_sub((-offset) as u64) {
+            if let Some(new_pos) = pos.checked_sub((-offset).cast_unsigned()) {
                 self.pos = new_pos as usize;
                 return Ok(());
             }
-        } else if let Some(new_pos) = pos.checked_add(offset as u64)
+        } else if let Some(new_pos) = pos.checked_add(offset.cast_unsigned())
             && new_pos <= self.cap as u64
         {
             self.pos = new_pos as usize;

@@ -135,7 +135,7 @@ impl Read for FileReader {
             .map(|u| u as isize)
             .or_minus_one_errno(); // TODO
         if i >= 0 {
-            Ok(i as usize)
+            Ok(i.cast_unsigned())
         } else {
             Err(io::Error::from_raw_os_error(-i as i32))
         }

@@ -28,7 +28,8 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
         return -1;
     }
 
-    let iovs = unsafe { slice::from_raw_parts(iov, iovcnt as usize) };
+    let iovs =
+        unsafe { slice::from_raw_parts(iov, usize::try_from(iovcnt).expect("iovcnt is positive")) };
     let mut vec = unsafe { gather(iovs) };
 
     let ret = unsafe { unistd::read(fd, vec.as_mut_ptr().cast::<c_void>(), vec.len()) };
@@ -53,7 +54,8 @@ pub unsafe extern "C" fn writev(fd: c_int, iov: *const iovec, iovcnt: c_int) -> 
         return -1;
     }
 
-    let iovs = unsafe { slice::from_raw_parts(iov, iovcnt as usize) };
+    let iovs =
+        unsafe { slice::from_raw_parts(iov, usize::try_from(iovcnt).expect("iovcnt is positive")) };
     let vec = unsafe { gather(iovs) };
 
     unsafe { unistd::write(fd, vec.as_ptr().cast::<c_void>(), vec.len()) }
