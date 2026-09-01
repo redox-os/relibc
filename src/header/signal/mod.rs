@@ -10,11 +10,7 @@ use cbitset::BitSet;
 use crate::platform::types::pthread_attr_t;
 use crate::{
     error::{Errno, ResultExt},
-    header::{
-        bits_sigset_t::sigset_t,
-        errno::{self, EINVAL},
-        time::timespec,
-    },
+    header::{bits_sigset_t::sigset_t, errno, time::timespec},
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{c_char, c_int, c_ulonglong, c_void, pid_t, pthread_t, size_t, uid_t},
@@ -250,18 +246,11 @@ pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
 /// not send the signal.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
-    // TODO match against all valid signals and return EINVAL if invalid
-    if sig == 0 {
-        return EINVAL;
-    }
     let os_tid = {
         let pthread = unsafe { &*(thread as *const crate::pthread::Pthread) };
         unsafe { pthread.os_tid.get().read() }
     };
-    // FIXME: SI_QUEUE is the only negative signal we have, is it ever valid use it here?
-    crate::header::pthread::e(unsafe {
-        Sys::rlct_kill(os_tid, usize::try_from(sig).expect("should be positive"))
-    })
+    crate::header::pthread::e(unsafe { Sys::rlct_kill(os_tid, sig as usize) })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_sigmask.html>.
