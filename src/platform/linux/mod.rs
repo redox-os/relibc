@@ -96,8 +96,8 @@ impl Pal for Sys {
                 FCHOWNAT,
                 fildes,
                 path.as_ptr(),
-                owner as u32,
-                group as u32,
+                owner.cast_unsigned(),
+                group.cast_unsigned(),
                 flags
             )
         })
@@ -315,7 +315,10 @@ impl Pal for Sys {
     // FIXME use offset or remove it
     unsafe fn dent_reclen_offset(this_dent: &[u8], _offset: usize) -> Option<(u16, u64)> {
         let dent = this_dent.as_ptr().cast::<dirent>();
-        Some((unsafe { (*dent).d_reclen }, unsafe { (*dent).d_off } as u64))
+        Some((
+            unsafe { (*dent).d_reclen },
+            unsafe { (*dent).d_off }.cast_unsigned(),
+        ))
     }
 
     fn getegid() -> gid_t {
@@ -536,7 +539,7 @@ impl Pal for Sys {
     }
 
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
-        let current_offset = Self::lseek(fildes, 0, SEEK_CUR)? as u64;
+        let current_offset = Self::lseek(fildes, 0, SEEK_CUR)?.cast_unsigned();
         let bytes_read = Self::getdents(fildes, buf, current_offset)?;
         if bytes_read == 0 {
             return Ok(0);
