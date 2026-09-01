@@ -17,7 +17,7 @@ int main()
 
 	int status;
 	status = pthread_kill(main_thread, -1);
-	ERROR_IF(pthread_kill, status, != EINVAL);
+	ERROR_IF2(pthread_kill, status, != EINVAL);
 
 	return EXIT_SUCCESS;
 }

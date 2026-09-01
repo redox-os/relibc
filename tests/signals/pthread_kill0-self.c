@@ -15,7 +15,7 @@ int main()
 
 	int status;
 	status = pthread_kill(main_thread, 0);
-	ERROR_IF(pthread_kill, status, != 0);
+	ERROR_IF2(pthread_kill, status, != 0);
 
 	return EXIT_SUCCESS;
 }
