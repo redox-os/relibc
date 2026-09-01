@@ -173,7 +173,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
         let index = unsafe {
             // SAFETY: the sub-pointer as returned by strchr must be derived from the same
             // allocation
-            substr.as_ptr().offset_from(self.as_ptr()) as usize
+            substr.as_ptr().offset_from(self.as_ptr()).cast_unsigned()
         };
         unsafe { core::slice::from_raw_parts(self.as_ptr().cast::<T::Char>(), index) }
     }
@@ -269,7 +269,6 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// Scan the string to get its length.
     #[doc(alias = "strlen")]
     #[doc(alias = "wcslen")]
-    #[expect(clippy::len_without_is_empty, reason = "len() signature intentional")]
     pub fn len(self) -> usize {
         self.to_chars().len()
     }
@@ -304,7 +303,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// It's a logic error for the prefix to contain NUL bytes.
     #[inline]
     pub fn strip_prefix_full(self, prefix: &[T::Char]) -> Option<(&'a [T::Char], Self)> {
-        assert!(!prefix.iter().any(|c| *c == T::NUL));
+        assert!(!prefix.contains(&T::NUL));
 
         // SAFETY:
         //
@@ -343,7 +342,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// # Safety
     ///
     /// - for each string `s` in `raw`, it must be safe to call `Self::from_ptr(s)`, i.e. it must
-    /// be valid and nonnull
+    ///   be valid and nonnull
     pub unsafe fn strs_from_raw(raw: &[*const c_char]) -> &[Self] {
         // SAFETY: layout compatible, and caller guarantees each element in `raw` is valid as a
         // CStr/WStr
@@ -354,7 +353,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// # Safety
     ///
     /// - for each string `s` in `raw`, it must be safe to call `Self::from_nullable_ptr(s)`, i.e. it must
-    /// be valid or null
+    ///   be valid or null
     pub unsafe fn opt_strs_from_raw(raw: &[*const c_char]) -> &[Option<Self>] {
         // SAFETY: layout compatible, and caller guarantees each element in `raw` is valid as an
         // Option<CStr/WStr>

@@ -84,7 +84,7 @@ impl io::Read for &File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match Sys::read(self.fd, buf).map(|read| read as ssize_t).or_minus_one_errno() /* TODO */ {
             -1 => Err(io::last_os_error()),
-            ok => Ok(ok as usize),
+            ok => Ok(ok.cast_unsigned()),
         }
     }
 }
@@ -96,7 +96,7 @@ impl io::Write for &File {
             .or_minus_one_errno()
         {
             -1 => Err(io::last_os_error()),
-            ok => Ok(ok as usize),
+            ok => Ok(ok.cast_unsigned()),
         }
     }
 
@@ -113,7 +113,7 @@ impl io::Seek for &File {
             io::SeekFrom::End(end) => (end as off_t, SEEK_END),
         };
 
-        Ok(Sys::lseek(self.fd, offset, whence)? as u64)
+        Ok(Sys::lseek(self.fd, offset, whence)?.cast_unsigned())
     }
 }
 
@@ -149,10 +149,10 @@ impl Deref for File {
 
 impl Drop for File {
     fn drop(&mut self) {
-        if !self.reference {
-            if let Err(e) = Sys::close(self.fd) {
-                log::warn!("Close did not succeed: {e:?}");
-            }
+        if !self.reference
+            && let Err(e) = Sys::close(self.fd)
+        {
+            log::warn!("Close did not succeed: {e:?}");
         }
     }
 }
