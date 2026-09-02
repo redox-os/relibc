@@ -291,8 +291,19 @@ pub unsafe extern "C" fn redox_dup2_v1(
     old_fd: usize,
     new_fd: usize,
     _buf: *const u8,
-    _len: usize,
+    len: usize,
 ) -> RawResult {
+    if len != 0 {
+        eprintln!("redox_dup2_v1: Non-empty buffers are not supported");
+        return Error::mux(Err(Error::new(EINVAL)));
+    }
+    Error::mux(redox_rt::sys::dup2(old_fd, new_fd))
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_dup2_v2(
+    old_fd: usize,
+    new_fd: usize,
+ -> RawResult {
     Error::mux(redox_rt::sys::dup2(old_fd, new_fd))
 }
 #[unsafe(no_mangle)]
