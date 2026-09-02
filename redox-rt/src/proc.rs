@@ -974,6 +974,7 @@ pub enum ForkArgs<'a> {
     Init {
         this_thr_fd: &'a FdGuardUpper,
         auth: &'a FdGuard,
+        name: &'a str,
     },
     Managed,
 }
@@ -1188,7 +1189,11 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
         ForkArgs::Init { .. } => unreachable!(),
 
         #[cfg(not(feature = "proc"))]
-        ForkArgs::Init { this_thr_fd, auth } => {
+        ForkArgs::Init {
+            this_thr_fd: _,
+            auth,
+            name,
+        } => {
             let thr_fd = auth.dup_into_upper(b"new-context")?;
             let buf = syscall::ProcSchemeAttrs {
                 pid: 0,
@@ -1197,8 +1202,8 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
                 prio: !0, // Value is overwritten later
                 debug_name: {
                     let mut buf = [0; 32];
-                    let src = b"[init]";
-                    buf[..src.len()].copy_from_slice(src);
+                    let len = name.len().min(buf.len());
+                    buf[..len].copy_from_slice(&name.as_bytes()[..len]);
                     buf
                 },
             };
