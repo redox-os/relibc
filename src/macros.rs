@@ -214,78 +214,72 @@ macro_rules! wcsto_impl {
     }};
 }
 
+// TODO: this should be replaced by a (type and const-) generic function.
 #[macro_export]
 macro_rules! strto_impl {
     // this variant is used by inttypes and stdlib
     (
-        $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:ident, $endptr:ident, $base:ident
+        $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:expr, $endptr:expr, $base:ident
     ) => {{
+        use $crate::c_str::CStr;
+
         // ensure these are constants
         const CHECK_SIGN: bool = $signed;
         const MAX_VAL: $rettype = $maxval;
         const MIN_VAL: $rettype = $minval;
 
-        let set_endptr = |idx: isize| {
-            if !$endptr.is_null() {
+        let mut endptr: Option<&mut *mut c_char> = $endptr;
+        let mut s: CStr = $s;
+
+        let mut set_endptr = |s: CStr| {
+            if let Some(ref mut end) = endptr {
                 // This is stupid, but apparently strto* functions want
                 // const input but mut output, yet the man page says
                 // "stores the address of the first invalid character in *endptr"
                 // so obviously it doesn't want us to clone it.
-                unsafe {
-                    *$endptr = $s.offset(idx).cast_mut();
-                }
+                **end = s.as_ptr().cast_mut();
             }
         };
 
-        let invalid_input = || {
+        let mut invalid_input = |s| {
             platform::ERRNO.set(EINVAL);
-            set_endptr(0);
+            set_endptr(s);
         };
 
         // only valid bases are 2 through 36
         if $base != 0 && !(2..=36).contains(&$base) {
-            invalid_input();
+            invalid_input(s);
             return 0;
         }
 
-        let mut idx = 0;
-
-        // skip any whitespace at the beginning of the string
-        while ctype::isspace(c_int::from(unsafe { *$s.offset(idx) })) != 0 {
-            idx += 1;
-        }
+        s = s.trim_start_whitespace();
 
         // check for +/-
-        let positive = match is_positive(unsafe { *$s.offset(idx) }) {
-            Some((pos, i)) => {
-                idx += i;
+        let positive = match parse_sign(s) {
+            Some((pos, next)) => {
+                s = next;
                 pos
             }
             None => {
-                invalid_input();
+                invalid_input(s);
                 return 0;
             }
         };
 
         // convert the string to a number
-        let num_str = unsafe { $s.offset(idx) };
         let res = match $base {
-            0 => unsafe { detect_base(num_str) }.and_then(|($base, i)| {
-                idx += i;
-                unsafe { convert_integer(num_str.offset(i), $base) }
-            }),
-            8 => unsafe { convert_octal(num_str) },
-            16 => unsafe { convert_hex(num_str) },
-            _ => unsafe { convert_integer(num_str, $base) },
+            0 => detect_base(s).and_then(|($base, next)| convert_integer(next, $base)),
+            8 => convert_octal(s),
+            16 => convert_hex(s),
+            _ => convert_integer(s, $base),
         };
 
         // check for error parsing octal/hex prefix
         // also check to ensure a number was indeed parsed
-        let Some((num, i, overflow)) = res else {
-            invalid_input();
+        let Some((num, s, overflow)) = res else {
+            invalid_input(s);
             return 0;
         };
-        idx += i;
 
         let overflow = if CHECK_SIGN {
             overflow || (num as c_long).is_negative()
@@ -310,7 +304,7 @@ macro_rules! strto_impl {
             }
         };
 
-        set_endptr(idx);
+        set_endptr(s);
 
         num
     }};
@@ -318,6 +312,7 @@ macro_rules! strto_impl {
 
 #[macro_export]
 macro_rules! strto_float_impl {
+    // TODO: remove all unsafe here, as was done in strto_impl
     ($type:ident, $s:expr, $endptr:expr) => {{
         use $crate::casting::CCharToU8;
 
