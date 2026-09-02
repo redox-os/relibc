@@ -12,7 +12,7 @@ use rand_xorshift::XorShiftRng;
 
 use crate::{
     c_str::CStr,
-    casting::{ByteLiteral, CCharToU8},
+    casting::ByteLiteral,
     error::{Errno, ResultExt},
     fs::File,
     header::{
@@ -1400,61 +1400,57 @@ pub unsafe extern "C" fn srandom(seed: c_uint) {
     unsafe { random_state.seed(seed) };
 }
 
-pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
-    match ch {
-        0 => None,
-        ch if ch == ByteLiteral::cast_cchar(b'+') => Some((true, 1)),
-        ch if ch == ByteLiteral::cast_cchar(b'-') => Some((false, 1)),
-        _ => Some((true, 0)),
-    }
+pub fn parse_sign(orig: CStr) -> Option<(bool, CStr)> {
+    let (first, advanced) = orig.split_first()?;
+    Some(match first {
+        b'+' => (true, advanced),
+        b'-' => (false, advanced),
+        _ => (true, orig),
+    })
 }
 
-pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
-    let first = CCharToU8::cast(unsafe { *s });
-    match first {
-        0 => None,
-        b'0' => {
-            let second = CCharToU8::cast(unsafe { *s.add(1) });
-            if second == b'X' || second == b'x' {
-                Some((16, 2))
-            } else if (b'0'..=b'7').contains(&second) {
-                Some((8, 1))
-            } else {
-                // in this case, the prefix (0) is going to be the number
-                Some((8, 0))
-            }
-        }
-        _ => Some((10, 0)),
-    }
+pub fn detect_base(s: CStr) -> Option<(c_int, CStr)> {
+    let (first, adv1) = s.split_first()?;
+
+    Some(match (first, adv1.split_first()) {
+        (b'0', Some((b'x' | b'X', adv2))) => (16, adv2),
+        (b'0', Some((b'0'..=b'7', _))) => (8, adv1),
+        // in this case, the prefix (0) is going to be the number
+        (b'0', None) => (8, s),
+        (_, _) => (10, s),
+    })
 }
 
-pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if unsafe { *s } != 0 && unsafe { *s } == ByteLiteral::cast_cchar(b'0') {
-        if let Some((val, idx, overflow)) = unsafe { convert_integer(s.add(1), 8) } {
-            Some((val, idx + 1, overflow))
+pub fn convert_octal(s: CStr) -> Option<(c_ulong, CStr, bool)> {
+    let (first, next) = s.split_first()?;
+
+    if first != b'0' {
+        return None;
+    }
+
+    Some(
+        if let Some((val, next, overflow)) = convert_integer(next, 8) {
+            (val, next, overflow)
         } else {
             // in case the prefix is not actually a prefix
-            Some((0, 1, false))
-        }
-    } else {
-        None
-    }
+            (0, next, false)
+        },
+    )
 }
 
-pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if (unsafe { *s } != 0 && unsafe { *s } == ByteLiteral::cast_cchar(b'0'))
-        && (unsafe { *s.add(1) } != 0
-            && (unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'x')
-                || unsafe { *s.add(1) } == ByteLiteral::cast_cchar(b'X')))
+pub fn convert_hex(s: CStr) -> Option<(c_ulong, CStr, bool)> {
+    let (first, next) = s.split_first()?;
+
+    if first == b'0'
+        && let Some((b'x' | b'X', next)) = next.split_first()
     {
-        unsafe { convert_integer(s.add(2), 16) }
-            .map(|(val, idx, overflow)| (val, idx + 2, overflow))
+        convert_integer(next, 16).map(|(val, next, overflow)| (val, next, overflow))
     } else {
-        unsafe { convert_integer(s, 16) }
+        convert_integer(s, 16)
     }
 }
 
-pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
+pub fn convert_integer(orig_s: CStr, base: c_int) -> Option<(c_ulong, CStr, bool)> {
     // -1 means the character is invalid
     #[rustfmt::skip]
     const LOOKUP_TABLE: [c_long; 256] = [
@@ -1476,15 +1472,15 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     ];
 
+    let mut s = orig_s;
     let mut num: c_ulong = 0;
-    let mut idx = 0;
     let mut overflowed = false;
 
-    loop {
+    while let Some((c, next_s)) = s.split_first() {
         // `-1 as usize` is usize::MAX
         // `-1 as u8 as usize` is u8::MAX
         // It extends by the sign bit unless we cast it to unsigned first.
-        let val = LOOKUP_TABLE[CCharToU8::cast(unsafe { *s.offset(idx) }) as usize];
+        let val = LOOKUP_TABLE[usize::from(c)];
         if val == -1 || val as c_int >= base {
             break;
         } else {
@@ -1499,12 +1495,12 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
                 overflowed = true;
             }
 
-            idx += 1;
+            s = next_s;
         }
     }
 
-    if idx > 0 {
-        Some((num, idx, overflowed))
+    if s.as_ptr() != orig_s.as_ptr() {
+        Some((num, s, overflowed))
     } else {
         None
     }
@@ -1536,7 +1532,15 @@ pub unsafe extern "C" fn strtol(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_long {
-    strto_impl!(c_long, true, c_long::MAX, c_long::MIN, nptr, endptr, base)
+    strto_impl!(
+        c_long,
+        true,
+        c_long::MAX,
+        c_long::MIN,
+        unsafe { CStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
+        base
+    )
 }
 
 // TODO: strtold(), when long double is available
@@ -1559,8 +1563,8 @@ pub unsafe extern "C" fn strtoll(
         true,
         c_longlong::MAX,
         c_longlong::MIN,
-        nptr,
-        endptr,
+        unsafe { CStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
         base
     )
 }
@@ -1583,8 +1587,8 @@ pub unsafe extern "C" fn strtoul(
         false,
         c_ulong::MAX,
         c_ulong::MIN,
-        str,
-        endptr,
+        unsafe { CStr::from_ptr(str) },
+        unsafe { endptr.as_mut() },
         base
     )
 }
@@ -1607,8 +1611,8 @@ pub unsafe extern "C" fn strtoull(
         false,
         c_ulonglong::MAX,
         c_ulonglong::MIN,
-        str,
-        endptr,
+        unsafe { CStr::from_ptr(str) },
+        unsafe { endptr.as_mut() },
         base
     )
 }

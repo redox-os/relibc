@@ -4,9 +4,9 @@
 
 use crate::{
     header::{
-        ctype::{self, isspace},
+        ctype::isspace,
         errno::{EINVAL, ERANGE},
-        stdlib::{convert_hex, convert_integer, convert_octal, detect_base, is_positive},
+        stdlib::{convert_hex, convert_integer, convert_octal, detect_base, parse_sign},
     },
     platform::{
         self,
@@ -65,8 +65,8 @@ pub unsafe extern "C" fn strtoimax(
         false,
         intmax_t::MAX,
         intmax_t::MIN,
-        nptr,
-        endptr,
+        unsafe { CStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
         base
     )
 }
@@ -89,8 +89,8 @@ pub unsafe extern "C" fn strtoumax(
         false,
         uintmax_t::MAX,
         uintmax_t::MIN,
-        nptr,
-        endptr,
+        unsafe { CStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
         base
     )
 }
