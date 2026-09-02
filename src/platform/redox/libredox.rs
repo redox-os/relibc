@@ -300,10 +300,7 @@ pub unsafe extern "C" fn redox_dup2_v1(
     Error::mux(redox_rt::sys::dup2(old_fd, new_fd))
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn redox_dup2_v2(
-    old_fd: usize,
-    new_fd: usize,
- -> RawResult {
+pub unsafe extern "C" fn redox_dup2_v2(old_fd: usize, new_fd: usize) -> RawResult {
     Error::mux(redox_rt::sys::dup2(old_fd, new_fd))
 }
 #[unsafe(no_mangle)]
