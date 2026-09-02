@@ -94,7 +94,7 @@ impl Number {
             VaArg::pointer(i) => i as usize,
             VaArg::ptrdiff_t(i) => i as usize,
             VaArg::ssize_t(i) => i as usize,
-            VaArg::wint_t(i) => i as usize,
+            VaArg::wint_t(i) => usize::try_from(i).expect("always positive and within bounds"),
         }
     }
 }
@@ -716,7 +716,10 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
                 return Some(Ok(PrintfFmt::Plain(
                     T::chars_from_bytes(
                         errno::STR_ERROR
-                            .get(platform::ERRNO.get() as usize)
+                            .get(
+                                usize::try_from(platform::ERRNO.get())
+                                    .expect("ERRNO values are positive"),
+                            )
                             .map(|e| e.as_bytes())
                             .unwrap_or(b"unknown error"),
                     )
@@ -834,9 +837,9 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
         };
         let pad_space = if signed_space < 0 {
             left = true;
-            -signed_space as usize
+            (-signed_space).cast_unsigned()
         } else {
-            signed_space as usize
+            signed_space.cast_unsigned()
         };
         let intkind = arg.intkind;
         let fmt = arg.fmt;
@@ -1039,7 +1042,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         // the unused logarithm, unless the exponent is
                         // negative which in case the integral part must
                         // of course be 0, 1 in length
-                        let len = 1 + cmp::max(0, exp) as usize;
+                        let len = 1 + cmp::max(0, exp).cast_unsigned();
                         let precision = precision.saturating_sub(len);
                         fmt_float_normal(
                             w, !alternate, alternate, precision, float, left, pad_space, pad_zero,

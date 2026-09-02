@@ -240,7 +240,7 @@ pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_kill.html>.
 ///
 /// Requests that a signal be delivered to the specified thread. It shall not
-/// be an error is `thread` is a zombie thread.
+/// be an error if `thread` is a zombie thread.
 ///
 /// Upon success, returns `0`. Upon failure, returns an error number and does
 /// not send the signal.

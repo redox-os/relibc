@@ -68,7 +68,13 @@ pub fn _fdopen(fd: c_int, mode: CStr) -> Result<Box<FILE>, Errno> {
     if mode.first() == b'a' {
         let f = unsafe { fcntl(fd, F_GETFL, 0) };
         if (f & O_APPEND) == 0 {
-            unsafe { fcntl(fd, F_SETFL, (f | O_APPEND) as c_ulonglong) };
+            unsafe {
+                fcntl(
+                    fd,
+                    F_SETFL,
+                    c_ulonglong::try_from(f | O_APPEND).expect("f not negative"),
+                )
+            };
         }
         flags |= F_APP;
     }

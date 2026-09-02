@@ -40,7 +40,7 @@ int main()
 
 	int status;
 	status = pthread_kill(invalid_tid, 0);
-	ERROR_IF(pthread_kill, status, != ESRCH);
+	ERROR_IF2(pthread_kill, status, != ESRCH);
  
 	exit(EXIT_SUCCESS);
 }

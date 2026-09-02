@@ -250,9 +250,9 @@ fn os_tid_invalid_after_fork() -> u32 {
 
         assert_ne!(tid, -1, "failed to obtain current thread ID");
 
-        CACHED_OS_TID_INVALID_AFTER_FORK.set(tid as u32);
+        CACHED_OS_TID_INVALID_AFTER_FORK.set(tid.cast_unsigned());
 
-        tid as u32
+        tid.cast_unsigned()
     } else {
         value
     }
