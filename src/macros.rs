@@ -339,14 +339,14 @@ macro_rules! strto_float_impl {
         // detect NaN, Inf
         if rust_s.to_lowercase().starts_with("inf") {
             result = $type::INFINITY;
-            let bytes = s.to_bytes();
+            let bytes = s.to_bytes_with_nul();
             let (_, rest) = bytes.split_at(3);
             s = CStr::from_bytes_with_nul(rest).expect("started with a valid CStr");
         } else if rust_s.to_lowercase().starts_with("nan") {
             // we cannot signal negative NaN in LLVM backed languages
             // https://github.com/rust-lang/rust/issues/73328 , https://github.com/rust-lang/rust/issues/81261
             result = $type::NAN;
-            let bytes = s.to_bytes();
+            let bytes = s.to_bytes_with_nul();
             let (_, rest) = bytes.split_at(3);
             s = CStr::from_bytes_with_nul(rest).expect("started with a valid CStr");
         } else {
