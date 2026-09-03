@@ -337,6 +337,7 @@ macro_rules! strto_float_impl {
         let rust_s = s.to_string_lossy();
 
         // detect NaN, Inf
+        // TODO add safe wrapper for strcasecmp()/strncasecp() for strip_case_insensitive_prefix()
         if rust_s.to_lowercase().starts_with("inf") {
             result = $type::INFINITY;
             let bytes = s.to_bytes_with_nul();
@@ -355,28 +356,20 @@ macro_rules! strto_float_impl {
                 radix = 16;
             }
 
-            while let Some((first_char, rest)) = s.split_first_char() {
-                if let Some(digit) = first_char.to_digit(radix) {
-                    result *= radix as $type;
-                    result += digit as $type;
-                    s = rest;
-                } else {
-                    break;
-                }
+            while let Some((first_char, rest)) = s.split_first_char() && let Some(digit) = first_char.to_digit(radix) {
+                result *= radix as $type;
+                result += digit as $type;
+                s = rest;
             }
 
             if let Some(rest) = s.strip_prefix(b".") {
                 s = rest;
 
                 let mut i = 1.0;
-                while let Some((first_char, after)) = s.split_first_char() {
-                    if let Some(digit) = first_char.to_digit(radix) {
-                        i *= radix as $type;
-                        result += digit as $type / i;
-                        s = after;
-                    } else {
-                        break;
-                    }
+                while let Some((first_char, after)) = s.split_first_char() && let Some(digit) = first_char.to_digit(radix) {
+                    i *= radix as $type;
+                    result += digit as $type / i;
+                    s = after;
                 }
             }
 
@@ -401,14 +394,10 @@ macro_rules! strto_float_impl {
                         if let Some(first_char) = s.first_char() && first_char.is_digit(10) {
                             let mut exponent_value = 0;
 
-                            while let Some((first_char, after)) = s.split_first_char() {
-                                if let Some(digit) = first_char.to_digit(10) {
-                                    exponent_value *= 10;
-                                    exponent_value += digit;
-                                    s = after;
-                                } else {
-                                    break;
-                                }
+                            while let Some((first_char, after)) = s.split_first_char() && let Some(digit) = first_char.to_digit(10) {
+                                exponent_value *= 10;
+                                exponent_value += digit;
+                                s = after;
                             }
 
                             let exponent_base = match radix {
