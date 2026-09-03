@@ -360,6 +360,8 @@ macro_rules! strto_float_impl {
                     result *= radix as $type;
                     result += digit as $type;
                     s = rest;
+                } else {
+                    break;
                 }
             }
 
@@ -372,6 +374,8 @@ macro_rules! strto_float_impl {
                         i *= radix as $type;
                         result += digit as $type / i;
                         s = after;
+                    } else {
+                        break;
                     }
                 }
             }
@@ -402,6 +406,8 @@ macro_rules! strto_float_impl {
                                     exponent_value *= 10;
                                     exponent_value += digit;
                                     s = after;
+                                } else {
+                                    break;
                                 }
                             }
 
