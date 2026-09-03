@@ -361,6 +361,7 @@ macro_rules! strto_float_impl {
                     result += digit as $type;
                     s = rest;
                 }
+                break;
             }
 
             if let Some(rest) = s.strip_prefix(b".") {
@@ -373,6 +374,7 @@ macro_rules! strto_float_impl {
                         result += digit as $type / i;
                         s = after;
                     }
+                    break;
                 }
             }
 
@@ -403,6 +405,7 @@ macro_rules! strto_float_impl {
                                     exponent_value += digit;
                                     s = after;
                                 }
+                                break;
                             }
 
                             let exponent_base = match radix {
