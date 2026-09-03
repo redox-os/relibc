@@ -1196,6 +1196,7 @@ impl Pal for Sys {
         new_path: CStr,
         flags: c_uint,
     ) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         const MASK: c_uint = !RENAME_NOREPLACE;
         if MASK & flags != 0 {
             return Err(Errno(EOPNOTSUPP));
