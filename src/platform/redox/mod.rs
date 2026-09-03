@@ -6,7 +6,7 @@ use core::{
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
-use redox_path::RedoxStr;
+use redox_path::{RedoxStr, scheme_path};
 use redox_protocols::protocol::{WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
@@ -782,17 +782,41 @@ impl Pal for Sys {
 
         let file = File::openat(fd1, oldpath, oflags)?;
 
-        let target_dirfd = if fd2 == fcntl::AT_FDCWD {
-            let cwd_guard = path::current_dir()?;
-            let cwd = cwd_guard.as_ref().unwrap();
-            cwd.fd.as_raw_fd() as usize
-        } else {
-            fd2 as usize
-        };
+        match newpath {
+            RedoxStr::Absolute(abs_path) => {
+                let (scheme, reference) = abs_path.as_parts().ok_or(Errno(EINVAL))?;
+                let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
 
-        let newpath: Cow<'_, str> = newpath.into();
-        redox_rt::sys::flinkat(*file as usize, target_dirfd, &newpath, flags as u32)
-            .map_err(Into::into)
+                let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
+                let root_guard = FdGuard::new(redox_rt::sys::openat_into_upper(
+                    redox_rt::current_namespace_fd()?,
+                    &scheme_root_str,
+                    syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
+                    0,
+                )?);
+
+                let newpath: Cow<'_, str> = reference.into();
+                redox_rt::sys::flinkat(
+                    *file as usize,
+                    root_guard.as_raw_fd(),
+                    &newpath,
+                    flags as u32,
+                )
+                .map_err(Into::into)
+            }
+            RedoxStr::Relative(rel_path) => {
+                let dirfd = if fd2 == fcntl::AT_FDCWD {
+                    let cwd_guard = path::current_dir()?;
+                    cwd_guard.as_ref().unwrap().fd.as_raw_fd() as usize
+                } else {
+                    fd2 as usize
+                };
+
+                let newpath: Cow<'_, str> = rel_path.into();
+                redox_rt::sys::flinkat(*file as usize, dirfd, &newpath, flags as u32)
+                    .map_err(Into::into)
+            }
+        }
     }
 
     fn lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
