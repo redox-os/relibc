@@ -10,6 +10,7 @@ use redox_path::RedoxStr;
 use redox_protocols::protocol::{WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
+    signal::tmp_disable_signals,
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
@@ -261,6 +262,7 @@ impl Pal for Sys {
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         self::exec::execve(
             Executable::InFd {
                 file: File::new(fildes),
@@ -278,6 +280,7 @@ impl Pal for Sys {
     }
 
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
             return Err(Errno(EINVAL));
@@ -303,6 +306,7 @@ impl Pal for Sys {
     }
 
     fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
             return Err(Errno(EINVAL));
@@ -458,6 +462,7 @@ impl Pal for Sys {
     }
 
     fn fstatat(dirfd: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         // `path` should be non-null.
         let mut path = path.ok_or(Errno(EFAULT))?;
 
@@ -513,6 +518,7 @@ impl Pal for Sys {
         times: *const timespec,
         flag: c_int,
     ) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         let mut path = path;
         if path.is_empty() {
             if flag & AT_EMPTY_PATH == AT_EMPTY_PATH {
@@ -757,6 +763,7 @@ impl Pal for Sys {
     }
 
     fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         // make sure the flags passed are valid.
         // valid states: AT_SYMLINK_FOLLOW, or 0.
         if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
@@ -967,6 +974,7 @@ impl Pal for Sys {
     }
 
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         fds.write(extra::pipe2(flags as usize)?);
         Ok(())
     }
@@ -1097,6 +1105,7 @@ impl Pal for Sys {
     }
 
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
+        let _siglock = tmp_disable_signals();
         let file = openat2(
             dirfd,
             path,
@@ -1496,6 +1505,7 @@ impl Pal for Sys {
     }
 
     fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         let mut file = File::createat(
             fd,
             path2,
@@ -1649,6 +1659,7 @@ impl Pal for Sys {
     }
 
     fn uname(mut utsname: Out<utsname>) -> Result<(), Errno> {
+        let _siglock = tmp_disable_signals();
         fn gethostname(mut name: Out<[u8]>) -> io::Result<()> {
             if name.is_empty() {
                 return Ok(());
@@ -1727,6 +1738,7 @@ impl Pal for Sys {
     }
 
     fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         if (flags & !AT_REMOVEDIR) != 0 {
             return Err(Errno(EINVAL));
         }
