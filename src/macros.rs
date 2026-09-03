@@ -356,12 +356,11 @@ macro_rules! strto_float_impl {
             }
 
             while let Some((first_char, rest)) = s.split_first_char() {
-                while let Some(digit) = first_char.to_digit(radix) {
+                if let Some(digit) = first_char.to_digit(radix) {
                     result *= radix as $type;
                     result += digit as $type;
                     s = rest;
                 }
-                break;
             }
 
             if let Some(rest) = s.strip_prefix(b".") {
@@ -369,12 +368,11 @@ macro_rules! strto_float_impl {
 
                 let mut i = 1.0;
                 while let Some((first_char, after)) = s.split_first_char() {
-                    while let Some(digit) = first_char.to_digit(radix) {
+                    if let Some(digit) = first_char.to_digit(radix) {
                         i *= radix as $type;
                         result += digit as $type / i;
                         s = after;
                     }
-                    break;
                 }
             }
 
@@ -400,12 +398,11 @@ macro_rules! strto_float_impl {
                             let mut exponent_value = 0;
 
                             while let Some((first_char, after)) = s.split_first_char() {
-                                while let Some(digit) = first_char.to_digit(10) {
+                                if let Some(digit) = first_char.to_digit(10) {
                                     exponent_value *= 10;
                                     exponent_value += digit;
                                     s = after;
                                 }
-                                break;
                             }
 
                             let exponent_base = match radix {
