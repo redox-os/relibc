@@ -1444,7 +1444,7 @@ pub fn convert_hex(s: CStr) -> Option<(c_ulong, CStr, bool)> {
     if first == b'0'
         && let Some((b'x' | b'X', next)) = next.split_first()
     {
-        convert_integer(next, 16).map(|(val, next, overflow)| (val, next, overflow))
+        convert_integer(next, 16)
     } else {
         convert_integer(s, 16)
     }
@@ -1510,13 +1510,17 @@ pub fn convert_integer(orig_s: CStr, base: c_int) -> Option<(c_ulong, CStr, bool
 #[expect(clippy::cast_lossless)] // not all users of `strto_float_impl!` are lossless
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c_double {
-    strto_float_impl!(c_double, s, endptr)
+    strto_float_impl!(c_double, unsafe { CStr::from_ptr(s) }, unsafe {
+        endptr.as_mut()
+    })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtod.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtof(s: *const c_char, endptr: *mut *mut c_char) -> c_float {
-    strto_float_impl!(c_float, s, endptr)
+    strto_float_impl!(c_float, unsafe { CStr::from_ptr(s) }, unsafe {
+        endptr.as_mut()
+    })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtol.html>.
