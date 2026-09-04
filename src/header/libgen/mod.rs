@@ -15,7 +15,8 @@ pub unsafe extern "C" fn basename(path: *mut c_char) -> *mut c_char {
     if path.is_null() || unsafe { strlen(path) == 0 } {
         return c".".as_ptr().cast_mut();
     }
-    let mut end = unsafe { strlen(path) as isize - 1 };
+    let mut end =
+        unsafe { isize::try_from(strlen(path)).expect("very unlikely to exceed isize::MAX") - 1 };
     while end >= 0 && unsafe { *path.offset(end) == ByteLiteral::cast_cchar(b'/') } {
         end -= 1;
     }
@@ -44,7 +45,8 @@ pub unsafe extern "C" fn dirname(path: *mut c_char) -> *mut c_char {
     if path.is_null() || unsafe { strlen(path) == 0 } {
         return c".".as_ptr().cast_mut();
     }
-    let mut end = unsafe { strlen(path) as isize - 1 };
+    let mut end =
+        unsafe { isize::try_from(strlen(path)).expect("very unlikely to exceed isize::MAX") - 1 };
     while end > 0 && unsafe { *path.offset(end) == ByteLiteral::cast_cchar(b'/') } {
         end -= 1;
     }
