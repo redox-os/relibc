@@ -363,7 +363,7 @@ pub unsafe extern "C" fn gethostbyaddr(
                         .cast::<c_char>(),
                     h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
                     h_addrtype: format,
-                    h_length: length as i32,
+                    h_length: i32::try_from(length).expect("guaranteed to be 4 or 16"),
                     h_addr_list: (&raw mut HOST_ADDR_LIST).cast(),
                 }
             };
@@ -800,10 +800,13 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
             None => continue,
         };
         unsafe {
-            SERV_PORT = Some(u32::from(htons(
-                u16::try_from(atoi(port.as_mut_slice().as_mut_ptr().cast::<c_char>()))
-                    .expect("port number should not exceed u16::MAX"),
-            )) as i32)
+            SERV_PORT = Some(
+                c_int::try_from(u32::from(htons(
+                    u16::try_from(atoi(port.as_mut_slice().as_mut_ptr().cast::<c_char>()))
+                        .expect("port number should not exceed u16::MAX"),
+                )))
+                .expect("port number should not exceed u16::MAX"),
+            )
         };
         let proto = match split.next() {
             Some(proto) => proto.bytes().chain(Some(b'\0')).collect(),

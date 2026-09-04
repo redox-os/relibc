@@ -150,7 +150,8 @@ pub unsafe extern "C" fn strfmon(
         return -1; // Buffer overflow
     }
     buffer[pos] = 0; // Null-terminate the buffer
-    pos as ssize_t // Return the number of characters written
+    // Return the number of characters written
+    ssize_t::try_from(pos).expect("very unlikely to exceed isize::MAX")
 }
 
 /// Formats a monetary value into the given `buffer` using locale-specific rules

@@ -94,7 +94,11 @@ pub unsafe extern "C" fn getdelim(
 
     // "[EOVERFLOW]
     // The number of bytes to be written into the buffer, including the delimiter character (if encountered), would exceed {SSIZE_MAX}."
-    if unlikely(count > ssize_t::MAX as usize) {
+    if unlikely(
+        count
+            > usize::try_from(ssize_t::MAX)
+                .expect("isize::MAX always positive and below usize::MAX"),
+    ) {
         ERRNO.set(EOVERFLOW);
         return -1;
     }
@@ -143,6 +147,6 @@ pub unsafe extern "C" fn getdelim(
             String::from_utf8(buf).unwrap(), count, *n, *lineptr
         );*/
         // Return allocated size
-        count as ssize_t
+        ssize_t::try_from(count).expect("already checked for overflow")
     }
 }
