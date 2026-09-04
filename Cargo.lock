@@ -271,14 +271,13 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libredox"
-version = "0.1.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d0a00925a9f930d679b6789b721e3a7f9ed110f41b86d2497caa780c3a070a"
+version = "0.1.22"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/libredox.git?branch=fcntl-fd-flags#4e64050c918fe6ae9c9e90c699cbac5f0a773341"
 dependencies = [
  "bitflags",
  "libc",
  "plain",
- "redox_syscall",
+ "redox_syscall 0.10.0",
 ]
 
 [[package]]
@@ -453,7 +452,7 @@ source = "git+https://gitlab.redox-os.org/redox-os/redox-buffer-pool.git#2597197
 dependencies = [
  "guard-trait",
  "log",
- "redox_syscall",
+ "redox_syscall 0.9.3",
  "spinning",
 ]
 
@@ -462,7 +461,7 @@ name = "redox-ioctl"
 version = "0.1.0"
 dependencies = [
  "drm-sys",
- "redox_syscall",
+ "redox_syscall 0.10.0",
 ]
 
 [[package]]
@@ -474,10 +473,10 @@ checksum = "083c57139a99303d842a4cfe1f0fd6483d77d81eda1442be84bcb1a0f737ed96"
 [[package]]
 name = "redox-rings"
 version = "0.1.0"
-source = "git+https://gitlab.redox-os.org/redox-os/redox-rings.git#8842a459c873c122596c591e4c454ad0753b9164"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/redox-rings.git?branch=update-crates#7dea230a6913706f03a67e66fcd90f1b22b80c81"
 dependencies = [
  "bitflags",
- "redox_syscall",
+ "redox_syscall 0.10.0",
  "zerocopy",
 ]
 
@@ -492,25 +491,32 @@ dependencies = [
  "libredox",
  "plain",
  "redox-path",
- "redox_syscall",
+ "redox_syscall 0.10.0",
 ]
 
 [[package]]
 name = "redox_event"
 version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5018d583d6d2f5499352aea8d177e9067d1eb03ab17c78169d5ba7a30001b15"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/event.git?branch=rm-fcntl-fd#f8423206c0cd33bd1083788cf32dfe84625a8119"
 dependencies = [
  "bitflags",
  "libredox",
- "redox_syscall",
+ "redox_syscall 0.10.0",
 ]
 
 [[package]]
 name = "redox_syscall"
-version = "0.9.2"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1c93da5bb2c5d4e6c0ef7abeead62c89169a0a4882bfb83ac892f2423aea2fe"
+checksum = "d678d17679829e73d371e96880897e98fee2ded7acc0a50bdf8af2affa4b2fe5"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
+name = "redox_syscall"
+version = "0.10.0"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=rm-redundant-dup#1899ea04747aa5346b93991cd218b1c88a72d93a"
 dependencies = [
  "bitflags",
 ]
@@ -550,7 +556,7 @@ dependencies = [
  "redox-rings",
  "redox-rt",
  "redox_event",
- "redox_syscall",
+ "redox_syscall 0.10.0",
  "sc",
  "scrypt",
  "sha-crypt",
