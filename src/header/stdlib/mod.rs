@@ -188,54 +188,50 @@ pub unsafe extern "C" fn atof(s: *const c_char) -> c_double {
     unsafe { strtod(s, ptr::null_mut()) }
 }
 
-macro_rules! dec_num_from_ascii {
-    ($s:expr, $t:ty) => {{
-        let mut s = $s;
-        // Iterate past whitespace
-        while ctype::isspace(c_int::from(unsafe { *s })) != 0 {
-            s = unsafe { s.offset(1) };
+fn dec_num_from_ascii<T: From<u8> + core::ops::Mul<Output = T> + core::ops::Sub<Output = T>>(
+    mut s: CStr,
+) -> T {
+    s = s.trim_start_whitespace();
+
+    let neg_sign = match s.split_first() {
+        Some((b'-', rest)) => {
+            s = rest;
+            true
         }
-
-        // Find out if there is a - sign
-        let neg_sign = match unsafe { *s } {
-            0x2d => {
-                s = unsafe { s.offset(1) };
-                true
-            }
-            // '+' increment s and continue parsing
-            0x2b => {
-                s = unsafe { s.offset(1) };
-                false
-            }
-            _ => false,
-        };
-
-        let mut n: $t = 0;
-        while ctype::isdigit(c_int::from(unsafe { *s })) != 0 {
-            n = 10 * n - (unsafe { *s } as $t - 0x30);
-            s = unsafe { s.offset(1) };
+        Some((b'+', rest)) => {
+            s = rest;
+            false
         }
+        _ => false,
+    };
 
-        if neg_sign { n } else { -n }
-    }};
+    let mut n = T::from(0_u8);
+    while let Some((digit, rest)) = s.split_first()
+        && ctype::isdigit(digit.into()) != 0
+    {
+        n = T::from(10) * n - T::from(digit - b'0');
+        s = rest;
+    }
+
+    if neg_sign { n } else { T::from(0) - n }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/atoi.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn atoi(s: *const c_char) -> c_int {
-    dec_num_from_ascii!(s, c_int)
+    dec_num_from_ascii::<c_int>(unsafe { CStr::from_ptr(s) })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/atol.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn atol(s: *const c_char) -> c_long {
-    dec_num_from_ascii!(s, c_long)
+    dec_num_from_ascii::<c_long>(unsafe { CStr::from_ptr(s) })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/atol.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn atoll(s: *const c_char) -> c_longlong {
-    dec_num_from_ascii!(s, c_longlong)
+    dec_num_from_ascii::<c_longlong>(unsafe { CStr::from_ptr(s) })
 }
 
 unsafe extern "C" fn void_cmp(a: *const c_void, b: *const c_void) -> c_int {
