@@ -695,7 +695,11 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
         #[allow(unused_unsafe)]
         let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
-        SUPPORTS_AVX.store(u8::from(cpuid_eax1_ecx & 1 << 28 != 0), Ordering::Relaxed);
+        let supports_avx_itself = cpuid_eax1_ecx & 1 << 28 != 0; // AVX
+        let kernel_supports_avx = cpuid_eax1_ecx & 1 << 27 != 0; // OSXSAVE
+        let supports_avx = supports_avx_itself && kernel_supports_avx;
+
+        SUPPORTS_AVX.store(u8::from(supports_avx), Ordering::Relaxed);
     }
 
     let data = current_setsighandler_struct();
