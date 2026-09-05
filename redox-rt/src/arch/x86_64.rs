@@ -37,12 +37,29 @@ pub struct SigArea {
     pub tmp_r12: usize,
     pub tmp_rt_inf: RtSigInfo,
     pub tmp_id_inf: u64,
+    pub tmp_syscall_rcx: usize,
+    pub tmp_syscall_r11: usize,
 
     pub altstack_top: usize,
     pub altstack_bottom: usize,
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
     pub last_sigstack: Option<NonNull<SigStack>>,
+    pub ymm_regs: YmmRegs,
+}
+#[repr(C, align(32))]
+#[derive(Debug)]
+pub struct YmmRegs {
+    pub fxsave: [u8; 512],
+    pub upper: [u128; 16],
+}
+impl Default for YmmRegs {
+    fn default() -> Self {
+        Self {
+            fxsave: [0; 512],
+            upper: [0; 16],
+        }
+    }
 }
 
 #[repr(C, align(16))]
@@ -175,6 +192,12 @@ asmfunction!(__relibc_internal_rlct_clone_ret: ["
     ret
 "] <= []);
 
+// TODO: it would probably be good to reserve a tiny stack, pointed to indirectly by the TCB or at
+// a fixed offset from it, to implement more of this increasingly complex assembly, in much
+// higher-level Rust.
+// TODO: write tests that randomize all integer and vector registers, have several
+// realtime/standard signals handled in the meantime, and check that everything is properly
+// saved/restored
 asmfunction!(__relibc_internal_sigentry: ["
     // Save some registers
     mov fs:[{tcb_sa_off} + {sa_tmp_rsp}], rsp
@@ -238,7 +261,60 @@ asmfunction!(__relibc_internal_sigentry: ["
     lea r8, [rip + {proc_call_sigdeq}]
     mov r10, 1
     mov eax, {SYS_CALL}
+
+    fxsave64 [rsi+{sa_tmp_fxsave}-{sa_tmp_rt_inf}]
+    // TODO: self-modifying?
+    cmp byte ptr [rip + {supports_avx}], 0
+    je 14f
+
+    // Prefer vextractf128 over vextracti128 since the former only requires AVX version 1.
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 15 * 16], ymm0, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 14 * 16], ymm1, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 13 * 16], ymm2, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 12 * 16], ymm3, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 11 * 16], ymm4, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 10 * 16], ymm5, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 9 * 16], ymm6, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 8 * 16], ymm7, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 7 * 16], ymm8, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 6 * 16], ymm9, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 5 * 16], ymm10, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 4 * 16], ymm11, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 3 * 16], ymm12, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 2 * 16], ymm13, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 16], ymm14, 1
+    vextractf128 [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf}], ymm15, 1
+14:
+
+    mov [rsi+{sa_tmp_rcx}-{sa_tmp_rt_inf}], rcx
+    mov [rsi+{sa_tmp_r11}-{sa_tmp_rt_inf}], r11
     syscall
+    mov rcx, [rsi+{sa_tmp_rcx}-{sa_tmp_rt_inf}]
+    mov r11, [rsi+{sa_tmp_r11}-{sa_tmp_rt_inf}]
+
+    fxrstor64 [rsi+{sa_tmp_fxsave}-{sa_tmp_rt_inf}]
+
+    cmp byte ptr [rip + {supports_avx}], 0
+    je 15f
+
+    vinsertf128 ymm0,  ymm0,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 15 * 16], 1
+    vinsertf128 ymm1,  ymm1,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 14 * 16], 1
+    vinsertf128 ymm2,  ymm2,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 13 * 16], 1
+    vinsertf128 ymm3,  ymm3,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 12 * 16], 1
+    vinsertf128 ymm4,  ymm4,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 11 * 16], 1
+    vinsertf128 ymm5,  ymm5,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 10 * 16], 1
+    vinsertf128 ymm6,  ymm6,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 9 * 16], 1
+    vinsertf128 ymm7,  ymm7,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 8 * 16], 1
+    vinsertf128 ymm8,  ymm8,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 7 * 16], 1
+    vinsertf128 ymm9,  ymm9,  [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 6 * 16], 1
+    vinsertf128 ymm10, ymm10, [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 5 * 16], 1
+    vinsertf128 ymm11, ymm11, [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 4 * 16], 1
+    vinsertf128 ymm12, ymm12, [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 3 * 16], 1
+    vinsertf128 ymm13, ymm13, [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 2 * 16], 1
+    vinsertf128 ymm14, ymm14, [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf} + 16], 1
+    vinsertf128 ymm15, ymm15, [rsi+{sa_tmp_ymm_hi}-{sa_tmp_rt_inf}], 1
+15:
+
     test eax, eax
     jnz 1b // assumes error can only be EAGAIN
     lea eax, [r12d + 32]
@@ -345,19 +421,19 @@ asmfunction!(__relibc_internal_sigentry: ["
     vinsertf128 ymm0, ymm0, [rsp + 15 * 16], 1
     vinsertf128 ymm1, ymm1, [rsp + 14 * 16], 1
     vinsertf128 ymm2, ymm2, [rsp + 13 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 12 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 11 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 10 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 9 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 8 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 7 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 6 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 5 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 4 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 3 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 2 * 16], 1
-    vinsertf128 ymm2, ymm2, [rsp + 16], 1
-    vinsertf128 ymm2, ymm2, [rsp], 1
+    vinsertf128 ymm3, ymm3, [rsp + 12 * 16], 1
+    vinsertf128 ymm4, ymm4, [rsp + 11 * 16], 1
+    vinsertf128 ymm5, ymm5, [rsp + 10 * 16], 1
+    vinsertf128 ymm6, ymm6, [rsp + 9 * 16], 1
+    vinsertf128 ymm7, ymm7, [rsp + 8 * 16], 1
+    vinsertf128 ymm8, ymm8, [rsp + 7 * 16], 1
+    vinsertf128 ymm9, ymm9, [rsp + 6 * 16], 1
+    vinsertf128 ymm10, ymm10, [rsp + 5 * 16], 1
+    vinsertf128 ymm11, ymm11, [rsp + 4 * 16], 1
+    vinsertf128 ymm12, ymm12, [rsp + 3 * 16], 1
+    vinsertf128 ymm13, ymm13, [rsp + 2 * 16], 1
+    vinsertf128 ymm14, ymm14, [rsp + 16], 1
+    vinsertf128 ymm15, ymm15, [rsp], 1
 6:
     add rsp, (29 + 16) * 16
 
@@ -432,6 +508,10 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_r12 = const offset_of!(SigArea, tmp_r12),
     sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
+    sa_tmp_fxsave = const (offset_of!(SigArea, ymm_regs) + offset_of!(YmmRegs, fxsave)),
+    sa_tmp_rcx = const offset_of!(SigArea, tmp_syscall_rcx),
+    sa_tmp_r11 = const offset_of!(SigArea, tmp_syscall_r11),
+    sa_tmp_ymm_hi = const (offset_of!(SigArea, ymm_regs) + offset_of!(YmmRegs, upper)),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),

@@ -537,6 +537,37 @@ fn current_sigctl() -> &'static Sigcontrol {
 pub struct TmpDisableSignalsGuard {
     active: bool,
 }
+#[unsafe(no_mangle)]
+#[cold]
+pub unsafe extern "C" fn __redox_rt_debug_clear_tmp_disable_signals() {
+    if !crate::TLS_ACTIVATED.load(Ordering::Relaxed) {
+        let _ = crate::sys::posix_write(1, b"no TLS\n");
+        return;
+    }
+    let tcb = unsafe { &Tcb::current().unwrap().os_specific };
+    tcb.control.control_flags.store(
+        tcb.control.control_flags.load(Ordering::Relaxed) & !syscall::flag::INHIBIT_DELIVERY.bits(),
+        Ordering::Relaxed,
+    );
+    unsafe {
+        (*tcb.arch.get()).disable_signals_depth = 0;
+    }
+}
+
+#[unsafe(no_mangle)]
+#[cold]
+pub unsafe extern "C" fn __redox_rt_debug_print_tmp_disable_signals_info() {
+    if !crate::TLS_ACTIVATED.load(Ordering::Relaxed) {
+        let _ = crate::sys::posix_write(1, b"no TLS\n");
+        return;
+    }
+    let tcb = unsafe { &Tcb::current().unwrap().os_specific };
+    let inhibited =
+        tcb.control.control_flags.load(Ordering::Relaxed) & syscall::flag::INHIBIT_DELIVERY.bits();
+    let depth = unsafe { (*tcb.arch.get()).disable_signals_depth };
+
+    let _ = crate::sys::posix_write(1, alloc::format!("Inhibited: {inhibited}, depth: {depth}. These should be false and 0 unless redox-rt is leaking tmp_disable_signals() guards.\n").as_bytes());
+}
 
 /// Used to disable jumping to signal handler while the guard active
 pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
@@ -664,7 +695,11 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
         #[allow(unused_unsafe)]
         let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
-        SUPPORTS_AVX.store(u8::from(cpuid_eax1_ecx & 1 << 28 != 0), Ordering::Relaxed);
+        let supports_avx_itself = cpuid_eax1_ecx & 1 << 28 != 0; // AVX
+        let kernel_supports_avx = cpuid_eax1_ecx & 1 << 27 != 0; // OSXSAVE
+        let supports_avx = supports_avx_itself && kernel_supports_avx;
+
+        SUPPORTS_AVX.store(u8::from(supports_avx), Ordering::Relaxed);
     }
 
     let data = current_setsighandler_struct();
