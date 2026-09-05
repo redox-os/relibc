@@ -537,6 +537,37 @@ fn current_sigctl() -> &'static Sigcontrol {
 pub struct TmpDisableSignalsGuard {
     active: bool,
 }
+#[unsafe(no_mangle)]
+#[cold]
+pub unsafe extern "C" fn __redox_rt_debug_clear_tmp_disable_signals() {
+    if !crate::TLS_ACTIVATED.load(Ordering::Relaxed) {
+        let _ = crate::sys::posix_write(1, b"no TLS\n");
+        return;
+    }
+    let tcb = unsafe { &Tcb::current().unwrap().os_specific };
+    tcb.control.control_flags.store(
+        tcb.control.control_flags.load(Ordering::Relaxed) & !syscall::flag::INHIBIT_DELIVERY.bits(),
+        Ordering::Relaxed,
+    );
+    unsafe {
+        (*tcb.arch.get()).disable_signals_depth = 0;
+    }
+}
+
+#[unsafe(no_mangle)]
+#[cold]
+pub unsafe extern "C" fn __redox_rt_debug_print_tmp_disable_signals_info() {
+    if !crate::TLS_ACTIVATED.load(Ordering::Relaxed) {
+        let _ = crate::sys::posix_write(1, b"no TLS\n");
+        return;
+    }
+    let tcb = unsafe { &Tcb::current().unwrap().os_specific };
+    let inhibited =
+        tcb.control.control_flags.load(Ordering::Relaxed) & syscall::flag::INHIBIT_DELIVERY.bits();
+    let depth = unsafe { (*tcb.arch.get()).disable_signals_depth };
+
+    let _ = crate::sys::posix_write(1, alloc::format!("Inhibited: {inhibited}, depth: {depth}. These should be false and 0 unless redox-rt is leaking tmp_disable_signals() guards.\n").as_bytes());
+}
 
 /// Used to disable jumping to signal handler while the guard active
 pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
