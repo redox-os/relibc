@@ -1497,7 +1497,12 @@ impl Pal for Sys {
         let mut file = File::createat(
             fd,
             path2,
-            fcntl::O_WRONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
+            fcntl::O_WRONLY
+                | fcntl::O_CLOEXEC
+                | fcntl::O_SYMLINK // create a symlink
+                | fcntl::O_NOFOLLOW // do not follow symlink
+                | fcntl::O_EXCL // throw EEXIST if already exist
+                | fcntl::O_PATH, // do not throw ELOOP because of O_NOFOLLOW
             0o777,
         )?;
 
