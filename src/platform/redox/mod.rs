@@ -6,7 +6,7 @@ use core::{
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
-use redox_path::RedoxStr;
+use redox_path::{RedoxReference, RedoxStr};
 use redox_protocols::protocol::{WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
@@ -1470,12 +1470,12 @@ impl Pal for Sys {
         )? {
             let interp_path =
                 CStr::from_bytes_with_nul(&interp_path).map_err(|_| Errno(ENOEXEC))?;
-
-            let interpreter = File::open(interp_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC)
-                .map_err(|_| Errno(ENOENT))?;
+            let interp_path =
+                RedoxReference::new_from_c(interp_path.to_cstr()).ok_or(Errno(ENOEXEC))?;
+            let interpreter = FdGuard::open(interp_path.as_ref(), syscall::O_RDONLY)?.to_upper()?;
 
             redox_rt::proc::fexec_impl(
-                FdGuard::new(interpreter.fd as usize).to_upper().unwrap(),
+                interpreter,
                 &child.thr_fd,
                 &proc_fd,
                 program,
