@@ -838,10 +838,21 @@ pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
     res
 }
 
-pub fn frenameat(fd: usize, dirfd: usize, path: &str, flags: u32) -> Result<()> {
+pub fn frenameat(
+    old_dir: usize,
+    old_path: &str,
+    new_dir: usize,
+    new_path: &str,
+    flags: u32,
+) -> Result<()> {
+    let mut payload = Vec::with_capacity(old_path.len() + 1 + new_path.len());
+    payload.extend_from_slice(old_path.as_bytes());
+    payload.push(b'\0');
+    payload.extend_from_slice(new_path.as_bytes());
+
     std_fs_call_wo(
-        &[fd, dirfd][..],
-        path.as_bytes(),
+        &[old_dir, new_dir][..],
+        &payload,
         &StdFsCallMeta::new(StdFsCallKind::Frenameat, flags as u64, 0),
     )
     .map(|_| ())

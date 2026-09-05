@@ -72,7 +72,7 @@ ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.4.0"
 redox_protocols = { package = "libredox", version = "0.1.22", default-features = false, features = ["protocol"] }
-redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "rm-redundant-dup" }
+redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/kernel.git", branch = "rebase" }
 
 [build-dependencies]
 cc = "1"
@@ -107,7 +107,7 @@ libm = "0.2"
 log = "0.4"
 spin = "0.9.8"
 argon2 = "0.5.3"
-redox-rings = { git = "https://gitlab.redox-os.org/Ibuki.O/redox-rings.git", branch = "update-crates", default-features = false, features = ["sync"] }
+redox-rings = { git = "https://gitlab.redox-os.org/Ibuki.O/redox-rings.git", branch = "update-redox_syscall", default-features = false, features = ["sync"] }
 redox-buffer-pool = { git = "https://gitlab.redox-os.org/redox-os/redox-buffer-pool.git", default-features = false, features = ["redox", "spinning"]}
 
 zerocopy = { version = "0.8.55", features = ["derive"] }

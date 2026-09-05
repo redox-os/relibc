@@ -1,4 +1,4 @@
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::ToString};
 use core::{
     convert::TryFrom,
     mem::{self, size_of},
@@ -1152,21 +1152,55 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
+        let oldpath = RedoxStr::new_from_c(old_path.to_cstr()).ok_or(Errno(EINVAL))?;
         let newpath = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
 
-        // oflags are the same as Sys::rename above.
-        let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
-
-        let new_dirfd = if new_dir == fcntl::AT_FDCWD {
-            let cwd_guard = path::current_dir()?;
-            let cwd = cwd_guard.as_ref().unwrap();
-            cwd.fd.as_raw_fd() as usize
-        } else {
-            new_dir as usize
+        let resolve_dir = |dir: c_int| -> Result<usize> {
+            if dir == fcntl::AT_FDCWD {
+                let cwd_guard = path::current_dir()?;
+                let cwd = cwd_guard.as_ref().unwrap();
+                Ok(cwd.fd.as_raw_fd() as usize)
+            } else {
+                Ok(dir as usize)
+            }
         };
 
-        let target: Cow<'_, str> = newpath.into();
-        redox_rt::sys::frenameat(*source as usize, new_dirfd, &target, flags).map_err(Into::into)
+        let (old_dfd, old_target, _old_guard) = match &oldpath {
+            RedoxStr::Absolute(abs) => {
+                let (scheme, reference) = abs.as_parts().ok_or(Errno(EINVAL))?;
+                let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
+                let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
+                let guard = FdGuard::new(redox_rt::sys::openat_into_upper(
+                    redox_rt::current_namespace_fd()?,
+                    &scheme_root_str,
+                    syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
+                    0,
+                )?);
+                let raw_fd = guard.as_raw_fd();
+                (raw_fd as usize, reference.as_ref().to_string(), Some(guard))
+            }
+            RedoxStr::Relative(rel) => (resolve_dir(old_dir)?, rel.as_ref().to_string(), None),
+        };
+
+        let (new_dfd, new_target, _new_guard) = match &newpath {
+            RedoxStr::Absolute(abs) => {
+                let (scheme, reference) = abs.as_parts().ok_or(Errno(EINVAL))?;
+                let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
+                let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
+                let guard = FdGuard::new(redox_rt::sys::openat_into_upper(
+                    redox_rt::current_namespace_fd()?,
+                    &scheme_root_str,
+                    syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
+                    0,
+                )?);
+                let raw_fd = guard.as_raw_fd();
+                (raw_fd as usize, reference.as_ref().to_string(), Some(guard))
+            }
+            RedoxStr::Relative(rel) => (resolve_dir(new_dir)?, rel.as_ref().to_string(), None),
+        };
+
+        redox_rt::sys::frenameat(old_dfd, &old_target, new_dfd, &new_target, flags)
+            .map_err(Into::into)
     }
 
     fn sched_yield() -> Result<()> {
