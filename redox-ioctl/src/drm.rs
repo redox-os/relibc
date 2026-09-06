@@ -13,7 +13,7 @@ pub use drm_sys::{
     drm_mode_get_blob, drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane,
     drm_mode_get_plane_res, drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo,
     drm_mode_obj_get_properties, drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap,
-    drm_set_version, drm_unique, drm_version,
+    drm_set_client_name, drm_set_version, drm_unique, drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -355,5 +355,14 @@ define_ioctl_data! {
     struct drm_mode_closefb, DrmModeClosefb {
         fb_id: u32,
         pad: u32,
+    }
+}
+
+pub const SET_CLIENT_NAME: u64 = 0xD1;
+pub use drm_sys::DRM_CLIENT_NAME_MAX_LEN;
+define_ioctl_data! {
+    struct drm_set_client_name, DrmSetClientName {
+        name_len: u64,
+        name: u64 [array<u8, name_len>],
     }
 }

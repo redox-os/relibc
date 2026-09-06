@@ -128,6 +128,7 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xBB => unsafe { dev.write_ioctl::<drm_mode_cursor2>(buf, MODE_CURSOR2) },
         0xCE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_GET_FB2) },
         0xD0 => unsafe { dev.read_write_ioctl::<drm_mode_closefb>(buf, MODE_CLOSE_FB) },
+        0xD1 => unsafe { dev.write_ioctl::<drm_set_client_name>(buf, SET_CLIENT_NAME) },
         _ => {
             todo_skip!(
                 0,
