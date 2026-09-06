@@ -8,12 +8,12 @@ use core::{
 pub use drm_sys::{
     __kernel_size_t, DRM_PROP_NAME_LEN, drm_clip_rect, drm_get_cap, drm_mode_card_res,
     drm_mode_closefb, drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc,
-    drm_mode_crtc_page_flip_target, drm_mode_cursor, drm_mode_cursor2, drm_mode_destroy_dumb,
-    drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_fb_dirty_cmd, drm_mode_get_blob,
-    drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res,
-    drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties,
-    drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap, drm_set_version, drm_unique,
-    drm_version,
+    drm_mode_crtc_lut, drm_mode_crtc_page_flip_target, drm_mode_cursor, drm_mode_cursor2,
+    drm_mode_destroy_dumb, drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_fb_dirty_cmd,
+    drm_mode_get_blob, drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane,
+    drm_mode_get_plane_res, drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo,
+    drm_mode_obj_get_properties, drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap,
+    drm_set_version, drm_unique, drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -111,6 +111,18 @@ define_ioctl_data! {
         width:u32,
         height:u32,
         handle:u32,
+    }
+}
+
+pub const MODE_GETGAMMA: u64 = 0xA4;
+pub const MODE_SETGAMMA: u64 = 0xA5;
+define_ioctl_data! {
+    struct drm_mode_crtc_lut, DrmModeCrtcLut {
+        crtc_id: u32,
+        gamma_size: u32,
+        red: u64 [array<u16, gamma_size>],
+        green: u64 [array<u16, gamma_size>],
+        blue: u64 [array<u16, gamma_size>],
     }
 }
 

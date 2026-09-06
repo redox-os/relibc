@@ -99,6 +99,8 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xA1 => unsafe { dev.read_write_ioctl::<drm_mode_crtc>(buf, MODE_GET_CRTC) },
         0xA2 => unsafe { dev.read_write_ioctl::<drm_mode_crtc>(buf, MODE_SET_CRTC) },
         0xA3 => unsafe { dev.write_ioctl::<drm_mode_cursor>(buf, MODE_CURSOR) },
+        0xA4 => unsafe { dev.write_ioctl::<drm_mode_crtc_lut>(buf, MODE_GETGAMMA) },
+        0xA5 => unsafe { dev.write_ioctl::<drm_mode_crtc_lut>(buf, MODE_SETGAMMA) },
         0xA6 => unsafe { dev.read_write_ioctl::<drm_mode_get_encoder>(buf, MODE_GET_ENCODER) },
         0xA7 => unsafe { dev.read_write_ioctl::<drm_mode_get_connector>(buf, MODE_GET_CONNECTOR) },
         0xAA => unsafe { dev.read_write_ioctl::<drm_mode_get_property>(buf, MODE_GET_PROPERTY) },
