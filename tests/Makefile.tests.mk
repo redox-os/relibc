@@ -190,6 +190,7 @@ EXPECT_NAMES=\
 	unistd/readlinkat \
 	unistd/rmdir \
 	unistd/sleep \
+	unistd/symlinkat \
 	unistd/swab \
 	unistd/write \
 	wchar/fgetwc \
