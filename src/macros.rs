@@ -334,22 +334,15 @@ macro_rules! strto_float_impl {
             1.0
         };
 
-        let rust_s = s.to_string_lossy();
-
         // detect NaN, Inf
-        // TODO add safe wrapper for strcasecmp()/strncasecp() for strip_case_insensitive_prefix()
-        if rust_s.to_lowercase().starts_with("inf") {
+        if let Some(rest) = s.strip_case_insensitive_prefix(b"inf") {
             result = $type::INFINITY;
-            let bytes = s.to_bytes_with_nul();
-            let (_, rest) = bytes.split_at(3);
-            s = CStr::from_bytes_with_nul(rest).expect("started with a valid CStr");
-        } else if rust_s.to_lowercase().starts_with("nan") {
+            s = rest;
+        } else if let Some(rest) = s.strip_case_insensitive_prefix(b"nan") {
             // we cannot signal negative NaN in LLVM backed languages
             // https://github.com/rust-lang/rust/issues/73328 , https://github.com/rust-lang/rust/issues/81261
             result = $type::NAN;
-            let bytes = s.to_bytes_with_nul();
-            let (_, rest) = bytes.split_at(3);
-            s = CStr::from_bytes_with_nul(rest).expect("started with a valid CStr");
+            s = rest;
         } else {
             if let Some(rest) = s.strip_prefix(b"0x") {
                 s = rest;
