@@ -1,5 +1,8 @@
 use super::{
-    super::{PalPtrace, types::*},
+    super::{
+        PalPtrace,
+        types::{c_int, c_void, pid_t},
+    },
     Sys, e_raw,
 };
 use crate::error::Result;

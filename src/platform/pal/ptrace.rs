@@ -1,6 +1,9 @@
 use crate::{
     error::Result,
-    platform::{Pal, types::*},
+    platform::{
+        Pal,
+        types::{c_int, c_void, pid_t},
+    },
 };
 
 /// Platform abstraction for `ptrace` functionality.

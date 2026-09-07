@@ -7,7 +7,7 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, wchar_t};
 
 /// A minimal alternative to the `Zero` trait from num-traits, for use in
 /// `NulTerminated`.

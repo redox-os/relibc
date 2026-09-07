@@ -14,6 +14,7 @@ const KEY_MAX: usize = 256;
 const SALT_MAX: usize = 16;
 const RSTRING: &str = "rounds=";
 
+#[derive(Clone, Copy)]
 pub enum ShaType {
     Sha256,
     Sha512,
@@ -99,12 +100,12 @@ pub fn crypt_sha(passw: &[u8], setting: &str, cipher: ShaType) -> Option<String>
     for i in 0..SALT_MAX.min(setting.len() - cursor) {
         let idx = cursor + i;
 
-        if &setting[idx..idx + 1] == "$" {
+        if &setting[idx..=idx] == "$" {
             break;
         }
 
         // reject characters that interfere with /etc/shadow parsing
-        if &setting[idx..idx + 1] == "\n" || &setting[idx..idx + 1] == ":" {
+        if &setting[idx..=idx] == "\n" || &setting[idx..=idx] == ":" {
             return None;
         }
         slen += 1;

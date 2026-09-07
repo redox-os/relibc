@@ -37,7 +37,7 @@ pub mod auxv_defs;
 #[cfg(target_os = "redox")]
 pub use redox_rt::auxv_defs;
 
-use self::types::*;
+use self::types::{c_char, c_int};
 pub mod types;
 
 /// The global `errno` variable used internally in relibc.

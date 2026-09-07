@@ -17,7 +17,10 @@ use crate::{
     error::Errno,
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::tcb::Tcb,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_int, c_void, clockid_t, pthread_t},
+    },
 };
 
 use crate::sync::{Mutex, waitval::Waitval};

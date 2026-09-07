@@ -45,7 +45,7 @@ pub unsafe extern "C" fn preadv(
 
     let ret = unsafe { unistd::pread(fd, vec.as_mut_ptr().cast::<c_void>(), vec.len(), offset) };
 
-    unsafe { scatter(iovs, vec) };
+    unsafe { scatter(iovs, &vec) };
 
     ret
 }

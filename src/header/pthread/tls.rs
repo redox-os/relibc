@@ -2,7 +2,7 @@
 // dropped from src/lib.rs.
 #![warn(warnings, unused_variables)]
 
-use super::*;
+use super::{c_int, c_void, pthread_key_t};
 
 // TODO: Hashmap?
 use alloc::{collections::BTreeMap, vec::Vec};
