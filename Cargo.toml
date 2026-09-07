@@ -72,7 +72,7 @@ ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.4.0"
 redox_protocols = { package = "libredox", version = "0.1.22", default-features = false, features = ["protocol"] }
-redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/kernel.git", branch = "rebase" }
+redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/kernel.git", branch = "non-ipc-dup" }
 
 [build-dependencies]
 cc = "1"
