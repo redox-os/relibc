@@ -171,7 +171,7 @@ fn split(buf: &mut [u8]) -> Option<group> {
 }
 
 fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Error> {
-    let buffer = line.clone().into_bytes();
+    let buffer = line.into_bytes();
 
     let mut buffer = buffer
         .into_iter()

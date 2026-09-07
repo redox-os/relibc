@@ -372,6 +372,7 @@ impl VaListCache {
 // |___|_| |_| |_| .__/|_|\___|_| |_| |_|\___|_| |_|\__\__,_|\__|_|\___/|_| |_(_)
 //               |_|
 
+#[derive(Clone, Copy)]
 enum FmtCase {
     Lower,
     Upper,

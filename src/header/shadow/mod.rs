@@ -10,7 +10,7 @@ use core::{
     str::FromStr,
 };
 
-use alloc::{boxed::Box, string::String};
+use alloc::boxed::Box;
 
 use crate::{
     c_str::CStr,
@@ -21,7 +21,7 @@ use crate::{
     platform::types::{c_char, c_int, c_long, c_ulong, size_t},
 };
 
-use super::errno::*;
+use super::errno::{ENOENT, ERANGE};
 
 /// cbindgen:ignore
 #[cfg(target_os = "linux")]
@@ -131,7 +131,7 @@ fn to_ulong(s: &str) -> c_ulong {
     c_ulong::from_str(s).unwrap_or(0)
 }
 
-fn parse_spwd(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedSpwd, Error> {
+fn parse_spwd(line: &str, destbuf: Option<DestBuffer>) -> Result<OwnedSpwd, Error> {
     let mut parts = line.split(SEPARATOR);
 
     let sp_namp_str = parts.next().ok_or(Error::Syntax)?;
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn getspnam(name: *const c_char) -> *mut spwd {
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { continue };
         if line.starts_with(c_name.to_str().unwrap_or("\0"))
-            && let Ok(pwd) = parse_spwd(line, None)
+            && let Ok(pwd) = parse_spwd(&line, None)
         {
             return pwd.into_global();
         }
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn getspnam_r(
                 ptr: buffer.cast::<u8>(),
                 len: buflen,
             });
-            return match parse_spwd(line, dest_buf) {
+            return match parse_spwd(&line, dest_buf) {
                 Ok(sp) => {
                     unsafe {
                         *result_buf = sp.reference;
@@ -274,7 +274,7 @@ pub unsafe extern "C" fn getspent() -> *mut spwd {
     }
     if let Some(lines) = line_reader
         && let Some(Ok(line)) = lines.next()
-        && let Ok(sp) = parse_spwd(line, None)
+        && let Ok(sp) = parse_spwd(&line, None)
     {
         return sp.into_global();
     }

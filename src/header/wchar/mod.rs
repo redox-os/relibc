@@ -12,9 +12,9 @@ use crate::{
         stdio::*,
         stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc},
         string,
-        time::*,
+        time::tm,
         wchar::reader::Reader,
-        wctype::*,
+        wctype::{WEOF, towlower},
     },
     iter::{NulTerminated, NulTerminatedInclusive},
     platform::{

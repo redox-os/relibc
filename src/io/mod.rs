@@ -406,7 +406,7 @@ fn read_until<R: BufRead + ?Sized>(r: &mut R, delim: u8, buf: &mut Vec<u8>) -> R
             };
             match memchr::memchr(delim, available) {
                 Some(i) => {
-                    buf.extend_from_slice(&available[..i + 1]);
+                    buf.extend_from_slice(&available[..=i]);
                     (true, i + 1)
                 }
                 None => {

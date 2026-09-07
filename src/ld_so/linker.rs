@@ -990,7 +990,7 @@ impl Linker {
     }
 
     fn run_init(&self, obj: &DSO) {
-        use crate::platform::{self, types::*};
+        use crate::platform::{self, types::c_char};
 
         if let Some((symbol, SymbolBinding::Global)) = obj.get_sym("__relibc_init_environ") {
             unsafe {

@@ -93,7 +93,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, Errno> {
     Ok(addrs)
 }
 
-pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, Errno> {
+pub fn lookup_addr(addr: &in_addr) -> Result<Vec<Vec<u8>>, Errno> {
     let dns_string = get_dns_server()?;
 
     if let Some(dns_addr) = parse_ipv4_string(&dns_string) {

@@ -7,7 +7,10 @@ use crate::{
     c_str::CStr,
     header::{libgen, stdlib},
     ld_so::{self},
-    platform::{self, Pal, Sys, get_auxvs, types::*},
+    platform::{
+        self, Pal, Sys, get_auxvs,
+        types::{c_char, c_int},
+    },
 };
 
 #[repr(C)]

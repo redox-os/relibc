@@ -15,7 +15,7 @@ use crate::{
         arpa_inet::inet_aton,
         bits_arpainet::{htons, ntohl},
         bits_safamily_t::sa_family_t,
-        errno::*,
+        errno::ENOENT,
         fcntl::O_RDONLY,
         netinet_in::{in_addr, sockaddr_in},
         stdlib::atoi,
@@ -346,7 +346,7 @@ pub unsafe extern "C" fn gethostbyaddr(
     let mut host_aliases: Vec<*mut c_char> = vec![ptr::null_mut()];
     unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
 
-    match lookup_addr(addr.clone()).map(|host_names| host_names.into_iter().next()) {
+    match lookup_addr(&addr).map(|host_names| host_names.into_iter().next()) {
         Ok(Some(host_name)) => {
             unsafe { _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes() };
             unsafe {
@@ -1080,7 +1080,7 @@ pub unsafe extern "C" fn getnameinfo(
             };
             unsafe { *host.add(ip_bytes.len()) = 0 };
         } else {
-            match lookup_addr(sa.sin_addr.clone()).map(|host_names| host_names.into_iter().next()) {
+            match lookup_addr(&sa.sin_addr).map(|host_names| host_names.into_iter().next()) {
                 Ok(Some(hostname)) => {
                     if (hostlen as usize) <= hostname.len() {
                         return EAI_MEMORY; // Buffer too small

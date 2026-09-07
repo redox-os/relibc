@@ -69,7 +69,7 @@ impl<'a, T: Kind> FileReader<'a, T> {
             let mut bytes_read = 0;
 
             loop {
-                match self.f.read(&mut buf[bytes_read..bytes_read + 1]) {
+                match self.f.read(&mut buf[bytes_read..=bytes_read]) {
                     Ok(0) => return Ok(None),
                     Ok(_) => {}
                     Err(_) => return Err(-1),

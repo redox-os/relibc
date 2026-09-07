@@ -10,7 +10,7 @@ use crate::{
     c_str::{CStr, CString},
     header::{
         dirent::{closedir, opendir, readdir},
-        errno::*,
+        errno::ENOENT,
         fnmatch::{FNM_NOESCAPE, FNM_PERIOD, fnmatch},
         sys_stat::{S_IFDIR, S_IFMT, stat},
     },

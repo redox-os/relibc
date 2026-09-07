@@ -34,7 +34,7 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
 
     let ret = unsafe { unistd::read(fd, vec.as_mut_ptr().cast::<c_void>(), vec.len()) };
 
-    unsafe { scatter(iovs, vec) };
+    unsafe { scatter(iovs, &vec) };
 
     ret
 }
