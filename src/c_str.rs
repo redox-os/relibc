@@ -38,6 +38,7 @@ pub trait Kind: private::Sealed + Copy + 'static {
     unsafe fn strchr(s: *const Self::C, c: Self::C) -> *const Self::C;
     unsafe fn strchrnul(s: *const Self::C, c: Self::C) -> *const Self::C;
     unsafe fn strncmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering;
+    unsafe fn strncasecmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering;
 }
 impl Kind for Thin {
     type C = c_char;
@@ -57,6 +58,9 @@ impl Kind for Thin {
     }
     unsafe fn strncmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering {
         unsafe { crate::header::string::strncmp(s1, s2, n) }.cmp(&0)
+    }
+    unsafe fn strncasecmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering {
+        unsafe { crate::header::strings::strncasecmp(s1, s2, n) }.cmp(&0)
     }
     fn r2c(c: u8) -> c_char {
         c as _
@@ -93,6 +97,9 @@ impl Kind for Wide {
     }
     unsafe fn strncmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering {
         unsafe { crate::header::wchar::wcsncmp(s1, s2, n) }.cmp(&0)
+    }
+    unsafe fn strncasecmp(s1: *const Self::C, s2: *const Self::C, n: usize) -> core::cmp::Ordering {
+        unsafe { crate::header::wchar::wcsncasecmp(s1, s2, n) }.cmp(&0)
     }
     fn r2c(c: Self::Char) -> Self::C {
         c as _
@@ -306,7 +313,6 @@ impl<'a, T: Kind> NulStr<'a, T> {
         assert!(!prefix.contains(&T::NUL));
 
         // SAFETY:
-        //
         // - strncmp can never read `prefix` out-of-bounds as it's already limited by its length
         // - strncmp will never read `self` out-of-bounds as it respects the NUL terminator
         if unsafe { T::strncmp(self.as_ptr(), prefix.as_ptr().cast::<T::C>(), prefix.len()) }
@@ -317,6 +323,25 @@ impl<'a, T: Kind> NulStr<'a, T> {
         // SAFETY: We already know `prefix.len()` bytes of `self` equal `prefix`, so obviously we
         // can advance by at least that. It's required that the prefix does not contain any NUL bytes, for this to be valid.
         Some(unsafe { self.advance_unchecked(prefix.len()) })
+    }
+
+    /// If the string starts with `prefix`, ignoring case, return `Some(next)`.
+    #[inline]
+    pub fn strip_case_insensitive_prefix(self, prefix: &[T::Char]) -> Option<Self> {
+        assert!(!prefix.contains(&T::NUL));
+
+        // SAFETY:
+        // - strncasecmp can never read `prefix` out-of-bounds as it's already limited by its length
+        // - strncasecmp will never read `self` out-of-bounds as it respects the NUL terminator
+        if unsafe { T::strncasecmp(self.as_ptr(), prefix.as_ptr().cast::<T::C>(), prefix.len()) }
+            != core::cmp::Ordering::Equal
+        {
+            return None;
+        }
+        // SAFETY: We already know `prefix.len()` bytes of `self` equal `prefix`, so obviously we
+        // can advance by at least that. It's required that the prefix does not contain any NUL bytes, for this to be valid.
+        let (_, output) = unsafe { self.advance_unchecked(prefix.len()) };
+        Some(output)
     }
 
     /// Casts a slice of strings to raw pointers, valid because of memory layout compatibility.

@@ -114,11 +114,24 @@ pub unsafe extern "C" fn rindex(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcasecmp.html>.
+///
+/// Compares, ignoring differences in case, the string pointed to by `s1` to
+/// the string pointed to by `s2`.
+///
+/// Returns an integer greater than, equal to, or less than `0`, if the string
+/// pointed to by `s1` is, ignoring case, greater than, equal to, or less than
+/// the string pointed to by `s2`.
+///
+/// # Safety
+/// `s1` and `s2` must point to a valid string terminated by nul.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strcasecmp(s1: *const c_char, s2: *const c_char) -> c_int {
-    // SAFETY: the caller must ensure that s1 and s2 point to nul-terminated buffers.
-    let s1_iter = unsafe { NulTerminated::new(s1).unwrap() }.chain(once(&0));
-    let s2_iter = unsafe { NulTerminated::new(s2).unwrap() }.chain(once(&0));
+    // SAFETY: the caller must ensure that s1 points to a nul-terminated buffer.
+    let s1_iter = unsafe { NulTerminated::new(s1).expect("s1 should be valid string from C") }
+        .chain(once(&0));
+    // SAFETY: the caller must ensure that s2 points to a nul-terminated buffer.
+    let s2_iter = unsafe { NulTerminated::new(s2).expect("s2 should be valid string from C") }
+        .chain(once(&0));
 
     let zipped = zip(s1_iter, s2_iter);
     inner_casecmp(zipped)
@@ -132,11 +145,24 @@ pub unsafe extern "C" fn strcasecmp(s1: *const c_char, s2: *const c_char) -> c_i
 }*/
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcasecmp.html>.
+///
+/// Compares, ignoring differences in case, not more than `n` bytes, the string
+/// pointed to by `s1` to the string pointed to by `s2`.
+///
+/// Returns an integer greater than, equal to, or less than `0`, if `n` bytes
+/// of the string pointed to by `s1` is, ignoring case, greater than, equal to,
+/// or less than the string pointed to by `s2`.
+///
+/// # Safety
+/// `s1` and `s2` must point to a valid string terminated by nul.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strncasecmp(s1: *const c_char, s2: *const c_char, n: size_t) -> c_int {
-    // SAFETY: the caller must ensure that s1 and s2 point to nul-terminated buffers.
-    let s1_iter = unsafe { NulTerminated::new(s1).unwrap() }.chain(once(&0));
-    let s2_iter = unsafe { NulTerminated::new(s2).unwrap() }.chain(once(&0));
+    // SAFETY: the caller must ensure that s1 points to a nul-terminated buffer.
+    let s1_iter = unsafe { NulTerminated::new(s1).expect("s1 should be valid string from C") }
+        .chain(once(&0));
+    // SAFETY: the caller must ensure that s2 points to a nul-terminated buffer.
+    let s2_iter = unsafe { NulTerminated::new(s2).expect("s2 should be valid string from C") }
+        .chain(once(&0));
 
     let zipped = zip(s1_iter, s2_iter).take(n);
     inner_casecmp(zipped)
