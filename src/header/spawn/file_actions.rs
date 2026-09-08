@@ -87,9 +87,7 @@ impl IntoIterator for &posix_spawn_file_actions_t {
 pub extern "C" fn posix_spawn_file_actions_init(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
-    if file_actions.is_null() {
-        panic!("file_actions cannot be NULL");
-    }
+    assert!(!file_actions.is_null(), "file_actions cannot be NULL");
     let v = Vec::new();
     let actions = FileActions(v);
     unsafe {
@@ -117,9 +115,7 @@ pub unsafe extern "C" fn posix_spawn_file_actions_destroy(
     file_actions: *mut posix_spawn_file_actions_t,
 ) -> c_int {
     // TODO should we be returning EINVAL when `file_actions` is invalid?
-    if file_actions.is_null() {
-        panic!("file_actions cannot be NULL");
-    }
+    assert!(!file_actions.is_null(), "file_actions cannot be NULL");
     unsafe {
         let _ = *(file_actions.cast::<FileActions>());
     }

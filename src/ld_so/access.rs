@@ -1,7 +1,7 @@
 use crate::{
     c_str::{CStr, CString},
     error::Errno,
-    platform::{Pal, Sys, types::*},
+    platform::{Pal, Sys, types::c_int},
 };
 
 pub fn accessible(path: &str, mode: c_int) -> Result<(), Errno> {

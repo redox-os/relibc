@@ -7,7 +7,7 @@ use core::{
 };
 
 mod sys;
-use super::types::*;
+use super::types::{c_void, max_align_t, size_t};
 use crate::{ALLOCATOR, sync::Mutex};
 use dlmalloc::DlmallocCApi;
 

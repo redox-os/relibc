@@ -8,7 +8,10 @@ use crate::{
     },
     io,
     out::Out,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_int, mode_t, off_t, ssize_t},
+    },
 };
 use core::ops::Deref;
 

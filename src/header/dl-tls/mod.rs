@@ -77,12 +77,12 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
 
     let mut ptr = tcb.dtv_mut()[dtv_index];
 
-    if ptr.is_null() {
-        panic!(
-            "__tls_get_addr({ti:p}: {:#x}, {:#x})",
-            ti.ti_module, ti.ti_offset
-        );
-    }
+    assert!(
+        !ptr.is_null(),
+        "__tls_get_addr({ti:p}: {:#x}, {:#x})",
+        ti.ti_module,
+        ti.ti_offset
+    );
 
     if cfg!(target_arch = "riscv64") {
         ptr = unsafe { ptr.add(0x800 + ti.ti_offset) }; // dynamic offsets are 0x800-based on risc-v

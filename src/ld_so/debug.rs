@@ -1,4 +1,4 @@
-use crate::{c_str::CString, platform::types::*};
+use crate::{c_str::CString, platform::types::c_char};
 use alloc::boxed::Box;
 use core::ptr;
 

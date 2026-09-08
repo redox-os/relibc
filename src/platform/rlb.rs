@@ -1,6 +1,9 @@
 use alloc::vec::Vec;
 
-use crate::platform::{Pal, Sys, types::*};
+use crate::platform::{
+    Pal, Sys,
+    types::{c_int, off_t},
+};
 
 use crate::{
     error::ResultExt,
