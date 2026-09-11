@@ -1145,16 +1145,23 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             new_env_regs_fd.write(&env_regs)?;
         }
     }
-    {
+    // TODO: This shouldn't be opt-in, make sure in the kernel that userspace can't create cyclic
+    // references to leak fds.
+    let new_filetable_weak_fd = {
         // TODO: Use file descriptor forwarding or something similar to avoid copying the file
         // table in the kernel.
         let new_filetable_sel_fd = new_thr_fd.dup_into_upper(b"current-filetable")?;
         new_filetable_sel_fd.write(&usize::to_ne_bytes(new_filetable_fd.as_raw_fd()))?;
-    }
-    new_filetable_fd.call_wo(
-        &new_filetable_fd.as_raw_fd().to_ne_bytes(),
+        // downgrade to a kernel handle with only a Weak reference to the FdTbl
+        let weak = new_filetable_fd.dup_into_upper(b"refresh")?;
+
+        drop(new_filetable_fd);
+        weak
+    };
+    new_filetable_weak_fd.call_wo(
+        &new_filetable_weak_fd.as_raw_fd().to_ne_bytes(),
         syscall::CallFlags::FD | syscall::CallFlags::FD_CLONE,
-        &[new_filetable_fd.as_raw_fd() as u64],
+        &[new_filetable_weak_fd.as_raw_fd() as u64],
     )?;
     let start_fd = new_thr_fd.dup_into_upper(b"start")?;
     start_fd.write(&[0])?;
