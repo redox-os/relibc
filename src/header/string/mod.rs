@@ -196,7 +196,7 @@ pub unsafe extern "C" fn memrchr(
 /// Returns `s`.
 ///
 /// # Implementation
-/// Casting of `c` may result in truncation.
+/// Casting of `c` may result in truncation or sign loss.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
     for i in 0..n {
@@ -390,10 +390,13 @@ pub unsafe extern "C" fn strerror_l(errnum: c_int, _loc: locale_t) -> *mut c_cha
     let strerror_ptr = unsafe { STRERROR_BUF.unsafe_mut().as_mut_ptr() };
     let mut w = platform::StringWriter(strerror_ptr, STRERROR_MAX);
 
-    let _ = match STR_ERROR.get(errnum as usize) {
-        Some(e) => w.write_str(e),
-        None => w.write_fmt(format_args!("Unknown error {}", errnum)),
-    };
+    if let Ok(num) = usize::try_from(errnum)
+        && let Some(e) = STR_ERROR.get(num)
+    {
+        let _ = w.write_str(e);
+    } else {
+        let _ = w.write_fmt(format_args!("Unknown error {}", errnum));
+    }
 
     strerror_ptr
 }
@@ -617,7 +620,7 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 pub unsafe extern "C" fn strsignal(signum: c_int) -> *mut c_char {
     U8PtrToCCharPtr::cast_mut(
         signal::SIGNAL_STRINGS
-            .get(signum as usize)
+            .get(usize::try_from(signum).unwrap_or(0))
             .unwrap_or(&signal::SIGNAL_STRINGS[0]) // Unknown signal message
             .as_ptr(),
     )

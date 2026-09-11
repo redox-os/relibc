@@ -66,7 +66,7 @@ impl<T> Once<T> {
                     crate::sync::futex_wake(&self.status, i32::MAX);
                 }
             }
-            Err(INITIALIZING) | Err(WAITING) => crate::sync::wait_until_generic(
+            Err(INITIALIZING | WAITING) => crate::sync::wait_until_generic(
                 &self.status,
                 // SAFETY: An Acquire load is necessary for the nonatomic store by the thread
                 // running the constructor, to become visible.
