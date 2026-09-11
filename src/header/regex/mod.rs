@@ -75,9 +75,11 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
             };
             0
         }
-        Err(CompileError::EmptyRepetition)
-        | Err(CompileError::IntegerOverflow)
-        | Err(CompileError::IllegalRange) => REG_BADBR,
+        Err(
+            CompileError::EmptyRepetition
+            | CompileError::IntegerOverflow
+            | CompileError::IllegalRange,
+        ) => REG_BADBR,
         Err(CompileError::UnclosedRepetition) => REG_EBRACE,
         Err(CompileError::LeadingRepetition) => REG_BADRPT,
         Err(CompileError::UnknownCollation) => REG_ECOLLATE,
