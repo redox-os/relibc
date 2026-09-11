@@ -66,22 +66,23 @@ pub unsafe fn select_epoll(
     // Keep track of the number of file descriptors that do not support epoll
     let mut not_epoll = 0;
     for fd in 0..nfds {
+        let fd_usize = usize::try_from(fd).expect("already checked for negative values");
         let mut events = 0;
 
         if let Some(ref fd_set) = read_bitset
-            && fd_set.contains(fd as usize)
+            && fd_set.contains(fd_usize)
         {
             events |= EPOLLIN;
         }
 
         if let Some(ref fd_set) = write_bitset
-            && fd_set.contains(fd as usize)
+            && fd_set.contains(fd_usize)
         {
             events |= EPOLLOUT;
         }
 
         if let Some(ref fd_set) = except_bitset
-            && fd_set.contains(fd as usize)
+            && fd_set.contains(fd_usize)
         {
             events |= EPOLLERR;
         }
@@ -96,21 +97,21 @@ pub unsafe fn select_epoll(
                 }
             } else {
                 if let Some(ref mut fd_set) = read_bitset
-                    && fd_set.contains(fd as usize)
+                    && fd_set.contains(fd_usize)
                 {
-                    fd_set.remove(fd as usize);
+                    fd_set.remove(fd_usize);
                 }
 
                 if let Some(ref mut fd_set) = write_bitset
-                    && fd_set.contains(fd as usize)
+                    && fd_set.contains(fd_usize)
                 {
-                    fd_set.remove(fd as usize);
+                    fd_set.remove(fd_usize);
                 }
 
                 if let Some(ref mut fd_set) = except_bitset
-                    && fd_set.contains(fd as usize)
+                    && fd_set.contains(fd_usize)
                 {
-                    fd_set.remove(fd as usize);
+                    fd_set.remove(fd_usize);
                 }
             }
         }
@@ -148,26 +149,30 @@ pub unsafe fn select_epoll(
     }
 
     let mut count = not_epoll;
-    for event in events.iter().take(res as usize) {
+    for event in events
+        .iter()
+        .take(usize::try_from(res).expect("already checked for negative values"))
+    {
         let fd = unsafe { event.data.fd };
         // TODO: Error status when fd does not match?
         if fd >= 0 && fd < c_int::try_from(FD_SETSIZE).expect("constant value within c_int::MAX") {
+            let fd_usize = usize::try_from(fd).expect("already checked for negative values");
             if event.events & EPOLLIN > 0
                 && let Some(ref mut fd_set) = read_bitset
             {
-                fd_set.insert(fd as usize);
+                fd_set.insert(fd_usize);
                 count += 1;
             }
             if event.events & EPOLLOUT > 0
                 && let Some(ref mut fd_set) = write_bitset
             {
-                fd_set.insert(fd as usize);
+                fd_set.insert(fd_usize);
                 count += 1;
             }
             if event.events & EPOLLERR > 0
                 && let Some(ref mut fd_set) = except_bitset
             {
-                fd_set.insert(fd as usize);
+                fd_set.insert(fd_usize);
                 count += 1;
             }
         }

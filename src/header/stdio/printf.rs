@@ -125,49 +125,45 @@ impl VaArg {
         match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call arg_from on %"),
 
-            (FmtKind::Char, IntKind::Long) | (FmtKind::Char, IntKind::LongLong) => {
+            (FmtKind::Char, IntKind::Long | IntKind::LongLong) => {
                 VaArg::wint_t(unsafe { ap.next_arg::<wint_t>() })
             }
 
-            (FmtKind::Char, _)
-            | (FmtKind::Unsigned, IntKind::Byte)
-            | (FmtKind::Signed, IntKind::Byte) => {
+            (FmtKind::Char, _) | (FmtKind::Unsigned | FmtKind::Signed, IntKind::Byte) => {
                 // c_int is passed but truncated to c_char
                 VaArg::c_char(unsafe { ap.next_arg::<c_int>() } as c_char)
             }
-            (FmtKind::Unsigned, IntKind::Short) | (FmtKind::Signed, IntKind::Short) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Short) => {
                 // c_int is passed but truncated to c_short
                 VaArg::c_short(unsafe { ap.next_arg::<c_int>() } as c_short)
             }
-            (FmtKind::Unsigned, IntKind::Int) | (FmtKind::Signed, IntKind::Int) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Int) => {
                 VaArg::c_int(unsafe { ap.next_arg::<c_int>() })
             }
-            (FmtKind::Unsigned, IntKind::Long) | (FmtKind::Signed, IntKind::Long) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Long) => {
                 VaArg::c_long(unsafe { ap.next_arg::<c_long>() })
             }
-            (FmtKind::Unsigned, IntKind::LongLong) | (FmtKind::Signed, IntKind::LongLong) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::LongLong) => {
                 VaArg::c_longlong(unsafe { ap.next_arg::<c_longlong>() })
             }
-            (FmtKind::Unsigned, IntKind::IntMax) | (FmtKind::Signed, IntKind::IntMax) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::IntMax) => {
                 VaArg::intmax_t(unsafe { ap.next_arg::<intmax_t>() })
             }
-            (FmtKind::Unsigned, IntKind::PtrDiff) | (FmtKind::Signed, IntKind::PtrDiff) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::PtrDiff) => {
                 VaArg::ptrdiff_t(unsafe { ap.next_arg::<ptrdiff_t>() })
             }
-            (FmtKind::Unsigned, IntKind::Size) | (FmtKind::Signed, IntKind::Size) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Size) => {
                 VaArg::ssize_t(unsafe { ap.next_arg::<ssize_t>() })
             }
 
-            (FmtKind::AnyNotation, IntKind::LongLong)
-            | (FmtKind::Decimal, IntKind::LongLong)
-            | (FmtKind::Scientific, IntKind::LongLong) => {
+            (FmtKind::AnyNotation | FmtKind::Decimal | FmtKind::Scientific, IntKind::LongLong) => {
                 VaArg::c_longdouble(unsafe { VaArg::extract_longdouble(ap) })
             }
-            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
+            (FmtKind::AnyNotation | FmtKind::Decimal | FmtKind::Scientific, _) => {
                 VaArg::c_double(unsafe { ap.next_arg::<c_double>() })
             }
 
-            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _) => {
+            (FmtKind::GetWritten | FmtKind::Pointer | FmtKind::String, _) => {
                 VaArg::pointer(unsafe { ap.next_arg::<*const c_void>() })
             }
         }
@@ -278,45 +274,43 @@ impl VaArg {
         match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call transmute on %"),
 
-            (FmtKind::Char, IntKind::Long) | (FmtKind::Char, IntKind::LongLong) => {
+            (FmtKind::Char, IntKind::Long | IntKind::LongLong) => {
                 VaArg::wint_t(unsafe { untyped.wint_t })
             }
 
-            (FmtKind::Char, _)
-            | (FmtKind::Unsigned, IntKind::Byte)
-            | (FmtKind::Signed, IntKind::Byte) => VaArg::c_char(unsafe { untyped.c_char }),
-            (FmtKind::Unsigned, IntKind::Short) | (FmtKind::Signed, IntKind::Short) => {
+            (FmtKind::Char, _) | (FmtKind::Unsigned | FmtKind::Signed, IntKind::Byte) => {
+                VaArg::c_char(unsafe { untyped.c_char })
+            }
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Short) => {
                 VaArg::c_short(unsafe { untyped.c_short })
             }
-            (FmtKind::Unsigned, IntKind::Int) | (FmtKind::Signed, IntKind::Int) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Int) => {
                 VaArg::c_int(unsafe { untyped.c_int })
             }
-            (FmtKind::Unsigned, IntKind::Long) | (FmtKind::Signed, IntKind::Long) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Long) => {
                 VaArg::c_long(unsafe { untyped.c_long })
             }
-            (FmtKind::Unsigned, IntKind::LongLong) | (FmtKind::Signed, IntKind::LongLong) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::LongLong) => {
                 VaArg::c_longlong(unsafe { untyped.c_longlong })
             }
-            (FmtKind::Unsigned, IntKind::IntMax) | (FmtKind::Signed, IntKind::IntMax) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::IntMax) => {
                 VaArg::intmax_t(unsafe { untyped.intmax_t })
             }
-            (FmtKind::Unsigned, IntKind::PtrDiff) | (FmtKind::Signed, IntKind::PtrDiff) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::PtrDiff) => {
                 VaArg::ptrdiff_t(unsafe { untyped.ptrdiff_t })
             }
-            (FmtKind::Unsigned, IntKind::Size) | (FmtKind::Signed, IntKind::Size) => {
+            (FmtKind::Unsigned | FmtKind::Signed, IntKind::Size) => {
                 VaArg::ssize_t(unsafe { untyped.ssize_t })
             }
 
-            (FmtKind::AnyNotation, IntKind::LongLong)
-            | (FmtKind::Decimal, IntKind::LongLong)
-            | (FmtKind::Scientific, IntKind::LongLong) => {
+            (FmtKind::AnyNotation | FmtKind::Decimal | FmtKind::Scientific, IntKind::LongLong) => {
                 VaArg::c_longdouble(unsafe { untyped.c_longdouble })
             }
-            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
+            (FmtKind::AnyNotation | FmtKind::Decimal | FmtKind::Scientific, _) => {
                 VaArg::c_double(unsafe { untyped.c_double })
             }
 
-            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _) => {
+            (FmtKind::GetWritten | FmtKind::Pointer | FmtKind::String, _) => {
                 VaArg::pointer(unsafe { untyped.pointer })
             }
         }
