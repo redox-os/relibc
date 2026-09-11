@@ -561,10 +561,14 @@ impl DSO {
         let bounds = {
             let mut bounds_opt: Option<(usize, usize)> = None;
             for ph in elf.elf_program_headers() {
-                let voff = ph.p_vaddr(endian) % ph.p_align(endian);
+                let align = ph.p_align(endian);
+                if align == 0 {
+                    // clang generated PT_GNU_STACK with 0 align
+                    continue;
+                }
+                let voff = ph.p_vaddr(endian) % align;
                 let vaddr = (ph.p_vaddr(endian) - voff) as usize;
-                let vsize = ((ph.p_memsz(endian) + voff) as usize)
-                    .next_multiple_of(ph.p_align(endian) as usize);
+                let vsize = ((ph.p_memsz(endian) + voff) as usize).next_multiple_of(align as usize);
 
                 match ph.p_type(endian) {
                     elf::PT_DYNAMIC => {
