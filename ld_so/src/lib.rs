@@ -66,7 +66,16 @@ _start:
     push esp
     call relibc_ld_so_start
     pop esp
-    # TODO: x86
+
+    # Restore original stack, clear registers, and jump to new start function
+    xor ecx, ecx
+    xor edx, edx
+    xor ebx, ebx
+    xor ebp, ebp
+    xor esi, esi
+    xor edi, edi
+    fninit
+    jmp eax
     ud2
 "
 );

@@ -10,8 +10,7 @@ use alloc::{
     vec::Vec,
 };
 use object::{
-    NativeEndian,
-    elf::{self, PT_DYNAMIC, PT_PHDR},
+    NativeEndian, elf,
     read::elf::{Dyn as _, FileHeader as _, ProgramHeader as _},
 };
 
@@ -154,6 +153,20 @@ fn resolve_path_name(
     None
 }
 
+/*
+use core::fmt::Write;
+struct RawStderr;
+
+/// To help debugging, uncomment this section, use
+/// like: `writeln!(RawStderr, "foo: {bar:x}");`
+impl Write for RawStderr {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let _ = syscall::write(2, s.as_bytes());
+        Ok(())
+    }
+}
+*/
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn relibc_ld_so_start(
     sp: &'static mut Stack,
@@ -166,8 +179,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     // external symbols **cannot** be made until `stage2()` so, this function might not be very
     // elegant.
     //
-    // At this stage the TCB is not setup either so `expect_notls` must be used instead of `expect`
-    // and `unwrap`.
+    // Until relocation is done `expect` may not be able to report panic.
     let mut at_phdr = None;
     let mut at_phnum = None;
     let mut at_phent = None;
@@ -196,12 +208,34 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     let self_base = if at_base != 0 {
         at_base
     } else {
-        let ph = phdrs
-            .iter()
-            .find(|ph| ph.p_type(NativeEndian) == PT_DYNAMIC)
-            .unwrap();
-        unsafe { dynamic.byte_sub(ph.p_vaddr(NativeEndian) as usize) as usize }
+        (at_phdr as usize)
+            .checked_sub(core::mem::size_of::<FileHeader>())
+            .expect("AT_PHDR underflow")
     };
+
+    let ehdr = unsafe { &*(self_base as *const FileHeader) };
+    let ph_off = ehdr.e_phoff(NativeEndian) as usize;
+    let ph_num = ehdr.e_phnum(NativeEndian) as usize;
+
+    let my_phdrs = unsafe {
+        slice::from_raw_parts(
+            (self_base as *const u8).add(ph_off).cast::<ProgramHeader>(),
+            ph_num,
+        )
+    };
+
+    #[cfg(target_arch = "x86")]
+    let dynamic = {
+        // i586: The dynamic and ld_entry argument is broken
+        let dyn_ph = my_phdrs
+            .iter()
+            .find(|ph| ph.p_type(NativeEndian) == elf::PT_DYNAMIC)
+            .expect("PT_DYNAMIC not found");
+        (self_base + dyn_ph.p_vaddr(NativeEndian) as usize) as *const Dyn
+    };
+
+    #[cfg(target_arch = "x86")]
+    let ld_entry = self_base + ehdr.e_entry(NativeEndian) as usize;
 
     let is_manual = at_entry == ld_entry; // Whether the dynamic linker was invoked as a command.
 
@@ -257,6 +291,40 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
+    // in i586, code must be mapped to absolute position, so unlocking PROT_WRITE is needed
+    #[cfg(target_arch = "x86")]
+    unsafe fn set_mprotect(phdrs: &[ProgramHeader], self_base: usize, force_write: bool) {
+        use syscall::MapFlags;
+
+        for ph in phdrs {
+            if ph.p_type(NativeEndian) == elf::PT_LOAD {
+                let vaddr = ph.p_vaddr(NativeEndian) as usize;
+                let memsz = ph.p_memsz(NativeEndian) as usize;
+                let flags = ph.p_flags(NativeEndian);
+
+                let start = self_base + vaddr;
+                let end = start + memsz;
+
+                let start_aligned = start & !0xFFF;
+                let end_aligned = (end + 0xFFF) & !0xFFF;
+
+                let mut prot = MapFlags::empty();
+                if flags & 1 != 0 {
+                    prot |= MapFlags::PROT_EXEC;
+                }
+                if flags & 2 != 0 || force_write {
+                    prot |= MapFlags::PROT_WRITE;
+                }
+                if flags & 4 != 0 {
+                    prot |= MapFlags::PROT_READ;
+                }
+
+                let _ =
+                    unsafe { syscall::mprotect(start_aligned, end_aligned - start_aligned, prot) };
+            }
+        }
+    }
+
     fn do_relocs<'a, T>(relocs: &'a [T], self_base: usize)
     where
         Relocation: From<&'a T>,
@@ -272,12 +340,21 @@ pub unsafe extern "C" fn relibc_ld_so_start(
 
     let rela = unsafe { get_array::<Rela>(rela_ptr, rela_len, self_base) };
     let rel = unsafe { get_array::<Rel>(rel_ptr, rel_len, self_base) };
+
+    #[cfg(target_arch = "x86")]
+    unsafe {
+        set_mprotect(my_phdrs, self_base, true);
+    }
+
     do_relocs(rela, self_base);
     do_relocs(rel, self_base);
 
     unsafe {
         let relr = get_array(relr_ptr, relr_len, self_base);
         apply_relr(self_base as *const u8, relr);
+
+        #[cfg(target_arch = "x86")]
+        set_mprotect(my_phdrs, self_base, false);
     }
 
     let mut base_addr = None;
@@ -286,7 +363,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         // program is already loaded by the kernel and we want
         // to use it. on redox, we treat it the same.
         for ph in phdrs.iter() {
-            if ph.p_type(NativeEndian) == PT_PHDR {
+            if ph.p_type(NativeEndian) == elf::PT_PHDR {
                 assert!(base_addr.is_none(), "`PT_PHDR` cannot occur more than once");
                 base_addr = Some(unsafe {
                     phdrs
@@ -297,22 +374,6 @@ pub unsafe extern "C" fn relibc_ld_so_start(
             }
         }
     }
-
-    unsafe extern "C" {
-        safe static __ehdr_start: FileHeader;
-    }
-
-    let ph_off = __ehdr_start.e_phoff(NativeEndian) as usize;
-    let ph_num = __ehdr_start.e_phnum(NativeEndian) as usize;
-
-    let my_phdrs = unsafe {
-        slice::from_raw_parts(
-            core::ptr::addr_of!(__ehdr_start)
-                .byte_add(ph_off)
-                .cast::<ProgramHeader>(),
-            ph_num,
-        )
-    };
 
     stage2(sp, self_base, is_manual, base_addr, dyns, my_phdrs)
 }
