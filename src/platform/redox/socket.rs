@@ -2,7 +2,7 @@ use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{cmp, mem, ptr, slice, str};
 use redox_path::RedoxStr;
 use redox_protocols::protocol::{FsCall, O_CLOEXEC, SocketCall};
-use redox_rt::proc::FdGuard;
+use redox_rt::{proc::FdGuard, signal::tmp_disable_signals};
 use syscall::{self, flag::*};
 
 use super::{
@@ -97,7 +97,7 @@ pub fn bind_or_connect_into(
 ) -> Result<c_int, Errno> {
     // Duplicate the socket, and then duplicate the copy back to the original fd
     let fd = FdGuard::new(bind_or_connect(op, socket, address_raw)?);
-    redox_rt::sys::dup2(fd.as_raw_fd(), socket as usize, &[])?;
+    redox_rt::sys::dup2(fd.as_raw_fd(), socket as usize)?;
     Ok(0)
 }
 
@@ -556,6 +556,7 @@ impl PalSocket for Sys {
     }
 
     fn bind(socket: c_int, address_raw: &[u8]) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         match extract_sa_family(address_raw)? {
             AF_INET => {
                 (bind_or_connect_into(SocketCall::Bind, socket, address_raw))?;
@@ -789,24 +790,26 @@ impl PalSocket for Sys {
         let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
 
         let mut msg_stream: Vec<u8> = Vec::new();
-
-        // Prepare space for the message stream.
-        // [name_len(usize)][name_buffer]
-        // [payload_len(usize)][payload_data_buffer]
-        // [ancillary_stream_buffer]
-        let expected_stream_size = {
-            64                             //reserve extra space for the scheme path
+        {
+            let _siglock = tmp_disable_signals();
+            // Prepare space for the message stream.
+            // [name_len(usize)][name_buffer]
+            // [payload_len(usize)][payload_data_buffer]
+            // [ancillary_stream_buffer]
+            let expected_stream_size = {
+                64                             //reserve extra space for the scheme path
             + mem::size_of::<usize>()      // name_len
             + mhdr.msg_namelen as usize    // name_buffer
             + mem::size_of::<usize>()      // payload_len
             + whole_iov_size               // payload_data_buffer
             + mem::size_of::<usize>()      // control_len
             + mhdr.msg_controllen // ancillary_stream_buffer
-        };
-        msg_stream
-            .try_reserve_exact(expected_stream_size)
-            .map_err(|_| Errno(ENOMEM))?;
-        msg_stream.resize(expected_stream_size, 0);
+            };
+            msg_stream
+                .try_reserve_exact(expected_stream_size)
+                .map_err(|_| Errno(ENOMEM))?;
+            msg_stream.resize(expected_stream_size, 0);
+        }
 
         // Write the information about the msghdr
         let mut cursor: usize = 0;
@@ -824,6 +827,8 @@ impl PalSocket for Sys {
         let call_flags = CallFlags::empty();
         let actual_read_len =
             redox_rt::sys::sys_call_rw(socket as usize, &mut msg_stream, call_flags, &metadata)?;
+
+        let _siglock = tmp_disable_signals();
         msg_stream.truncate(actual_read_len);
 
         cursor = 0;
@@ -880,25 +885,30 @@ impl PalSocket for Sys {
         };
 
         let mut msg_stream: Vec<u8> = Vec::new();
-        let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
-        msg_stream
-            .try_reserve_exact(
-                mem::size_of::<usize>()     // payload_len
+        let mut actual_payload_bytes_serialized = 0;
+        {
+            let _siglock = tmp_disable_signals();
+            let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
+            msg_stream
+                .try_reserve_exact(
+                    mem::size_of::<usize>()     // payload_len
             + whole_iov_size                // payload_data_buffer
             + mhdr.msg_controllen, // ancillary_stream_buffer
-            )
-            .map_err(|_| Errno(ENOMEM))?;
+                )
+                .map_err(|_| Errno(ENOMEM))?;
 
-        // Write the message to the msg_stream.
-        let mut actual_payload_bytes_serialized = 0;
-        if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 {
-            actual_payload_bytes_serialized = unsafe {
-                serialize_payload_to_stream(&mut msg_stream, iovs_slice, whole_iov_size)
-            }?;
-        }
-        // Process Control Messages from msghdr and serialize them.
-        if mhdr.msg_controllen > 0 {
-            (unsafe { serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream) })?;
+            // Write the message to the msg_stream.
+            if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 {
+                actual_payload_bytes_serialized = unsafe {
+                    serialize_payload_to_stream(&mut msg_stream, iovs_slice, whole_iov_size)
+                }?;
+            }
+            // Process Control Messages from msghdr and serialize them.
+            if mhdr.msg_controllen > 0 {
+                (unsafe {
+                    serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream)
+                })?;
+            }
         }
 
         // Send the message stream.
@@ -942,6 +952,7 @@ impl PalSocket for Sys {
         } else if let Some(dest) = dest_addr
             && !dest.is_empty()
         {
+            let _siglock = tmp_disable_signals();
             match bind_or_connect(SocketCall::Connect, socket, dest) {
                 Ok(fd) => {
                     let fd = FdGuard::new(fd);
@@ -972,6 +983,7 @@ impl PalSocket for Sys {
         option_value: &[u8],
     ) -> Result<()> {
         let set_timeout = |timeout_name: &[u8]| -> Result<()> {
+            let _siglock = tmp_disable_signals();
             let bytes = option_value
                 .get(..size_of::<timeval>())
                 .ok_or(Errno(EINVAL))?;
@@ -1055,6 +1067,7 @@ impl PalSocket for Sys {
     }
 
     fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         let (kind, flags) = socket_kind(kind);
 
         match (domain, kind) {
