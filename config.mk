@@ -40,7 +40,7 @@ ifeq ($(TARGET),i586-unknown-redox)
 	export NM=i586-unknown-redox-nm
 	export OBJCOPY=i586-unknown-redox-objcopy
 	export CPPFLAGS=
-	LD_SONAME=ld.so.1
+	LD_SONAME=libc.so.1
 endif
 
 ifeq ($(TARGET),i686-unknown-redox)
@@ -50,7 +50,7 @@ ifeq ($(TARGET),i686-unknown-redox)
 	export NM=i686-unknown-redox-nm
 	export OBJCOPY=i686-unknown-redox-objcopy
 	export CPPFLAGS=
-	LD_SONAME=ld.so.1
+	LD_SONAME=libc.so.1
 endif
 
 ifeq ($(TARGET),x86_64-unknown-linux-gnu)

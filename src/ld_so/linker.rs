@@ -793,7 +793,7 @@ impl Linker {
 
         let debug = self.config.debug_flags.contains(DebugFlags::LOAD);
 
-        if name == "libc.so.6" || name == "libc.so" {
+        if name == "libc.so.6" || name == "libc.so" || name == "/lib/libc.so.1" {
             let (me, master) = DSO::from_raw(
                 self.me.base,
                 self.me.dyns,
