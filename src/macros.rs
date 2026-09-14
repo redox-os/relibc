@@ -176,29 +176,30 @@ macro_rules! wcsto_impl {
 
         let mut base = $base;
 
-        match base {
-            0 | 8 | 10 | 16 => {
-                base = if let Some((zero, rest)) = ws.split_first_char()
-                    && zero == '0'
-                {
-                    ws = rest;
-                    if let Some((hex, after)) = ws.split_first_char()
-                        && (hex == 'x' || hex == 'X')
-                    {
-                        ws = after;
-                        16
-                    } else {
-                        8
-                    }
-                } else {
-                    10
-                };
-            }
-            2..=7 | 9 | 11..=15 | 17..=36 => {}
-            _ => {
-                platform::ERRNO.set(EINVAL);
-                set_endptr(ws);
-                return 0;
+        if let Some((zero, rest)) = ws.split_first_char()
+            && zero == '0'
+            && (base == 0 || base == 16)
+            && let Some((hex, after)) = rest.split_first_char()
+            && (hex == 'x' || hex == 'X')
+        {
+            ws = after;
+            base = 16;
+        } else if let Some((zero, rest)) = ws.split_first_char()
+            && zero == '0'
+            && base == 0
+        {
+            ws = rest;
+            base = 8;
+        } else if base == 0 {
+            base = 10;
+        } else {
+            match base {
+                2..=36 => {}
+                _ => {
+                    platform::ERRNO.set(EINVAL);
+                    set_endptr(ws);
+                    return 0;
+                }
             }
         }
 
