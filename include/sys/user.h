@@ -6,6 +6,9 @@
 #include <arch/aarch64/user.h>
 #elif defined(__riscv) && __riscv_xlen==64
 #include <arch/riscv64/user.h>
+#elif defined(__i386__)
+// TODO: this is incorrect
+#include <arch/x64/user.h>
 #else
 #error "Unknown architecture"
 #endif
