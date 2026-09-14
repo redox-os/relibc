@@ -211,27 +211,13 @@ macro_rules! wcsto_impl {
                 .checked_mul($type::try_from(base).expect("base within limits"))
                 .and_then(|result| {
                     if has_minus && type_is_signed {
-                        #[cfg(target_arch = "x86")]
-                        {
-                            result.checked_sub(
-                                $type::try_from(digit).expect("single digit never overflows"),
-                            )
-                        }
-                        #[cfg(not(target_arch = "x86"))]
-                        {
-                            result.checked_sub($type::from(digit))
-                        }
+                        result.checked_sub(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
                     } else {
-                        #[cfg(target_arch = "x86")]
-                        {
-                            result.checked_add(
-                                $type::try_from(digit).expect("single digit never overflows"),
-                            )
-                        }
-                        #[cfg(not(target_arch = "x86"))]
-                        {
-                            result.checked_add($type::from(digit))
-                        }
+                        result.checked_add(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
                     }
                 });
             result = match new {
