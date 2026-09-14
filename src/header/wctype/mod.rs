@@ -131,10 +131,10 @@ pub extern "C" fn iswpunct(wc: wint_t) -> c_int {
 pub extern "C" fn iswspace(wc: wint_t) -> c_int {
     c_int::from(
         [
-            ' ' as wint_t,
-            '\t' as wint_t,
-            '\n' as wint_t,
-            '\r' as wint_t,
+            wint_t::from(' '),
+            wint_t::from('\t'),
+            wint_t::from('\n'),
+            wint_t::from('\r'),
             11,
             12,
             0x0085,
