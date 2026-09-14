@@ -1,7 +1,7 @@
 percent: %
 string: String
 char: c
-char: ş
+char: ~
 int: -16
 uint: 32
 hex: beef
@@ -53,7 +53,8 @@ Float madness:
 1E-05
 1.000000E-05
 001234.56
-001234.56
+01234.567
+005.0E-01
 
 Non-finite float madness:
 %e: inf -inf nan -nan
