@@ -167,6 +167,8 @@ impl Write for RawStderr {
 }
 */
 
+// i586: The dynamic and ld_entry argument is broken
+#[cfg_attr(target_arch = "x86", expect(unused_variables))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn relibc_ld_so_start(
     sp: &'static mut Stack,
@@ -226,7 +228,6 @@ pub unsafe extern "C" fn relibc_ld_so_start(
 
     #[cfg(target_arch = "x86")]
     let dynamic = {
-        // i586: The dynamic and ld_entry argument is broken
         let dyn_ph = my_phdrs
             .iter()
             .find(|ph| ph.p_type(NativeEndian) == elf::PT_DYNAMIC)
