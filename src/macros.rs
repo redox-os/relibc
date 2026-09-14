@@ -140,63 +140,86 @@ macro_rules! skipws {
 
 #[macro_export]
 macro_rules! wcsto_impl {
-    ($type:ident, $ptr:expr, $base:expr) => {{
-        let has_minus = unsafe { *$ptr } == '-' as wchar_t;
-        let has_plus = unsafe { *$ptr } == '+' as wchar_t;
-        if has_minus || has_plus {
-            $ptr = unsafe { $ptr.add(1) };
-        }
+    ($type:ident, $ws:expr, $endptr:expr, $base:expr) => {{
+        use $crate::c_str::WStr;
+        let mut endptr: Option<&mut *mut wchar_t> = $endptr;
+        let mut ws = $ws;
+        ws = ws.trim_start_whitespace();
+
+        let mut set_endptr = |ws: WStr| {
+            if let Some(ref mut end) = endptr {
+                // This is stupid, but apparently strto* functions want
+                // const input but mut output, yet the man page says
+                // "stores the address of the first invalid character in *endptr"
+                // so obviously it doesn't want us to clone it.
+                **end = ws.as_ptr().cast_mut();
+            }
+        };
+
+        let has_minus = if let Some((sign, rest)) = ws.split_first_char() {
+            match sign {
+                '-' => {
+                    ws = rest;
+                    true
+                }
+                '+' => {
+                    ws = rest;
+                    false
+                }
+                _ => false,
+            }
+        } else {
+            false
+        };
 
         let type_is_signed = $type::MIN != 0;
 
         let mut base = $base;
 
-        if (base == 16 || base == 0)
-            && unsafe { *$ptr } == '0' as wchar_t
-            && (unsafe { *$ptr.add(1) } == 'x' as wchar_t
-                || unsafe { *$ptr.add(1) } == 'X' as wchar_t)
+        if let Some((zero, rest)) = ws.split_first_char()
+            && zero == '0'
+            && (base == 0 || base == 16)
+            && let Some((hex, after)) = rest.split_first_char()
+            && (hex == 'x' || hex == 'X')
         {
-            $ptr = unsafe { $ptr.add(2) };
+            ws = after;
             base = 16;
+        } else if let Some((zero, rest)) = ws.split_first_char()
+            && zero == '0'
+            && base == 0
+        {
+            ws = rest;
+            base = 8;
+        } else if base == 0 {
+            base = 10;
+        } else {
+            match base {
+                2..=36 => {}
+                _ => {
+                    platform::ERRNO.set(EINVAL);
+                    set_endptr(ws);
+                    return 0;
+                }
+            }
         }
 
-        if base == 0 {
-            base = if unsafe { *$ptr } == '0' as wchar_t {
-                8
-            } else {
-                10
-            };
-        };
-
         let mut result: $type = 0;
-        while let Some(digit) =
-            char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base.cast_unsigned()))
+        while let Some((first, rest)) = ws.split_first_char()
+            && let Some(digit) = first.to_digit(u32::try_from(base).expect("base within limits"))
         {
-            let new = result.checked_mul(base as $type).and_then(|result| {
-                if has_minus && type_is_signed {
-                    #[cfg(target_arch = "x86")]
-                    {
+            let new = result
+                .checked_mul($type::try_from(base).expect("base within limits"))
+                .and_then(|result| {
+                    if has_minus && type_is_signed {
                         result.checked_sub(
                             $type::try_from(digit).expect("single digit never overflows"),
                         )
-                    }
-                    #[cfg(not(target_arch = "x86"))]
-                    {
-                        result.checked_sub($type::from(digit))
-                    }
-                } else {
-                    #[cfg(target_arch = "x86")]
-                    {
+                    } else {
                         result.checked_add(
                             $type::try_from(digit).expect("single digit never overflows"),
                         )
                     }
-                    #[cfg(not(target_arch = "x86"))]
-                    {
-                        result.checked_add($type::from(digit))
-                    }
-                }
-            });
+                });
             result = match new {
                 Some(new) => new,
                 None => {
@@ -205,11 +228,12 @@ macro_rules! wcsto_impl {
                 }
             };
 
-            $ptr = unsafe { $ptr.add(1) };
+            ws = rest;
         }
         if has_minus && !type_is_signed {
             result = $type::MAX - result + 1;
         }
+        set_endptr(ws);
         result
     }};
 }
