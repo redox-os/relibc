@@ -432,6 +432,17 @@ impl<'a> CStr<'a> {
     }
 }
 
+impl<'a> WStr<'a> {
+    pub fn trim_start_whitespace(mut self) -> Self {
+        while let Some((c, next)) = self.split_first()
+            && crate::header::wctype::iswspace(c) != 0
+        {
+            self = next;
+        }
+        self
+    }
+}
+
 unsafe impl<T: Kind> Send for NulStr<'_, T> {}
 unsafe impl<T: Kind> Sync for NulStr<'_, T> {}
 

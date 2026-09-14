@@ -8,7 +8,7 @@ use crate::{
     c_str::{WStr, Wide},
     header::{
         ctype::isspace,
-        errno::{EILSEQ, ENOMEM, ERANGE},
+        errno::{EILSEQ, EINVAL, ENOMEM, ERANGE},
         stdio::*,
         stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc},
         string,
@@ -862,16 +862,16 @@ pub unsafe extern "C" fn wcstok(
 /// performed, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstol(
-    mut nptr: *const wchar_t,
+    nptr: *const wchar_t,
     endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_long {
-    skipws!(nptr);
-    let result = wcsto_impl!(c_long, nptr, base);
-    if !endptr.is_null() {
-        unsafe { *endptr = nptr.cast_mut() };
-    }
-    result
+    wcsto_impl!(
+        c_long,
+        unsafe { WStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
+        base
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoll.html>.
@@ -881,19 +881,18 @@ pub unsafe extern "C" fn wcstol(
 ///
 /// Upon success, returns the converted value. If no conversion could be
 /// performed, returns `0`.
-#[expect(clippy::cast_lossless)] // not all users of `wcsto_impl!` are lossless
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoll(
-    mut nptr: *const wchar_t,
+    nptr: *const wchar_t,
     endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_longlong {
-    skipws!(nptr);
-    let result = wcsto_impl!(c_longlong, nptr, base);
-    if !endptr.is_null() {
-        unsafe { *endptr = nptr.cast_mut() };
-    }
-    result
+    wcsto_impl!(
+        c_longlong,
+        unsafe { WStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
+        base
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoul.html>.
@@ -905,16 +904,16 @@ pub unsafe extern "C" fn wcstoll(
 /// performed, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoul(
-    mut nptr: *const wchar_t,
+    nptr: *const wchar_t,
     endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_ulong {
-    skipws!(nptr);
-    let result = wcsto_impl!(c_ulong, nptr, base);
-    if !endptr.is_null() {
-        unsafe { *endptr = nptr.cast_mut() };
-    }
-    result
+    wcsto_impl!(
+        c_ulong,
+        unsafe { WStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
+        base
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoull.html>.
@@ -926,16 +925,16 @@ pub unsafe extern "C" fn wcstoul(
 /// performed, returns `0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoull(
-    mut nptr: *const wchar_t,
+    nptr: *const wchar_t,
     endptr: *mut *mut wchar_t,
     base: c_int,
 ) -> c_ulonglong {
-    skipws!(nptr);
-    let result = wcsto_impl!(c_ulonglong, nptr, base);
-    if !endptr.is_null() {
-        unsafe { *endptr = nptr.cast_mut() };
-    }
-    result
+    wcsto_impl!(
+        c_ulonglong,
+        unsafe { WStr::from_ptr(nptr) },
+        unsafe { endptr.as_mut() },
+        base
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/009604499/functions/wcswcs.html>.
