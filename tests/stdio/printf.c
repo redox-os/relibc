@@ -9,7 +9,7 @@ int main(void) {
         "percent: %%\nstring: %s\nchar: %c\nchar: %c\nint: %d\n%nuint: %u\nhex: %x\nHEX: %X\nstring: %s\n",
         "String",
         'c',
-        254,
+        0x7e,
         -16,
         &sofar,
         32,
@@ -66,7 +66,8 @@ int main(void) {
     printf("%E\n", 0.00001);
 
     printf("%2$0*1$.*3$lf\n", 9, 1234.56, 2);
-    printf("%2$0*1$.*3$Lf\n", 9, 1234.56L, 2);
+    printf("%2$0*1$.*3$Lf\n", 9, 1234.567L, 3);
+    printf("%2$0*1$.*3$LE\n", 9L, sinl(M_PI/6), 1);
 
     double nonfinites[] = {INFINITY, -INFINITY, NAN, -NAN};
     char *float_formats[] = {"%e", "%E", "%f", "%F", "%g", "%G"};
