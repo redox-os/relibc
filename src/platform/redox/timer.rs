@@ -1,5 +1,4 @@
 use redox_rt::proc::FdGuard;
-use syscall::Error;
 
 use crate::{
     error::{Errno, Result},
@@ -85,18 +84,7 @@ pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
     };
     loop {
         let mut buf = MaybeUninit::uninit();
-        let res = Error::demux(unsafe {
-            // this blocks the thread
-            event::redox_event_queue_get_events_v1(
-                // TODO: should safe to pass even closed, but not sure.
-                eventfd,
-                buf.as_mut_ptr(),
-                1,
-                0,
-                core::ptr::null(),
-                core::ptr::null(),
-            )
-        });
+        let res = event::queue_get_events(eventfd, Out::from_uninit_mut(&mut buf), 1, 0);
         if let Ok(res) = res {
             assert_eq!(res, 1, "EOF is not yet well defined for event queues");
         } else {
@@ -138,13 +126,13 @@ fn timer_next_event(timer_st: &mut RlctTimer) -> Result<()> {
         timer_st.thread = ptr::null_mut();
         return Err(e);
     }
-    let buf_to_write = unsafe {
-        Error::demux(event::redox_event_queue_ctl_v1(
+    let buf_to_write = {
+        event::queue_ctl(
             timer_st.eventfd.as_raw_fd(),
             timer_st.timerfd.as_raw_fd(),
             1,
             0,
-        ))?;
+        )?;
 
         syscall::TimeSpec::from(&timer_st.next_wake_time.it_value)
     };

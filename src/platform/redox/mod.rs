@@ -1540,10 +1540,7 @@ impl Pal for Sys {
             _ => return Err(Errno(EINVAL)),
         };
         let timerfd = FdGuard::open_into_upper(path, syscall::O_RDWR)?;
-        let eventfd = FdGuard::new(Error::demux(unsafe {
-            event::redox_event_queue_create_v1(0)
-        })?)
-        .to_upper()?;
+        let eventfd = FdGuard::new(event::queue_create(0)?).to_upper()?;
 
         Ok(RlctTimer::create(clock_id, evp, timerfd, eventfd))
     }
@@ -1616,14 +1613,12 @@ impl Pal for Sys {
             val
         };
 
-        Error::demux(unsafe {
-            event::redox_event_queue_ctl_v1(
-                timer_st.eventfd.as_raw_fd(),
-                timer_st.timerfd.as_raw_fd(),
-                1,
-                0,
-            )
-        })?;
+        event::queue_ctl(
+            timer_st.eventfd.as_raw_fd(),
+            timer_st.timerfd.as_raw_fd(),
+            1,
+            0,
+        )?;
 
         let buf_to_write = syscall::TimeSpec::from(&timer_st.next_wake_time.it_value);
         let bytes_written = timer_st.timerfd.write(&buf_to_write)?;
