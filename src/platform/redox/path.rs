@@ -7,7 +7,10 @@ use core::{
 };
 use redox_path::{RedoxReference, RedoxStr};
 use redox_protocols::protocol::O_CLOEXEC;
-use redox_rt::{proc::FdGuardUpper, signal::tmp_disable_signals};
+use redox_rt::{
+    proc::FdGuardUpper,
+    signal::{TmpDisableSignalsGuard, tmp_disable_signals},
+};
 use syscall::{data::Stat, error::*, flag::*};
 
 use super::{FdGuard, Pal, Sys, libcscheme};
@@ -62,13 +65,9 @@ pub fn fchdir(fd: c_int) -> Result<()> {
         let res = Sys::fpath(fd, buf.as_bytes_mut())?;
         buf.set_len(res);
     }
-    let fd = FdGuard::new(redox_rt::sys::fcntl(
-        fd as usize,
-        syscall::F_DUPFD,
-        syscall::UPPER_FDTBL_TAG,
-    )?)
-    .to_upper()
-    .unwrap();
+    let fd = FdGuard::new(redox_rt::sys::dup_into_upper(fd as usize, &[])?)
+        .to_upper()
+        .unwrap();
     set_cwd_manual(buf, fd)?;
     Ok(())
 }
@@ -90,8 +89,20 @@ pub fn getcwd(mut buf: Out<[u8]>) -> Result<usize> {
     Ok(path_bytes.len())
 }
 
+pub struct CwdGuard {
+    _siglock: TmpDisableSignalsGuard,
+    guard: ReadGuard<'static, Option<Cwd<'static>>>,
+}
+
+impl core::ops::Deref for CwdGuard {
+    type Target = Option<Cwd<'static>>;
+    fn deref(&self) -> &Self::Target {
+        &self.guard
+    }
+}
+
 // Get Cwd object
-pub fn current_dir() -> Result<ReadGuard<'static, Option<Cwd<'static>>>> {
+pub fn current_dir() -> Result<CwdGuard> {
     let _siglock = tmp_disable_signals();
     let guard = CWD.read();
 
@@ -99,7 +110,7 @@ pub fn current_dir() -> Result<ReadGuard<'static, Option<Cwd<'static>>>> {
         return Err(Error::new(ENOENT));
     }
 
-    Ok(guard)
+    Ok(CwdGuard { _siglock, guard })
 }
 
 pub type CwdPath = ArrayString<{ limits::PATH_MAX }>;

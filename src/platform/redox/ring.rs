@@ -184,7 +184,7 @@ impl<'ring> redox_ring_sq<'ring> {
 
         let shm_size = {
             let mut stat = syscall::data::Stat::default();
-            syscall::fstat(fd.as_c_fd().unwrap() as usize, &mut stat)?;
+            fd.fstat(&mut stat)?;
             stat.st_size as usize
         };
 
@@ -301,7 +301,7 @@ impl<'ring> redox_ring_cq<'ring> {
 
         let shm_size = {
             let mut stat = syscall::data::Stat::default();
-            syscall::fstat(fd.as_c_fd().unwrap() as usize, &mut stat)?;
+            fd.fstat(&mut stat)?;
             stat.st_size as usize
         };
 

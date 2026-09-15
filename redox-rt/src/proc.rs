@@ -99,7 +99,7 @@ pub fn fexec_impl(
         let current_addrspace_fd = thread_fd.dup_into_upper(b"addrspace")?;
         current_addrspace_fd.dup_into_upper(b"empty")?
     };
-    grants_fd.fcntl(syscall::F_SETFD, O_CLOEXEC)?;
+    grants_fd.fcntl(redox_protocols::protocol::F_SETFD, O_CLOEXEC)?;
 
     // Never allow more than 1 MiB of program headers.
     const MAX_PH_SIZE: usize = 1024 * 1024;
@@ -491,7 +491,7 @@ pub fn fexec_impl(
         // set the active file table.
         let _siglock = crate::signal::tmp_disable_signals();
         let fds_to_close = {
-            let guard = crate::current_filetable();
+            let guard = crate::current_filetable().inner.lock();
             let mut fds = alloc::vec::Vec::new();
             for (fd, flags) in guard.iter() {
                 if fd == addrspace_selection_fd.as_raw_fd() {
@@ -522,7 +522,7 @@ pub fn fexec_impl(
             );
         }
         {
-            let mut guard = crate::current_filetable();
+            let mut guard = crate::current_filetable().inner.lock();
             for fd in fds_to_close {
                 let _ = guard.remove(fd);
             }
@@ -532,11 +532,7 @@ pub fn fexec_impl(
             deactivate_tcb(thread_fd)?;
         }
 
-        let old_filetable_fd = {
-            let mut guard = crate::current_filetable();
-            guard.take()
-        };
-        drop(old_filetable_fd);
+        drop(crate::current_filetable().take());
 
         // Dropping this FD will cause the address space switch.
         drop(addrspace_selection_fd);
@@ -815,9 +811,13 @@ impl FdGuard<false> {
     pub fn to_upper(self) -> Result<FdGuardUpper> {
         // Move to upper table if necessary
         let fd = if self.fd & syscall::UPPER_FDTBL_TAG == 0 {
-            //TODO: use F_DUPFD_CLOEXEC?
-            let fd = crate::sys::fcntl(self.fd, syscall::F_DUPFD, syscall::UPPER_FDTBL_TAG)?;
-            drop(self);
+            let fd = crate::sys::fdcntl(
+                self.fd,
+                None,
+                syscall::FileTableVerb::Move,
+                syscall::UPPER_FDTBL_TAG,
+            )?;
+            self.take();
             fd
         } else {
             self.take()
