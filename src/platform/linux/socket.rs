@@ -14,7 +14,7 @@ impl PalSocket for Sys {
             syscall!(
                 ACCEPT,
                 socket,
-                address_dst.map_or(core::ptr::null_mut(), |a| a.as_mut_ptr()),
+                address_dst.map_or(core::ptr::null_mut(), <[u8]>::as_mut_ptr),
                 &raw mut len
             )
         })? as c_int;
@@ -85,7 +85,7 @@ impl PalSocket for Sys {
                 buf.as_mut_ptr().as_mut_ptr(),
                 buf.len(),
                 flags,
-                address_raw.map_or(core::ptr::null_mut(), |a| a.as_mut_ptr()),
+                address_raw.map_or(core::ptr::null_mut(), <[u8]>::as_mut_ptr),
                 &raw mut len
             )
         })?;
@@ -109,8 +109,8 @@ impl PalSocket for Sys {
                 buf.as_ptr(),
                 buf.len(),
                 flags,
-                dest.map_or(core::ptr::null(), |d| d.as_ptr()),
-                dest.map_or(0, |d| d.len())
+                dest.map_or(core::ptr::null(), <[u8]>::as_ptr),
+                dest.map_or(0, <[u8]>::len)
             )
         })
     }

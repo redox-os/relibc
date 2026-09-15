@@ -114,7 +114,7 @@ impl addrinfo {
             ai_addrlen: wrapped.sockaddr.len().try_into().unwrap(),
             ai_canonname: wrapped
                 .canonname
-                .map_or_else(core::ptr::null_mut, |s| s.into_ptr()),
+                .map_or_else(core::ptr::null_mut, OwnedThinCStr::into_ptr),
             ai_addr: Box::into_raw(wrapped.sockaddr).as_mut_ptr().cast(),
             ai_next: core::ptr::null_mut(),
         }

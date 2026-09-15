@@ -256,7 +256,7 @@ pub extern "C" fn getpwent() -> *mut passwd {
         }
     };
     getpwent_r(reader, None)
-        .map(|res| res.into_global())
+        .map(OwnedPwd::into_global)
         .unwrap_or(ptr::null_mut())
 }
 
@@ -264,7 +264,7 @@ pub extern "C" fn getpwent() -> *mut passwd {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getpwnam(name: *const c_char) -> *mut passwd {
     pwd_lookup(|parts| unsafe { strcmp(parts.pw_name, name) } == 0, None)
-        .map(|res| res.into_global())
+        .map(OwnedPwd::into_global)
         .unwrap_or(ptr::null_mut())
 }
 
@@ -296,7 +296,7 @@ pub unsafe extern "C" fn getpwnam_r(
 #[unsafe(no_mangle)]
 pub extern "C" fn getpwuid(uid: uid_t) -> *mut passwd {
     pwd_lookup(|parts| parts.pw_uid == uid, None)
-        .map(|res| res.into_global())
+        .map(OwnedPwd::into_global)
         .unwrap_or(ptr::null_mut())
 }
 
