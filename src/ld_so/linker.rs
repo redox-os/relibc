@@ -884,7 +884,7 @@ impl Linker {
         let dependencies = obj
             .dependencies()
             .iter()
-            .map(|dep| dep.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>();
 
         let obj = Arc::new(obj);

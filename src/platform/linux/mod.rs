@@ -183,7 +183,7 @@ impl Pal for Sys {
             syscall!(
                 FCHMODAT,
                 dirfd,
-                path.map_or(core::ptr::null(), |p| p.as_ptr()),
+                path.map_or(core::ptr::null(), CStr::as_ptr),
                 mode,
                 flags
             )
@@ -204,7 +204,7 @@ impl Pal for Sys {
             syscall!(
                 NEWFSTATAT,
                 fildes,
-                path.map_or(core::ptr::null(), |s| s.as_ptr()),
+                path.map_or(core::ptr::null(), CStr::as_ptr),
                 buf.as_mut_ptr(),
                 flags
             )

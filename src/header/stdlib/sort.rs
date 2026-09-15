@@ -40,6 +40,7 @@ pub unsafe fn introsort<C: SortContext>(
 
 // NOTE: if num is 0, the result should be considered undefined
 fn log2(num: size_t) -> size_t {
+    // TODO use try_from instead of as casts when const stable
     const IS_32_BIT: bool = size_t::MAX as u32 as size_t == size_t::MAX;
 
     let max_bits = if IS_32_BIT {

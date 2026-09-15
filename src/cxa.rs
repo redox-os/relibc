@@ -70,7 +70,7 @@ pub unsafe extern "C" fn __cxa_finalize(dso: *mut c_void) {
     if dso.is_null() {
         funcs.clear();
     } else {
-        funcs.retain(|opt| opt.is_some());
+        funcs.retain(Option::is_some);
     }
 }
 

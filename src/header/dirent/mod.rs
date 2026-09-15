@@ -373,7 +373,7 @@ pub unsafe extern "C" fn scandir(
             )
         };
 
-        len as c_int
+        c_int::try_from(len).expect("len should not exceed isize::MAX")
     }
 }
 

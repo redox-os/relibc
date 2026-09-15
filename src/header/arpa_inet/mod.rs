@@ -217,7 +217,7 @@ pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *mut c_char {
             AF_INET,
             ptr::from_ref::<in_addr>(&r#in).cast::<c_void>(),
             NTOA_ADDR.unsafe_mut().as_mut_ptr(),
-            NTOA_ADDR.unsafe_ref().len() as socklen_t,
+            socklen_t::try_from(NTOA_ADDR.unsafe_ref().len()).expect("len within bounds"),
         );
         // Mutable pointer is required, inet_ntop returns destination as const pointer
         ptr.cast_mut()
