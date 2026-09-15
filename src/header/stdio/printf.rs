@@ -82,10 +82,7 @@ impl Number {
         match arg {
             VaArg::c_char(i) => i as usize,
             VaArg::c_double(i) => i as usize,
-            #[cfg(target_pointer_width = "32")]
-            VaArg::c_longdouble(_) => 0_usize,
-            #[cfg(target_pointer_width = "64")]
-            VaArg::c_longdouble(i) => i as usize,
+            VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&raw const i) as usize },
             VaArg::c_int(i) => i as usize,
             VaArg::c_long(i) => i as usize,
             VaArg::c_longlong(i) => i as usize,
@@ -169,15 +166,33 @@ impl VaArg {
         }
     }
     #[cfg(target_arch = "x86")]
-    unsafe fn extract_longdouble(_ap: &mut core::ffi::VaList) -> c_longdouble {
-        todo_skip!(0, "long double in variadic printf is not supported");
-        [0, 0, 0]
+    unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
+        // https://refspecs.linuxfoundation.org/elf/abi386-4.pdf
+        // long double is nothing special than regular floating point
+
+        // exactly same as core::ffi::VaListInner which is just an opaque pointer
+        #[repr(C)]
+        struct VaListInner {
+            ptr: *const c_void,
+        }
+
+        let ap_impl = unsafe {
+            let ptr_to_struct = core::ptr::from_mut::<core::ffi::VaList>(ap).cast::<VaListInner>();
+            &mut *ptr_to_struct
+        };
+
+        let ptr = ap_impl.ptr.cast::<c_longdouble>();
+        let val = unsafe { ptr.read() };
+
+        ap_impl.ptr = unsafe { ptr.add(1) }.cast::<core::ffi::c_void>();
+
+        val
     }
     #[cfg(target_arch = "x86_64")]
     unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
         // https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.95.pdf (long double)
 
-        // exactly same as core::ffi::VaListImpl but all variables exposed
+        // exactly same as core::ffi::VaListInner but all variables exposed
         #[repr(C)]
         struct VaListInner {
             gp_offset: i32,
@@ -202,7 +217,7 @@ impl VaArg {
     unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
         // https://c9x.me/compile/bib/abi-arm64.pdf (quad precision)
 
-        // exactly same as core::ffi::VaListImpl but all variables exposed
+        // exactly same as core::ffi::VaListInner but all variables exposed
         #[repr(C)]
         struct VaListInner {
             stack: *const c_void,
