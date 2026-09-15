@@ -12,7 +12,7 @@ use crate::{
     },
     platform::{
         Pal, Sys,
-        types::{c_int, c_long, c_void, size_t},
+        types::{c_int, c_long, c_uchar, c_void, size_t},
     },
     pthread::{Pthread, PthreadFlags},
 };
@@ -21,14 +21,16 @@ impl Default for RlctAttr {
     fn default() -> Self {
         Self {
             // Default according to POSIX.
-            detachstate: PTHREAD_CREATE_JOINABLE as _,
+            detachstate: c_uchar::try_from(PTHREAD_CREATE_JOINABLE)
+                .expect("constant value within bounds"),
             // Default according to POSIX.
-            inheritsched: PTHREAD_INHERIT_SCHED as _,
+            inheritsched: c_uchar::try_from(PTHREAD_INHERIT_SCHED)
+                .expect("constant value within bounds"),
             // TODO: Linux
             // Redox uses a round-robin scheduler
-            schedpolicy: SCHED_RR as _,
+            schedpolicy: c_uchar::try_from(SCHED_RR).expect("constant value within bounds"),
             // TODO: Linux uses this one.
-            scope: PTHREAD_SCOPE_SYSTEM as _,
+            scope: c_uchar::try_from(PTHREAD_SCOPE_SYSTEM).expect("constant value within bounds"),
             guardsize: Sys::getpagesize(),
             // TODO
             stack: 0,
@@ -493,7 +495,8 @@ pub unsafe extern "C" fn pthread_getattr_np(thread: pthread_t, attr: *mut pthrea
     unsafe { ptr::write(attr_ptr, RlctAttr::default()) };
     let attr = unsafe { &mut *attr_ptr };
     if thread.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
-        attr.detachstate = PTHREAD_CREATE_DETACHED as _;
+        attr.detachstate =
+            c_uchar::try_from(PTHREAD_CREATE_DETACHED).expect("constant value within bounds");
     }
     attr.stack = thread.stack_base as usize;
     attr.stacksize = thread.stack_size;

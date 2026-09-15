@@ -542,7 +542,7 @@ pub unsafe extern "C" fn getgrouplist(
             .next()
             .unwrap_or("")
             .split(",")
-            .map(|i| i.trim())
+            .map(str::trim)
             .collect::<Vec<_>>();
 
         if !members.contains(&user) {

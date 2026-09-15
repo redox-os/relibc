@@ -485,7 +485,7 @@ pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, dstsize: 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
     unsafe { NulTerminated::new(s) }
-        .map(|s| s.count())
+        .map(Iterator::count)
         .unwrap_or(0)
 }
 

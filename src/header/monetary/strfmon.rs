@@ -180,11 +180,11 @@ fn format_monetary(
     let frac_digits = if flags.international {
         flags
             .right_precision
-            .unwrap_or(monetary.int_frac_digits as usize)
+            .unwrap_or(usize::from(monetary.int_frac_digits))
     } else {
         flags
             .right_precision
-            .unwrap_or(monetary.frac_digits as usize)
+            .unwrap_or(usize::from(monetary.frac_digits))
     };
 
     // 3) split the value into integer and fractional parts

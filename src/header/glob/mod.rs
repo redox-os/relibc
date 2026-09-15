@@ -128,7 +128,7 @@ pub unsafe extern "C" fn glob(
                 }
 
                 pathv.reserve_exact(results.len());
-                pathv.extend(results.into_iter().map(|s| s.into_raw()));
+                pathv.extend(results.into_iter().map(CString::into_raw));
 
                 0
             }

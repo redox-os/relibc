@@ -29,7 +29,7 @@ impl LogSink for LogFile {
         let log_addr = {
             let path = c"/dev/log";
             let mut sockaddr: sockaddr_un = unsafe { core::mem::zeroed() };
-            sockaddr.sun_family = AF_UNIX as _;
+            sockaddr.sun_family = u16::try_from(AF_UNIX).expect("constant value within bounds");
             unsafe {
                 core::ptr::copy_nonoverlapping(
                     path.as_ptr(),

@@ -821,8 +821,8 @@ pub unsafe extern "C" fn linkat(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
     let mut fl = fcntl::flock {
-        l_type: fcntl::F_WRLCK as c_short,
-        l_whence: SEEK_CUR as c_short,
+        l_type: c_short::try_from(fcntl::F_WRLCK).expect("constant value within bounds"),
+        l_whence: c_short::try_from(SEEK_CUR).expect("constant value within bounds"),
         l_start: 0,
         l_len: size,
         l_pid: -1,
@@ -830,18 +830,20 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
 
     match function {
         F_TEST => {
-            fl.l_type = fcntl::F_RDLCK as c_short;
+            fl.l_type = c_short::try_from(fcntl::F_RDLCK).expect("constant value within bounds");
             if unsafe { fcntl::fcntl(fildes, fcntl::F_GETLK, &raw mut fl as c_ulonglong) } < 0 {
                 return -1;
             }
-            if fl.l_type == fcntl::F_UNLCK as c_short || fl.l_pid == getpid() {
+            if fl.l_type == c_short::try_from(fcntl::F_UNLCK).expect("constant value within bounds")
+                || fl.l_pid == getpid()
+            {
                 return 0;
             }
             platform::ERRNO.set(errno::EACCES);
             -1
         }
         F_ULOCK => {
-            fl.l_type = fcntl::F_UNLCK as c_short;
+            fl.l_type = c_short::try_from(fcntl::F_UNLCK).expect("constant value within bounds");
             unsafe { fcntl::fcntl(fildes, fcntl::F_SETLK, &raw mut fl as c_ulonglong) }
         }
         F_TLOCK => unsafe { fcntl::fcntl(fildes, fcntl::F_SETLK, &raw mut fl as c_ulonglong) },
@@ -1417,7 +1419,7 @@ unsafe fn with_argv(
     let argc = 1 + unsafe {
         let mut copy = va.clone();
         core::iter::from_fn(|| Some(copy.next_arg::<*const c_char>()))
-            .position(|p| p.is_null())
+            .position(<*const c_char>::is_null)
             .unwrap()
     };
 
