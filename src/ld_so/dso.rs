@@ -239,6 +239,7 @@ pub enum RelocationKind {
     SYMBOLIC,
     TLSDESC,
     TPOFF,
+    TPOFFELF,
     UNKNOWN(u32),
 }
 
@@ -293,6 +294,7 @@ impl RelocationKind {
             elf::R_386_32 => Self::SYMBOLIC,
             elf::R_386_TLS_DESC => Self::TLSDESC,
             elf::R_386_TLS_TPOFF => Self::TPOFF,
+            elf::R_386_TLS_TPOFF32 => Self::TPOFFELF,
             _ => Self::UNKNOWN(kind),
         }
     }
@@ -1135,20 +1137,26 @@ impl DSO {
             RelocationKind::OFFSET => set_usize((s + a).wrapping_sub(p)),
             RelocationKind::RELATIVE => set_usize(self.base as usize + a),
             RelocationKind::SYMBOLIC => set_usize(s + a),
-            RelocationKind::TPOFF => {
+            RelocationKind::TPOFF | RelocationKind::TPOFFELF => {
                 assert!(
                     !tls_obj.dlopened,
                     "The {{local/initial}}-exec access model is used for symbol '{}' in '{}', which requires a static TLS block. However, the definition in '{}' resides in the dynamic TLS block because the object was loaded via dlopen(2).",
                     reloc.sym, self.name, tls_obj.name
                 );
-                if reloc.sym.0 > 0 {
+                let b = if reloc.sym.0 > 0 {
                     let (sym, _) = sym
                         .as_ref()
                         .expect("RelocationKind::TPOFF called without valid symbol");
-                    set_usize((sym.value + a).wrapping_sub(tls_obj.tls_offset));
+                    sym.value
                 } else {
-                    set_usize(a.wrapping_sub(tls_obj.tls_offset));
-                }
+                    0
+                };
+
+                set_usize(if reloc.kind == RelocationKind::TPOFF {
+                    (a + b).wrapping_sub(tls_obj.tls_offset)
+                } else {
+                    tls_obj.tls_offset.wrapping_sub(a + b)
+                })
             }
             RelocationKind::IRELATIVE => unsafe {
                 let f: unsafe extern "C" fn() -> usize =
