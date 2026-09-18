@@ -236,12 +236,15 @@ impl Pal for Sys {
     }
 
     fn close(fd: c_int) -> Result<()> {
-        redox_rt::sys::close(fd as usize)?;
-        Ok(())
+        let r = redox_rt::sys::close(fd as usize).map(|_| ());
+        trace_log!("close({fd}) = {:?}", r);
+        r.map_err(Errno::from)
     }
 
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
-        Ok(redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[])? as c_int)
+        let r = redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[]);
+        trace_log!("dup2({fd1}, {fd2}) = {:?}", r);
+        Ok(r? as c_int)
     }
 
     fn exit(status: c_int) -> ! {
@@ -344,22 +347,32 @@ impl Pal for Sys {
                 match i32::from(flock.l_type) {
                     F_UNLCK => {
                         let meta = StdFsCallMeta::new(StdFsCallKind::Unlock, start, len);
-                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
-                        return Ok(0);
+                        let r = syscall::std_fs_call(fd as usize, &mut [], &meta);
+                        trace_log!(
+                            "fcntl({fd}, {} | F_UNLCK, [{start:x}:{:x}]#{}) = {r:?}",
+                            if is_ofd { "F_OFD_SETLK" } else { "F_SETLK" },
+                            len + start,
+                            flock.l_pid
+                        );
+                        return r.map(|_| 0).map_err(Errno::from);
                     }
 
                     F_RDLCK | F_WRLCK => {
+                        let is_wrclk = i32::from(flock.l_type) == F_WRLCK;
                         let meta = StdFsCallMeta::new(
                             StdFsCallKind::Lock,
                             start,
-                            len | if i32::from(flock.l_type) == F_WRLCK {
-                                1 << 63
-                            } else {
-                                0
-                            },
+                            len | if is_wrclk { 1 << 63 } else { 0 },
                         );
-                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
-                        return Ok(0);
+                        let r = syscall::std_fs_call(fd as usize, &mut [], &meta);
+                        trace_log!(
+                            "fcntl({fd}, {} | {}, [{start:x}:{:x}]#{}) = {r:?}",
+                            if is_ofd { "F_OFD_SETLK" } else { "F_SETLK" },
+                            if is_wrclk { "F_WRLCK" } else { "F_RDLCK" },
+                            len + start,
+                            flock.l_pid
+                        );
+                        return r.map(|_| 0).map_err(Errno::from);
                     }
 
                     _ => return Err(Errno(EINVAL)),
@@ -454,7 +467,14 @@ impl Pal for Sys {
         // TODO: Find way to avoid lock.
         let _guard = CLONE_LOCK.write();
 
-        Ok(redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
+        let r = redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed);
+
+        #[cfg(not(feature = "no_trace"))]
+        if !matches!(r, Ok(0)) {
+            trace_log!("fork() = {r:?}");
+        }
+
+        Ok(r? as pid_t)
     }
 
     fn fstatat(dirfd: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
@@ -958,7 +978,9 @@ impl Pal for Sys {
     }
 
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
-        fds.write(extra::pipe2(flags as usize)?);
+        let r = extra::pipe2(flags as usize);
+        trace_log!("pipe2({flags:x}) = {:?}", r);
+        fds.write(r?);
         Ok(())
     }
 

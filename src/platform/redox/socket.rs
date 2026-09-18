@@ -1012,7 +1012,7 @@ impl PalSocket for Sys {
 
         todo_skip!(
             0,
-            "setsockopt({}, {}, {}, {:#x?}) - unknown option",
+            "setsockopt({}, {}, {}, {:?}) - unknown option",
             socket,
             level,
             option_name,
