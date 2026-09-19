@@ -6,6 +6,8 @@ use core::{mem, ptr};
 
 use cbitset::BitSet;
 
+#[cfg(target_os = "linux")]
+use crate::platform::types::c_short;
 #[cfg(target_os = "redox")]
 use crate::platform::types::pthread_attr_t;
 use crate::{
@@ -146,9 +148,9 @@ pub struct sigevent {
     __unused1: [c_int; 12],
 }
 
-// FIXME: This struct is wrong on Linux
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(not(target_os = "linux"))]
 pub struct siginfo {
     /// Signal number.
     pub si_signo: c_int,
@@ -166,6 +168,51 @@ pub struct siginfo {
     pub si_status: c_int,
     /// Signal value.
     pub si_value: sigval,
+}
+
+#[cfg(target_os = "linux")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct siginfo {
+    /// Signal number.
+    pub si_signo: c_int,
+    /// If non-zero, an errno value associated with this signal.
+    pub si_errno: c_int,
+    /// Signal code.
+    pub si_code: c_int,
+
+    #[cfg(target_pointer_width = "64")]
+    pub _pad: c_int,
+    /// Additional fields
+    // copied from musl
+    pub _sifields: siginfo_sifields,
+}
+
+#[cfg(target_os = "linux")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union siginfo_sifields {
+    pub __si_common: siginfo_common,
+    pub __sigfault: siginfo_sigfault,
+    // 128 - 16
+    pub _pad: [c_char; 112],
+}
+
+#[cfg(target_os = "linux")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct siginfo_common {
+    pub si_pid: pid_t,
+    pub si_uid: uid_t,
+    pub si_value: sigval,
+}
+
+#[cfg(target_os = "linux")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct siginfo_sigfault {
+    pub si_addr: *mut c_void,
+    pub si_addr_lsb: c_short,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.

@@ -21,6 +21,8 @@ FAILING_TESTS += sys_socket/unixpeername
 FAILING_TESTS += sys_socket/unixscmrights
 # Task failed successfully?
 FAILING_TESTS += signals/pthread_kill-child
+# Not implemented, crashing anyway
+FAILING_TESTS += signals/sigsegv
 # Got EBADF
 FAILING_TESTS += unistd/isatty
 # Got EINVAL
