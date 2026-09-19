@@ -455,6 +455,15 @@ impl From<&core::ffi::CStr> for CStr<'_> {
     }
 }
 
+impl<'a> core::fmt::Debug for CStr<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self.to_str() {
+            Ok(s) => write!(f, "{:?}", s),
+            Err(_) => write!(f, "{:?}", "[non-utf8 CStr]"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct FromCharsWithNulError;
 

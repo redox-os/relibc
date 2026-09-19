@@ -61,6 +61,12 @@ pub struct pollfd {
     pub revents: c_short,
 }
 
+impl core::fmt::Debug for pollfd {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self.fd)
+    }
+}
+
 pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
     let event_map = [
         (POLLIN, EPOLLIN),
@@ -179,17 +185,11 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 /// Note: Uses epoll internally.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
+    let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
     trace_expr!(
-        unsafe {
-            poll_epoll(
-                slice::from_raw_parts_mut(fds, nfds as usize),
-                timeout,
-                ptr::null_mut(),
-            )
-        },
-        "poll({:p}, {}, {})",
-        fds,
-        nfds,
+        unsafe { poll_epoll(fd_buf, timeout, ptr::null_mut(),) },
+        "poll({:?}, {})",
+        fd_buf,
         timeout,
     )
 }
@@ -220,18 +220,12 @@ pub unsafe extern "C" fn ppoll(
             ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
         }
     };
+    let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
     trace_expr!(
-        unsafe {
-            poll_epoll(
-                slice::from_raw_parts_mut(fds, nfds as usize),
-                timeout,
-                sigmask,
-            )
-        },
-        "ppoll({:p}, {}, {:p}, {:p})",
-        fds,
-        nfds,
-        tmo_p,
+        unsafe { poll_epoll(fd_buf, timeout, sigmask,) },
+        "ppoll({:?}, {:?}, {:p})",
+        fd_buf,
+        timeout,
         sigmask
     )
 }
