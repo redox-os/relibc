@@ -39,6 +39,10 @@ pub const O_DIRECTORY: c_int = 0x1000_0000;
 /// Get a file descriptor to indicate a location in the filesystem tree and
 /// to perform operations that act purely at the file descriptor level.
 pub const O_PATH: c_int = 0x2000_0000;
+/// Non-POSIX, Redox OS specific.
+///
+/// Creates a symlink if with O_CREAT, otherwise reveal
+/// a location into other scheme using `fpath`.
 pub const O_SYMLINK: c_int = 0x4000_0000;
 // Negative to allow it to be used as int
 /// Do not follow symbolic links.

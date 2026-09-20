@@ -65,10 +65,11 @@ pub struct DIR {
 impl DIR {
     pub fn new(path: CStr) -> Result<Box<Self>, Errno> {
         Ok(Box::new(Self {
-            file: File::open(
+            file: File::new(Sys::open(
                 path,
                 fcntl::O_RDONLY | fcntl::O_DIRECTORY | fcntl::O_CLOEXEC,
-            )?,
+                0,
+            )?),
             buf: Vec::with_capacity(INITIAL_BUFSIZE),
             buf_offset: 0,
             opaque_offset: 0,
