@@ -52,6 +52,15 @@ language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
+trailer = """
+#if defined(__linux__)
+#define si_pid _sifields.__si_common.si_pid
+#define si_uid _sifields.__si_common.si_uid
+#define si_value _sifields.__si_common.si_value
+#define si_status si_value.sival_int
+#define si_addr _sifields.__sigfault.si_addr
+#endif
+"""
 
 [enum]
 prefix_with_name = true

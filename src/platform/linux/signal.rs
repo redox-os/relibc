@@ -17,7 +17,10 @@ use crate::{
     header::{
         bits_sigset_t::sigset_t,
         bits_timespec::timespec,
-        signal::{SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigval, stack_t},
+        signal::{
+            SA_RESTORER, SI_QUEUE, sigaction, siginfo_common, siginfo_sifields, siginfo_t, sigval,
+            stack_t,
+        },
     },
 };
 
@@ -36,14 +39,20 @@ impl PalSignal for Sys {
     }
     fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
         let info = siginfo_t {
-            si_addr: core::ptr::null_mut(),
-            si_code: SI_QUEUE,
-            si_errno: 0,
-            si_pid: 0, // TODO: GETPID?
             si_signo: sig,
-            si_status: 0,
-            si_uid: 0, // TODO: GETUID?
-            si_value: val,
+            si_errno: 0,
+            si_code: SI_QUEUE,
+
+            #[cfg(target_pointer_width = "64")]
+            _pad: 0,
+
+            _sifields: siginfo_sifields {
+                __si_common: siginfo_common {
+                    si_pid: 0, // TODO: GETPID?
+                    si_uid: 0, // TODO: GETUID?
+                    si_value: val,
+                },
+            },
         };
         e_raw(unsafe { syscall!(RT_SIGQUEUEINFO, pid, sig, addr_of!(info)) }).map(|_| ())
     }
