@@ -89,10 +89,21 @@ pub const RLIMIT_NICE: c_int = 13;
 /// This specifies a ceiling on the real-time priority that may be set for
 /// this process using `sched_setscheduler(2)` and `sched_setparam(2)`.
 pub const RLIMIT_RTPRIO: c_int = 14;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/getrlimit.2.html>.
+///
+/// This is a limit (in microseconds) on the amount of CPU time
+/// that a process scheduled under a real-time scheduling
+/// policy may consume without making a blocking system call.
+/// For the purpose of this limit, each time a process makes a
+/// blocking system call, the count of its consumed CPU time is
+/// reset to zero.  The CPU time count is not reset if the
+/// process continues trying to use the CPU but is preempted,
+/// its time slice expires, or it calls sched_yield(2).
+pub const RLIMIT_RTTIME: c_int = 15;
 /// Non-POSIX, found in glibc.
 ///
 /// Number of limit flavors.
-pub const RLIMIT_NLIMITS: c_int = 15;
+pub const RLIMIT_NLIMITS: c_int = 16;
 
 /// Unsigned integer type used for limit values.
 pub type rlim_t = c_ulonglong;
