@@ -7,7 +7,7 @@ use core::{
 };
 use object::bytes_of_slice_mut;
 use redox_path::{RedoxReference, RedoxStr};
-use redox_protocols::protocol::{WaitFlags, wifstopped};
+use redox_protocols::protocol::{Rlimit, WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
     sys::{Resugid, WaitpidTarget},
@@ -30,7 +30,7 @@ use crate::{
     header::{
         errno::{
             EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
-            ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
+            ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP,
         },
         fcntl::{
             self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
@@ -42,7 +42,7 @@ use crate::{
         sys_file,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
-        sys_resource::{PRIO_PROCESS, RLIM_INFINITY, rlimit, rusage, setpriority},
+        sys_resource::{PRIO_PROCESS, RLIMIT_NLIMITS, rlimit, rusage, setpriority},
         sys_select::timeval,
         sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
         sys_statvfs::statvfs,
@@ -722,17 +722,38 @@ impl Pal for Sys {
     }
 
     fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
-        todo_skip!(0, "getrlimit({}, {:p}): not implemented", resource, rlim);
+        if resource < 0 || resource >= RLIMIT_NLIMITS {
+            return Err(Errno(EINVAL));
+        }
+        let mut redox_rlimit = Rlimit::const_default();
+        let out = match redox_rt::sys::posix_getrlimit(resource as usize, &mut redox_rlimit) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.into()),
+        };
         rlim.write(rlimit {
-            rlim_cur: RLIM_INFINITY,
-            rlim_max: RLIM_INFINITY,
+            rlim_cur: redox_rlimit.rlim_cur,
+            rlim_max: redox_rlimit.rlim_max,
         });
-        Ok(())
+        out
     }
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()> {
-        todo_skip!(0, "setrlimit({}, {:p}): not implemented", resource, rlim);
-        Err(Errno(EPERM))
+        if resource < 0 || resource >= RLIMIT_NLIMITS {
+            return Err(Errno(EINVAL));
+        }
+
+        let Some(rlim) = (unsafe { rlim.as_ref() }) else {
+            return Err(Errno(EINVAL));
+        };
+        let rlim = &Rlimit {
+            rlim_cur: rlim.rlim_cur,
+            rlim_max: rlim.rlim_max,
+        };
+
+        match redox_rt::sys::posix_setrlimit(resource as usize, rlim) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.into()),
+        }
     }
 
     fn getrusage(who: c_int, r_usage: Out<rusage>) -> Result<()> {
