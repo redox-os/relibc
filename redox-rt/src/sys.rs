@@ -22,7 +22,8 @@ use crate::{
 };
 use alloc::{collections::btree_set::BTreeSet, vec::Vec};
 use redox_protocols::protocol::{
-    F_DUPFD_CLOEXEC, NsDup, O_CLOEXEC, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
+    F_DUPFD_CLOEXEC, NsDup, O_CLOEXEC, ProcCall, ProcKillTarget, Rlimit, RtSigInfo, ThreadCall,
+    WaitFlags,
 };
 
 #[inline]
@@ -504,6 +505,49 @@ pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) ->
         &[ProcCall::GetProcCredentials as u64, target_pid as u64],
     )
 }
+
+pub fn posix_getrlimit(resource: usize, rlim: &mut Rlimit) -> Result<usize> {
+    const {
+        assert!(core::mem::size_of::<Rlimit>() == 16);
+    }
+    // SAFETY:
+    // We ensured with the above assert that `rlim' has no padding, and
+    // is plainly just two u64's.
+    let rlim = unsafe { plain::as_mut_bytes(rlim) };
+    this_proc_call_ro(
+        rlim,
+        CallFlags::empty(),
+        &[
+            ProcCall::Rlimit as u64,
+            resource as u64,
+            // TODO: get rid of this metadata once the kernel
+            // passes FD flags to handlers of SYS_CALL
+            CallFlags::READ.bits() as u64,
+        ],
+    )
+}
+
+pub fn posix_setrlimit(resource: usize, rlim: &Rlimit) -> Result<usize> {
+    const {
+        assert!(core::mem::size_of::<Rlimit>() == 16);
+    }
+    // SAFETY:
+    // We ensured with the above assert that `rlim' has no padding, and
+    // is plainly just two u64's.
+    let rlim = unsafe { plain::as_bytes(rlim) };
+    this_proc_call_wo(
+        rlim,
+        CallFlags::empty(),
+        &[
+            ProcCall::Rlimit as u64,
+            resource as u64,
+            // TODO: get rid of this metadata once the kernel
+            // passes FD flags to handlers of SYS_CALL
+            CallFlags::WRITE.bits() as u64,
+        ],
+    )
+}
+
 pub fn posix_exit(status: i32) -> ! {
     loop {
         match this_proc_call(
