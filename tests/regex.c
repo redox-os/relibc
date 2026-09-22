@@ -18,6 +18,8 @@ int main(void) {
 
     regmatch_t matches[3] = {{0}};
 
+    printf("Number of sub-groups: %d\n", regex.re_nsub);
+
     error = regexec(&regex, "Hey, how are you? Hello? Hallo Wurld??", 3, matches, 0);
 
     regfree(&regex);
