@@ -1592,8 +1592,15 @@ pub unsafe extern "C" fn vasprintf(
 ) -> c_int {
     let mut alloc_writer = CVec::new();
     let ret = unsafe { printf::printf(&mut alloc_writer, CStr::from_ptr(format), ap) };
-    alloc_writer.push(0).unwrap();
-    alloc_writer.shrink_to_fit().unwrap();
+    if ret < 0 {
+        return ret;
+    }
+    if let Err(crate::c_vec::AllocError) = alloc_writer.push(0)
+        && let Err(crate::c_vec::AllocError) = alloc_writer.shrink_to_fit()
+    {
+        platform::ERRNO.set(errno::ENOMEM);
+        return -1;
+    }
     unsafe { *strp = alloc_writer.leak().cast::<c_char>() };
     ret
 }
