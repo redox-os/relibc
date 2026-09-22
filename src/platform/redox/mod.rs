@@ -722,7 +722,7 @@ impl Pal for Sys {
     }
 
     fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
-        if resource < 0 || resource >= RLIMIT_NLIMITS {
+        if !(0..RLIMIT_NLIMITS).contains(&resource) {
             return Err(Errno(EINVAL));
         }
         let mut redox_rlimit = Rlimit::const_default();
@@ -738,7 +738,7 @@ impl Pal for Sys {
     }
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()> {
-        if resource < 0 || resource >= RLIMIT_NLIMITS {
+        if !(0..RLIMIT_NLIMITS).contains(&resource) {
             return Err(Errno(EINVAL));
         }
 
