@@ -635,10 +635,6 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getlogin.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getlogin() -> *mut c_char {
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "LOGIN_NAME_MAX within bounds but cannot use try_from because value used as const"
-    )]
     const LOGIN_LEN: usize = limits::LOGIN_NAME_MAX as usize;
     static mut LOGIN: [c_char; LOGIN_LEN] = [0; LOGIN_LEN];
     if getlogin_r((&raw mut LOGIN).cast(), LOGIN_LEN) == 0 {

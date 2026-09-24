@@ -971,10 +971,6 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
 ///   calling thread is terminated.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ptsname(fildes: c_int) -> *mut c_char {
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "TTY_NAME_MAX within bounds but cannot use try_from as value is used as const"
-    )]
     const PTS_BUFFER_LEN: usize = limits::TTY_NAME_MAX as usize;
     static mut PTS_BUFFER: [c_char; PTS_BUFFER_LEN] = [0; PTS_BUFFER_LEN];
     let ret = unsafe { ptsname_r(fildes, (&raw mut PTS_BUFFER).cast(), PTS_BUFFER_LEN) };
