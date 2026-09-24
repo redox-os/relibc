@@ -380,14 +380,23 @@ pub unsafe extern "C" fn tcflow(fildes: c_int, action: c_int) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfmakeraw(termios_p: *mut termios) {
     unsafe {
-        (*termios_p).c_iflag &=
-            u32::try_from(!(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON))
-                .expect("within bounds");
-        (*termios_p).c_oflag &= u32::try_from(!OPOST).expect("within bounds");
-        (*termios_p).c_lflag &=
-            u32::try_from(!(ECHO | ECHONL | ICANON | ISIG | IEXTEN)).expect("within bounds");
-        (*termios_p).c_cflag &= u32::try_from(!(CSIZE | PARENB)).expect("within bounds");
-        (*termios_p).c_cflag |= u32::try_from(CS8).expect("within bounds");
+        (*termios_p).c_iflag &= !(u32::try_from(IGNBRK).expect("value within bounds")
+            | u32::try_from(BRKINT).expect("value within bounds")
+            | u32::try_from(PARMRK).expect("value within bounds")
+            | u32::try_from(ISTRIP).expect("value within bounds")
+            | u32::try_from(INLCR).expect("value within bounds")
+            | u32::try_from(IGNCR).expect("value within bounds")
+            | u32::try_from(ICRNL).expect("value within bounds")
+            | u32::try_from(IXON).expect("value within bounds"));
+        (*termios_p).c_oflag &= !u32::try_from(OPOST).expect("value within bounds");
+        (*termios_p).c_lflag &= !(u32::try_from(ECHO).expect("value within bounds")
+            | u32::try_from(ECHONL).expect("value within bounds")
+            | u32::try_from(ICANON).expect("value within bounds")
+            | u32::try_from(ISIG).expect("value within bounds")
+            | u32::try_from(IEXTEN).expect("value within bounds"));
+        (*termios_p).c_cflag &= !(u32::try_from(CSIZE).expect("value within bounds")
+            | u32::try_from(PARENB).expect("value within bounds"));
+        (*termios_p).c_cflag |= u32::try_from(CS8).expect("value within bounds");
         (*termios_p).c_cc[VMIN] = 1;
         (*termios_p).c_cc[VTIME] = 0;
     }
