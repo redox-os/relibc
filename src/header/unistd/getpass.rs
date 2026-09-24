@@ -25,11 +25,9 @@ fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Erro
 
     let old_term = term.clone();
 
-    term.c_iflag &=
-        u32::try_from(!(termios::IGNCR | termios::INLCR)).expect("constant values within bounds");
+    term.c_iflag &= !(termios::IGNCR | termios::INLCR) as u32;
     term.c_iflag |= u32::try_from(termios::ICRNL).expect("constant value within bounds");
-    term.c_lflag &=
-        u32::try_from(!(termios::ECHO | termios::ISIG)).expect("constant values within bounds");
+    term.c_lflag &= !(termios::ECHO | termios::ISIG) as u32;
     term.c_lflag |= u32::try_from(termios::ICANON).expect("constant value within bounds");
 
     unsafe {
