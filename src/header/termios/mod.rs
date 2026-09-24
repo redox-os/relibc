@@ -381,11 +381,13 @@ pub unsafe extern "C" fn tcflow(fildes: c_int, action: c_int) -> c_int {
 pub unsafe extern "C" fn cfmakeraw(termios_p: *mut termios) {
     unsafe {
         (*termios_p).c_iflag &=
-            !(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON) as u32;
-        (*termios_p).c_oflag &= !OPOST as u32;
-        (*termios_p).c_lflag &= !(ECHO | ECHONL | ICANON | ISIG | IEXTEN) as u32;
-        (*termios_p).c_cflag &= !(CSIZE | PARENB) as u32;
-        (*termios_p).c_cflag |= CS8 as u32;
+            u32::try_from(!(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON))
+                .expect("within bounds");
+        (*termios_p).c_oflag &= u32::try_from(!OPOST).expect("within bounds");
+        (*termios_p).c_lflag &=
+            u32::try_from(!(ECHO | ECHONL | ICANON | ISIG | IEXTEN)).expect("within bounds");
+        (*termios_p).c_cflag &= u32::try_from(!(CSIZE | PARENB)).expect("within bounds");
+        (*termios_p).c_cflag |= u32::try_from(CS8).expect("within bounds");
         (*termios_p).c_cc[VMIN] = 1;
         (*termios_p).c_cc[VTIME] = 0;
     }
