@@ -875,9 +875,8 @@ pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> 
         return -1;
     }
 
-    let err = Sys::lseek(*stream.file, off, whence).or_minus_one_errno();
-    if err < 0 {
-        return err as c_int;
+    if Sys::lseek(*stream.file, off, whence).or_minus_one_errno() < 0 {
+        return -1;
     }
 
     stream.flags &= !(F_EOF | F_ERR);
@@ -1257,14 +1256,15 @@ pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn putw(w: c_int, stream: *mut FILE) -> c_int {
-    (unsafe {
+    c_int::try_from(unsafe {
         fwrite(
             ptr::from_ref::<c_int>(&w).cast(),
             mem::size_of_val(&w),
             1,
             stream,
         )
-    }) as i32
+    })
+    .expect("output always fits in c_int")
         - 1
 }
 

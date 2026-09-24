@@ -550,10 +550,7 @@ pub extern "C" fn getdtablesize() -> c_int {
         };
         if r == 0 {
             let cur = unsafe { lim.assume_init() }.rlim_cur;
-            return match cur {
-                c if c < i32::MAX as u64 => c as i32,
-                _ => i32::MAX,
-            };
+            return i32::try_from(cur).unwrap_or(i32::MAX);
         }
     }
     -1

@@ -159,14 +159,15 @@ pub unsafe extern "C" fn CMSG_ALIGN(len: size_t) -> size_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
-    (unsafe { CMSG_ALIGN(len as size_t) } + unsafe { CMSG_ALIGN(mem::size_of::<cmsghdr>()) })
-        as c_uint
+    (unsafe { CMSG_ALIGN(size_t::try_from(len).expect("len always fits in size_t")) }
+        + unsafe { CMSG_ALIGN(mem::size_of::<cmsghdr>()) }) as c_uint
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
-    (unsafe { CMSG_ALIGN(mem::size_of::<cmsghdr>()) } + length as usize) as c_uint
+    (unsafe { CMSG_ALIGN(mem::size_of::<cmsghdr>()) }
+        + size_t::try_from(length).expect("length always fits in size_t")) as c_uint
 }
 // } These must match C macros in sys_socket/cbindgen.toml
 
