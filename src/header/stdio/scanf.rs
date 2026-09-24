@@ -440,7 +440,7 @@ pub unsafe fn inner_scanf<T: Kind>(
                         prev = c.into();
                         c = next_char(&mut format)?;
                         if c == '-' {
-                            if prev as u8 == b']' {
+                            if let Ok(b']') = u8::try_from(prev) {
                                 continue;
                             }
                             c = next_char(&mut format)?;

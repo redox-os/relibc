@@ -500,10 +500,12 @@ pub unsafe extern "C" fn getsubopt(
 
             if suffix_char == ByteLiteral::cast_cchar(b'=') {
                 unsafe { *valuep = start.add(token_len + 1) };
-                return i as c_int;
+                return c_int::try_from(i)
+                    .expect("always positive; extremely unlikely to exceed c_int::MAX");
             } else if suffix_char == 0 {
                 unsafe { *valuep = ptr::null_mut() };
-                return i as c_int;
+                return c_int::try_from(i)
+                    .expect("always positive; extremely unlikely to exceed c_int::MAX");
             }
         }
         i += 1;
@@ -575,6 +577,7 @@ pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
 pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
     // POSIX says we should only consider the lower 32 bits of value.
     #[cfg(not(target_arch = "x86"))]
+    #[expect(clippy::cast_possible_truncation, reason = "desired behaviour")]
     let value_as_i32 = value as i32;
     #[cfg(target_arch = "x86")]
     let value_as_i32 = value;
@@ -734,7 +737,7 @@ pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
         return -1;
     }
 
-    result as i32
+    c_int::try_from(result).expect("only possible return value at this point should be 0")
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mbstowcs.html>.
@@ -755,7 +758,7 @@ fn inner_mktemp<T, F>(name: *mut c_char, suffix_len: c_int, mut attempt: F) -> O
 where
     F: FnMut() -> Option<T>,
 {
-    let len = unsafe { strlen(name) as c_int };
+    let len = unsafe { c_int::try_from(strlen(name)).expect("name unlikely to exceed c_int::MAX") };
 
     if len < 6 || suffix_len > len - 6 {
         platform::ERRNO.set(errno::EINVAL);
