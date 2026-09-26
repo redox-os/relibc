@@ -928,7 +928,8 @@ impl Linker {
             eprintln!("[ld.so]: looking for '{}'", name);
         }
 
-        if name.contains('/') && accessible(&name, F_OK).is_ok() {
+        let mut full_path = name.to_string();
+        if accessible(&full_path, F_OK).is_ok() {
             if debug {
                 eprintln!("[ld.so]: found at '{}'!", full_path);
             }

@@ -124,19 +124,30 @@ fn resolve_path_name(
     name_or_path: &str,
     envs: &BTreeMap<String, String>,
 ) -> Option<(String, String)> {
-    match name_or_path.rsplit_once('/') {
-        Some((_, file_name)) => {
-            if accessible(name_or_path, unistd::F_OK).is_ok() {
-                return Some((name_or_path.to_string(), file_name.to_string()));
-            }
-        }
-        None => {
-            for part in envs.get("PATH")?.split(PATH_SEP) {
-                let path = format!("{}/{}", part, name_or_path);
-                if accessible(&path, unistd::F_OK).is_ok() {
-                    return Some((path.clone(), name_or_path.to_string()));
-                }
-            }
+    if accessible(name_or_path, unistd::F_OK).is_ok() {
+        return Some((
+            name_or_path.to_string(),
+            name_or_path
+                .split("/")
+                .collect::<Vec<&str>>()
+                .last()
+                .unwrap()
+                .to_string(),
+        ));
+    }
+    if name_or_path.split("/").collect::<Vec<&str>>().len() != 1 {
+        return None;
+    }
+
+    let env_path = envs.get("PATH")?;
+    for part in env_path.split(PATH_SEP) {
+        let path = if part.is_empty() {
+            format!("./{}", name_or_path)
+        } else {
+            format!("{}/{}", part, name_or_path)
+        };
+        if accessible(&path, unistd::F_OK).is_ok() {
+            return Some((path.clone(), name_or_path.to_string()));
         }
     }
     None
