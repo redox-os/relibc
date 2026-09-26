@@ -3,10 +3,10 @@
 use core::slice;
 
 use alloc::{
-    borrow::ToOwned,
+    borrow::{Cow, ToOwned},
     boxed::Box,
     collections::BTreeMap,
-    string::{String, ToString},
+    string::String,
     vec::Vec,
 };
 use object::{
@@ -120,21 +120,21 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
     sp.set_argc(sp.argc() - 1);
 }
 
-fn resolve_path_name(
-    name_or_path: &str,
+fn resolve_path_name<'a>(
+    name_or_path: &'a str,
     envs: &BTreeMap<String, String>,
-) -> Option<(String, String)> {
+) -> Option<(Cow<'a, str>, &'a str)> {
     match name_or_path.rsplit_once('/') {
         Some((_, file_name)) => {
             if accessible(name_or_path, unistd::F_OK).is_ok() {
-                return Some((name_or_path.to_string(), file_name.to_string()));
+                return Some((name_or_path.into(), file_name));
             }
         }
         None => {
             for part in envs.get("PATH")?.split(PATH_SEP) {
                 let path = format!("{}/{}", part, name_or_path);
                 if accessible(&path, unistd::F_OK).is_ok() {
-                    return Some((path.clone(), name_or_path.to_string()));
+                    return Some((path.into(), name_or_path));
                 }
             }
         }
