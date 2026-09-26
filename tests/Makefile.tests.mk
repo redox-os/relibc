@@ -21,8 +21,6 @@ FAILING_TESTS += sys_socket/unixpeername
 FAILING_TESTS += sys_socket/unixscmrights
 # Task failed successfully?
 FAILING_TESTS += signals/pthread_kill-child
-# Not implemented, crashing anyway
-FAILING_TESTS += signals/sigsegv
 # Got EBADF
 FAILING_TESTS += unistd/isatty
 # Got EINVAL
@@ -284,6 +282,7 @@ VARIED_NAMES=\
 	signals/sigrelse-1 \
 	signals/sigrelse-2 \
 	signals/sigrelse-3 \
+	signals/sigsegv \
 	signals/sigset-1 \
 	signals/sigset-10 \
 	signals/sigset-2 \
@@ -291,6 +290,7 @@ VARIED_NAMES=\
 	signals/sigset-4 \
 	signals/sigset-5 \
 	signals/sigset-9 \
+	signals/stackoverflow \
 	stdio/ctermid \
 	stdio/tempnam \
 	stdio/tmpnam \

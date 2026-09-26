@@ -1,4 +1,8 @@
-use core::{ffi::c_int, ptr::NonNull, sync::atomic::Ordering};
+use core::{
+    ffi::{c_int, c_void},
+    ptr::NonNull,
+    sync::atomic::Ordering,
+};
 
 use syscall::{
     CallFlags, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM, Error, RawAction, Result, SenderInfo,
@@ -25,6 +29,11 @@ pub fn sighandler_function() -> usize {
     // TODO: HWCAP?
 
     __relibc_internal_sigentry as *const () as usize
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+pub fn excp_handler_function() -> usize {
+    __relibc_internal_excpentry as *const () as usize
 }
 
 /// ucontext_t representation
@@ -287,6 +296,116 @@ pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
 #[cfg(target_arch = "x86")]
 pub(crate) unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
     unsafe { inner(&mut *(stack as *mut SigStack)) }
+}
+
+#[inline(always)]
+unsafe fn inner_excp(stack: &mut SigStack) {
+    let os = unsafe { &Tcb::current().unwrap().os_specific };
+    let control_flags = &os.control.control_flags;
+
+    let fault_addr = os.control.saved_excp_addr.get();
+    let fault_code = os.control.saved_excp_code.get();
+    let excp = syscall::Exception::unpack(fault_code, fault_addr);
+
+    let (si_signo, si_code) = map_err_code(&excp);
+
+    let sigaction = {
+        let _guard = SIGACTIONS_LOCK.lock();
+        convert_old(&PROC_CONTROL_STRUCT.actions[si_signo as usize - 1])
+    };
+
+    if let SigactionKind::Handled { handler } = sigaction.kind {
+        if sigaction.flags.contains(SigactionFlags::SIGINFO) {
+            let mut info = SiginfoAbi {
+                si_signo,
+                si_addr: excp.address as *mut (),
+                si_code,
+                si_errno: 0,
+                si_pid: 0,
+                si_status: 0,
+                si_uid: 0,
+                si_value: stack.sival,
+            };
+
+            let siginfo_handler: extern "C" fn(c_int, *mut SiginfoAbi, *mut c_void) =
+                unsafe { core::mem::transmute(handler) };
+
+            siginfo_handler(
+                si_signo,
+                &raw mut info,
+                core::ptr::from_mut(stack).cast::<c_void>(),
+            );
+        } else if let Some(handler) = unsafe { handler.handler } {
+            handler(si_signo);
+        }
+    } else {
+        let _ = sys_call(
+            current_proc_fd().as_raw_fd(),
+            CallFlags::empty(),
+            &[
+                ProcCall::Exit as u64,
+                u64::from(si_signo.cast_unsigned()) << 8,
+            ],
+        );
+        panic!()
+    }
+
+    core::sync::atomic::compiler_fence(Ordering::Release);
+    control_flags.store(
+        control_flags.load(Ordering::Relaxed)
+            & !SigcontrolFlags::HANDLING_EXCEPTION.bits()
+            & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
+        Ordering::Relaxed,
+    );
+}
+
+#[cfg(not(target_arch = "x86"))]
+pub(crate) unsafe extern "C" fn inner_excp_c(stack: usize) {
+    unsafe { inner_excp(&mut *(stack as *mut SigStack)) }
+}
+#[cfg(target_arch = "x86")]
+pub(crate) unsafe extern "fastcall" fn inner_excp_fastcall(stack: usize) {
+    unsafe { inner_excp(&mut *(stack as *mut SigStack)) }
+}
+
+#[cfg(not(target_arch = "x86"))]
+pub(crate) unsafe extern "C" fn get_sigaction_stack_c(
+    original_sp: usize,
+    excp_info: usize,
+) -> usize {
+    unsafe { get_sigaction_stack(original_sp, excp_info) }
+}
+
+#[cfg(target_arch = "x86")]
+pub unsafe extern "fastcall" fn get_sigaction_stack_fastcall(
+    original_sp: usize,
+    excp_info: usize,
+) -> usize {
+    unsafe { get_sigaction_stack(original_sp, excp_info) }
+}
+
+#[inline(always)]
+unsafe fn get_sigaction_stack(original_sp: usize, excp_info: usize) -> usize {
+    let os = unsafe { &Tcb::current().unwrap().os_specific };
+    let excp = syscall::Exception::unpack(excp_info, 0);
+    let (sig_num, _) = map_err_code(&excp);
+
+    let action = {
+        let _guard = SIGACTIONS_LOCK.lock();
+        convert_old(&PROC_CONTROL_STRUCT.actions[sig_num as usize - 1])
+    };
+
+    if action.flags.contains(SigactionFlags::ONSTACK) {
+        let altstack_top = unsafe { (&*os.arch.get()).altstack_top };
+        let altstack_bottom = unsafe { (&*os.arch.get()).altstack_bottom };
+
+        // Return altstack if we aren't already on it
+        if original_sp > altstack_top || original_sp <= altstack_bottom {
+            return altstack_top;
+        }
+    }
+
+    original_sp
 }
 
 pub fn get_sigmask() -> Result<u64> {
@@ -720,6 +839,9 @@ pub type RtSigarea = RtTcb; // TODO
 pub fn current_setsighandler_struct() -> SetSighandlerData {
     SetSighandlerData {
         user_handler: sighandler_function(),
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        excp_handler: excp_handler_function(),
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
         excp_handler: 0, // TODO
         thread_control_addr: core::ptr::addr_of!(
             unsafe { Tcb::current() }.unwrap().os_specific.control

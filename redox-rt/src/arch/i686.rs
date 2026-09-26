@@ -4,7 +4,10 @@ use syscall::*;
 
 use crate::{
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
-    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_fastcall},
+    signal::{
+        PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, get_sigaction_stack_fastcall,
+        inner_excp_fastcall, inner_fastcall,
+    },
 };
 use redox_protocols::protocol::{ProcCall, RtSigInfo};
 
@@ -335,6 +338,102 @@ __relibc_internal_sigentry_crit_third:
     RTINF_SIZE = const size_of::<RtSigInfo>(),
 ]);
 
+asmfunction!(__relibc_internal_excpentry: ["
+    // Save some registers
+    mov gs:[{tcb_sa_off} + {sa_tmp_esp}], esp
+    mov gs:[{tcb_sa_off} + {sa_tmp_eax}], eax
+    mov gs:[{tcb_sa_off} + {sa_tmp_edx}], edx
+    mov gs:[{tcb_sa_off} + {sa_tmp_ecx}], ecx
+    mov gs:[{tcb_sa_off} + {sa_tmp_ebx}], ebx
+    mov gs:[{tcb_sa_off} + {sa_tmp_edi}], edi
+    mov gs:[{tcb_sa_off} + {sa_tmp_esi}], esi
+
+    // Args for get_stack
+    mov ecx, esp
+    mov edx, gs:[{tcb_sc_off} + {sc_saved_excp_code}]
+
+    mov eax, gs:[{tcb_sa_off} + {sa_altstack_top}]
+    
+    cmp esp, eax
+    ja 1f
+    
+    cmp esp, gs:[{tcb_sa_off} + {sa_altstack_bottom}]
+    jbe 1f
+    
+    jmp 2f
+1:
+    mov esp, eax
+2:
+    and esp, -{STACK_ALIGN}
+    call {get_stack}
+    
+    mov esp, eax
+    and esp, -{STACK_ALIGN}
+4:
+    // Now that we have a stack, we can finally start populating the signal stack.
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_esp}]
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eip}]
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eflags}]
+
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_edx}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ecx}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_eax}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ebx}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_edi}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_esi}]
+    push ebp
+
+    sub esp, 2 * 4 + 29 * 16
+    fxsave [esp]
+
+    mov [esp - 4], eax
+    sub esp, 48
+
+    mov ecx, esp
+    call {inner}
+
+    fxrstor [esp + 48]
+    add esp, 48 + 29 * 16 + 2 * 4
+
+    pop ebp
+    pop esi
+    pop edi
+    pop ebx
+    pop eax
+    pop ecx
+    pop edx
+
+    popfd
+    pop dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
+
+    .globl __relibc_internal_excpentry_crit_first
+__relibc_internal_excpentry_crit_first:
+    pop esp
+
+    .globl __relibc_internal_excpentry_crit_second
+__relibc_internal_excpentry_crit_second:
+    jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
+"] <= [
+    inner = sym inner_excp_fastcall,
+    get_stack = sym get_sigaction_stack_fastcall,
+    sa_tmp_eip = const offset_of!(SigArea, tmp_eip),
+    sa_tmp_esp = const offset_of!(SigArea, tmp_esp),
+    sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
+    sa_tmp_ebx = const offset_of!(SigArea, tmp_ebx),
+    sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
+    sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
+    sa_tmp_edi = const offset_of!(SigArea, tmp_edi),
+    sa_tmp_esi = const offset_of!(SigArea, tmp_esi),
+    sa_altstack_top = const offset_of!(SigArea, altstack_top),
+    sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
+    sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
+    sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
+    sc_saved_excp_code = const offset_of!(Sigcontrol, saved_excp_code),
+    tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
+    tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
+    STACK_ALIGN = const 16,
+]);
+
 asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
     # Load registers
     pop eax
@@ -357,14 +456,19 @@ unsafe extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();
+    fn __relibc_internal_excpentry_crit_first();
+    fn __relibc_internal_excpentry_crit_second();
 }
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
-    if stack.regs.eip == __relibc_internal_sigentry_crit_first as *const () as usize {
+    if stack.regs.eip == __relibc_internal_sigentry_crit_first as *const () as usize
+        || stack.regs.eip == __relibc_internal_excpentry_crit_first as *const () as usize
+    {
         let stack_ptr = stack.regs.esp as *const usize;
         stack.regs.esp = unsafe { stack_ptr.read() };
         stack.regs.eip = unsafe { stack_ptr.sub(1).read() };
     } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as *const () as usize
         || stack.regs.eip == __relibc_internal_sigentry_crit_third as *const () as usize
+        || stack.regs.eip == __relibc_internal_excpentry_crit_second as *const () as usize
     {
         stack.regs.eip = area.tmp_eip;
     }
@@ -405,6 +509,21 @@ pub unsafe fn manually_enter_trampoline() {
         );
     }
 }
+
+/// map to `si_signo` and `si_code`.
+pub(crate) fn map_err_code(excp: &syscall::Exception) -> (i32, i32) {
+    use redox_protocols::flag::*;
+    match excp.kind {
+        0  /* divide_by_zero */  => (SIGFPE, 1 /* todo */),
+        3  /* breakpoint */  => (SIGTRAP, 1 /* TRAP_BRKPT */),
+        6  /* invalid_opcode */  => (SIGILL, 1 /* todo */),
+        14  /* page */  => (SIGSEGV, if excp.code & 1 == 0 { 1 /* SEGV_MAPERR */ } else { 2 /* SEGV_ACCERR */ }),
+        17  /* alignment_check */  => (SIGTRAP, 1 /* BUS_ADRALN */),
+        18  /* machine_check */  => (SIGTRAP, 3 /* BUS_OBJERR */),
+        _  => (SIGABRT, 0 /* todo */),
+    }
+}
+
 /// Get current stack pointer, weak granularity guarantees.
 pub fn current_sp() -> usize {
     let sp: usize;
