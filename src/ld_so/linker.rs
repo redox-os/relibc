@@ -928,12 +928,11 @@ impl Linker {
             eprintln!("[ld.so]: looking for '{}'", name);
         }
 
-        let mut full_path = name.to_string();
-        if accessible(&full_path, F_OK).is_ok() {
+        if name.contains('/') && accessible(&name, F_OK).is_ok() {
             if debug {
-                eprintln!("[ld.so]: found at '{}'!", full_path);
+                eprintln!("[ld.so]: found at '{}'!", name);
             }
-            return Ok(full_path);
+            return Ok(name.to_string());
         } else {
             let mut search_paths = Vec::new();
             if let Some(runpath) = parent_runpath {
@@ -944,7 +943,7 @@ impl Linker {
             }
             search_paths.push("/lib");
             for part in search_paths.iter() {
-                full_path = format!("{}/{}", part, name);
+                let full_path = format!("{}/{}", part, name);
                 if debug {
                     eprintln!("[ld.so]: trying path '{}'", full_path);
                 }
