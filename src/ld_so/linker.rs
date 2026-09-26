@@ -1,4 +1,5 @@
 use alloc::{
+    borrow::Cow,
     collections::BTreeMap,
     string::{String, ToString},
     sync::{Arc, Weak},
@@ -412,7 +413,7 @@ impl Linker {
     pub fn load_program(&mut self, path: &str, base_addr: Option<usize>) -> Result<usize> {
         let dso = self.load_object(
             path,
-            &None,
+            None,
             base_addr,
             false,
             if self.config.bind_now {
@@ -468,14 +469,15 @@ impl Linker {
 
                     Ok(obj.clone())
                 } else if !noload {
-                    let parent_runpath = &self
+                    let parent_runpath = self
                         .objects
                         .get(&ROOT_ID)
-                        .and_then(|parent| parent.runpath().cloned());
+                        .and_then(|parent| parent.runpath())
+                        .map(|s| s.to_string());
 
                     Ok(self.load_object(
                         name,
-                        parent_runpath,
+                        parent_runpath.as_deref(),
                         None,
                         true,
                         if self.config.bind_now {
@@ -572,7 +574,7 @@ impl Linker {
     fn load_object(
         &mut self,
         path: &str,
-        runpath: &Option<String>,
+        runpath: Option<&str>,
         base_addr: Option<usize>,
         dlopened: bool,
         resolve: Resolve,
@@ -756,7 +758,7 @@ impl Linker {
     fn load_objects_recursive(
         &mut self,
         name: &str,
-        parent_runpath: &Option<String>,
+        parent_runpath: Option<&str>,
         base_addr: Option<usize>,
         dlopened: bool,
         new_objects: &mut Vec<Arc<DSO>>,
@@ -880,12 +882,7 @@ impl Linker {
             self.next_tls_module_id += 1;
         }
 
-        let runpath = obj.runpath().cloned();
-        let dependencies = obj
-            .dependencies()
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
+        let runpath = obj.runpath().map(|s| s.to_string());
 
         let obj = Arc::new(obj);
         let mut scope = Scope::local();
@@ -899,10 +896,10 @@ impl Linker {
             GLOBAL_SCOPE.write().add(&obj);
         }
 
-        for dep_name in dependencies.iter() {
+        for dep_name in obj.dependencies() {
             self.load_objects_recursive(
                 dep_name,
-                &runpath,
+                runpath.as_deref(),
                 None,
                 dlopened,
                 new_objects,
@@ -922,7 +919,11 @@ impl Linker {
         Ok(obj)
     }
 
-    fn search_object(&self, name: &str, parent_runpath: &Option<String>) -> Result<String> {
+    fn search_object<'a>(
+        &self,
+        name: &'a str,
+        parent_runpath: Option<&str>,
+    ) -> Result<Cow<'a, str>> {
         let debug = self.config.debug_flags.contains(DebugFlags::SEARCH);
         if debug {
             eprintln!("[ld.so]: looking for '{}'", name);
@@ -932,7 +933,7 @@ impl Linker {
             if debug {
                 eprintln!("[ld.so]: found at '{}'!", name);
             }
-            return Ok(name.to_string());
+            return Ok(name.into());
         } else {
             let mut search_paths = Vec::new();
             if let Some(runpath) = parent_runpath {
@@ -951,7 +952,7 @@ impl Linker {
                     if debug {
                         eprintln!("[ld.so]: found at '{}'!", full_path);
                     }
-                    return Ok(full_path);
+                    return Ok(full_path.into());
                 }
             }
         }

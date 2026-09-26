@@ -441,9 +441,10 @@ impl DSO {
             DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
 
         let name = match dynamic.soname {
-            Some(soname) => soname.to_string(),
+            Some(soname) => soname,
             _ => basename(path),
-        };
+        }
+        .to_string();
         let tls_offset = match tcb_master {
             Some(ref master) => master.offset,
             _ => 0,
@@ -497,8 +498,8 @@ impl DSO {
     }
 
     #[inline]
-    pub fn runpath(&self) -> Option<&String> {
-        self.dynamic.runpath.as_ref()
+    pub fn runpath(&self) -> Option<&str> {
+        self.dynamic.runpath.as_deref()
     }
 
     #[inline]
@@ -986,7 +987,7 @@ impl DSO {
         let runpath = runpath
             .map(get_str)
             .transpose()?
-            .map(|value| value.replace("$ORIGIN", &base));
+            .map(|value| value.replace("$ORIGIN", base));
 
         let soname = soname.map(get_str).transpose()?;
 
@@ -1354,14 +1355,18 @@ fn is_pie_enabled(elf: &ElfFile) -> bool {
     elf.elf_header().e_type.get(elf.endian()) == elf::ET_DYN
 }
 
-fn basename(path: &str) -> String {
-    path.split("/").last().unwrap_or(path).to_string()
+fn basename(path: &str) -> &str {
+    let Some((_, base)) = path.rsplit_once("/") else {
+        return path;
+    };
+    base
 }
 
-fn dirname(path: &str) -> String {
-    let mut parts: Vec<&str> = path.split("/").collect();
-    parts.truncate(parts.len() - 1);
-    parts.join("/")
+fn dirname(path: &str) -> &str {
+    let Some((dir, _)) = path.rsplit_once("/") else {
+        return path;
+    };
+    dir
 }
 
 pub fn resolve_sym<'a>(
