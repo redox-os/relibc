@@ -26,6 +26,8 @@ use crate::{
     },
 };
 
+use super::{bits_locale_t::locale_t, locale::THREAD_LOCALE};
+
 mod utf8;
 mod wprintf;
 mod wscanf;
@@ -961,12 +963,26 @@ pub unsafe extern "C" fn wcswidth(pwcs: *const wchar_t, n: size_t) -> c_int {
     total_width
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsxfrm_l.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wcsxfrm_l(
+    ws1: *mut wchar_t,
+    ws2: *const wchar_t,
+    n: size_t,
+    _loc: locale_t,
+) -> size_t {
+    // relibc has no locale stuff (yet)
+    let len = unsafe { wcslen(ws2) };
+    if len < n {
+        unsafe { wcscpy(ws1, ws2) };
+    }
+    len
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsxfrm.html>.
 #[unsafe(no_mangle)]
-#[expect(unused_variables, reason = "function not yet implemented")]
-pub extern "C" fn wcsxfrm(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> size_t {
-    todo_skip!(0, "wcsxfrm is not implemented");
-    0
+pub unsafe extern "C" fn wcsxfrm(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> size_t {
+    unsafe { wcsxfrm_l(ws1, ws2, n, THREAD_LOCALE as locale_t) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wctob.html>.
