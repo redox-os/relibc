@@ -13,6 +13,12 @@ static sem_t alarm_sem;
 
 static void handler(int sig) {
     (void)sig;
+    // TODO: this usleep is a hack only in redox. 
+    // This handler is called before futex syscall completed so without usleep, 
+    // this sem_post (FUTEX_WAKE) is triggered early and EINTR won't trigger.
+    // The exact reason is that Sigqueue (from timer routine) issues signal handling
+    // so it being wake up handling this handler first before back to futex syscall.
+    usleep(100000);
     sem_post(&alarm_sem);
 }
 
@@ -75,8 +81,8 @@ int main(void) {
     // UNEXP_IF(timer_gettime, current_timer_spec.it_value.tv_nsec, > COUNTDOWN_MILLISECONDS * 1000000);
     
     r = sem_wait(&alarm_sem);
-    // will always EINTR because of SIGARLM
-    ERROR_IF(sem_wait, r, != -1);
+    // will always EINTR because of SIGALRM
+    UNEXP_IF(sem_wait, r, != -1);
     UNEXP_IF(sem_wait, errno, != EINTR);
     r = sem_wait(&alarm_sem);
     ERROR_IF(sem_wait, r, == -1);
