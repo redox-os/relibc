@@ -563,10 +563,24 @@ pub extern "C" fn getegid() -> gid_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getentropy.html>.
-// #[unsafe(no_mangle)]
-#[expect(unused_variables, reason = "function not yet implemented")]
+#[unsafe(no_mangle)]
 pub extern "C" fn getentropy(buffer: *mut c_void, length: size_t) -> c_int {
-    unimplemented!();
+    if length
+        > usize::try_from(limits::GETENTROPY_MAX.cast_unsigned())
+            .expect("GETENTROPY_MAX is within usize")
+    {
+        // required by posix, also by linux to guarantee assert satisfied
+        return Err(Errno(EINVAL)).or_minus_one_errno();
+    }
+    Sys::getrandom(
+        unsafe { slice::from_raw_parts_mut(buffer.cast::<u8>(), length) },
+        0,
+    )
+    .map(|s| {
+        assert_eq!(s, length);
+        0
+    })
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/geteuid.html>.
