@@ -3,6 +3,7 @@
 RED='\033[1;38;5;196m'
 GREEN='\033[1;38;5;46m'
 NC='\033[0m'
+ARCH=$(uname -m)
 
 show_help() {
     echo "Usage: $(basename "$0") [OPTIONS]"
@@ -25,7 +26,7 @@ show_help() {
     for t in "${SUPPORTED_TARGETS[@]}"; do
         echo "  - $t"
     done
-    echo "  - $(uname -m)-unknown-linux-gnu"
+    echo "  - ${ARCH}-unknown-linux-gnu"
     echo ""
     echo "Environment:"
     echo "  TARGET              Sets the default target (overridden by --target)"
@@ -44,7 +45,7 @@ SUPPORTED_TARGETS=(
     "riscv64gc-unknown-redox"
 )
 
-CURRENT_TARGET="${TARGET:-x86_64-unknown-redox}"
+CURRENT_TARGET="${TARGET:-${ARCH}-unknown-redox}"
 CHECK_ALL=false
 CMD_ACTION="make"
 CARGO_ACTION="check"
@@ -73,14 +74,15 @@ while [[ $# -gt 0 ]]; do
             CARGO_ACTION="clippy"
             ;;
         --host)
-            CURRENT_TARGET="$(uname -m)-unknown-linux-gnu"
+            CURRENT_TARGET="${ARCH}-unknown-linux-gnu"
             IS_HOST=1
             ;;
         --target=*)
             CURRENT_TARGET="${1#*=}"
             ;;
         --arch=*)
-            CURRENT_TARGET="${1#*=}-unknown-redox"
+            ARCH="${1#*=}"
+            CURRENT_TARGET="${ARCH}-unknown-redox"
             ;;
         --help)
             show_help
@@ -132,7 +134,7 @@ run_redoxer() {
 
     echo "----------------------------------------"
     echo "Running $REDOXER_ENV $CMD_ACTION $CMD_OPT for: $TARGET"
-    
+
     if $REDOXER_ENV $CMD_ACTION $CMD_OPT; then
         return 0
     else
@@ -143,15 +145,15 @@ run_redoxer() {
 
 if [ "$CHECK_ALL" = true ]; then
     echo "Running $CMD_ACTION for all supported Redox targets..."
-    
+
     has_error=false
-    
+
     for target in "${SUPPORTED_TARGETS[@]}"; do
         if ! run_redoxer "$target"; then
             has_error=true
         fi
     done
-    
+
     echo "----------------------------------------"
     if [ "$has_error" = true ]; then
         echo -e "${RED}Summary: One or more targets failed.${NC}"
