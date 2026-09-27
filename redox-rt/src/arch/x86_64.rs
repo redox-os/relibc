@@ -2,7 +2,7 @@ use core::{
     cell::SyncUnsafeCell,
     mem::offset_of,
     ptr::NonNull,
-    sync::atomic::{AtomicU8, Ordering},
+    sync::atomic::{AtomicU8, AtomicU32, Ordering},
 };
 
 use syscall::{
@@ -13,7 +13,10 @@ use syscall::{
 use crate::{
     Tcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
-    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, get_sigaltstack, inner_c},
+    signal::{
+        PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, get_sigaltstack, inner_c,
+        inner_excp_c,
+    },
 };
 use redox_protocols::protocol::{ProcCall, RtSigInfo};
 
@@ -535,10 +538,129 @@ __relibc_internal_sigentry_crit_third:
     proc_fd = sym PROC_FD,
 ]);
 
+asmfunction!(__relibc_internal_excpentry: ["
+    // Save some registers
+    mov fs:[{tcb_sa_off} + {sa_tmp_rsp}], rsp
+    mov fs:[{tcb_sa_off} + {sa_tmp_rax}], rax
+    mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
+    mov fs:[{tcb_sa_off} + {sa_tmp_rdi}], rdi
+
+    // Check for SA_ONSTACK
+    mov eax, dword ptr [rip + {bitset}]
+    mov edi, fs:[{tcb_sc_off}+{sc_saved_excp_code}+4]
+    bt eax, edi
+    jnc 4f
+
+    // Check for altstack. If sigaltstack being disabled, it is equivalent
+    // to setting 'top' to usize::MAX and 'bottom' to 0.
+
+    // If current RSP is above altstack region, switch to altstack
+    mov rdx, fs:[{tcb_sa_off} + {sa_altstack_top}]
+    cmp rsp, rdx
+    cmova rsp, rdx
+
+    // If current RSP is below altstack region, also switch to altstack
+    cmp rsp, fs:[{tcb_sa_off} + {sa_altstack_bottom}]
+    cmovbe rsp, rdx
+
+4:
+    sub rsp, {REDZONE_SIZE}
+    and rsp, -{STACK_ALIGN}
+    // Now that we have a stack, we can finally start initializing the signal stack!
+
+    push fs:[{tcb_sa_off} + {sa_tmp_rsp}]
+    push fs:[{tcb_sc_off} + {sc_saved_rip}]
+    push fs:[{tcb_sc_off} + {sc_saved_rflags}]
+
+    push fs:[{tcb_sa_off} + {sa_tmp_rdi}]
+    push rsi
+    push fs:[{tcb_sa_off} + {sa_tmp_rdx}]
+    push rcx
+    push fs:[{tcb_sa_off} + {sa_tmp_rax}]
+    push r8
+    push r9
+    push r10
+    push r11
+    push rbx
+    push rbp
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, (29 + 16) * 16 // fxsave region minus available bytes
+    fxsave64 [rsp + 16  * 16]
+
+5:
+    sub rsp, 64 // alloc space for ucontext fields
+
+    mov rdi, rsp
+    call {inner_excp}
+
+    add rsp, 64
+
+    fxrstor64 [rsp + 16 * 16]
+
+6:
+    add rsp, (29 + 16) * 16
+
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    pop rbx
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rax
+    pop rcx
+    pop rdx
+    pop rsi
+    pop rdi
+
+    popfq
+    pop qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
+
+    // x86 lacks atomic instructions for setting both the stack and instruction pointer
+    // simultaneously, except the slow microcoded IRETQ instruction. Thus, we let the arch_pre
+    // function emulate atomicity between the pop rsp and indirect jump.
+
+    .globl __relibc_internal_excpentry_crit_first
+__relibc_internal_excpentry_crit_first:
+
+    pop rsp
+
+    .globl __relibc_internal_excpentry_crit_second
+__relibc_internal_excpentry_crit_second:
+    jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
+"] <= [
+    inner_excp = sym inner_excp_c,
+    bitset = sym GLOBAL_EXCP_STACK_BITSET,
+    sa_tmp_rip = const offset_of!(SigArea, tmp_rip),
+    sa_tmp_rsp = const offset_of!(SigArea, tmp_rsp),
+    sa_tmp_rax = const offset_of!(SigArea, tmp_rax),
+    sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
+    sa_tmp_rdi = const offset_of!(SigArea, tmp_rdi),
+    sa_altstack_top = const offset_of!(SigArea, altstack_top),
+    sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
+    sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
+    sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
+    sc_saved_excp_code = const offset_of!(Sigcontrol, saved_excp_code),
+    tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
+    tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
+    REDZONE_SIZE = const 128,
+    STACK_ALIGN = const 16,
+]);
+
+pub(crate) static GLOBAL_EXCP_STACK_BITSET: AtomicU32 = AtomicU32::new(0);
+
 unsafe extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();
+    fn __relibc_internal_excpentry_crit_first();
+    fn __relibc_internal_excpentry_crit_second();
 }
 /// Fixes some edge cases, and calculates the value for uc_stack.
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
@@ -548,7 +670,9 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     // atomicity inside the critical section, consisting of one instruction at 'crit_first', one at
     // 'crit_second', and one at 'crit_third', see asm.
 
-    if stack.regs.rip == __relibc_internal_sigentry_crit_first as *const () as usize {
+    if stack.regs.rip == __relibc_internal_sigentry_crit_first as *const () as usize
+        || stack.regs.rip == __relibc_internal_excpentry_crit_first as *const () as usize
+    {
         // Reexecute pop rsp and jump steps. This case needs to be different from the one below,
         // since rsp has not been overwritten with the previous context's stack, just yet. At this
         // point, we know [rsp+0] contains the saved RSP, and [rsp-8] contains the saved RIP.
@@ -557,6 +681,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
         stack.regs.rip = unsafe { stack_ptr.sub(1).read() };
     } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as *const () as usize
         || stack.regs.rip == __relibc_internal_sigentry_crit_third as *const () as usize
+        || stack.regs.rip == __relibc_internal_excpentry_crit_second as *const () as usize
     {
         // Almost finished, just reexecute the jump before tmp_rip is overwritten by this
         // deeper-level signal.
@@ -600,6 +725,20 @@ pub unsafe fn manually_enter_trampoline() {
         tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
         sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     );
+}
+
+/// map to `si_signo` and `si_code`.
+pub(crate) fn map_err_code(excp: &syscall::Exception) -> (i32, i32) {
+    use redox_protocols::flag::*;
+    match excp.kind {
+        0  /* divide_by_zero */  => (SIGFPE, 1 /* todo */),
+        3  /* breakpoint */  => (SIGTRAP, 1 /* TRAP_BRKPT */),
+        6  /* invalid_opcode */  => (SIGILL, 1 /* todo */),
+        14  /* page */  => (SIGSEGV, if excp.code & 1 == 0 { 1 /* SEGV_MAPERR */ } else { 2 /* SEGV_ACCERR */ }),
+        17  /* alignment_check */  => (SIGBUS, 1 /* BUS_ADRALN */),
+        18  /* machine_check */  => (SIGBUS, 3 /* BUS_OBJERR */),
+        _  => (SIGABRT, 0 /* todo */),
+    }
 }
 
 /// Get current stack pointer, weak granularity guarantees.
