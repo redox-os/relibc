@@ -18,8 +18,8 @@ pub const AT_REMOVEDIR: c_int = 0x200;
 /// Follow symbolic link.
 pub const AT_SYMLINK_FOLLOW: c_int = 0x2000;
 // nonstandard extension, but likely to be in a future standard
-// TODO should be ifdef guarded by _GNU_SOURCE
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/link.2.html>.
+#[cfg(feature = "_gnu_source")]
 pub const AT_EMPTY_PATH: c_int = 0x4000;
 // only used for faccessat()
 /// Check access using effective user and group ID.

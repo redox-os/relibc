@@ -5,6 +5,7 @@
 after_includes = """
 #include <bits/gid-t.h>  // for gid_t from sys/types.h
 #include <bits/size-t.h> // for size_t from sys/types.h
+#include <features.h> // for _DEFAULT_SOURCE
 """
 include_guard = "_RELIBC_GRP_H"
 language = "C"

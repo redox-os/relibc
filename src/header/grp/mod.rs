@@ -498,11 +498,11 @@ pub unsafe extern "C" fn setgrent() {
     *line_reader = Some(BufReader::new(db).lines());
 }
 
-// TODO should be guarded by `_DEFAULT_SOURCE`
 /// MT-Safe locale
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getgrouplist.3.html>.
 ///
 /// Get a list of groups to which a user belongs.
+#[cfg(feature = "_default_source")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrouplist(
     user: *const c_char,
@@ -572,11 +572,11 @@ pub unsafe extern "C" fn getgrouplist(
     }
 }
 
-// TODO should be guarded by `_DEFAULT_SOURCE`
 /// MT-Safe locale
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/initgroups.3.html>.
 ///
 /// Initialize the supplementary group access list.
+#[cfg(feature = "_default_source")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
@@ -592,10 +592,10 @@ pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     }
 }
 
-// TODO should be guarded by `_DEFAULT_SOURCE`
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/setgroups.2.html>.
 ///
 /// Set a list of supplementary group IDs.
+#[cfg(feature = "_default_source")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
     unsafe { Sys::setgroups(size, list) }
