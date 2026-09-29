@@ -29,6 +29,7 @@ int main(void) {
         wchar_t *src = L"hello";
         wchar_t dst[3];
         assert(wcsxfrm(dst, src, 3) == 5);
+        assert(wcscmp(dst, L"he") == 0);
     }
 
     {
@@ -42,7 +43,7 @@ int main(void) {
         wchar_t *src = L"hello";
         wchar_t dst[5] = L"ABCD";
         assert(wcsxfrm(dst, src, 5) == 5);
-        assert(wcscmp(dst, L"ABCD") == 0);
+        assert(wcscmp(dst, L"hell") == 0);
     }
 
     {

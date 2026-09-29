@@ -975,6 +975,11 @@ pub unsafe extern "C" fn wcsxfrm_l(
     let len = unsafe { wcslen(ws2) };
     if len < n {
         unsafe { wcscpy(ws1, ws2) };
+    } else if n != 0 {
+        unsafe {
+            wmemcpy(ws1, ws2, n - 1);
+            *ws1.add(n - 1) = 0;
+        }
     }
     len
 }
