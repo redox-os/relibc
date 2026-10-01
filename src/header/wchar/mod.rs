@@ -12,7 +12,7 @@ use crate::{
         stdio::*,
         stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc},
         string,
-        time::tm,
+        time::{strftime, tm},
         wchar::reader::Reader,
         wctype::{WEOF, towlower},
     },
@@ -568,15 +568,41 @@ pub unsafe extern "C" fn wcscspn(wcs: *const wchar_t, set: *const wchar_t) -> si
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsftime.html>.
 #[unsafe(no_mangle)]
-#[expect(unused_variables, reason = "function not yet implemented")]
-pub extern "C" fn wcsftime(
+pub unsafe extern "C" fn wcsftime(
     wcs: *mut wchar_t,
     maxsize: size_t,
-    format: *const wchar_t,
+    mut format: *const wchar_t,
     timptr: *const tm,
 ) -> size_t {
-    todo_skip!(0, "wcsftime is not implemented");
-    0
+    let mut state: mbstate_t = mbstate_t {};
+    let format_size = unsafe { wcslen(format) };
+    let mut format_char = vec![0 as c_char; format_size + 1];
+    unsafe {
+        wcsrtombs(
+            format_char.as_mut_ptr(),
+            &raw mut format,
+            format_size,
+            &raw mut state,
+        )
+    };
+
+    let mut buffer_char = vec![0 as c_char; maxsize * MB_LEN_MAX as size_t + 1];
+    let _ret = unsafe {
+        strftime(
+            buffer_char.as_mut_ptr(),
+            buffer_char.len(),
+            format_char.as_ptr(),
+            timptr,
+        )
+    };
+
+    let mut src = buffer_char.as_ptr();
+    let out = unsafe { mbsrtowcs(wcs, &raw mut src, maxsize, &raw mut state) };
+    if !src.is_null() {
+        return 0;
+    }
+
+    out
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcslen.html>.
