@@ -574,6 +574,10 @@ pub unsafe extern "C" fn wcsftime(
     mut format: *const wchar_t,
     timptr: *const tm,
 ) -> size_t {
+    if maxsize == 0 {
+        return 0;
+    }
+
     let mut state: mbstate_t = mbstate_t {};
     let format_size = unsafe { wcslen(format) };
     let mut format_char = vec![0 as c_char; format_size + 1];
@@ -599,6 +603,7 @@ pub unsafe extern "C" fn wcsftime(
     let mut src = buffer_char.as_ptr();
     let out = unsafe { mbsrtowcs(wcs, &raw mut src, maxsize, &raw mut state) };
     if !src.is_null() {
+        unsafe { *wcs.add(maxsize - 1) = 0 };
         return 0;
     }
 
