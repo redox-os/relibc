@@ -45,7 +45,8 @@ SUPPORTED_TARGETS=(
 )
 
 CURRENT_TARGET="${TARGET:-x86_64-unknown-redox}"
-CHECK_ALL=false
+CHECK_ALL_TARGETS=false
+ALL_FEATURES=false
 CMD_ACTION="make"
 CARGO_ACTION="check"
 MAKE_ACTION="all"
@@ -55,7 +56,10 @@ IS_HOST=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --all-target)
-            CHECK_ALL=true
+            CHECK_ALL_TARGETS=true
+            ;;
+        --all-features)
+            ALL_FEATURES=true
             ;;
         --test)
             MAKE_ACTION="test"
@@ -126,6 +130,10 @@ run_redoxer() {
         CMD_OPT="$CARGO_ACTION --target=$TARGET"
     fi
 
+    if [ "$ALL_FEATURES" = true ]; then
+        CMD_OPT="$CMD_OPT --all-features"
+    fi
+
     echo "----------------------------------------"
     echo "Running $REDOXER_ENV $CMD_ACTION $CMD_OPT for: $TARGET"
     
@@ -137,7 +145,7 @@ run_redoxer() {
     fi
 }
 
-if [ "$CHECK_ALL" = true ]; then
+if [ "$CHECK_ALL_TARGETS" = true ]; then
     echo "Running $CMD_ACTION for all supported Redox targets..."
     
     has_error=false
