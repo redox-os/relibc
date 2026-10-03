@@ -547,7 +547,7 @@ pub unsafe extern "C" fn log2f(x: c_float) -> c_float {
 #[unsafe(no_mangle)]
 unsafe extern "C" fn logb(x: c_double) -> c_double {
     // TODO: errno
-    libm::ilogb(x) as _
+    libm::ilogb(x).into()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/logbf.html>.
