@@ -85,6 +85,53 @@ impl Dev {
         )?;
         Ok(res as c_int)
     }
+
+    unsafe fn prime_handle_to_fd(&self, mut buf: IoctlBuffer) -> Result<c_int> {
+        let mut data = unsafe { buf.read::<drm_prime_handle>() }?;
+        let mut new_fd: usize = 0;
+        let metadata = [
+            DRM_IOCTL_PRIME_HANDLE_TO_FD,
+            data.handle as u64,
+            data.flags as u64,
+        ];
+        let payload = core::slice::from_raw_parts_mut(
+            &mut new_fd as *mut usize as *mut u8,
+            core::mem::size_of::<usize>(),
+        );
+
+        
+        let res = redox_rt::sys::sys_call_rw(
+            self.fd as usize,
+            payload,
+            syscall::CallFlags::FD,
+            &metadata,
+        )?;
+        data.fd = new_fd as i32;
+        unsafe { buf.write(data) }?;
+        Ok(res as c_int)
+    }
+
+    unsafe fn prime_fd_to_handle(&self, mut buf: IoctlBuffer) -> Result<c_int> {
+        let mut data = unsafe { buf.read::<drm_prime_handle>() }?;
+        let mut handle_slot: usize = data.fd as usize;
+        let metadata = [
+            DRM_IOCTL_PRIME_FD_TO_HANDLE,
+            data.flags as u64,
+        ];
+        let payload = core::slice::from_raw_parts_mut(
+            &mut handle_slot as *mut usize as *mut u8,
+            core::mem::size_of::<usize>(),
+        );
+        let res = redox_rt::sys::sys_call_rw(
+            self.fd as usize,
+            payload,
+            syscall::CallFlags::FD,
+            &metadata,
+        )?;
+        data.handle = handle_slot as u32;
+        unsafe { buf.write(data) }?;
+        Ok(res as c_int)
+    }
 }
 
 pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_int> {
@@ -129,6 +176,8 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xCE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_GET_FB2) },
         0xD0 => unsafe { dev.read_write_ioctl::<drm_mode_closefb>(buf, MODE_CLOSE_FB) },
         0xD1 => unsafe { dev.write_ioctl::<drm_set_client_name>(buf, SET_CLIENT_NAME) },
+        0x2D => unsafe { dev.prime_handle_to_fd(buf) },
+        0x2E => unsafe { dev.prime_fd_to_handle(buf) },
         _ => {
             todo_skip!(
                 0,
