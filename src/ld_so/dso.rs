@@ -240,6 +240,7 @@ pub enum RelocationKind {
     TLSDESC,
     TPOFF,
     TPOFFELF,
+    NONE,
     UNKNOWN(u32),
 }
 
@@ -266,6 +267,7 @@ impl RelocationKind {
     pub fn new(kind: u32) -> Self {
         //WARNING: Only use R_RISCV_* constants here!
         match kind {
+            elf::R_RISCV_NONE => Self::NONE,
             elf::R_RISCV_COPY => Self::COPY,
             elf::R_RISCV_TLS_DTPMOD64 => Self::DTPMOD,
             elf::R_RISCV_TLS_DTPREL64 => Self::DTPOFF,
@@ -399,11 +401,15 @@ impl DSO {
         let tcb_master = phdrs
             .iter()
             .find(|ph| ph.p_type(NativeEndian) == elf::PT_TLS)
-            .map(|ph| Master {
-                ptr: unsafe { base.byte_add(ph.p_vaddr(NativeEndian) as usize) },
-                image_size: ph.p_filesz(NativeEndian) as usize,
-                segment_size: ph.p_memsz(NativeEndian) as usize,
-                offset: tls_offset + ph.p_memsz(NativeEndian) as usize,
+            .map(|ph| {
+                let align = ph.p_align(NativeEndian).max(1) as usize;
+                let memsz = ph.p_memsz(NativeEndian) as usize;
+                Master {
+                    ptr: unsafe { base.byte_add(ph.p_vaddr(NativeEndian) as usize) },
+                    image_size: ph.p_filesz(NativeEndian) as usize,
+                    segment_size: memsz,
+                    offset: (tls_offset + memsz).next_multiple_of(align),
+                }
             })
             .unwrap();
 
@@ -697,11 +703,13 @@ impl DSO {
                             ph.p_vaddr(endian) as *const u8
                         }
                     };
+                    let align = ph.p_align(endian).max(1) as usize;
+                    let memsz = ph.p_memsz(endian) as usize;
                     tcb_master = Some(Master {
                         ptr,
                         image_size: ph.p_filesz(endian) as usize,
-                        segment_size: ph.p_memsz(endian) as usize,
-                        offset: tls_offset + ph.p_memsz(endian) as usize,
+                        segment_size: memsz,
+                        offset: (tls_offset + memsz).next_multiple_of(align),
                     });
                     log::trace!("  tcb master {:x?}", tcb_master);
                 }
@@ -993,6 +1001,19 @@ impl DSO {
 
         let jmprel = jmprel.unwrap_or_default();
 
+        // Some linkers (e.g. GNU ld on RISC-V) make DT_RELA/DT_RELASZ also cover
+        // `.rela.plt`. Those entries are processed through DT_JMPREL, so exclude
+        // them here, as glibc does.
+        if let (Some(rela_ptr), Some(len)) = (rela_offset, rela_len.as_mut())
+            && jmprel != 0
+        {
+            let start = rela_ptr as usize;
+            let end = start + *len * size_of::<Rela>();
+            if (start..end).contains(&jmprel) {
+                *len = (jmprel - start) / size_of::<Rela>();
+            }
+        }
+
         let init_array = unsafe { get_array(init_array_ptr, init_array_len) };
         let fini_array = unsafe { get_array(fini_array_ptr, fini_array_len) };
         let rela = unsafe { get_array(rela_offset, rela_len) };
@@ -1071,6 +1092,10 @@ impl DSO {
     }
 
     fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
+        if reloc.kind == RelocationKind::NONE {
+            return Ok(());
+        }
+
         let (sym, my_sym) = if reloc.sym != STN_UNDEF {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 

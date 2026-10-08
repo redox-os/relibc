@@ -9,7 +9,11 @@
 static void *alt_stack_base;
 static size_t alt_stack_size = MINSIGSTKSZ;
 
-void segv_handler() {
+void segv_handler(int sig, siginfo_t *info, void *context) {
+    (void)sig;
+    (void)info;
+    (void)context;
+
     int local_var;
     void *current_sp = (void *)&local_var;
     void *alt_stack_end = (char *)alt_stack_base + alt_stack_size;
@@ -27,8 +31,8 @@ void segv_handler() {
 volatile int keep_going = 1;
 volatile void *escape_ptr;
 void __attribute__((noinline)) overflow_stack() {
-    long padding[4096] = {0}; 
-    escape_ptr = (void*)padding[0]; 
+    long padding[4096] = {0};
+    escape_ptr = (void*)padding[0];
     if (keep_going) {
         overflow_stack();
     }
@@ -50,7 +54,7 @@ int main() {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = segv_handler;
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK; 
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
     sigemptyset(&sa.sa_mask);
 
     ret = sigaction(SIGSEGV, &sa, NULL);

@@ -91,7 +91,7 @@ EXPECT_NAMES=\
 	stdio/fseek \
 	stdio/fwrite \
 	stdio/getc_unget \
-  	stdio/getline \
+	stdio/getline \
 	stdio/mutex \
 	stdio/popen \
 	stdio/printf \

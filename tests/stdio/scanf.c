@@ -48,6 +48,7 @@ int main(void) {
     test("h%1[ae]ll%1[^a] wor%1[^\n]%[d]", "halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test("h%1[ae]ll%1[^a] wor%1[^\n]%[d]", "halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test("%[^a]%[b]", "testbbbb", &p, &p.string1, &p.string2);
+    test("%d%n", "notaword", &p, &p.ia, &p.ib);
 
 
     // Scanf stolen from the url parsing in curl

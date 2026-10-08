@@ -18,7 +18,7 @@ show_help() {
     echo "  --host              Run the command on host (linux) target"
     echo "  --all-target        Run the command on all supported Redox architectures"
     echo "  --all-features      Run Cargo with the --all-features flag"
-    echo "  --target=<target>   Override the target architecture (e.g., i586-unknown-redox)"
+    echo "  --target=<target>   Override the target architecture (e.g., i586-unknown-redox; default: x86_64-unknown-redox)"
     echo "  --arch=<arch>       Override the target architecture using arch (e.g., i586)"
     echo "  --help              Show this help message"
     echo ""
@@ -31,12 +31,6 @@ show_help() {
     echo "Environment:"
     echo "  TARGET              Sets the default target (overridden by --target)"
 }
-
-if ! command -v cbindgen &> /dev/null; then
-    echo "Error: 'cbindgen' CLI not found."
-    echo "Please install it: cargo install cbindgen"
-    exit 1
-fi
 
 SUPPORTED_TARGETS=(
     "x86_64-unknown-redox"
@@ -100,15 +94,33 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-if [ "$IS_HOST" -eq 0 ]; then
-if ! command -v redoxer &> /dev/null; then
-    echo "Error: 'redoxer' CLI not found."
-    echo "Please install it: cargo install redoxer"
+if ! command -v cbindgen &> /dev/null; then
+    echo "Error: 'cbindgen' CLI not found."
+    echo "Please install it: cargo install cbindgen"
     exit 1
 fi
+
+if [ "$IS_HOST" -eq 0 ]; then
+    if ! command -v redoxer &> /dev/null; then
+        echo "Error: 'redoxer' CLI not found."
+        echo "Please install it: cargo install redoxer"
+        exit 1
+    fi
+
+    if ! command -v fusermount &> /dev/null; then
+        echo "Error: 'fusermount' CLI not found."
+        echo "Please install it using your package manager"
+        exit 1
+    fi
+
+    if ! command -v rsync &> /dev/null; then
+        echo "Error: 'rsync' CLI not found."
+        echo "Please install it using your package manager"
+        exit 1
+    fi
 fi
 
-run_redoxer() {
+run() {
     export TARGET=$1
     REDOXER_ENV="redoxer env"
     if [ "$IS_HOST" -eq 0 ]; then
@@ -137,7 +149,7 @@ run_redoxer() {
 
     echo "----------------------------------------"
     echo "Running $REDOXER_ENV $CMD_ACTION $CMD_OPT for: $TARGET"
-    
+
     if $REDOXER_ENV $CMD_ACTION $CMD_OPT; then
         return 0
     else
@@ -148,15 +160,15 @@ run_redoxer() {
 
 if [ "$CHECK_ALL_TARGETS" = true ]; then
     echo "Running $CMD_ACTION for all supported Redox targets..."
-    
+
     has_error=false
-    
+
     for target in "${SUPPORTED_TARGETS[@]}"; do
-        if ! run_redoxer "$target"; then
+        if ! run "$target"; then
             has_error=true
         fi
     done
-    
+
     echo "----------------------------------------"
     if [ "$has_error" = true ]; then
         echo -e "${RED}Summary: One or more targets failed.${NC}"
@@ -166,7 +178,7 @@ if [ "$CHECK_ALL_TARGETS" = true ]; then
         exit 0
     fi
 else
-    if run_redoxer "$CURRENT_TARGET"; then
+    if run "$CURRENT_TARGET"; then
         echo -e "${GREEN}Success: $CARGO_ACTION for $CURRENT_TARGET passed.${NC}"
         exit 0
     else

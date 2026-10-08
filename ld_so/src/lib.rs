@@ -118,10 +118,52 @@ _start:
 #[cfg(target_arch = "riscv64")]
 global_asm!(
     "
+.weak _DYNAMIC
+.hidden _DYNAMIC
+
 .globl _start
 _start:
-    mv a0, sp
+    # Save original stack and align stack to 16 bytes
+    mv s0, sp
+    andi sp, sp, -16
+
+    # Call ld_so_start(stack=a0, ld_entry=a1, dynamic=a2)
+    mv a0, s0
+    lla a1, _start
+    lla a2, _DYNAMIC
     call relibc_ld_so_start
+
+    # Restore original stack, clear registers, and jump to new start function
+    mv sp, s0
+    mv t0, a0
+    li ra, 0
+    li t1, 0
+    li t2, 0
+    li s0, 0
+    li s1, 0
+    li a0, 0
+    li a1, 0
+    li a2, 0
+    li a3, 0
+    li a4, 0
+    li a5, 0
+    li a6, 0
+    li a7, 0
+    li s2, 0
+    li s3, 0
+    li s4, 0
+    li s5, 0
+    li s6, 0
+    li s7, 0
+    li s8, 0
+    li s9, 0
+    li s10, 0
+    li s11, 0
+    li t3, 0
+    li t4, 0
+    li t5, 0
+    li t6, 0
+    jr t0
     unimp
 "
 );

@@ -13,4 +13,5 @@
 4, { sa: 12, ia: 84, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: a, string2: e, string3: f, string4: dddddd }
 4, { sa: 12, ia: 84, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: a, string2: e, string3: f, string4: dddddd }
 1, { sa: 12, ia: 84, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: testbbbb, string2: e, string3: f, string4: dddddd }
+0, { sa: 12, ia: 84, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: testbbbb, string2: e, string3: f, string4: dddddd }
 3 "https" "//" "redox-os.org" ""

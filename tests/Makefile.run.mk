@@ -28,6 +28,6 @@ run: $(BUILD)/bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BIN
 
 run-once: $(BUILD)/bins_verify/relibc-tests $(BUILD)/$(TESTBIN)
 	@echo "\033[1;36;49mRunning single test $(TESTBIN) $*\033[0m"
-	@if [ -f "expected/$(TESTBIN).stdout" ]; then \
+	@if [ -f "expected/$(subst bins_dynamic/,,$(TESTBIN)).stdout" ]; then \
 		$(TEST_RUNNER) $< $(BUILD)/$(TESTBIN); \
 	else $(TEST_RUNNER) $< -s$(BUILD)/$(TESTBIN); fi
