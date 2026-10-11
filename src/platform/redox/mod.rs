@@ -30,7 +30,7 @@ use crate::{
     fs::File,
     header::{
         errno::{
-            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
+            EBADF, EBADFD, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
             ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP,
         },
         fcntl::{
