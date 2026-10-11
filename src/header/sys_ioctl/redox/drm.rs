@@ -88,49 +88,32 @@ impl Dev {
 
     unsafe fn prime_handle_to_fd(&self, mut buf: IoctlBuffer) -> Result<c_int> {
         let mut data = unsafe { buf.read::<drm_prime_handle>() }?;
-        let mut new_fd: usize = 0;
-        let metadata = [
-            DRM_IOCTL_PRIME_HANDLE_TO_FD,
-            data.handle as u64,
-            data.flags as u64,
-        ];
-        let payload = core::slice::from_raw_parts_mut(
-            &mut new_fd as *mut usize as *mut u8,
-            core::mem::size_of::<usize>(),
-        );
-
-        
-        let res = redox_rt::sys::sys_call_rw(
-            self.fd as usize,
-            payload,
-            syscall::CallFlags::FD,
-            &metadata,
-        )?;
+        let mut metadata = [0u8; 24];
+        metadata[0..8].copy_from_slice(&DRM_IOCTL_PRIME_HANDLE_TO_FD.to_ne_bytes());
+        metadata[8..16].copy_from_slice(&(data.handle as u64).to_ne_bytes());
+        metadata[16..24].copy_from_slice(&(data.flags as u64).to_ne_bytes());
+        let new_fd = redox_rt::sys::dup(self.fd as usize, &metadata)?;
         data.fd = new_fd as i32;
         unsafe { buf.write(data) }?;
-        Ok(res as c_int)
+        Ok(0)
     }
 
     unsafe fn prime_fd_to_handle(&self, mut buf: IoctlBuffer) -> Result<c_int> {
         let mut data = unsafe { buf.read::<drm_prime_handle>() }?;
-        let mut handle_slot: usize = data.fd as usize;
+        let payload = (data.fd as usize).to_ne_bytes();
         let metadata = [
             DRM_IOCTL_PRIME_FD_TO_HANDLE,
             data.flags as u64,
         ];
-        let payload = core::slice::from_raw_parts_mut(
-            &mut handle_slot as *mut usize as *mut u8,
-            core::mem::size_of::<usize>(),
-        );
-        let res = redox_rt::sys::sys_call_rw(
+        let handle = redox_rt::sys::sys_call_wo(
             self.fd as usize,
-            payload,
-            syscall::CallFlags::FD,
+            &payload,
+            syscall::CallFlags::MULTIPLE_FDS,
             &metadata,
         )?;
-        data.handle = handle_slot as u32;
+        data.handle = handle as u32;
         unsafe { buf.write(data) }?;
-        Ok(res as c_int)
+        Ok(0)
     }
 }
 
