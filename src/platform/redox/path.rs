@@ -90,8 +90,8 @@ pub fn getcwd(mut buf: Out<[u8]>) -> Result<usize> {
 }
 
 pub struct CwdGuard {
-    _siglock: TmpDisableSignalsGuard,
     guard: ReadGuard<'static, Option<Cwd<'static>>>,
+    _siglock: TmpDisableSignalsGuard,
 }
 
 impl core::ops::Deref for CwdGuard {
