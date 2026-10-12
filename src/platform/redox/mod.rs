@@ -1,4 +1,7 @@
-use alloc::{borrow::Cow, string::ToString};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use core::{
     convert::TryFrom,
     mem::{self, size_of},
@@ -1202,52 +1205,37 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let oldpath = RedoxStr::new_from_c(old_path.to_cstr()).ok_or(Errno(EINVAL))?;
-        let newpath = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
-
-        let resolve_dir = |dir: c_int| -> Result<usize> {
-            if dir == fcntl::AT_FDCWD {
-                let cwd_guard = path::current_dir()?;
-                let cwd = cwd_guard.as_ref().unwrap();
-                Ok(cwd.fd.as_raw_fd() as usize)
-            } else {
-                Ok(dir as usize)
+        let resolve = |path: &CStr, dir: c_int| -> Result<(usize, String, Option<FdGuard>)> {
+            let redox_path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+            match redox_path {
+                RedoxStr::Absolute(abs) => {
+                    let (scheme, reference) = abs.as_parts().ok_or(Errno(EINVAL))?;
+                    let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
+                    let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
+                    let guard = FdGuard::new(redox_rt::sys::openat_into_upper(
+                        redox_rt::current_namespace_fd()?,
+                        &scheme_root_str,
+                        syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
+                        0,
+                    )?);
+                    let raw_fd = guard.as_raw_fd();
+                    Ok((raw_fd, reference.as_ref().to_string(), Some(guard)))
+                }
+                RedoxStr::Relative(rel) => {
+                    let dir_fd = if dir == fcntl::AT_FDCWD {
+                        let cwd_guard = path::current_dir()?;
+                        let cwd = cwd_guard.as_ref().unwrap();
+                        cwd.fd.as_raw_fd()
+                    } else {
+                        dir as usize
+                    };
+                    Ok((dir_fd, rel.as_ref().to_string(), None))
+                }
             }
         };
 
-        let (old_dfd, old_target, _old_guard) = match &oldpath {
-            RedoxStr::Absolute(abs) => {
-                let (scheme, reference) = abs.as_parts().ok_or(Errno(EINVAL))?;
-                let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
-                let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
-                let guard = FdGuard::new(redox_rt::sys::openat_into_upper(
-                    redox_rt::current_namespace_fd()?,
-                    &scheme_root_str,
-                    syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
-                    0,
-                )?);
-                let raw_fd = guard.as_raw_fd();
-                (raw_fd as usize, reference.as_ref().to_string(), Some(guard))
-            }
-            RedoxStr::Relative(rel) => (resolve_dir(old_dir)?, rel.as_ref().to_string(), None),
-        };
-
-        let (new_dfd, new_target, _new_guard) = match &newpath {
-            RedoxStr::Absolute(abs) => {
-                let (scheme, reference) = abs.as_parts().ok_or(Errno(EINVAL))?;
-                let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
-                let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
-                let guard = FdGuard::new(redox_rt::sys::openat_into_upper(
-                    redox_rt::current_namespace_fd()?,
-                    &scheme_root_str,
-                    syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
-                    0,
-                )?);
-                let raw_fd = guard.as_raw_fd();
-                (raw_fd as usize, reference.as_ref().to_string(), Some(guard))
-            }
-            RedoxStr::Relative(rel) => (resolve_dir(new_dir)?, rel.as_ref().to_string(), None),
-        };
+        let (old_dfd, old_target, _old_guard) = resolve(&old_path, old_dir)?;
+        let (new_dfd, new_target, _new_guard) = resolve(&new_path, new_dir)?;
 
         redox_rt::sys::frenameat(old_dfd, &old_target, new_dfd, &new_target, flags)
             .map_err(Into::into)
