@@ -640,17 +640,7 @@ fn openat_into_posix<T: AsRef<str>>(
         guard.add_posix(flags)?
     };
 
-    let res = unsafe {
-        syscall::syscall6(
-            syscall::SYS_OPENAT_INTO,
-            fd,
-            path.as_ptr() as usize,
-            path.len(),
-            flags,
-            fcntl_flags,
-            out,
-        )
-    };
+    let res = syscall::openat_into(fd, out, path, flags, fcntl_flags);
 
     if res.is_err() {
         let mut guard = FILETABLE.lock();
@@ -866,17 +856,7 @@ pub fn openat_into_upper<T: AsRef<str>>(
     };
     let out = out_idx | syscall::UPPER_FDTBL_TAG;
 
-    let res = unsafe {
-        syscall::syscall6(
-            syscall::SYS_OPENAT_INTO,
-            fd,
-            path.as_ptr() as usize,
-            path.len(),
-            flags,
-            fcntl_flags,
-            out,
-        )
-    };
+    let res = syscall::openat_into(fd, out, path, flags, fcntl_flags);
 
     if res.is_err() {
         let mut guard = FILETABLE.lock();

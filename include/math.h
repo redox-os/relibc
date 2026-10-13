@@ -1,8 +1,11 @@
 #include <openlibm_math.h>
 
 // Missing typedefs
+#ifndef _RELIBC_FLOAT_T
+#define _RELIBC_FLOAT_T
 typedef float float_t;
 typedef double double_t;
+#endif
 
 /* double */
 
