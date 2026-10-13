@@ -222,6 +222,7 @@ EXPECT_NAMES=\
 	wchar/wcsnlen \
 	wchar/wcsnrtombs \
 	wchar/wcswidth \
+	wchar/wcsxfrm \
 	wctype/towlower \
 	wctype/towupper \
 	mknod \
