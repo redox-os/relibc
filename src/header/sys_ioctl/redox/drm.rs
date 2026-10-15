@@ -1,7 +1,7 @@
 use core::slice;
 
 use redox_ioctl::{IoctlData, drm::*};
-use syscall::flag::{F_SETFD, O_RDWR, O_CLOEXEC};
+use syscall::flag::{F_SETFD, O_CLOEXEC, O_RDWR};
 
 use crate::{
     error::{Errno, Result},
@@ -107,9 +107,7 @@ impl Dev {
     unsafe fn prime_fd_to_handle(&self, mut buf: IoctlBuffer) -> Result<c_int> {
         let mut data = unsafe { buf.read::<drm_prime_handle>() }?;
         let payload = (data.fd as usize).to_ne_bytes();
-        let metadata = [
-            DRM_IOCTL_PRIME_FD_TO_HANDLE,
-        ];
+        let metadata = [DRM_IOCTL_PRIME_FD_TO_HANDLE];
         let handle = redox_rt::sys::sys_call_wo(
             self.fd as usize,
             &payload,

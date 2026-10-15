@@ -12,8 +12,8 @@ pub use drm_sys::{
     drm_mode_destroy_dumb, drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_fb_dirty_cmd,
     drm_mode_get_blob, drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane,
     drm_mode_get_plane_res, drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo,
-    drm_mode_obj_get_properties, drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap,
-    drm_set_client_name, drm_set_version, drm_unique, drm_version, drm_prime_handle,
+    drm_mode_obj_get_properties, drm_mode_property_enum, drm_mode_set_plane, drm_prime_handle,
+    drm_set_client_cap, drm_set_client_name, drm_set_version, drm_unique, drm_version,
 };
 
 pub const VERSION: u64 = 0;
