@@ -477,7 +477,6 @@ pub unsafe extern "C" fn pthread_attr_setstacksize(
     }
 }
 
-// TODO should be guarded by _GNU_SOURCE
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/pthread_getattr_np.3.html>.
 ///
 /// Initializes the thread attributes object referenced to by `attr` so that it
@@ -489,6 +488,7 @@ pub unsafe extern "C" fn pthread_attr_setstacksize(
 /// # Implementation
 /// Always succeeds, so will never return an error number.
 #[unsafe(no_mangle)]
+#[cfg(feature = "_gnu_source")]
 pub unsafe extern "C" fn pthread_getattr_np(thread: pthread_t, attr: *mut pthread_attr_t) -> c_int {
     let thread = unsafe { &*thread.cast::<Pthread>() };
     let attr_ptr = attr.cast::<RlctAttr>();

@@ -5,7 +5,7 @@
 # - "Inclusion of the <pthread.h> header shall make symbols defined in the headers <sched.h> and <time.h> visible."
 #
 # time.h brings in NULL
-# features.h needed for no return (Rust never type)
+# features.h needed for no return (Rust never type) and _GNU_SOURCE
 sys_includes = ["sched.h", "time.h", "features.h"]
 # TODO: Any better way to implement pthread_cleanup_push/pthread_cleanup_pop?
 after_includes = """

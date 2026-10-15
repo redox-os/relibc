@@ -707,7 +707,7 @@ pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
     ptr
 }
 
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/posix_memalign.3.html>.
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/memalign.3.html>.
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
