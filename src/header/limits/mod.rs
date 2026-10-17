@@ -3,8 +3,8 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/limits.h.html>.
 
 use crate::platform::types::{
-    c_char, c_int, c_long, c_longlong, c_schar, c_short, c_uchar, c_uint, c_ulong, c_ulonglong,
-    c_ushort, ssize_t,
+    c_char, c_int, c_long, c_longlong, c_schar, c_short, c_uchar, c_uint, c_ulonglong, c_ushort,
+    ssize_t,
 };
 
 pub use crate::header::bits_limits_ptdi::{
@@ -46,24 +46,19 @@ pub const CHAR_MAX: c_char = 0x7F;
 pub const SCHAR_MAX: c_schar = 0x7F;
 pub const SHRT_MAX: c_short = 0x7FFF;
 pub const INT_MAX: c_int = 0x7FFF_FFFF;
-#[cfg(target_pointer_width = "32")]
-pub const LONG_MAX: c_long = 0x7FFF_FFFF;
-#[cfg(target_pointer_width = "64")]
-pub const LONG_MAX: c_long = 0x7FFF_FFFF_FFFF_FFFF;
-pub const LLONG_MAX: c_longlong = 0x7FFF_FFFF_FFFF_FFFF;
+// suffixes for adding 'u', 'll', 'ull'. TODO: no suffix or 'ul' and 'l'.
+// https://github.com/mozilla/cbindgen/blob/d3bf7d6/src/bindgen/ir/constant.rs#L530
+// LONG_MAX is defined in cbindgen.toml
+pub const LLONG_MAX: c_longlong = 0x7FFF_FFFF_FFFF_FFFF_i64;
 #[cfg(target_pointer_width = "32")]
 pub const SSIZE_MAX: ssize_t = 0x7FFF_FFFF;
 #[cfg(target_pointer_width = "64")]
 pub const SSIZE_MAX: ssize_t = 0x7FFF_FFFF_FFFF_FFFF;
 pub const UCHAR_MAX: c_uchar = 0xFF;
 pub const USHRT_MAX: c_ushort = 0xFFFF;
-pub const UINT_MAX: c_uint = 0xFFFFFFFF;
-
-#[cfg(target_pointer_width = "32")]
-pub const ULONG_MAX: c_ulong = 0xFFFF_FFFF;
-#[cfg(target_pointer_width = "64")]
-pub const ULONG_MAX: c_ulong = 0xFFFF_FFFF_FFFF_FFFF;
-pub const ULLONG_MAX: c_ulonglong = 0xFFFF_FFFF_FFFF_FFFF;
+pub const UINT_MAX: c_uint = 0xFFFFFFFF_u32;
+// ULONG_MAX is defined in cbindgen.toml
+pub const ULLONG_MAX: c_ulonglong = 0xFFFF_FFFF_FFFF_FFFF_u64;
 
 #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
 pub const CHAR_MIN: c_char = 0;
@@ -72,7 +67,7 @@ pub const CHAR_MIN: c_char = -0x80;
 pub const SCHAR_MIN: c_schar = -SCHAR_MAX - 1;
 pub const SHRT_MIN: c_short = -SHRT_MAX - 1;
 pub const INT_MIN: c_int = -INT_MAX - 1;
-pub const LONG_MIN: c_long = -LONG_MAX - 1;
+// LONG_MIN is defined in cbindgen.toml
 pub const LLONG_MIN: c_longlong = -LLONG_MAX - 1;
 
 // TODO: 4096 for most architectures as determined by a quick grep of musl's source; need a better

@@ -41,7 +41,11 @@ after_includes = """
 #define DBL_MAX_10_EXP 308
 
 #define LDBL_HAS_SUBNORM 1
+// TODO: Real values once relibc fully support c_longdouble
+#define LDBL_DIG DBL_DIG
 #define LDBL_DECIMAL_DIG DECIMAL_DIG
+#define LDBL_MIN_10_EXP DBL_MIN_10_EXP
+#define LDBL_MAX_10_EXP DBL_MAX_10_EXP
 
 // TODO: Support more architectures than x86_64 here:
 #define LDBL_TRUE_MIN 3.6451995318824746025e-4951L

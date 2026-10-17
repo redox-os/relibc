@@ -235,6 +235,7 @@ VARIED_NAMES=\
 	includes \
 	kill-waitpid \
 	limits \
+	limits_cpp \
 	pthread/timedwait \
 	pty/forkpty \
 	psignal \
