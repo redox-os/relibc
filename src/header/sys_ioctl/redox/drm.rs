@@ -5,10 +5,9 @@ use syscall::flag::{F_SETFD, O_RDWR};
 
 use crate::{
     error::{Errno, Result},
-    header::errno::EINVAL,
+    header::{errno::EINVAL, fcntl::sys::FD_CLOEXEC},
     platform::types::c_int,
 };
-use crate::header::fcntl::sys::FD_CLOEXEC;  
 
 use super::IoctlBuffer;
 
