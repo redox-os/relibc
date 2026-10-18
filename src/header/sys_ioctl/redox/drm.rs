@@ -1,13 +1,14 @@
 use core::slice;
 
 use redox_ioctl::{IoctlData, drm::*};
-use syscall::flag::{F_SETFD, O_CLOEXEC, O_RDWR};
+use syscall::flag::{F_SETFD, O_RDWR};
 
 use crate::{
     error::{Errno, Result},
     header::errno::EINVAL,
     platform::types::c_int,
 };
+use crate::header::fcntl::sys::FD_CLOEXEC;  
 
 use super::IoctlBuffer;
 
@@ -89,15 +90,14 @@ impl Dev {
 
     unsafe fn prime_handle_to_fd(&self, mut buf: IoctlBuffer) -> Result<c_int> {
         let mut data = unsafe { buf.read::<drm_prime_handle>() }?;
-        let writable = (data.flags & O_RDWR) != 0;
+        let writable = (data.flags & O_RDWR as u32) != 0;
         let mut metadata = [0u8; 16];
         metadata[0..8].copy_from_slice(&DRM_IOCTL_PRIME_HANDLE_TO_FD.to_ne_bytes());
         metadata[8..12].copy_from_slice(&data.handle.to_ne_bytes());
         metadata[12..16].copy_from_slice(&(if writable { 1u32 } else { 0u32 }).to_ne_bytes());
         let new_fd = redox_rt::sys::dup(self.fd as usize, &metadata)?;
-        let mut fd_flags = 0;
-        if data.flags & O_CLOEXEC != 0 {
-            redox_rt::sys::fcntl(new_fd as usize, F_SETFD, O_CLOEXEC)?;
+        if (data.flags & FD_CLOEXEC as u32) != 0 {
+            redox_rt::sys::fcntl(new_fd as usize, F_SETFD, FD_CLOEXEC as usize)?;
         }
         data.fd = new_fd as i32;
         unsafe { buf.write(data) }?;
@@ -111,7 +111,7 @@ impl Dev {
         let handle = redox_rt::sys::sys_call_wo(
             self.fd as usize,
             &payload,
-            syscall::CallFlags::MULTIPLE_FDS,
+            syscall::CallFlags::MULTIPLE_FDS2,
             &metadata,
         )?;
         data.handle = handle as u32;
