@@ -19,6 +19,7 @@ use crate::{
     error::Errno,
     header::{
         dl_tls::{__tls_get_addr, dl_tls_index},
+        dlfcn::Dl_info_t,
         fcntl, sys_mman,
         unistd::F_OK,
     },
@@ -524,6 +525,31 @@ impl Linker {
                 unsafe { __tls_get_addr(&raw mut tls_index) }
             }
         })
+    }
+
+    pub fn dladdr(&self, addr: *const c_void, info: Option<&mut Dl_info_t>) -> bool {
+        let addr_val = addr as usize;
+
+        let Some(obj) = self.objects.values().find(|obj| obj.is_in_range(addr_val)) else {
+            return false;
+        };
+
+        let Some(info) = info else {
+            return true;
+        };
+
+        info.dli_fname = obj.path_c.as_ptr();
+        info.dli_fbase = obj.base as *mut c_void;
+
+        if let Some((sym_name, sym_addr)) = obj.find_sym(addr_val) {
+            info.dli_sname = sym_name;
+            info.dli_saddr = sym_addr as *mut c_void;
+        } else {
+            info.dli_sname = ptr::null();
+            info.dli_saddr = ptr::null_mut();
+        }
+
+        true
     }
 
     pub fn unload(&mut self, obj: Arc<DSO>) {

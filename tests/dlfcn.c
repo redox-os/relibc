@@ -2,6 +2,7 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <threads.h>
 
 #define SHARED_LIB "sharedlib.so"
@@ -95,6 +96,31 @@ void test_dlsym_tls_var(char *lib, int rtld) {
     dlclose(handle);
 }
 
+void test_dladdr_function(char *lib, int rtld) {
+    void *handle = dlopen(lib, rtld);
+    if (!handle) {
+        printf("dlopen(%s) failed: %s\n", lib, dlerror());
+        exit(1);
+    }
+
+    void (*f)();
+    *(void **)(&f) = dlsym(handle, "print");
+
+    if (!f) {
+        printf("dlsym(handle, print) failed\n");
+        exit(2);
+    }
+
+    Dl_info info;
+    if (dladdr((void *)(uintptr_t)f, &info) != 0) {
+        printf("main: (%s, %s)\n", strrchr(info.dli_fname, '/') + 1, info.dli_sname);
+    } else {
+        printf("dladdr(print) failed: %s\n", dlerror());
+    }
+
+    dlclose(handle);
+}
+
 void test_dlunload(char *lib, int rtld) {
     void *handle = dlopen(lib, rtld | RTLD_LOCAL);
     void *handle2 = dlopen(lib, rtld | RTLD_LOCAL);
@@ -121,11 +147,13 @@ void test(int rtld) {
     test_dlsym_function(SHARED_LIB, rtld);
     test_dlsym_global_var(SHARED_LIB, rtld);
     test_dlsym_tls_var(SHARED_LIB, rtld);
+    test_dladdr_function(SHARED_LIB, rtld);
     test_dlunload(SHARED_LIB, rtld);
     printf("--sharedlib_cpp.so--\n");
     test_dlsym_function(SHARED_LIB_CPP, rtld);
     test_dlsym_global_var(SHARED_LIB_CPP, rtld);
     test_dlsym_tls_var(SHARED_LIB_CPP, rtld);
+    test_dladdr_function(SHARED_LIB_CPP, rtld);
     test_dlunload(SHARED_LIB_CPP, rtld);
 }
 

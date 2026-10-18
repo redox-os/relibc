@@ -6,12 +6,14 @@ sharedlib: global_var == 42
 sharedlib: tls_var == 21
 main: global_var == 42
 main: tls_var == 21
+main: (sharedlib.so, print)
 --sharedlib_cpp.so--
 sharedlib: global_var == 42
 sharedlib: tls_var == 21
 sharedlib: tls_var_dyn == 7
 main: global_var == 42
 main: tls_var == 21
+main: (sharedlib_cpp.so, print)
 --RTLD_NOW--
 add(22, 33) = 55
 puts from dlopened libc
@@ -20,9 +22,11 @@ sharedlib: global_var == 42
 sharedlib: tls_var == 21
 main: global_var == 42
 main: tls_var == 21
+main: (sharedlib.so, print)
 --sharedlib_cpp.so--
 sharedlib: global_var == 42
 sharedlib: tls_var == 21
 sharedlib: tls_var_dyn == 7
 main: global_var == 42
 main: tls_var == 21
+main: (sharedlib_cpp.so, print)

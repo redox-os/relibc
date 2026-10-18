@@ -61,13 +61,13 @@ fn set_last_error(error: DlError) {
 #[allow(non_camel_case_types)]
 pub struct Dl_info_t {
     /// Pathname of mapped object file.
-    dli_fname: *const c_char,
+    pub dli_fname: *const c_char,
     /// Base of mapped address range.
-    dli_fbase: *mut c_void,
+    pub dli_fbase: *mut c_void,
     /// Symbol name or null pointer.
-    dli_sname: *const c_char,
+    pub dli_sname: *const c_char,
     /// Symbol address of null pointer.
-    dli_saddr: *mut c_void,
+    pub dli_saddr: *mut c_void,
 }
 
 /// alias as per spec update: <https://www.austingroupbugs.net/view.php?id=1847>
@@ -75,15 +75,33 @@ pub type Dl_info = Dl_info_t;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dladdr.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn dladdr(_addr: *const c_void, info: *mut Dl_info_t) -> c_int {
-    //TODO
-    unsafe {
-        (*info).dli_fname = ptr::null();
-        (*info).dli_fbase = ptr::null_mut();
-        (*info).dli_sname = ptr::null();
-        (*info).dli_saddr = ptr::null_mut();
+pub unsafe extern "C" fn dladdr(addr: *const c_void, dlip: *mut Dl_info_t) -> c_int {
+    let Some(tcb) = (unsafe { Tcb::current() }) else {
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        return 0;
+    };
+
+    if tcb.linker_ptr.is_null() {
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        return 0;
     }
-    0
+
+    let linker = unsafe { (*tcb.linker_ptr).lock() };
+
+    let dlip_mut = unsafe { dlip.as_mut() };
+
+    if !linker.dladdr(addr, dlip_mut) {
+        let Some(dlip_mut) = (unsafe { dlip.as_mut() }) else {
+            return 0;
+        };
+
+        dlip_mut.dli_fname = ptr::null();
+        dlip_mut.dli_fbase = ptr::null_mut();
+        dlip_mut.dli_sname = ptr::null();
+        dlip_mut.dli_saddr = ptr::null_mut();
+        return 0;
+    }
+    1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlopen.html>.

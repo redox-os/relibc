@@ -23,6 +23,7 @@ use crate::{
 };
 use alloc::{
     boxed::Box,
+    ffi::CString,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
@@ -34,6 +35,7 @@ use core::{
     mem::size_of,
     ptr::{self, NonNull},
     slice,
+    str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -363,6 +365,7 @@ impl Drop for MemoryMapHandle {
 /// Use to represent a library as well as all the symbols that is loaded withen it.
 pub struct DSO {
     pub name: String,
+    pub path_c: CString,
     pub id: usize,
     pub dlopened: bool,
     pub entry_point: usize,
@@ -416,6 +419,8 @@ impl DSO {
         (
             Self {
                 name: String::from("libc.so.6"),
+                // TODO: actually resolve the path to libc
+                path_c: CString::from_str("/lib/libc.so.6").unwrap(),
                 id,
                 tls_offset: tcb_master.offset,
                 tls_module_id,
@@ -451,6 +456,7 @@ impl DSO {
             _ => basename(path),
         }
         .to_string();
+        let path_c = CString::new(path).map_err(|err| err.to_string())?;
         let tls_offset = match tcb_master {
             Some(ref master) => master.offset,
             _ => 0,
@@ -463,6 +469,7 @@ impl DSO {
 
         let dso = DSO {
             name,
+            path_c,
             id,
             dlopened,
             entry_point,
@@ -543,6 +550,54 @@ impl DSO {
         ))
     }
 
+    pub fn find_sym(&self, addr: usize) -> Option<(*const c_char, usize)> {
+        let mut best_name: *const c_char = ptr::null();
+        let mut best_addr: usize = 0;
+        let mut min_diff = usize::MAX;
+
+        for sym in self.dynamic.symbols {
+            if sym.st_shndx(object::NativeEndian) == elf::SHN_UNDEF {
+                continue;
+            }
+
+            let st_type = sym.st_type();
+            if st_type != elf::STT_FUNC && st_type != elf::STT_OBJECT {
+                continue;
+            }
+
+            let st_value = sym.st_value(object::NativeEndian) as usize;
+
+            let sym_addr = if self.pie {
+                self.base.addr() + st_value
+            } else {
+                st_value
+            };
+
+            if sym_addr <= addr {
+                let diff = addr - sym_addr;
+
+                if diff < min_diff {
+                    min_diff = diff;
+                    best_addr = sym_addr;
+
+                    if let Ok(name_bytes) = self
+                        .dynamic
+                        .dynstrtab
+                        .get(sym.st_name(object::NativeEndian))
+                    {
+                        best_name = name_bytes.as_ptr().cast::<c_char>();
+                    }
+                }
+            }
+        }
+
+        if best_name.is_null() {
+            None
+        } else {
+            Some((best_name, best_addr))
+        }
+    }
+
     pub fn run_init(&self) {
         for f in self.dynamic.init_array {
             unsafe { f() }
@@ -553,6 +608,16 @@ impl DSO {
         for f in self.dynamic.fini_array.iter().rev() {
             unsafe { f() }
         }
+    }
+
+    pub fn is_in_range(&self, addr: usize) -> bool {
+        let Some(mmap) = &self.mmap else {
+            // TODO: is this reachable?
+            return false;
+        };
+        let start = mmap.as_ptr() as usize;
+        let end = start + mmap.size();
+        addr >= start && addr < end
     }
 
     fn mmap_and_copy<'a>(

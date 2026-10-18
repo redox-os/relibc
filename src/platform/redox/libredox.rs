@@ -286,6 +286,7 @@ pub unsafe extern "C" fn redox_dup_v1(fd: usize, buf: *const u8, len: usize) -> 
         core::slice::from_raw_parts(buf, len)
     }))
 }
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_dup2_v1(
     old_fd: usize,
@@ -297,6 +298,11 @@ pub unsafe extern "C" fn redox_dup2_v1(
         core::slice::from_raw_parts(buf, len)
     }))
 }
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_dup2_v2(old_fd: usize, new_fd: usize) -> RawResult {
+    Error::mux(redox_rt::sys::dup2(old_fd, new_fd, &[]))
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_read_v1(fd: usize, dst_base: *mut u8, dst_len: usize) -> RawResult {
     Error::mux(posix_read(fd, unsafe {
