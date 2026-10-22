@@ -67,6 +67,16 @@ define_ioctl_data! {
     }
 }
 
+pub const PRIME_HANDLE_TO_FD: u64 = 0x2D;
+pub const PRIME_FD_TO_HANDLE: u64 = 0x2E;
+define_ioctl_data! {
+    struct drm_prime_handle, DrmPrimeHandle {
+        handle: u32,
+        flags: u32,
+        fd: i32,
+    }
+}
+
 pub const MODE_CARD_RES: u64 = 0xA0;
 define_ioctl_data! {
     struct drm_mode_card_res, DrmModeCardRes {
@@ -364,15 +374,5 @@ define_ioctl_data! {
     struct drm_set_client_name, DrmSetClientName {
         name_len: u64,
         name: u64 [array<u8, name_len>],
-    }
-}
-
-pub const DRM_IOCTL_PRIME_HANDLE_TO_FD: u64 = 0x2d;
-pub const DRM_IOCTL_PRIME_FD_TO_HANDLE: u64 = 0x2e;
-define_ioctl_data! {
-    struct drm_prime_handle, DrmPrimeHandle {
-        handle: u32,
-        flags: u32,
-        fd: i32,
     }
 }
