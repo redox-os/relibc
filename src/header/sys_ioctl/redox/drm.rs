@@ -109,7 +109,7 @@ impl Dev {
         let handle = redox_rt::sys::sys_call_wo(
             &[self.fd as usize, data.fd as usize][..],
             &[],
-            syscall::CallFlags::MULTIPLE_FDS2,
+            syscall::CallFlags::empty(),
             &metadata,
         )?;
         data.handle = handle as u32;
