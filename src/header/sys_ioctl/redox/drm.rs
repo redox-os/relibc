@@ -105,11 +105,10 @@ impl Dev {
 
     unsafe fn prime_fd_to_handle(&self, mut buf: IoctlBuffer) -> Result<c_int> {
         let mut data = unsafe { buf.read::<drm_prime_handle>() }?;
-        let payload = (data.fd as usize).to_ne_bytes();
         let metadata = [DRM_IOCTL_PRIME_FD_TO_HANDLE];
         let handle = redox_rt::sys::sys_call_wo(
-            self.fd as usize,
-            &payload,
+            &[self.fd as usize, data.fd as usize][..],
+            &[],
             syscall::CallFlags::MULTIPLE_FDS2,
             &metadata,
         )?;
