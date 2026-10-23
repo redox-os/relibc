@@ -887,7 +887,7 @@ pub fn frenameat(
     std_fs_call_wo(
         &[old_dir, new_dir][..],
         &payload,
-        &StdFsCallMeta::new(StdFsCallKind::Frenameat, flags as u64, 0),
+        &StdFsCallMeta::new(StdFsCallKind::Frenameat, u64::from(flags), 0),
     )
     .map(|_| ())
 }
@@ -896,7 +896,7 @@ pub fn flinkat(fd: usize, dirfd: usize, path: &str, flags: u32) -> Result<()> {
     std_fs_call_wo(
         &[fd, dirfd][..],
         path.as_bytes(),
-        &StdFsCallMeta::new(StdFsCallKind::Flinkat, flags as u64, 0),
+        &StdFsCallMeta::new(StdFsCallKind::Flinkat, u64::from(flags), 0),
     )
     .map(|_| ())
 }
@@ -1075,6 +1075,10 @@ pub struct FdTbl {
 }
 
 impl FdTbl {
+    #[expect(
+        clippy::new_without_default,
+        reason = "default not expected for this type"
+    )]
     pub const fn new() -> Self {
         Self {
             fd: Mutex::new(None),
