@@ -5,7 +5,6 @@
 use crate::platform::types::clock_t;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_times.h.html>.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct tms {
     tms_utime: clock_t,

@@ -14,9 +14,9 @@ use crate::{
     platform::{
         self,
         types::{
-            c_char, c_double, c_int, c_long, c_longdouble, c_longlong, c_short, c_uchar, c_uint,
-            c_ulong, c_ulonglong, c_ushort, c_void, intmax_t, ptrdiff_t, size_t, ssize_t,
-            uintmax_t, wchar_t, wint_t,
+            c_char, c_double, c_int, c_long, c_longdouble, c_longlong, c_short, c_uint, c_ulong,
+            c_ulonglong, c_ushort, c_void, intmax_t, ptrdiff_t, size_t, ssize_t, uintmax_t,
+            wchar_t, wint_t,
         },
     },
 };
@@ -842,7 +842,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
             .filter(|&n| (n as c_int) >= 0);
         let pad_zero = if zero { min_width } else { 0 };
         let signed_space = match pad_zero {
-            0 => min_width as isize,
+            0 => min_width.cast_signed(),
             _ => 0,
         };
         let pad_space = if signed_space < 0 {
@@ -929,7 +929,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 let string = match unsafe {
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
-                    VaArg::c_char(i) => fmt_int::<_, T>(fmt, i as c_uchar),
+                    VaArg::c_char(i) => fmt_int::<_, T>(fmt, CCharToU8::cast(i)),
                     VaArg::c_double(_) => panic!("this should not be possible"),
                     VaArg::c_longdouble(_) => panic!("this should not be possible"),
                     VaArg::c_int(i) => fmt_int::<c_uint, T>(fmt, i.cast_unsigned()),
@@ -1082,7 +1082,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         let mut string = String::new();
 
                         while unsafe { *ptr } != 0 {
-                            let Some(c) = char::from_u32(unsafe { *ptr } as _) else {
+                            let Some(c) = char::from_u32(unsafe { *ptr }.cast_unsigned()) else {
                                 platform::ERRNO.set(EILSEQ);
                                 return Err(io::last_os_error());
                             };
@@ -1163,23 +1163,37 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 };
 
                 match intkind {
-                    IntKind::Byte => unsafe { *(ptr as *mut c_char) = w.written as c_char },
-                    IntKind::Short => unsafe { *(ptr as *mut c_short) = w.written as c_short },
-                    IntKind::Int => unsafe { *(ptr as *mut c_int) = w.written as c_int },
-                    IntKind::Long => unsafe { *(ptr as *mut c_long) = w.written as c_long },
+                    IntKind::Byte => unsafe {
+                        *(ptr as *mut c_char) = c_char::try_from(w.written).unwrap_or(c_char::MAX)
+                    },
+                    IntKind::Short => unsafe {
+                        *(ptr as *mut c_short) =
+                            c_short::try_from(w.written).unwrap_or(c_short::MAX)
+                    },
+                    IntKind::Int => unsafe {
+                        *(ptr as *mut c_int) = c_int::try_from(w.written).unwrap_or(c_int::MAX)
+                    },
+                    IntKind::Long => unsafe {
+                        *(ptr as *mut c_long) = c_long::try_from(w.written).unwrap_or(c_long::MAX)
+                    },
                     IntKind::LongLong => unsafe {
-                        *(ptr as *mut c_longlong) = w.written as c_longlong
+                        *(ptr as *mut c_longlong) =
+                            c_longlong::try_from(w.written).unwrap_or(c_longlong::MAX)
                     },
-                    IntKind::IntMax => unsafe { *(ptr as *mut intmax_t) = w.written as intmax_t },
+                    IntKind::IntMax => unsafe {
+                        *(ptr as *mut intmax_t) =
+                            intmax_t::try_from(w.written).unwrap_or(intmax_t::MAX)
+                    },
                     IntKind::PtrDiff => unsafe {
-                        *(ptr as *mut ptrdiff_t) = w.written as ptrdiff_t
+                        *(ptr as *mut ptrdiff_t) =
+                            ptrdiff_t::try_from(w.written).unwrap_or(ptrdiff_t::MAX)
                     },
-                    IntKind::Size => unsafe { *(ptr as *mut size_t) = w.written as size_t },
+                    IntKind::Size => unsafe { *(ptr as *mut size_t) = w.written },
                 }
             }
         }
     }
-    Ok(w.written as c_int)
+    Ok(c_int::try_from(w.written).unwrap_or(c_int::MAX))
 }
 
 /// Implementation of `printf` formatting function, generic over a `writer`

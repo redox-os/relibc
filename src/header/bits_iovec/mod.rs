@@ -4,7 +4,6 @@ use core::slice;
 use crate::platform::types::{c_void, size_t};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_uio.h.html>.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
 pub struct iovec {

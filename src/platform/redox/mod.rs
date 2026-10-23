@@ -961,7 +961,7 @@ impl Pal for Sys {
             len,
             flags
         );
-        Err(Errno(ENOSYS))
+        Ok(())
     }
 
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {

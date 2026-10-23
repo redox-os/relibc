@@ -42,7 +42,6 @@ const SEPARATOR: u8 = b';';
 /// for POSIX minimum requirements, and
 /// <https://www.man7.org/linux/man-pages/man3/getpwnam.3.html> for further
 /// details.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug)]
 pub struct passwd {

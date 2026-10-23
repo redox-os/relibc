@@ -147,6 +147,7 @@ EXPECT_NAMES=\
 	sys_select/select_timed \
 	sys_select/pselect \
 	sys_shm/shm \
+	sys_socket/getsockopt \
 	sys_socket/recv \
 	sys_socket/recvfrom \
 	sys_socket/unixnonblock \

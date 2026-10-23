@@ -16,7 +16,6 @@ use crate::{
     },
 };
 
-#[allow(non_camel_case_types)]
 pub type shmatt_t = core::ffi::c_ushort;
 
 /// Attach read-only (else read-write).

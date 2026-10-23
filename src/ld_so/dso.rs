@@ -194,8 +194,10 @@ pub(super) struct Relocation {
 impl From<&Rela> for Relocation {
     fn from(reloc: &Rela) -> Self {
         Self {
-            offset: reloc.r_offset(NativeEndian) as usize,
-            addend: Some(reloc.r_addend(NativeEndian) as usize),
+            offset: usize::try_from(reloc.r_offset(NativeEndian)).expect("cfg'd to 32-bit targets"),
+            addend: Some(
+                usize::try_from(reloc.r_addend(NativeEndian)).expect("cfg'd to 32-bit targets"),
+            ),
             sym: SymbolIndex(reloc.r_sym(NativeEndian) as usize),
             kind: RelocationKind::new(reloc.r_type(NativeEndian)),
         }
@@ -207,8 +209,10 @@ impl From<&Rela> for Relocation {
     fn from(reloc: &Rela) -> Self {
         let is_mips64el = cfg!(all(target_arch = "mips64", target_endian = "little"));
         Self {
-            offset: reloc.r_offset(NativeEndian) as usize,
-            addend: Some(reloc.r_addend(NativeEndian) as usize),
+            offset: usize::try_from(reloc.r_offset(NativeEndian)).expect("cfg'd to 64-bit targets"),
+            addend: Some(
+                usize::try_from(reloc.r_addend(NativeEndian)).expect("cfg'd to 64-bit targets"),
+            ),
             sym: SymbolIndex(reloc.r_sym(NativeEndian, is_mips64el) as usize),
             kind: RelocationKind::new(reloc.r_type(NativeEndian, is_mips64el)),
         }
@@ -218,7 +222,8 @@ impl From<&Rela> for Relocation {
 impl From<&Rel> for Relocation {
     fn from(reloc: &Rel) -> Self {
         Self {
-            offset: reloc.r_offset(NativeEndian) as usize,
+            offset: usize::try_from(reloc.r_offset(NativeEndian))
+                .expect("cfg'd to appropriate target pointer width"),
             addend: None,
             sym: SymbolIndex(reloc.r_sym(NativeEndian) as usize),
             kind: RelocationKind::new(reloc.r_type(NativeEndian)),
@@ -405,11 +410,19 @@ impl DSO {
             .iter()
             .find(|ph| ph.p_type(NativeEndian) == elf::PT_TLS)
             .map(|ph| {
-                let align = ph.p_align(NativeEndian).max(1) as usize;
-                let memsz = ph.p_memsz(NativeEndian) as usize;
+                let align =
+                    usize::try_from(ph.p_align(NativeEndian).max(1)).expect("always within bounds");
+                let memsz =
+                    usize::try_from(ph.p_memsz(NativeEndian)).expect("always within bounds");
                 Master {
-                    ptr: unsafe { base.byte_add(ph.p_vaddr(NativeEndian) as usize) },
-                    image_size: ph.p_filesz(NativeEndian) as usize,
+                    ptr: unsafe {
+                        base.byte_add(
+                            usize::try_from(ph.p_vaddr(NativeEndian))
+                                .expect("always within bounds"),
+                        )
+                    },
+                    image_size: usize::try_from(ph.p_filesz(NativeEndian))
+                        .expect("always within bounds"),
                     segment_size: memsz,
                     offset: (tls_offset + memsz).next_multiple_of(align),
                 }
@@ -462,9 +475,9 @@ impl DSO {
             _ => 0,
         };
         let entry_point = if is_pie_enabled(&elf) {
-            mmap.as_ptr() as usize + elf.entry() as usize
+            mmap.as_ptr() as usize + usize::try_from(elf.entry()).expect("always within bounds")
         } else {
-            elf.entry() as usize
+            usize::try_from(elf.entry()).expect("always within bounds")
         };
 
         let dso = DSO {
@@ -537,8 +550,8 @@ impl DSO {
             Symbol {
                 name,
                 base: if self.pie { self.base as usize } else { 0 },
-                value: sym.st_value(NativeEndian) as usize,
-                size: sym.st_size(NativeEndian) as usize,
+                value: usize::try_from(sym.st_value(NativeEndian)).expect("always within bounds"),
+                size: usize::try_from(sym.st_size(NativeEndian)).expect("always within bounds"),
                 sym_type: sym.st_type(),
             },
             // TODO(andypython): move this into [`Symbol`]
@@ -565,7 +578,8 @@ impl DSO {
                 continue;
             }
 
-            let st_value = sym.st_value(object::NativeEndian) as usize;
+            let st_value =
+                usize::try_from(sym.st_value(object::NativeEndian)).expect("always within bounds");
 
             let sym_addr = if self.pie {
                 self.base.addr() + st_value
@@ -641,8 +655,11 @@ impl DSO {
                     continue;
                 }
                 let voff = ph.p_vaddr(endian) % align;
-                let vaddr = (ph.p_vaddr(endian) - voff) as usize;
-                let vsize = ((ph.p_memsz(endian) + voff) as usize).next_multiple_of(align as usize);
+                let vaddr =
+                    usize::try_from(ph.p_vaddr(endian) - voff).expect("always within bounds");
+                let vsize = (usize::try_from(ph.p_memsz(endian) + voff)
+                    .expect("always within bounds"))
+                .next_multiple_of(usize::try_from(align).expect("always within bounds"));
 
                 match ph.p_type(endian) {
                     elf::PT_DYNAMIC => {
@@ -675,9 +692,11 @@ impl DSO {
                 } else {
                     bounds.1 - bounds.0
                 };
-                _r_debug
-                    .lock()
-                    .insert_first(addr + bounds.0, path, addr + l_ld as usize);
+                _r_debug.lock().insert_first(
+                    addr + bounds.0,
+                    path,
+                    addr + usize::try_from(l_ld).expect("always within bounds"),
+                );
                 slice::from_raw_parts_mut((addr + bounds.0) as *mut u8, size)
             } else {
                 let (start, end) = bounds;
@@ -705,9 +724,11 @@ impl DSO {
                     );
                 }
                 log::trace!("    = {:p}", ptr);
-                _r_debug
-                    .lock()
-                    .insert(ptr as usize, path, ptr as usize + l_ld as usize);
+                _r_debug.lock().insert(
+                    ptr as usize,
+                    path,
+                    ptr as usize + usize::try_from(l_ld).expect("always within bounds"),
+                );
                 slice::from_raw_parts_mut(ptr.cast::<u8>(), size)
             }
         };
@@ -725,8 +746,9 @@ impl DSO {
                     }
                     let obj_data = {
                         let (offset, size) = ph.file_range(endian);
-                        let offset = offset as usize;
-                        let range = offset..(offset + size as usize);
+                        let offset = usize::try_from(offset).expect("always within bounds");
+                        let range =
+                            offset..(offset + usize::try_from(size).expect("always within bounds"));
                         match data.get(range.clone()) {
                             Some(some) => some,
                             None => return Err(format!("failed to read {:x?}", range)),
@@ -735,10 +757,13 @@ impl DSO {
 
                     let mmap_data = {
                         let range = if is_pie_enabled(elf) {
-                            let addr = ph.p_vaddr(endian) as usize;
+                            let addr =
+                                usize::try_from(ph.p_vaddr(endian)).expect("always within bounds");
                             addr..addr + obj_data.len()
                         } else {
-                            let addr = ph.p_vaddr(endian) as usize - mmap.as_ptr() as usize;
+                            let addr = usize::try_from(ph.p_vaddr(endian))
+                                .expect("always within bounds")
+                                - mmap.as_ptr() as usize;
                             addr..addr + obj_data.len()
                         };
                         match mmap.get_mut(range.clone()) {
@@ -749,8 +774,11 @@ impl DSO {
                         }
                     };
                     let _voff = ph.p_vaddr(endian) % ph.p_align(endian);
-                    let _vsize = ((ph.p_memsz(endian) + _voff) as usize)
-                        .next_multiple_of(ph.p_align(endian) as usize);
+                    let _vsize = (usize::try_from(ph.p_memsz(endian) + _voff)
+                        .expect("always within bounds"))
+                    .next_multiple_of(
+                        usize::try_from(ph.p_align(endian)).expect("always within bounds"),
+                    );
                     log::trace!(
                         "  copy {:#x}, {:#x}: {:#x}, {:#x}",
                         ph.p_vaddr(endian) - _voff,
@@ -763,16 +791,20 @@ impl DSO {
                 elf::PT_TLS => {
                     let ptr = unsafe {
                         if is_pie_enabled(elf) {
-                            mmap.as_ptr().add(ph.p_vaddr(endian) as usize)
+                            mmap.as_ptr().add(
+                                usize::try_from(ph.p_vaddr(endian)).expect("always within bounds"),
+                            )
                         } else {
                             ph.p_vaddr(endian) as *const u8
                         }
                     };
-                    let align = ph.p_align(endian).max(1) as usize;
-                    let memsz = ph.p_memsz(endian) as usize;
+                    let align =
+                        usize::try_from(ph.p_align(endian).max(1)).expect("always within bounds");
+                    let memsz = usize::try_from(ph.p_memsz(endian)).expect("always within bounds");
                     tcb_master = Some(Master {
                         ptr,
-                        image_size: ph.p_filesz(endian) as usize,
+                        image_size: usize::try_from(ph.p_filesz(endian))
+                            .expect("always within bounds"),
                         segment_size: memsz,
                         offset: (tls_offset + memsz).next_multiple_of(align),
                     });
@@ -799,7 +831,7 @@ impl DSO {
         if let Some(i) = debug {
             // FIXME: cleanup
             let (ph, _) = dynamic;
-            let vaddr = ph.p_vaddr(endian) as usize;
+            let vaddr = usize::try_from(ph.p_vaddr(endian)).expect("always within bounds");
             let bytes: [u8; size_of::<Dyn>() / 2] =
                 ((&raw const _r_debug).cast::<*const RTLDDebug>() as usize).to_ne_bytes();
             let start = if is_pie_enabled(elf) {
@@ -835,8 +867,11 @@ impl DSO {
             if ph.p_type(NativeEndian) == elf::PT_LOAD {
                 let align = ph.p_align(NativeEndian).max(1);
                 let voff = ph.p_vaddr(NativeEndian) % align;
-                let vaddr = (ph.p_vaddr(NativeEndian) - voff) as usize;
-                let vsize = (ph.p_memsz(NativeEndian) + voff).next_multiple_of(align) as usize;
+                let vaddr =
+                    usize::try_from(ph.p_vaddr(NativeEndian) - voff).expect("always within bounds");
+                let vsize =
+                    usize::try_from((ph.p_memsz(NativeEndian) + voff).next_multiple_of(align))
+                        .expect("always within bounds");
 
                 if let Some(ref mut bounds) = bounds_opt {
                     bounds.0 = bounds.0.min(vaddr);
@@ -882,8 +917,9 @@ impl DSO {
 
         for (i, entry) in entries.iter().enumerate() {
             let val = entry.d_val(NativeEndian);
-            let relative_idx = val as usize - if is_pie { 0 } else { mmap as usize };
-            let ptr = (val as usize + if is_pie { mmap as usize } else { 0 }) as *const u8;
+            let val_usize = usize::try_from(val).expect("always within bounds");
+            let relative_idx = val_usize - if is_pie { 0 } else { mmap as usize };
+            let ptr = (val_usize + if is_pie { mmap as usize } else { 0 }) as *const u8;
             #[cfg(target_pointer_width = "32")]
             let tag = entry.d_tag(NativeEndian);
             #[cfg(target_pointer_width = "64")]
@@ -972,21 +1008,21 @@ impl DSO {
                 elf::DT_SONAME => soname = Some(entry),
 
                 elf::DT_RELA => rela_offset = Some(ptr.cast::<Rela>()),
-                elf::DT_RELASZ => rela_len = Some(val as usize / size_of::<Rela>()),
+                elf::DT_RELASZ => rela_len = Some(val_usize / size_of::<Rela>()),
                 elf::DT_RELAENT => {
-                    assert_eq!(val, size_of::<Rela>() as _)
+                    assert_eq!(val_usize, size_of::<Rela>())
                 }
 
                 elf::DT_REL => rel_ptr = Some(ptr.cast::<Rel>()),
-                elf::DT_RELSZ => rel_len = Some(val as usize / size_of::<Rel>()),
+                elf::DT_RELSZ => rel_len = Some(val_usize / size_of::<Rel>()),
                 elf::DT_RELENT => {
-                    assert_eq!(val, size_of::<Rel>() as _)
+                    assert_eq!(val_usize, size_of::<Rel>())
                 }
 
                 DT_RELR => relr_ptr = Some(ptr.cast::<Relr>()),
-                DT_RELRSZ => relr_len = Some(val as usize / size_of::<Relr>()),
+                DT_RELRSZ => relr_len = Some(val_usize / size_of::<Relr>()),
                 DT_RELRENT => {
-                    assert_eq!(val, size_of::<Relr>() as _)
+                    assert_eq!(val_usize, size_of::<Relr>())
                 }
 
                 elf::DT_PLTREL => {
@@ -999,17 +1035,17 @@ impl DSO {
                         explicit_addend = Some(false);
                     }
                 }
-                elf::DT_PLTRELSZ => pltrelsz = Some(val as usize),
+                elf::DT_PLTRELSZ => pltrelsz = Some(val_usize),
 
                 elf::DT_INIT_ARRAY if val != 0 => init_array_ptr = Some(ptr.cast::<InitFn>()),
-                elf::DT_INIT_ARRAYSZ => init_array_len = Some(val as usize / size_of::<InitFn>()),
+                elf::DT_INIT_ARRAYSZ => init_array_len = Some(val_usize / size_of::<InitFn>()),
 
                 elf::DT_FINI_ARRAY if val != 0 => fini_array_ptr = Some(ptr.cast::<InitFn>()),
-                elf::DT_FINI_ARRAYSZ => fini_array_len = Some(val as usize / size_of::<InitFn>()),
+                elf::DT_FINI_ARRAYSZ => fini_array_len = Some(val_usize / size_of::<InitFn>()),
 
                 elf::DT_SYMTAB => symtab_ptr = Some(ptr.cast::<Sym>()),
                 elf::DT_SYMENT => {
-                    assert_eq!(val as usize, size_of::<Sym>());
+                    assert_eq!(val_usize, size_of::<Sym>());
                 }
 
                 _ => {}
@@ -1023,13 +1059,23 @@ impl DSO {
 
         #[cfg(target_arch = "x86")]
         let dynstrtab = StringTable::new(
-            unsafe { slice::from_raw_parts(mmap.byte_add(strtab_offset), strtab_size as usize) },
+            unsafe {
+                slice::from_raw_parts(
+                    mmap.byte_add(strtab_offset),
+                    usize::try_from(strtab_size).expect("always within bounds"),
+                )
+            },
             0,
             u64::from(strtab_size),
         );
         #[cfg(not(target_arch = "x86"))]
         let dynstrtab = StringTable::new(
-            unsafe { slice::from_raw_parts(mmap.byte_add(strtab_offset), strtab_size as usize) },
+            unsafe {
+                slice::from_raw_parts(
+                    mmap.byte_add(strtab_offset),
+                    usize::try_from(strtab_size).expect("always within bounds"),
+                )
+            },
             0,
             strtab_size,
         );
@@ -1260,7 +1306,9 @@ impl DSO {
                     .expect("RelocationKind::COPY called without valid symbol");
                 let my_sym = my_sym.expect("RelocationKind::COPY called without valid symbol");
                 assert!(
-                    sym.size == my_sym.st_size(NativeEndian) as usize,
+                    sym.size
+                        == usize::try_from(my_sym.st_size(NativeEndian))
+                            .expect("always within bounds"),
                     "RelocationKind::COPY failed: I was trying to use the symbol {} from {} for {} but they had different sizes. Please consider relinking.",
                     sym.name,
                     obj.name,
@@ -1404,9 +1452,11 @@ impl DSO {
             .filter(|ph| ph.p_type(NativeEndian) == elf::PT_LOAD)
         {
             let voff = ph.p_vaddr(NativeEndian) % page_size;
-            let vaddr = (ph.p_vaddr(NativeEndian) - voff) as usize;
-            let vsize =
-                ((ph.p_memsz(NativeEndian) + voff) as usize).next_multiple_of(page_size as usize);
+            let vaddr =
+                usize::try_from(ph.p_vaddr(NativeEndian) - voff).expect("always within bounds");
+            let vsize = (usize::try_from(ph.p_memsz(NativeEndian) + voff)
+                .expect("always within bounds"))
+            .next_multiple_of(usize::try_from(page_size).expect("always within bounds"));
 
             let mut prot = 0;
             if ph.p_flags(NativeEndian) & elf::PF_R == elf::PF_R {

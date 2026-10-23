@@ -7,7 +7,6 @@ use crate::platform::types::{suseconds_t, time_t};
 /// Specifications Issue 7 and prior, see
 /// <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
 #[repr(C)]
-#[allow(non_camel_case_types)]
 #[derive(Default, CheckVsLibcCrate)]
 pub struct timeval {
     /// Seconds.

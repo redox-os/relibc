@@ -45,5 +45,4 @@ pub const TMP_MAX: int32_t = 2_147_483_647;
 /// cbindgen:ignore
 pub const P_tmpdir: &[u8; 5] = b"/tmp\0";
 
-#[allow(non_camel_case_types)]
 pub type fpos_t = off_t;

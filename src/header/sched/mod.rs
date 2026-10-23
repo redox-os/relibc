@@ -15,7 +15,6 @@ use crate::{
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
 ///
 /// Scheduling parameters required for each supported scheduling policy.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct sched_param {

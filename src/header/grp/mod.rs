@@ -90,7 +90,6 @@ static mut GROUP: group = group {
 static LINE_READER: SyncUnsafeCell<Option<Lines<BufReader<File>>>> = SyncUnsafeCell::new(None);
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/grp.h.html>.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug)]
 pub struct group {

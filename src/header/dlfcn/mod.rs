@@ -58,7 +58,6 @@ fn set_last_error(error: DlError) {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dlfcn.h.html>.
 #[repr(C)]
-#[allow(non_camel_case_types)]
 pub struct Dl_info_t {
     /// Pathname of mapped object file.
     pub dli_fname: *const c_char,

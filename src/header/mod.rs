@@ -181,7 +181,6 @@ pub mod sys_procfs;
 pub mod sys_random;
 pub mod sys_syslog;
 pub mod sys_types;
-#[allow(non_camel_case_types)]
 pub mod sys_types_extra;
 pub mod sys_uio;
 pub mod sys_un;

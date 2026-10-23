@@ -19,6 +19,8 @@
 #![feature(sync_unsafe_cell)]
 #![feature(thread_local)]
 #![feature(negative_impls)]
+// https://github.com/rust-lang/rust-analyzer/issues/16628
+#![allow(non_camel_case_types)]
 
 #[macro_use]
 extern crate alloc;

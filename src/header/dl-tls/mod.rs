@@ -13,7 +13,6 @@ use core::{alloc::Layout, ptr};
 use crate::{ld_so::tcb::Tcb, platform::types::c_void};
 
 #[repr(C)]
-#[allow(non_camel_case_types)]
 pub struct dl_tls_index {
     pub ti_module: usize,
     pub ti_offset: usize,

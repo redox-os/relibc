@@ -33,7 +33,6 @@ type FdBitSet = BitSet<[u64; FD_SETSIZE / (8 * mem::size_of::<u64>())]>;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 /// cbindgen:ignore
-#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct fd_set {
     pub fds_bits: FdBitSet,

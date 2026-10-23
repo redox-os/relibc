@@ -151,7 +151,6 @@ pub const AI_ADDRCONFIG: c_int = 0x0020;
 pub const AI_NUMERICSERV: c_int = 0x0400;
 
 #[repr(i32)]
-#[allow(non_camel_case_types)]
 enum AddrInfoErr {
     EAI_BADFLAGS = -1,
     EAI_NONAME = -2,

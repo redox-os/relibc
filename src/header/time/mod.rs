@@ -53,7 +53,6 @@ pub(crate) const NANOSECONDS: c_long = 1_000_000_000;
 const UTC_STR: &core::ffi::CStr = c"UTC";
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct tm {
     pub tm_sec: c_int,          // 0 - 60

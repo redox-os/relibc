@@ -44,13 +44,11 @@ pub const POLLWRNORM: c_short = 0x100;
 pub const POLLWRBAND: c_short = 0x200;
 
 /// An unsigned integer type used for the number of file descriptors.
-#[allow(non_camel_case_types)]
 pub type nfds_t = c_ulong;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/poll.h.html>.
 ///
 /// A structure storing a file descriptor along with input and output flags for poll operations.
-#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct pollfd {
     /// The following descriptor being polled.
