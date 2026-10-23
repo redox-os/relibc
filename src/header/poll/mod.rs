@@ -183,7 +183,8 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 /// Note: Uses epoll internally.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
-    let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
+    let fd_buf =
+        unsafe { slice::from_raw_parts_mut(fds, usize::try_from(nfds).expect("within bounds")) };
     trace_expr!(
         unsafe { poll_epoll(fd_buf, timeout, ptr::null_mut(),) },
         "poll({:?}, {})",
@@ -218,7 +219,8 @@ pub unsafe extern "C" fn ppoll(
             ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
         }
     };
-    let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
+    let fd_buf =
+        unsafe { slice::from_raw_parts_mut(fds, usize::try_from(nfds).expect("within bounds")) };
     trace_expr!(
         unsafe { poll_epoll(fd_buf, timeout, sigmask,) },
         "ppoll({:?}, {:?}, {:p})",
