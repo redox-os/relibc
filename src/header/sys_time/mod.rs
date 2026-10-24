@@ -136,12 +136,7 @@ pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c
             },
         ])
     };
-    let times_ptr = match &times_spec {
-        Some(times_spec) => times_spec.as_ptr(),
-        // Nullptr is valid here, it means "use current time"
-        None => core::ptr::null(),
-    };
-    unsafe { Sys::utimens(path, times_ptr) }
+    Sys::utimens(path, times_spec.as_ref())
         .map(|()| 0)
         .or_minus_one_errno()
 }

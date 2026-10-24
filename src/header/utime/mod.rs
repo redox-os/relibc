@@ -59,7 +59,7 @@ pub unsafe extern "C" fn utime(path: *const c_char, times: *const utimbuf) -> c_
             tv_nsec: 0,
         },
     ];
-    unsafe { Sys::utimens(filename_cstr, times_spec.as_ptr()) }
+    Sys::utimens(filename_cstr, Some(&times_spec))
         .map(|()| 0)
         .or_minus_one_errno()
 }

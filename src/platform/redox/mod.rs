@@ -526,10 +526,10 @@ impl Pal for Sys {
         Ok(unsafe { redox_rt::sys::sys_futex_wake(addr, num) }?)
     }
 
-    unsafe fn utimensat(
+    fn utimensat(
         dirfd: c_int,
         path: CStr,
-        times: *const timespec,
+        times: Option<&[timespec; 2]>,
         flag: c_int,
     ) -> Result<()> {
         let mut path = path;
@@ -538,7 +538,7 @@ impl Pal for Sys {
                 if dirfd == AT_FDCWD {
                     path = c".".into();
                 } else {
-                    return Ok(unsafe { libredox::futimens(dirfd as usize, times) }?);
+                    return Ok(libredox::futimens(dirfd as usize, times)?);
                 }
             } else {
                 // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
@@ -547,7 +547,7 @@ impl Pal for Sys {
         }
 
         let file = openat2(dirfd, path, flag, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
-        Ok(unsafe { libredox::futimens(*file as usize, times) }?)
+        Ok(libredox::futimens(*file as usize, times)?)
     }
 
     fn getcwd(buf: Out<[u8]>) -> Result<()> {
@@ -962,20 +962,15 @@ impl Pal for Sys {
         Ok(())
     }
 
-    unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
-        let redox_rqtp = unsafe { (&*rqtp).into() };
-        let mut redox_rmtp = redox_timespec::default();
-        if !rmtp.is_null() {
-            redox_rmtp = unsafe { (&*rmtp).into() };
-        }
+    fn nanosleep(rqtp: &timespec, rmtp: Option<Out<timespec>>) -> Result<()> {
+        let redox_rqtp = rqtp.into();
+        let mut redox_rmtp = syscall::TimeSpec::default();
         match redox_rt::sys::posix_nanosleep(&redox_rqtp, &mut redox_rmtp) {
             Ok(()) => Ok(()),
             Err(Error { errno: EINTR }) => {
-                unsafe {
-                    if !rmtp.is_null() {
-                        *rmtp = (&redox_rmtp).into();
-                    }
-                };
+                if let Some(mut rmtp) = rmtp {
+                    rmtp.write((&redox_rmtp).into());
+                }
                 Err(Errno(EINTR))
             }
             Err(Error { errno: e }) => Err(Errno(e)),

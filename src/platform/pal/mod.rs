@@ -161,21 +161,21 @@ pub trait Pal {
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32>;
 
     /// Platform implementation of [`futimens()`](crate::header::sys_stat::futimens) from [`sys/stat.h`](crate::header::sys_stat).
-    unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
-        unsafe { Self::utimensat(fd, c"".into(), times, AT_EMPTY_PATH) }
+    fn futimens(fd: c_int, times: Option<&[timespec; 2]>) -> Result<()> {
+        Self::utimensat(fd, c"".into(), times, AT_EMPTY_PATH)
     }
 
     /// Platform implementation of [`utimens()`](crate::header::unistd::utimens) (from [`sys/stat.h`](crate::header::sys_stat).
     /// This is an extension of POSIX.
-    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
-        unsafe { Self::utimensat(AT_FDCWD, path, times, 0) }
+    fn utimens(path: CStr, times: Option<&[timespec; 2]>) -> Result<()> {
+        Self::utimensat(AT_FDCWD, path, times, 0)
     }
 
     /// Platform implementation of [`utimensat()`](crate::header::unistd::utimensat) (from [`sys/stat.h`](crate::header::sys_stat).
-    unsafe fn utimensat(
+    fn utimensat(
         dirfd: c_int,
         path: CStr,
-        times: *const timespec,
+        times: Option<&[timespec; 2]>,
         flag: c_int,
     ) -> Result<()>;
 
@@ -348,7 +348,7 @@ pub trait Pal {
     unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<()>;
 
     /// Platform implementation of [`nanosleep()`](crate::header::time::nanosleep) from [`time.h`](crate::header::time).
-    unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()>;
+    fn nanosleep(rqtp: &timespec, rmtp: Option<Out<timespec>>) -> Result<()>;
 
     /// Platform implementation of [`open()`](crate::header::fcntl::open) from [`fcntl.h`](crate::header::fcntl).
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {

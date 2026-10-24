@@ -286,13 +286,22 @@ impl Pal for Sys {
         .map(|n| n as u32)
     }
 
-    unsafe fn utimensat(
+    fn utimensat(
         dirfd: c_int,
         path: CStr,
-        times: *const timespec,
+        times: Option<&[timespec; 2]>,
         flag: c_int,
     ) -> Result<()> {
-        e_raw(unsafe { syscall!(UTIMENSAT, dirfd, path.as_ptr(), times, flag) }).map(|_| ())
+        e_raw(unsafe {
+            syscall!(
+                UTIMENSAT,
+                dirfd,
+                path.as_ptr(),
+                times.map(|s| s.as_ptr()).unwrap_or(ptr::null()),
+                flag
+            )
+        })
+        .map(|_| ())
     }
 
     fn getcwd(mut buf: Out<[u8]>) -> Result<()> {
@@ -522,8 +531,15 @@ impl Pal for Sys {
         e_raw(syscall!(MADVISE, addr, len, flags)).map(|_| ())
     }
 
-    unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
-        e_raw(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }).map(|_| ())
+    fn nanosleep(rqtp: &timespec, rmtp: Option<Out<timespec>>) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                NANOSLEEP,
+                core::ptr::from_ref(rqtp),
+                rmtp.map(|mut x| x.as_mut_ptr()).unwrap_or(ptr::null_mut())
+            )
+        })
+        .map(|_| ())
     }
 
     fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
