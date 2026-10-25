@@ -10,7 +10,7 @@ use crate::{
     error::Errno,
     header::{bits_sigset_t::sigset_t, errno::*, fcntl::*, sys_epoll::*},
 };
-use core::{mem, slice};
+use core::{mem, ptr, slice};
 use syscall::{data::Event, flag::EVENT_READ};
 
 fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
@@ -55,22 +55,23 @@ impl PalEpoll for Sys {
         }
     }
 
-    unsafe fn epoll_ctl(
+    fn epoll_ctl(
         epfd: c_int,
         op: c_int,
         fd: c_int,
-        event: *mut epoll_event,
+        event: Option<&mut epoll_event>,
     ) -> Result<(), Errno> {
         match op {
             EPOLL_CTL_ADD | EPOLL_CTL_MOD => {
+                let Some(event) = event else {
+                    return Err(Errno(EINVAL));
+                };
                 Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
-                        flags: unsafe { epoll_to_event_flags((*event).events) },
-                        // NOTE: Danger when using something smaller than 64-bit
-                        // systems. If this is needed, use a box or something
-                        data: unsafe { (*event).data.u64 as usize },
+                        flags: epoll_to_event_flags(event.events),
+                        data: event.data.into(),
                     },
                 )?;
             }
@@ -80,7 +81,7 @@ impl PalEpoll for Sys {
                     &Event {
                         id: fd as usize,
                         flags: syscall::EventFlags::empty(),
-                        //TODO: Is data required?
+                        // data is not required
                         data: 0,
                     },
                 )?;
@@ -90,57 +91,57 @@ impl PalEpoll for Sys {
         Ok(())
     }
 
-    unsafe fn epoll_pwait(
+    fn epoll_pwait(
         epfd: c_int,
-        events: *mut epoll_event,
-        maxevents: c_int,
+        events: &mut [epoll_event],
         timeout: c_int,
-        sigset: *const sigset_t,
+        sigmask: Option<&sigset_t>,
     ) -> Result<usize, Errno> {
-        assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
-
-        if maxevents <= 0 {
-            return Err(Errno(EINVAL));
-        }
+        const { assert!(mem::size_of::<epoll_event>() == mem::size_of::<Event>()) }
 
         if timeout != -1 {
             register_timeout(epfd, timeout)?;
         }
-
-        let callback = || {
-            syscall::read(epfd as usize, unsafe {
-                slice::from_raw_parts_mut(
-                    events.cast::<u8>(),
-                    maxevents as usize * mem::size_of::<syscall::Event>(),
-                )
-            })
+        let mut callback = || {
+            syscall::read(
+                epfd as usize,
+                // SAFETY: the const assert guarantees the same size
+                unsafe {
+                    slice::from_raw_parts_mut(
+                        events.as_mut_ptr().cast::<u8>(),
+                        events.len() as usize * mem::size_of::<syscall::Event>(),
+                    )
+                },
+            )
         };
 
-        let bytes_read = if sigset.is_null() {
-            callback()
-        } else {
+        let bytes_read = if let Some(sigmask) = sigmask {
             // Allowset is inverse of sigset mask
-            let allowset = !unsafe { *sigset };
+            let allowset = !sigmask;
             redox_rt::signal::callback_or_signal_async(allowset, callback)
+        } else {
+            callback()
         }?;
 
         let read = bytes_read as usize / mem::size_of::<syscall::Event>();
+        assert!(read <= events.len());
 
+        let events_ptr = events.as_mut_ptr();
         let mut count = 0;
+
         for i in 0..read {
+            // SAFETY:
+            // We already checked the size and it's aligned
             unsafe {
-                let event_ptr = (events.cast::<Event>()).add(i);
-                let target_ptr = events.add(count);
-                let event = *event_ptr;
+                let event_ptr = events_ptr.add(i) as *const syscall::Event;
+                let event = ptr::read(event_ptr);
+
                 if event.id == syscall::EVENT_TIMEOUT_ID {
                     continue;
                 }
-                *target_ptr = epoll_event::new(
-                    event_flags_to_epoll(event.flags),
-                    epoll_data {
-                        u64: event.data as u64,
-                    },
-                );
+                let new_event =
+                    epoll_event::new(event_flags_to_epoll(event.flags), event.data.into());
+                events_ptr.add(count).write(new_event);
                 count += 1;
             }
         }

@@ -10,14 +10,13 @@ pub trait PalEpoll: Pal {
     fn epoll_create1(flags: c_int) -> Result<c_int>;
 
     /// Platform implementation of [`epoll_ctl()`](crate::header::sys_epoll::epoll_ctl) from [`sys/epoll.h`](crate::header::sys_epoll).
-    unsafe fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> Result<()>;
+    fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: Option<&mut epoll_event>) -> Result<()>;
 
     /// Platform implementation of [`epoll_pwait()`](crate::header::sys_epoll::epoll_pwait) from [`sys/epoll.h`](crate::header::sys_epoll).
-    unsafe fn epoll_pwait(
+    fn epoll_pwait(
         epfd: c_int,
-        events: *mut epoll_event,
-        maxevents: c_int,
+        events: &mut [epoll_event],
         timeout: c_int,
-        sigmask: *const sigset_t,
+        sigmask: Option<&sigset_t>,
     ) -> Result<usize>;
 }

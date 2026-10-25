@@ -5,8 +5,8 @@
 use core::ptr;
 
 use crate::{
-    error::ResultExt,
-    header::bits_sigset_t::sigset_t,
+    error::{Errno, ResultExt},
+    header::{bits_sigset_t::sigset_t, errno::EINVAL},
     platform::{
         PalEpoll, Sys,
         types::{c_int, c_uint, c_ulonglong, c_void},
@@ -75,6 +75,36 @@ impl Default for epoll_data {
     }
 }
 
+#[cfg(target_pointer_width = "64")]
+impl From<usize> for epoll_data {
+    fn from(value: usize) -> Self {
+        Self { u64: value as u64 }
+    }
+}
+
+#[cfg(target_pointer_width = "32")]
+impl From<usize> for epoll_data {
+    fn from(value: usize) -> Self {
+        Self { u32: value as u32 }
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+impl From<epoll_data> for usize {
+    fn from(value: epoll_data) -> Self {
+        unsafe { value.u64 as usize }
+    }
+}
+
+#[cfg(target_pointer_width = "32")]
+impl From<epoll_data> for usize {
+    fn from(value: epoll_data) -> Self {
+        // NOTE: Danger when the value overflows in 32-bit
+        // systems. If this is needed, use a box or something
+        unsafe { value.u32 as usize }
+    }
+}
+
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man3/epoll_event.3type.html>.
 ///
 /// Specifies data that the kernel should save and return when the
@@ -126,6 +156,17 @@ impl epoll_event {
     }
 }
 
+impl core::fmt::Debug for epoll_event {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let data: usize = self.data.into();
+        f.write_fmt(core::format_args!(
+            "epoll_event({} -> {:x})",
+            self.events,
+            data
+        ))
+    }
+}
+
 /// Non-POSIX, see <https://man7.org/linux/man-pages/man2/epoll_create.2.html>.
 ///
 /// Creates a file descriptor referring to the new epoll instance.
@@ -171,10 +212,10 @@ pub unsafe extern "C" fn epoll_ctl(
     event: *mut epoll_event,
 ) -> c_int {
     trace_expr!(
-        unsafe { Sys::epoll_ctl(epfd, op, fd, event) }
+        Sys::epoll_ctl(epfd, op, fd, unsafe { event.as_mut() })
             .map(|()| 0)
             .or_minus_one_errno(),
-        "epoll_ctl({}, {}, {}, {:p})",
+        "epoll_ctl({}, {}, {}, {:?})",
         epfd,
         op,
         fd,
@@ -232,8 +273,15 @@ pub unsafe extern "C" fn epoll_pwait(
     timeout: c_int,
     sigmask: *const sigset_t,
 ) -> c_int {
+    if maxevents <= 0 {
+        return Err(Errno(EINVAL)).or_minus_one_errno();
+    };
+    // TODO: use Out when possible
+    let event_buf = unsafe {
+        core::slice::from_raw_parts_mut(events.cast::<epoll_event>(), maxevents as usize)
+    };
     trace_expr!(
-        unsafe { Sys::epoll_pwait(epfd, events, maxevents, timeout, sigmask) }
+        Sys::epoll_pwait(epfd, event_buf, timeout, unsafe { sigmask.as_ref() })
             .map(|e| e as c_int)
             .or_minus_one_errno(),
         "epoll_pwait({}, {:p}, {}, {}, {:p})",

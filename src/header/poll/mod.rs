@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/poll.h.html>.
 
-use core::{mem, ptr, slice};
+use core::slice;
 
 use crate::{
     error::Errno,
@@ -65,7 +65,7 @@ impl core::fmt::Debug for pollfd {
     }
 }
 
-pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
+pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: Option<&sigset_t>) -> c_int {
     let event_map = [
         (POLLIN, EPOLLIN),
         (POLLPRI, EPOLLPRI),
@@ -109,7 +109,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
             }
         }
 
-        match unsafe { Sys::epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } {
+        match Sys::epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, Some(&mut event)) {
             Ok(()) => {}
             Err(Errno(EBADF)) => {
                 pfd.revents |= POLLNVAL;
@@ -129,19 +129,12 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         return i32::try_from(closed).unwrap_or(i32::MAX);
     }
 
-    let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    match unsafe {
-        Sys::epoll_pwait(
-            *ep,
-            events.as_mut_ptr(),
-            c_int::try_from(events.len()).expect("events len below i32::MAX"),
-            timeout,
-            sigmask,
-        )
-    } {
+    let mut events = [epoll_event::default(); 32];
+
+    match Sys::epoll_pwait(*ep, &mut events, timeout, sigmask) {
         Ok(res) => {
             for event in events.iter().take(res) {
-                let pi = unsafe { event.data.u64 as usize };
+                let pi: usize = event.data.into();
                 // TODO: Error status when fd does not match?
                 if let Some(pfd) = fds.get_mut(pi) {
                     for (p, ep) in event_map.iter() {
@@ -185,7 +178,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
     trace_expr!(
-        unsafe { poll_epoll(fd_buf, timeout, ptr::null_mut(),) },
+        poll_epoll(fd_buf, timeout, None),
         "poll({:?}, {})",
         fd_buf,
         timeout,
@@ -220,7 +213,7 @@ pub unsafe extern "C" fn ppoll(
     };
     let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
     trace_expr!(
-        unsafe { poll_epoll(fd_buf, timeout, sigmask,) },
+        poll_epoll(fd_buf, timeout, unsafe { sigmask.as_ref() }),
         "ppoll({:?}, {:?}, {:p})",
         fd_buf,
         timeout,
