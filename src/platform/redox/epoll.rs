@@ -24,8 +24,16 @@ fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
         event_flags |= syscall::EventFlags::EVENT_WRITE;
     }
 
+    if epoll & EPOLLERR != 0 {
+        event_flags |= syscall::EventFlags::EVENT_ERR;
+    }
+
+    if epoll & EPOLLHUP != 0 {
+        event_flags |= syscall::EventFlags::EVENT_HUP;
+    }
+
     /*TODO: support more EPOLL flags  */
-    let unsupported = !(EPOLLIN | EPOLLOUT);
+    let unsupported = !(EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP);
     if epoll & unsupported != 0 {
         log::trace!("epoll unsupported flags 0x{:X}", epoll & unsupported);
     }
@@ -42,6 +50,14 @@ fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
 
     if flags.contains(syscall::EventFlags::EVENT_WRITE) {
         epoll |= EPOLLOUT;
+    }
+
+    if flags.contains(syscall::EventFlags::EVENT_HUP) {
+        epoll |= EPOLLHUP;
+    }
+
+    if flags.contains(syscall::EventFlags::EVENT_ERR) {
+        epoll |= EPOLLERR;
     }
 
     epoll
