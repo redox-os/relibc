@@ -18,6 +18,7 @@ use crate::{
     },
     out::Out,
     platform::{PalSignal, pal::Pal, types::*},
+    pthread::Pthread,
 };
 
 use super::Sys;
@@ -239,6 +240,38 @@ fn get_mem_policy(policy: &mut [u8]) -> Result<()> {
         syscall::CallFlags::READ,
         &[syscall::flag::NumaVerb::MemPolicy as u64],
     )?;
+    Ok(())
+}
+
+fn sched_set_affinity(thread: pthread_t, cpuset: &[u8]) -> Result<()> {
+    let thread_fd = unsafe {
+        (thread as *const Pthread)
+            .as_ref()
+            .ok_or(syscall::Error::new(EINVAL))?
+            .os_tid
+            .get()
+            .as_ref()
+            .unwrap()
+            .thread_fd
+    };
+    let aff = redox_rt::sys::dup(thread_fd, b"sched-affinity")?;
+    syscall::write(aff, cpuset)?;
+    Ok(())
+}
+
+fn sched_get_affinity(thread: pthread_t, cpuset: &mut [u8]) -> Result<()> {
+    let thread_fd = unsafe {
+        (thread as *const Pthread)
+            .as_ref()
+            .ok_or(syscall::Error::new(EINVAL))?
+            .os_tid
+            .get()
+            .as_ref()
+            .unwrap()
+            .thread_fd
+    };
+    let aff = redox_rt::sys::dup(thread_fd, b"sched-affinity")?;
+    syscall::read(aff, cpuset)?;
     Ok(())
 }
 
@@ -758,4 +791,29 @@ pub unsafe extern "C" fn redox_numa_set_mem_policy_v0(policy: *const u8, len: us
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_numa_get_mem_policy_v0(policy: *mut u8, len: usize) -> RawResult {
     Error::mux(unsafe { get_mem_policy(slice::from_raw_parts_mut(policy, len)).map(|()| 0) })
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_current_thread_fd_unstable_v0() -> usize {
+    redox_rt::RtTcb::current().thread_fd().as_raw_fd()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_sched_set_affinity_v0(
+    thread: pthread_t,
+    cpuset: *const u8,
+    len: usize,
+) -> RawResult {
+    Error::mux(sched_set_affinity(thread, unsafe { slice::from_raw_parts(cpuset, len) }).map(|()| 0))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_sched_get_affinity_v0(
+    thread: pthread_t,
+    cpuset: *mut u8,
+    len: usize,
+) -> RawResult {
+    Error::mux(
+        sched_get_affinity(thread, unsafe { slice::from_raw_parts_mut(cpuset, len) }).map(|()| 0),
+    )
 }
