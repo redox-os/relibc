@@ -1202,7 +1202,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     // If sleep() returns because the requested time has elapsed, the value returned shall be 0.
     // If sleep() returns due to delivery of a signal, the return value shall be the "unslept" amount
     // (the requested time minus the time actually slept) in seconds.
-    match unsafe { Sys::nanosleep(&raw const rqtp, &raw mut rmtp) } {
+    match Sys::nanosleep(&rqtp, Some(Out::from_mut(&mut rmtp))) {
         Err(Errno(_)) => rmtp.tv_sec as c_uint,
         _ => 0,
     }
@@ -1405,10 +1405,7 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
         tv_sec: time_t::from(useconds / 1_000_000),
         tv_nsec,
     };
-    let rmtp = ptr::null_mut();
-    unsafe { Sys::nanosleep(&raw const rqtp, rmtp) }
-        .map(|()| 0)
-        .or_minus_one_errno()
+    Sys::nanosleep(&rqtp, None).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/vfork.html>.

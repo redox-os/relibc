@@ -496,7 +496,11 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 /// not returned.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    unsafe { Sys::nanosleep(rqtp, rmtp) }
+    // copied() to avoid UB if rmtp == rqtp by reference
+    let Some(rqtp) = (unsafe { rqtp.as_ref().cloned() }) else {
+        return Err(Errno(EINVAL)).or_minus_one_errno();
+    };
+    Sys::nanosleep(&rqtp, unsafe { Out::nullable(rmtp) })
         .map(|()| 0)
         .or_minus_one_errno()
 }

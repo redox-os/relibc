@@ -5,6 +5,7 @@
 use crate::{
     c_str::CStr,
     error::ResultExt,
+    fs::File,
     header::{fcntl::AT_SYMLINK_NOFOLLOW, time::timespec},
     out::Out,
     platform::{
@@ -175,9 +176,8 @@ pub unsafe extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) ->
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/futimens.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
-    unsafe { Sys::futimens(fd, times) }
-        .map(|()| 0)
-        .or_minus_one_errno()
+    let times = unsafe { times.cast::<[timespec; 2]>().as_ref() };
+    Sys::futimens(fd, times).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lstat.html>.
@@ -264,12 +264,10 @@ pub unsafe extern "C" fn utimensat(
     flag: c_int,
 ) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
-    match Sys::openat(fd, path, flag & AT_SYMLINK_NOFOLLOW, 0) {
-        Ok(fd) => unsafe {
-            let r = Sys::futimens(fd, times).map(|()| 0).or_minus_one_errno();
-            let _ = Sys::close(fd);
-            r
-        },
-        r => r.or_minus_one_errno(),
+    let times = unsafe { times.cast::<[timespec; 2]>().as_ref() };
+    match File::openat(fd, path, flag & AT_SYMLINK_NOFOLLOW) {
+        Ok(fd) => Sys::futimens(*fd, times).map(|()| 0),
+        Err(e) => Err(e),
     }
+    .or_minus_one_errno()
 }

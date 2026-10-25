@@ -196,8 +196,13 @@ pub fn ftruncate(fd: usize, len: usize) -> Result<()> {
     )?;
     Ok(())
 }
-pub unsafe fn futimens(fd: usize, times: *const timespec) -> Result<()> {
-    let times = if times.is_null() {
+pub fn futimens(fd: usize, times: Option<&[timespec; 2]>) -> Result<()> {
+    let times = if let Some(times) = times {
+        [
+            syscall::TimeSpec::from(&times[0]),
+            syscall::TimeSpec::from(&times[1]),
+        ]
+    } else {
         // null means set to current time using special UTIME_NOW value (tv_sec is ignored in that case)
         [
             syscall::TimeSpec {
@@ -209,8 +214,6 @@ pub unsafe fn futimens(fd: usize, times: *const timespec) -> Result<()> {
                 tv_nsec: sys_stat::UTIME_NOW as c_int,
             },
         ]
-    } else {
-        unsafe { times.cast::<[timespec; 2]>().read() }.map(|ts| syscall::TimeSpec::from(&ts))
     };
     let redox_buf = unsafe {
         slice::from_raw_parts(
@@ -408,7 +411,8 @@ pub unsafe extern "C" fn redox_ftruncate_v0(fd: usize, len: usize) -> RawResult 
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_futimens_v1(fd: usize, times: *const timespec) -> RawResult {
-    Error::mux(unsafe { futimens(fd, times) }.map(|()| 0))
+    let times = unsafe { times.cast::<[timespec; 2]>().as_ref() };
+    Error::mux(futimens(fd, times).map(|()| 0))
 }
 /* TODO: Support unlinkat
 #[unsafe(no_mangle)]
