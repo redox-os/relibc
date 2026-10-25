@@ -485,7 +485,7 @@ impl Pal for Sys {
         Ok(r? as pid_t)
     }
 
-    fn fstatat(dirfd: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
+    fn fstatat(dirfd: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
         let _siglock = tmp_disable_signals();
         // `path` should be non-null.
         let mut path = path.ok_or(Errno(EFAULT))?;
