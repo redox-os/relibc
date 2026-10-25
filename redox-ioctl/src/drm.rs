@@ -12,8 +12,8 @@ pub use drm_sys::{
     drm_mode_destroy_dumb, drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_fb_dirty_cmd,
     drm_mode_get_blob, drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane,
     drm_mode_get_plane_res, drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo,
-    drm_mode_obj_get_properties, drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap,
-    drm_set_client_name, drm_set_version, drm_unique, drm_version,
+    drm_mode_obj_get_properties, drm_mode_property_enum, drm_mode_set_plane, drm_prime_handle,
+    drm_set_client_cap, drm_set_client_name, drm_set_version, drm_unique, drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -64,6 +64,16 @@ define_ioctl_data! {
     struct drm_set_client_cap, DrmSetClientCap {
         capability: u64,
         value: u64,
+    }
+}
+
+pub const PRIME_HANDLE_TO_FD: u64 = 0x2D;
+pub const PRIME_FD_TO_HANDLE: u64 = 0x2E;
+define_ioctl_data! {
+    struct drm_prime_handle, DrmPrimeHandle {
+        handle: u32,
+        flags: u32,
+        fd: i32,
     }
 }
 
