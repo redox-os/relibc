@@ -267,7 +267,7 @@ pub unsafe extern "C" fn utimensat(
     let times = unsafe { times.cast::<[timespec; 2]>().as_ref() };
     match File::openat(fd, path, flag & AT_SYMLINK_NOFOLLOW) {
         Ok(fd) => Sys::futimens(*fd, times).map(|()| 0),
-        r => r.map(|s| *s),
+        Err(e) => Err(e),
     }
     .or_minus_one_errno()
 }
