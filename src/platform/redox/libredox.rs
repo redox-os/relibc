@@ -814,6 +814,6 @@ pub unsafe extern "C" fn redox_sched_get_affinity_v0(
     len: usize,
 ) -> RawResult {
     Error::mux(
-        sched_get_affinity(thread, unsafe { slice::from_raw_parts_mut(cpuset, len) }).map(|_| 0),
+        sched_get_affinity(thread, unsafe { slice::from_raw_parts_mut(cpuset, len) }).map(|()| 0),
     )
 }
