@@ -378,6 +378,8 @@ pub struct DSO {
     pub mmap: Option<MemoryMapHandle>,
     pub tls_module_id: usize,
     pub tls_offset: usize,
+    pub phdrs: *const ProgramHeader,
+    pub phnum: usize,
 
     pub(super) dynamic: Dynamic<'static>,
 
@@ -437,6 +439,8 @@ impl DSO {
                 id,
                 tls_offset: tcb_master.offset,
                 tls_module_id,
+                phdrs: phdrs.as_ptr(),
+                phnum: phdrs.len(),
                 dlopened: false,
                 entry_point: 0,
                 base,
@@ -461,6 +465,7 @@ impl DSO {
         tls_offset: usize,
     ) -> Result<(DSO, Option<Master>, Vec<ProgramHeader>), String> {
         let elf = ElfFile::parse(data).map_err(|err| err.to_string())?;
+
         let (mmap, tcb_master, dynamic) =
             DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
 
@@ -480,10 +485,17 @@ impl DSO {
             usize::try_from(elf.entry()).expect("always within bounds")
         };
 
+        use object::read::elf::FileHeader;
+        let phoff = elf.elf_header().e_phoff(object::NativeEndian) as usize;
+        let phnum = elf.elf_header().e_phnum(object::NativeEndian) as usize;
+        let phdrs_ptr = unsafe { mmap.as_ptr().add(phoff) }.cast();
+
         let dso = DSO {
             name,
             path_c,
             id,
+            phdrs: phdrs_ptr,
+            phnum,
             dlopened,
             entry_point,
 
