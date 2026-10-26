@@ -1,5 +1,5 @@
 use crate::{
-    header::stdio::{F_NORD, F_NOWR, FILE, Pending},
+    header::stdio::{F_ERR, F_NORD, F_NOWR, FILE, Pending},
     platform::types::{c_int, size_t},
 };
 
@@ -38,4 +38,14 @@ pub extern "C" fn __fwriting(stream: *mut FILE) -> c_int {
     let stream = unsafe { &mut *stream }.lock();
 
     c_int::from(stream.flags & F_NOWR == 0)
+}
+
+/// Non_POSIX, from gnulib.
+///
+/// Set the error indicator of a stream.
+#[unsafe(no_mangle)]
+pub extern "C" fn __fseterr(stream: *mut FILE) {
+    let mut stream = unsafe { &mut *stream }.lock();
+
+    stream.flags |= F_ERR;
 }
