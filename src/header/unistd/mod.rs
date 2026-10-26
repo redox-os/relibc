@@ -20,8 +20,7 @@ use crate::{
         errno::{self, ENAMETOOLONG},
         fcntl, limits,
         signal::{sigprocmask, sigsuspend},
-        stdlib::getenv,
-        sys_ioctl, sys_resource,
+        stdlib, sys_ioctl, sys_resource,
         sys_select::timeval,
         sys_time, sys_utsname, termios,
         time::timespec,
@@ -392,9 +391,8 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
     } else {
         let mut error = errno::ENOENT;
 
-        let path_env = unsafe { getenv(c"PATH".as_ptr()) };
-        if !path_env.is_null() {
-            let path_env = unsafe { CStr::from_ptr(path_env) };
+        let path_env = stdlib::getenv_cstr(c"PATH");
+        if let Some(path_env) = path_env {
             for program_buf in PathSearchIter::new(file.to_bytes(), &path_env) {
                 // SAFETY: CStr::from_ptr().to_bytes() always stop at null, no need to check again
                 let program_c =

@@ -457,6 +457,16 @@ pub unsafe extern "C" fn getenv(name: *const c_char) -> *mut c_char {
         .unwrap_or(ptr::null_mut())
 }
 
+/// Wrapper to `getenv` for safe consumption
+pub(crate) fn getenv_str(name: &core::ffi::CStr) -> Option<&str> {
+    unsafe { CStr::from_nullable_ptr(getenv(name.as_ptr())).and_then(|s| s.to_str().ok()) }
+}
+
+/// Wrapper to `getenv` for safe consumption
+pub(crate) fn getenv_cstr(name: &core::ffi::CStr) -> Option<CStr<'_>> {
+    unsafe { CStr::from_nullable_ptr(getenv(name.as_ptr())) }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsubopt.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getsubopt(
