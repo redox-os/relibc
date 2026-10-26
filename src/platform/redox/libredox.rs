@@ -808,7 +808,9 @@ pub unsafe extern "C" fn redox_sched_set_affinity_v0(
     cpuset: *const u8,
     len: usize,
 ) -> RawResult {
-    Error::mux(sched_set_affinity(thread, unsafe { slice::from_raw_parts(cpuset, len) }).map(|()| 0))
+    Error::mux(
+        sched_set_affinity(thread, unsafe { slice::from_raw_parts(cpuset, len) }).map(|()| 0),
+    )
 }
 
 #[unsafe(no_mangle)]
