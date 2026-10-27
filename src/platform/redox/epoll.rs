@@ -125,7 +125,7 @@ impl PalEpoll for Sys {
                 unsafe {
                     slice::from_raw_parts_mut(
                         events.as_mut_ptr().cast::<u8>(),
-                        events.len() as usize * mem::size_of::<syscall::Event>(),
+                        events.len() * mem::size_of::<syscall::Event>(),
                     )
                 },
             )
