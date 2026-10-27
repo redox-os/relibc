@@ -10,8 +10,6 @@ stages:
     - build
     - cross-build
     - test
-before_script:
-    cargo install cbindgen
 
 fmt:
     stage: build
