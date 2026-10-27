@@ -8,7 +8,7 @@ use crate::{
     header::{
         errno::{EINVAL, ENOMEM, EOVERFLOW, ETIMEDOUT},
         signal::sigevent,
-        stdlib::getenv,
+        stdlib,
         time::posix_tz::PosixTz,
         unistd::readlink,
     },
@@ -778,10 +778,7 @@ fn get_system_time_zone<'a>() -> Option<&'a str> {
 
 fn get_current_time_zone<'a>() -> &'a str {
     // Check the `TZ` environment variable
-    let tz_env = unsafe { getenv(c"TZ".as_ptr().cast()) };
-    if !tz_env.is_null()
-        && let Ok(tz) = unsafe { CStr::from_ptr(tz_env) }.to_str()
-    {
+    if let Some(tz) = stdlib::getenv_str(c"TZ") {
         return tz;
     }
 

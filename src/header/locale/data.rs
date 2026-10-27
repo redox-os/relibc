@@ -1,14 +1,17 @@
-use core::str::FromStr;
+use core::{ffi::CStr, str::FromStr};
 
 use alloc::{boxed::Box, ffi::CString, string::String, vec::Vec};
 
 use super::constants::*;
-use crate::platform::types::{c_char, c_int};
+use crate::{
+    c_str::CStr as CStr2,
+    platform::types::{c_char, c_int},
+};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 /// this struct is not ordered like in the posix spec for readability
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct lconv {
     pub decimal_point: *mut c_char,
     pub thousands_sep: *mut c_char,
@@ -86,24 +89,51 @@ pub(crate) struct LocaleData {
     pub mon_grouping: Vec<c_char>,
     pub positive_sign: CString,
     pub negative_sign: CString,
+    // the same version but used for relibc
+    pub b_decimal_point: Box<[u8]>,
+    pub b_thousands_sep: Box<[u8]>,
+    pub b_int_curr_symbol: Box<[u8]>,
+    pub b_currency_symbol: Box<[u8]>,
+    pub b_mon_decimal_point: Box<[u8]>,
+    pub b_mon_thousands_sep: Box<[u8]>,
+    pub b_positive_sign: Box<[u8]>,
+    pub b_negative_sign: Box<[u8]>,
 }
 unsafe impl Sync for LocaleData {}
 
 impl LocaleData {
     pub fn new(name: CString, defs: PosixLocaleDef) -> Box<Self> {
+        let decimal_point = Self::to_cstring(defs.decimal_point, c".");
+        let thousands_sep = Self::to_cstring(defs.thousands_sep, c"");
+        let int_curr_symbol = Self::to_cstring(defs.int_curr_symbol, c"");
+        let currency_symbol = Self::to_cstring(defs.currency_symbol, c"");
+        let mon_decimal_point = Self::to_cstring(defs.mon_decimal_point, c"");
+        let mon_thousands_sep = Self::to_cstring(defs.mon_thousands_sep, c"");
+        let positive_sign = Self::to_cstring(defs.positive_sign, c"");
+        let negative_sign = Self::to_cstring(defs.negative_sign, c"");
+
         let mut data = Box::new(LocaleData {
             name,
-            decimal_point: Self::to_cstring(defs.decimal_point),
-            thousands_sep: Self::to_cstring(defs.thousands_sep),
+            b_decimal_point: Box::from(decimal_point.as_bytes()),
+            b_thousands_sep: Box::from(thousands_sep.as_bytes()),
+            b_int_curr_symbol: Box::from(int_curr_symbol.as_bytes()),
+            b_currency_symbol: Box::from(currency_symbol.as_bytes()),
+            b_mon_decimal_point: Box::from(mon_decimal_point.as_bytes()),
+            b_mon_thousands_sep: Box::from(mon_thousands_sep.as_bytes()),
+            b_positive_sign: Box::from(positive_sign.as_bytes()),
+            b_negative_sign: Box::from(negative_sign.as_bytes()),
+
+            decimal_point,
+            thousands_sep,
             grouping: Self::to_grouping_char(defs.grouping),
-            int_curr_symbol: Self::to_cstring(defs.int_curr_symbol),
-            currency_symbol: Self::to_cstring(defs.currency_symbol),
-            mon_decimal_point: Self::to_cstring(defs.mon_decimal_point),
-            mon_thousands_sep: Self::to_cstring(defs.mon_thousands_sep),
+            int_curr_symbol,
+            currency_symbol,
+            mon_decimal_point,
+            mon_thousands_sep,
             mon_grouping: Self::to_grouping_char(defs.mon_grouping),
-            positive_sign: Self::to_cstring(defs.positive_sign),
-            negative_sign: Self::to_cstring(defs.negative_sign),
-            lconv: unsafe { core::mem::zeroed() },
+            positive_sign,
+            negative_sign,
+            lconv: lconv::default(),
         });
 
         data.lconv.int_frac_digits = defs.int_frac_digits.unwrap_or(c_char::MAX);
@@ -181,8 +211,8 @@ impl LocaleData {
         self.update_lconv_pointers();
     }
 
-    fn to_cstring(opt: Option<CString>) -> CString {
-        opt.unwrap_or_else(|| CString::new("").unwrap())
+    fn to_cstring(opt: Option<CString>, default: &'static CStr) -> CString {
+        opt.unwrap_or_else(|| CStr2::from(default).to_owned_cstring())
     }
 
     fn to_grouping_char(opt: Vec<Option<c_char>>) -> Vec<c_char> {
@@ -211,6 +241,14 @@ impl Clone for LocaleData {
             mon_grouping: self.mon_grouping.clone(),
             positive_sign: self.positive_sign.clone(),
             negative_sign: self.negative_sign.clone(),
+            b_decimal_point: self.b_decimal_point.clone(),
+            b_thousands_sep: self.b_thousands_sep.clone(),
+            b_int_curr_symbol: self.b_int_curr_symbol.clone(),
+            b_currency_symbol: self.b_currency_symbol.clone(),
+            b_mon_decimal_point: self.b_mon_decimal_point.clone(),
+            b_mon_thousands_sep: self.b_mon_thousands_sep.clone(),
+            b_positive_sign: self.b_positive_sign.clone(),
+            b_negative_sign: self.b_negative_sign.clone(),
         };
         data.update_lconv_pointers();
         data
