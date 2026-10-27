@@ -11,8 +11,6 @@ FAILING_TESTS += mkfifo
 FAILING_TESTS += sigchld
 # not triggering ERANGE
 FAILING_TESTS += stdlib/ptsname
-# Hang
-FAILING_TESTS += sys_epoll/epollet
 # Kernel hit todo!
 FAILING_TESTS += sys_mman/fmap
 # Hang
@@ -303,6 +301,7 @@ VARIED_NAMES=\
 	stdlib/realpath \
 	sys_epoll/epoll \
 	sys_epoll/epoll_del \
+	sys_epoll/epollet \
 	sys_mman/mmap \
 	sys_mman/posix_madvise \
 	sys_resource/constants \
