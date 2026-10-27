@@ -235,6 +235,7 @@ VARIED_NAMES=\
 	dirent/posix_getdents \
 	includes \
 	kill-waitpid \
+	link/dl-iterate-phdr \
 	limits \
 	limits_cpp \
 	pthread/timedwait \

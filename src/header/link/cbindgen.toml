@@ -1,0 +1,21 @@
+# Non POSIX
+include_guard = "_RELIBC_LINK_H"
+sys_includes = ["stdint.h", "stddef.h", "elf.h"]
+after_includes = """
+#if UINTPTR_MAX > 0xffffffff
+#define ElfW(type) Elf64_ ## type
+#else
+#define ElfW(type) Elf32_ ## type
+#endif
+"""
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+usize_is_size_t = true
+
+[enum]
+prefix_with_name = true
+
+[export.rename]
+ProgramHeader = "ElfW(Phdr)"
