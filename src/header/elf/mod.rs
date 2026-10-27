@@ -12,8 +12,8 @@ pub type Elf64_Half = uint16_t;
 
 pub type Elf32_Word = uint32_t;
 pub type Elf32_Sword = int32_t;
-pub type Elf64_Word = uint64_t;
-pub type Elf64_Sword = int64_t;
+pub type Elf64_Word = uint32_t;
+pub type Elf64_Sword = int32_t;
 
 pub type Elf32_Xword = uint64_t;
 pub type Elf32_Sxword = int64_t;

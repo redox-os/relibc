@@ -20,7 +20,9 @@ use crate::{
     header::{
         dl_tls::{__tls_get_addr, dl_tls_index},
         dlfcn::Dl_info_t,
-        fcntl, sys_mman,
+        fcntl,
+        link::{dl_iterate_phdr_callback, dl_phdr_info},
+        sys_mman,
         unistd::F_OK,
     },
     ld_so::dso::{Dyn, SymbolBinding},
@@ -550,6 +552,37 @@ impl Linker {
         }
 
         true
+    }
+
+    pub unsafe fn dl_iterate_phdr(
+        &self,
+        callback: dl_iterate_phdr_callback,
+        data: *mut c_void,
+    ) -> c_int {
+        let Some(cb) = callback else {
+            return 0;
+        };
+        for obj in self.objects.values() {
+            let mut info = dl_phdr_info {
+                dlpi_addr: if obj.pie { obj.base as usize } else { 0 },
+                dlpi_name: obj.path_c.as_ptr(),
+                dlpi_phdr: obj.phdrs,
+                dlpi_phnum: obj.phnum as u16,
+                // TODO
+                dlpi_adds: 0,
+                dlpi_subs: 0,
+                dlpi_tls_modid: 0,
+                dlpi_tls_data: ptr::null(),
+            };
+
+            let res = unsafe { cb(&raw mut info, core::mem::size_of::<dl_phdr_info>(), data) };
+
+            if res != 0 {
+                return res;
+            }
+        }
+
+        0
     }
 
     pub fn unload(&mut self, obj: Arc<DSO>) {
