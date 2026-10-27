@@ -337,6 +337,7 @@ macro_rules! strto_impl {
 macro_rules! strto_float_impl {
     ($type:ident, $s:expr, $endptr:expr) => {{
         use $crate::c_str::CStr;
+        use $crate::header::locale;
 
         let mut s = $s;
         let mut endptr = $endptr;
@@ -346,6 +347,8 @@ macro_rules! strto_float_impl {
         let mut result: $type = 0.0;
         let mut exponent: Option<$type> = None;
         let mut radix = 10;
+
+        let current_locale = locale::current_locale();
 
         let result_sign = if let Some(rest) = s.strip_prefix(b"-") {
             s = rest;
@@ -378,7 +381,7 @@ macro_rules! strto_float_impl {
                 s = rest;
             }
 
-            if let Some(rest) = s.strip_prefix(b".") {
+            if let Some(rest) = s.strip_prefix(&current_locale.b_decimal_point) {
                 s = rest;
 
                 let mut i = 1.0;

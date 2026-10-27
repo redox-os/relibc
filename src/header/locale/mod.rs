@@ -10,7 +10,11 @@ use crate::{
     casting::ByteLiteral,
     error::{Errno, ResultExtPtrMut},
     fs::File,
-    header::{errno, fcntl},
+    header::{
+        errno::{self, ENOENT},
+        fcntl, stdlib,
+        unistd::path::PathSearchIter,
+    },
     io::Read,
     platform::types::{c_char, c_int},
 };
@@ -168,16 +172,30 @@ pub unsafe extern "C" fn duplocale(loc: locale_t) -> locale_t {
 }
 
 pub(crate) fn load_locale_file(name: &str) -> Result<Box<LocaleData>, Errno> {
-    let mut path = String::from("/usr/share/i18n/locales/");
-    path.push_str(name);
+    let path_env = stdlib::getenv_cstr(c"LOCPATH").unwrap_or(c"/usr/share/i18n/locales/".into());
+    for program_buf in PathSearchIter::new(name.as_bytes(), &path_env) {
+        // SAFETY: CStr::from_ptr().to_bytes() always stop at null, no need to check again
+        let path_c = unsafe { CStr::from_bytes_with_nul_unchecked(program_buf.as_slice()) };
+        let mut content = String::new();
+        let mut file = File::open(path_c, fcntl::O_RDONLY)?;
+        file.read_to_string(&mut content)
+            .map_err(|_| Errno(errno::EIO))?;
 
-    let path_c = CString::new(path).map_err(|_| Errno(errno::EINVAL))?;
-    let mut content = String::new();
+        let def = PosixLocaleDef::parse(&content);
+        return Ok(LocaleData::new(CString::from_str(name).unwrap(), def));
+    }
+    Err(Errno(ENOENT))
+}
 
-    let mut file = File::open(path_c.as_c_str().into(), fcntl::O_RDONLY)?;
-    file.read_to_string(&mut content)
-        .map_err(|_| Errno(errno::EIO))?;
-
-    let toml = PosixLocaleDef::parse(&content);
-    Ok(LocaleData::new(CString::from_str(name).unwrap(), toml))
+pub(crate) fn current_locale() -> &'static LocaleData {
+    unsafe {
+        if !THREAD_LOCALE.is_null() {
+            return &*THREAD_LOCALE;
+        }
+        if GLOBAL_LOCALE.is_null() {
+            let new_global = GlobalLocaleData::new();
+            GLOBAL_LOCALE = Box::into_raw(new_global);
+        }
+        &(&*GLOBAL_LOCALE).data
+    }
 }

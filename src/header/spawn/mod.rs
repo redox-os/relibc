@@ -12,8 +12,7 @@ use crate::{
     c_str::CStr,
     casting::U8PtrToCCharPtr,
     header::{
-        errno,
-        stdlib::getenv,
+        errno, stdlib,
         unistd::{F_OK, path::PathSearchIter},
     },
     iter::NulTerminated,
@@ -114,11 +113,9 @@ pub unsafe extern "C" fn posix_spawnp(
     if program.contains(b'/') {
         return unsafe { posix_spawn(pid, file, file_actions, attrp, argv, envp) };
     }
-    let path_env = unsafe { getenv(c"PATH".as_ptr()) };
-    if path_env.is_null() {
+    let Some(path_env) = stdlib::getenv_cstr(c"PATH") else {
         return errno::ENOENT;
-    }
-    let path_env = unsafe { CStr::from_ptr(path_env) };
+    };
     for program_buf in PathSearchIter::new(program.to_bytes(), &path_env) {
         // SAFETY: CStr::from_ptr().to_bytes() always stop at null, no need to check again
         let program_c = unsafe { CStr::from_bytes_with_nul_unchecked(program_buf.as_slice()) };
