@@ -1786,5 +1786,5 @@ pub unsafe extern "C" fn wctomb(s: *mut c_char, wc: wchar_t) -> c_int {
         return -1;
     }
 
-    result as c_int
+    c_int::try_from(result).expect("within bounds")
 }

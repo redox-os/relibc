@@ -74,22 +74,22 @@ fn static_init(
             SIZEOF_PHDR64 => unsafe {
                 let ph = &*(ph_addr as *const ProgramHeader64<Endianness>);
                 (
-                    ph.p_align(endian) as usize,
-                    ph.p_filesz(endian) as usize,
-                    ph.p_memsz(endian) as usize,
+                    usize::try_from(ph.p_align(endian)).expect("always within bounds"),
+                    usize::try_from(ph.p_filesz(endian)).expect("always within bounds"),
+                    usize::try_from(ph.p_memsz(endian)).expect("always within bounds"),
                     ph.p_type(endian),
-                    ph.p_vaddr(endian) as usize,
+                    usize::try_from(ph.p_vaddr(endian)).expect("always within bounds"),
                 )
             },
 
             SIZEOF_PHDR32 => unsafe {
                 let ph = &*(ph_addr as *const ProgramHeader32<Endianness>);
                 (
-                    ph.p_align(endian) as usize,
-                    ph.p_filesz(endian) as usize,
-                    ph.p_memsz(endian) as usize,
+                    usize::try_from(ph.p_align(endian)).expect("always within bounds"),
+                    usize::try_from(ph.p_filesz(endian)).expect("always within bounds"),
+                    usize::try_from(ph.p_memsz(endian)).expect("always within bounds"),
                     ph.p_type(endian),
-                    ph.p_vaddr(endian) as usize,
+                    usize::try_from(ph.p_vaddr(endian)).expect("always within bounds"),
                 )
             },
             _ => panic!("unknown AT_PHENT size {}", phent),
