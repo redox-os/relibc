@@ -76,7 +76,7 @@ int main(void) {
     
     r = sem_wait(&alarm_sem);
     // will always EINTR because of SIGARLM
-    ERROR_IF(sem_wait, r, != -1);
+    UNEXP_IF(sem_wait, r, != -1);
     UNEXP_IF(sem_wait, errno, != EINTR);
     r = sem_wait(&alarm_sem);
     ERROR_IF(sem_wait, r, == -1);
