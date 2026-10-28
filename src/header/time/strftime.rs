@@ -291,7 +291,9 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
 /// ## Source
 /// https://en.wikipedia.org/wiki/ISO_week_date
 fn weeks_per_year(year: c_int) -> c_int {
-    let p_y = (year + (year / 4) - (year / 100) + (year / 400)) % 7;
+    let year = f64::from(year);
+    #[expect(clippy::cast_possible_truncation, reason = "cannot use TryFrom")]
+    let p_y = (year + (year / 4.) - (year / 100.) + (year / 400.)) as c_int % 7;
     if p_y == 4 { 53 } else { 52 }
 }
 
