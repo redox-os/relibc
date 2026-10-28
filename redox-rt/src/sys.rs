@@ -180,6 +180,8 @@ pub fn sys_call_ro<T: Call>(
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
+    let flags = flags | fd.extra_flags();
+
     if !flags.contains(CallFlags::FD) {
         return unsafe {
             fd.raw_call(
@@ -258,6 +260,8 @@ pub fn sys_call_wo<T: Call>(
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
+    let flags = flags | fd.extra_flags();
+
     if !flags.contains(CallFlags::FD) {
         return unsafe {
             fd.raw_call(
@@ -304,6 +308,8 @@ pub fn sys_call_rw<T: Call>(
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
+    let flags = flags | fd.extra_flags();
+
     unsafe {
         fd.raw_call(
             payload.as_mut_ptr(),
@@ -314,6 +320,7 @@ pub fn sys_call_rw<T: Call>(
     }
 }
 pub fn sys_call<T: Call>(fd: T, flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    let flags = flags | fd.extra_flags();
     unsafe { fd.raw_call(core::ptr::null_mut(), 0, flags, metadata) }
 }
 
