@@ -4,7 +4,7 @@ use crate::{
     error::{Errno, Result},
     header::{
         errno::EIO,
-        signal::{SIGEV_SIGNAL, SIGEV_THREAD, sigevent},
+        signal,
         time::{itimerspec, timespec},
     },
     out::Out,
@@ -33,7 +33,7 @@ pub(crate) struct RlctTimer {
     pub clockid: clockid_t,
     pub timerfd: FdGuard<true>,
     pub eventfd: FdGuard<true>,
-    pub evp: sigevent,
+    pub evp: signal::sigevent,
     pub thread: pthread_t,
     /// relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
@@ -51,7 +51,7 @@ impl RlctTimer {
     /// Get the new instance of [`RlctTimer`], get the key
     pub fn create(
         clockid: i32,
-        evp: &sigevent,
+        evp: &signal::sigevent,
         timerfd: FdGuard<true>,
         eventfd: FdGuard<true>,
     ) -> timer_t {
@@ -75,6 +75,12 @@ impl RlctTimer {
 }
 
 pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
+    unsafe {
+        // do not deliver any signal to this thread
+        let mut set: u64 = 0;
+        signal::sigfillset(&raw mut set);
+        signal::pthread_sigmask(signal::SIG_SETMASK, &raw mut set, ptr::null_mut());
+    }
     let (mut timer_version, eventfd) = {
         let timers = TIMERS.lock();
         let Some(timer_st) = timers.get(&arg.addr()) else {
@@ -96,11 +102,11 @@ pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
             return ptr::null_mut();
         };
         if timer_version == timer_st.next_wake_version {
-            if timer_st.evp.sigev_notify == SIGEV_THREAD {
+            if timer_st.evp.sigev_notify == signal::SIGEV_THREAD {
                 if let Some(fun) = timer_st.evp.sigev_notify_function {
                     fun(timer_st.evp.sigev_value);
                 }
-            } else if timer_st.evp.sigev_notify == SIGEV_SIGNAL
+            } else if timer_st.evp.sigev_notify == signal::SIGEV_SIGNAL
                 && Sys::sigqueue(
                     timer_st.process_pid,
                     timer_st.evp.sigev_signo as _,
