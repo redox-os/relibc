@@ -9,7 +9,7 @@ void test_stpcpy(const char *src, char *dest) {
 }
 
 int main() {
-    char dest[20];
+    char dest[26];
 
     test_stpcpy("Hello, World!", dest);
 
