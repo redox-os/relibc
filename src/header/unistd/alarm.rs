@@ -37,7 +37,7 @@ pub fn alarm_timespec(duration: timespec) -> c_uint {
     let remaining = if let Some(ref alarm) = *guard {
         match Sys::timer_gettime(alarm.0) {
             Ok(cur) => {
-                let secs = cur.it_value.tv_sec as c_uint;
+                let secs = c_uint::try_from(cur.it_value.tv_sec).unwrap_or(c_uint::MAX);
                 if cur.it_value.tv_nsec > 0 {
                     secs + 1 // POSIX: round up
                 } else {

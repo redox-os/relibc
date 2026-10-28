@@ -209,7 +209,11 @@ pub unsafe extern "C" fn ppoll(
         if tmo.tv_sec > (c_int::MAX / 1000).into() {
             c_int::MAX
         } else {
-            ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
+            #[cfg(target_pointer_width = "64")]
+            let tv_nsec = c_int::try_from(tmo.tv_nsec).unwrap_or(c_int::MAX);
+            #[cfg(target_pointer_width = "32")]
+            let tv_nsec = tmo.tv_nsec;
+            (c_int::try_from(tmo.tv_sec).expect("within bounds") * 1000) + (tv_nsec / 1000000)
         }
     };
     let fd_buf =

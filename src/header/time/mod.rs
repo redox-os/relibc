@@ -800,7 +800,7 @@ fn time_zone() -> Option<Tz> {
 fn now() -> NaiveDateTime {
     let mut now = timespec::default();
     if Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut now)).is_ok() {}; // TODO what to do if Err?
-    DateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
+    DateTime::from_timestamp(now.tv_sec, u32::try_from(now.tv_nsec).unwrap_or(u32::MAX))
         .unwrap_or_default()
         .naive_local()
 }

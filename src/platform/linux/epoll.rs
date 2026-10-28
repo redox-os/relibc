@@ -42,7 +42,7 @@ impl PalEpoll for Sys {
                 events.as_mut_ptr(),
                 events.len(),
                 timeout,
-                sigmask.map(|x| ptr::from_ref(x)).unwrap_or(ptr::null()),
+                sigmask.map(ptr::from_ref).unwrap_or(ptr::null()),
                 sigsetsize
             ))
         }
