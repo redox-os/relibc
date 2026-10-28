@@ -63,12 +63,10 @@ pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
         return Err(Error::new(EINVAL));
     }
 
-    match wrapper(false, true, || {
-        this_proc_call(
-            CallFlags::empty(),
-            &[ProcCall::Kill as u64, target.raw() as u64, sig as u64],
-        )
-    }) {
+    match this_proc_call(
+        CallFlags::empty(),
+        &[ProcCall::Kill as u64, target.raw() as u64, sig as u64],
+    ) {
         Ok(_) | Err(Error { errno: ERESTART }) => Ok(()),
         Err(error) => Err(error),
     }
@@ -146,7 +144,7 @@ pub fn posix_getpriority(which: i32, who: u32) -> Result<u32, syscall::Error> {
 
 #[inline]
 pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
-    wrapper(true, false, || {
+    wrapper(false, false, || {
         unsafe {
             syscall::syscall5(
                 syscall::SYS_FUTEX,
