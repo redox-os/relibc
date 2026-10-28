@@ -1201,7 +1201,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     // If sleep() returns due to delivery of a signal, the return value shall be the "unslept" amount
     // (the requested time minus the time actually slept) in seconds.
     match Sys::nanosleep(&rqtp, Some(Out::from_mut(&mut rmtp))) {
-        Err(Errno(_)) => rmtp.tv_sec as c_uint,
+        Err(Errno(_)) => c_uint::try_from(rmtp.tv_sec).expect("within bounds"),
         _ => 0,
     }
 }
@@ -1347,14 +1347,21 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 #[unsafe(no_mangle)]
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
     // TODO setitimer is unimplemented on Redox and obsolete
+    #[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+    let (val_usec, int_usec) = (suseconds_t::from(usecs), suseconds_t::from(interval));
+    #[cfg(not(all(target_os = "linux", target_pointer_width = "64")))]
+    let (val_usec, int_usec) = (
+        suseconds_t::try_from(usecs).unwrap_or(suseconds_t::MAX),
+        suseconds_t::try_from(interval).unwrap_or(suseconds_t::MAX),
+    );
     let mut timer = sys_time::itimerval {
         it_value: timeval {
             tv_sec: 0,
-            tv_usec: usecs as suseconds_t,
+            tv_usec: val_usec,
         },
         it_interval: timeval {
             tv_sec: 0,
-            tv_usec: interval as suseconds_t,
+            tv_usec: int_usec,
         },
     };
     let errno_backup = platform::ERRNO.get();
@@ -1364,7 +1371,8 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
         {
             0
         } else {
-            timer.it_value.tv_sec as useconds_t * 1_000_000 + timer.it_value.tv_usec as useconds_t
+            useconds_t::try_from(timer.it_value.tv_sec).unwrap_or(useconds_t::MAX) * 1_000_000
+                + useconds_t::try_from(timer.it_value.tv_usec).unwrap_or(useconds_t::MAX)
         };
     platform::ERRNO.set(errno_backup);
 

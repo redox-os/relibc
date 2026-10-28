@@ -65,9 +65,9 @@ pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
     #[expect(deprecated)]
     tp_out.write(timeb {
         time: tv.tv_sec,
-        millitm: (tv.tv_usec / 1000) as c_ushort,
-        timezone: tz.tz_minuteswest as c_short,
-        dstflag: tz.tz_dsttime as c_short,
+        millitm: c_ushort::try_from(tv.tv_usec / 1000).unwrap_or(c_ushort::MAX),
+        timezone: c_short::try_from(tz.tz_minuteswest).unwrap_or(c_short::MAX),
+        dstflag: c_short::try_from(tz.tz_dsttime).unwrap_or(c_short::MAX),
     });
 
     0
