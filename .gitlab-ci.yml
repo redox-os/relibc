@@ -59,6 +59,7 @@ test:linux:
     stage: test
     needs: [linux]
     script:
+        - rustup toolchain install
         - ./check.sh --host --test
 
 test:x86_64:
