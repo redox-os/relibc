@@ -166,6 +166,7 @@ pub unsafe extern "C" fn strfmon(
 ///   and grouping sizes
 /// - `flags`: Additional formatting options
 ///
+#[expect(clippy::cast_precision_loss, reason = "cannot TryFrom")]
 fn format_monetary(
     buffer: &mut [u8],
     value: f64,

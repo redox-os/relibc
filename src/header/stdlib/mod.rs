@@ -1516,7 +1516,13 @@ pub fn convert_integer(orig_s: CStr, base: c_int) -> Option<(c_ulong, CStr, bool
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtod.html>.
-#[expect(clippy::cast_lossless)] // not all users of `strto_float_impl!` are lossless
+///
+/// Converts a string to a `double`.
+#[expect(
+    clippy::cast_lossless,
+    clippy::cast_precision_loss,
+    reason = "not all users of `strto_float_impl!` are lossless"
+)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c_double {
     strto_float_impl!(c_double, unsafe { CStr::from_ptr(s) }, unsafe {
@@ -1525,6 +1531,12 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtod.html>.
+///
+/// Converts a string to a `float`.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "not all users of `strto_float_impl!` are lossless"
+)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtof(s: *const c_char, endptr: *mut *mut c_char) -> c_float {
     strto_float_impl!(c_float, unsafe { CStr::from_ptr(s) }, unsafe {

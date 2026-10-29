@@ -232,7 +232,6 @@ impl From<&Rel> for Relocation {
 }
 
 // This is matched up to REL_* constants used by musl for ease of comparison
-#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RelocationKind {
     COPY,
@@ -1175,7 +1174,6 @@ impl DSO {
     /// Panics if `reloc.kind` is not `RelocationKind::TLSDESC`.
     fn do_tlsdesc_reloc(&self, reloc: Relocation, ptr: *mut usize, global_scope: &Scope) {
         assert!(reloc.kind == RelocationKind::TLSDESC);
-        #[allow(unused_variables)]
         // tls_module_id unused on riscv64 and i586
         // too messy to cfg out
         let (sym, tls_module_id, tls_offset) = if reloc.sym != SymbolIndex(0) {

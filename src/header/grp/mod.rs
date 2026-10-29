@@ -106,7 +106,7 @@ pub struct group {
     pub gr_mem: *mut *mut c_char,
 }
 
-#[allow(clippy::upper_case_acronyms)]
+#[expect(clippy::upper_case_acronyms, reason = "prefer EOF")]
 #[derive(Debug)]
 enum Error {
     EOF,

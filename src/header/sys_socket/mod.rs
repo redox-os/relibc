@@ -99,17 +99,20 @@ pub struct sockaddr_storage {
 
 // These must match C macros in sys_socket/cbindgen.toml {
 /// cbindgen:ignore
+#[expect(non_snake_case, reason = "name must match C")]
 pub unsafe extern "C" fn __CMSG_LEN(cmsg: *const cmsghdr) -> ssize_t {
     ((unsafe { (*cmsg).cmsg_len as size_t } + mem::size_of::<c_long>() - 1)
         & !(mem::size_of::<c_long>() - 1)) as ssize_t
 }
 
 /// cbindgen:ignore
+#[expect(non_snake_case, reason = "name must match C")]
 pub unsafe extern "C" fn __CMSG_NEXT(cmsg: *const cmsghdr) -> *mut c_uchar {
     unsafe { (cmsg as *mut c_uchar).offset(__CMSG_LEN(cmsg)) }
 }
 
 /// cbindgen:ignore
+#[expect(non_snake_case, reason = "name must match C")]
 pub unsafe extern "C" fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
     unsafe { ((*mhdr).msg_control.cast::<c_uchar>()).add((*mhdr).msg_controllen) }
 }

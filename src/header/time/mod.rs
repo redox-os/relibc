@@ -308,9 +308,12 @@ pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/difftime.html>.
+///
+/// Computes the difference between two calendar time values: `time1` - `time0`
+#[expect(clippy::cast_precision_loss, reason = "cannot TryFrom")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
-    (time1 - time0) as _
+    (time1 - time0) as c_double
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getdate.html>.
