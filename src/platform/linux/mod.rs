@@ -6,7 +6,7 @@ use crate::{
     error::{Errno, Result},
     header::{
         dirent::dirent,
-        errno::{EINVAL, EIO, ENOSYS},
+        errno::{self, EINVAL, EIO, ENOSYS},
         fcntl::AT_EMPTY_PATH,
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
@@ -696,7 +696,16 @@ impl Pal for Sys {
 
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {
         let tgid = Self::getpid();
-        e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ())
+        // undocumented EAGAIN not happening in redox
+        loop {
+            match e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ()) {
+                Err(Errno(errno::EAGAIN)) => {
+                    let _ = Self::sched_yield();
+                    continue;
+                }
+                r => return r,
+            }
+        }
     }
 
     fn current_os_tid() -> crate::pthread::OsTid {
