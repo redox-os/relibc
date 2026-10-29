@@ -1,4 +1,7 @@
-use alloc::borrow::Cow;
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use core::{
     convert::TryFrom,
     mem::{self, size_of},
@@ -6,10 +9,11 @@ use core::{
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
-use redox_path::{RedoxReference, RedoxStr};
+use redox_path::{RedoxReference, RedoxStr, scheme_path};
 use redox_protocols::protocol::{Rlimit, WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
+    signal::tmp_disable_signals,
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
@@ -29,7 +33,7 @@ use crate::{
     fs::File,
     header::{
         errno::{
-            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
+            EBADF, EBADFD, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
             ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP,
         },
         fcntl::{
@@ -243,7 +247,7 @@ impl Pal for Sys {
     }
 
     fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int> {
-        let r = redox_rt::sys::dup2(fd1 as usize, fd2 as usize, &[]);
+        let r = redox_rt::sys::dup2(fd1 as usize, fd2 as usize);
         trace_log!("dup2({fd1}, {fd2}) = {:?}", r);
         Ok(r? as c_int)
     }
@@ -265,6 +269,7 @@ impl Pal for Sys {
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         self::exec::execve(
             Executable::InFd {
                 file: File::new(fildes),
@@ -282,6 +287,7 @@ impl Pal for Sys {
     }
 
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
             return Err(Errno(EINVAL));
@@ -307,6 +313,7 @@ impl Pal for Sys {
     }
 
     fn fchownat(fildes: c_int, path: CStr, owner: uid_t, group: gid_t, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
         if MASK & flags != 0 {
             return Err(Errno(EINVAL));
@@ -479,6 +486,7 @@ impl Pal for Sys {
     }
 
     fn fstatat(dirfd: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         // `path` should be non-null.
         let mut path = path.ok_or(Errno(EFAULT))?;
 
@@ -532,6 +540,7 @@ impl Pal for Sys {
         times: Option<&[timespec; 2]>,
         flag: c_int,
     ) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         let mut path = path;
         if path.is_empty() {
             if flag & AT_EMPTY_PATH == AT_EMPTY_PATH {
@@ -797,6 +806,7 @@ impl Pal for Sys {
     }
 
     fn linkat(fd1: c_int, oldpath: CStr, fd2: c_int, newpath: CStr, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         // make sure the flags passed are valid.
         // valid states: AT_SYMLINK_FOLLOW, or 0.
         if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
@@ -814,9 +824,42 @@ impl Pal for Sys {
         }
 
         let file = File::openat(fd1, oldpath, oflags)?;
-        let newpath: Cow<'_, str> = openat2_path(fd2, newpath, 0)?.into();
-        syscall::flink(*file as usize, newpath)?;
-        Ok(())
+
+        match newpath {
+            RedoxStr::Absolute(abs_path) => {
+                let (scheme, reference) = abs_path.as_parts().ok_or(Errno(EINVAL))?;
+                let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
+
+                let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
+                let root_guard = FdGuard::new(redox_rt::sys::openat_into_upper(
+                    redox_rt::current_namespace_fd()?,
+                    &scheme_root_str,
+                    syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
+                    0,
+                )?);
+
+                let newpath: Cow<'_, str> = reference.into();
+                redox_rt::sys::flinkat(
+                    *file as usize,
+                    root_guard.as_raw_fd(),
+                    &newpath,
+                    flags as u32,
+                )
+                .map_err(Into::into)
+            }
+            RedoxStr::Relative(rel_path) => {
+                let dirfd = if fd2 == fcntl::AT_FDCWD {
+                    let cwd_guard = path::current_dir()?;
+                    cwd_guard.as_ref().unwrap().fd.as_raw_fd() as usize
+                } else {
+                    fd2 as usize
+                };
+
+                let newpath: Cow<'_, str> = rel_path.into();
+                redox_rt::sys::flinkat(*file as usize, dirfd, &newpath, flags as u32)
+                    .map_err(Into::into)
+            }
+        }
     }
 
     fn lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
@@ -993,6 +1036,7 @@ impl Pal for Sys {
     }
 
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         let r = extra::pipe2(flags as usize);
         trace_log!("pipe2({flags:x}) = {:?}", r);
         fds.write(r?);
@@ -1138,6 +1182,7 @@ impl Pal for Sys {
     }
 
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
+        let _siglock = tmp_disable_signals();
         let file = openat2(
             dirfd,
             path,
@@ -1154,32 +1199,45 @@ impl Pal for Sys {
         new_path: CStr,
         flags: c_uint,
     ) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         const MASK: c_uint = !RENAME_NOREPLACE;
         if MASK & flags != 0 {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let new_path = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Errno(EINVAL))?;
-        // Fail if the target exists with RENAME_NOREPLACE.
-        if flags & RENAME_NOREPLACE != 0
-            && let Ok(_) = libredox::openat(
-                new_dir,
-                new_path.clone(),
-                fcntl::O_PATH | fcntl::O_CLOEXEC,
-                0,
-            )
-            .map(FdGuard::new)
-        {
-            return Err(Errno(EEXIST));
-        }
+        let resolve = |path: &CStr, dir: c_int| -> Result<(usize, String, Option<FdGuard>)> {
+            let redox_path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+            match redox_path {
+                RedoxStr::Absolute(abs) => {
+                    let (scheme, reference) = abs.as_parts().ok_or(Errno(EINVAL))?;
+                    let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
+                    let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
+                    let guard = FdGuard::new(redox_rt::sys::openat_into_upper(
+                        redox_rt::current_namespace_fd()?,
+                        &scheme_root_str,
+                        syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
+                        0,
+                    )?);
+                    let raw_fd = guard.as_raw_fd();
+                    Ok((raw_fd, reference.as_ref().to_string(), Some(guard)))
+                }
+                RedoxStr::Relative(rel) => {
+                    let dir_fd = if dir == fcntl::AT_FDCWD {
+                        let cwd_guard = path::current_dir()?;
+                        let cwd = cwd_guard.as_ref().unwrap();
+                        cwd.fd.as_raw_fd()
+                    } else {
+                        dir as usize
+                    };
+                    Ok((dir_fd, rel.as_ref().to_string(), None))
+                }
+            }
+        };
 
-        // oflags are the same as Sys::rename above.
-        let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
+        let (old_dfd, old_target, _old_guard) = resolve(&old_path, old_dir)?;
+        let (new_dfd, new_target, _new_guard) = resolve(&new_path, new_dir)?;
 
-        let target: Cow<'_, str> = openat2_path(new_dir, new_path, 0)?.into();
-        // I'm avoiding Sys::rename to avoid reallocating a CString from a String.
-        syscall::frename(*source as usize, target)
-            .map(|_| ())
+        redox_rt::sys::frenameat(old_dfd, &old_target, new_dfd, &new_target, flags)
             .map_err(Into::into)
     }
 
@@ -1381,7 +1439,7 @@ impl Pal for Sys {
 
         {
             let fds_to_close = {
-                let guard = redox_rt::current_filetable();
+                let guard = redox_rt::current_filetable().inner.lock();
                 let mut fds = alloc::vec::Vec::new();
                 for (fd, flags) in guard.iter() {
                     if flags & redox_protocols::protocol::O_CLOEXEC
@@ -1544,6 +1602,7 @@ impl Pal for Sys {
     }
 
     fn symlinkat(path1: CStr, fd: c_int, path2: CStr) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         let mut file = File::createat(
             fd,
             path2,
@@ -1697,6 +1756,7 @@ impl Pal for Sys {
     }
 
     fn uname(mut utsname: Out<utsname>) -> Result<(), Errno> {
+        let _siglock = tmp_disable_signals();
         fn gethostname(mut name: Out<[u8]>) -> io::Result<()> {
             if name.is_empty() {
                 return Ok(());
@@ -1775,6 +1835,7 @@ impl Pal for Sys {
     }
 
     fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
+        let _siglock = tmp_disable_signals();
         if (flags & !AT_REMOVEDIR) != 0 {
             return Err(Errno(EINVAL));
         }
