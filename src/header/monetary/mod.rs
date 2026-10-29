@@ -91,6 +91,7 @@ fn apply_grouping(int_str: &str, monetary: &LocaleMonetaryInfo) -> String {
 }
 
 /// Safe handling of large monetary values. Returns None if the value is too large to format
+#[expect(clippy::cast_precision_loss, reason = "cannot TryFrom")]
 fn format_value_parts(value: f64, frac_digits: usize) -> Option<(String, i64)> {
     let abs_value = fabs(value);
     if abs_value > (i64::MAX as f64) {

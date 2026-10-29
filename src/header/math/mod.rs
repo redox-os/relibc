@@ -552,9 +552,10 @@ unsafe extern "C" fn logb(x: c_double) -> c_double {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/logbf.html>.
 #[unsafe(no_mangle)]
+#[expect(clippy::cast_precision_loss, reason = "cannot TryFrom")]
 unsafe extern "C" fn logbf(x: c_float) -> c_float {
     // TODO: errno
-    libm::ilogbf(x) as _
+    libm::ilogbf(x) as c_float
 }
 
 // TODO logbl (long double)
