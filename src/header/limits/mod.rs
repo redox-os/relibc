@@ -4,7 +4,6 @@
 
 use crate::platform::types::{
     c_char, c_int, c_long, c_longlong, c_schar, c_short, c_uchar, c_uint, c_ulonglong, c_ushort,
-    ssize_t,
 };
 
 pub use crate::header::bits_limits_ptdi::{
@@ -50,13 +49,10 @@ pub const INT_MAX: c_int = 0x7FFF_FFFF;
 // https://github.com/mozilla/cbindgen/blob/d3bf7d6/src/bindgen/ir/constant.rs#L530
 // LONG_MAX is defined in cbindgen.toml
 pub const LLONG_MAX: c_longlong = 0x7FFF_FFFF_FFFF_FFFF_i64;
-#[cfg(target_pointer_width = "32")]
-pub const SSIZE_MAX: ssize_t = 0x7FFF_FFFF;
-#[cfg(target_pointer_width = "64")]
-pub const SSIZE_MAX: ssize_t = 0x7FFF_FFFF_FFFF_FFFF;
 pub const UCHAR_MAX: c_uchar = 0xFF;
 pub const USHRT_MAX: c_ushort = 0xFFFF;
 pub const UINT_MAX: c_uint = 0xFFFFFFFF_u32;
+// SSIZE_MAX is defined in cbindgen.toml
 // ULONG_MAX is defined in cbindgen.toml
 pub const ULLONG_MAX: c_ulonglong = 0xFFFF_FFFF_FFFF_FFFF_u64;
 

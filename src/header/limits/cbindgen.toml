@@ -11,6 +11,7 @@ after_includes = """
 #if defined(__LP64__)
 #define LONG_MAX 9223372036854775807l
 #endif
+#define SSIZE_MAX LONG_MAX
 #if defined(__ILP32__)
 #define ULONG_MAX 4294967295ul
 #endif
