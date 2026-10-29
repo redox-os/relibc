@@ -24,6 +24,7 @@ clippy:
     needs: []
     script:
         - ./check.sh --clippy
+        - ./check.sh --clippy --all-features
 
 linux:
     stage: build
@@ -31,6 +32,7 @@ linux:
         - rustup component add clippy
         - ./check.sh --host
         - ./check.sh --host --clippy
+        - ./check.sh --host --clippy --all-features
 
 x86_64:
     stage: build
@@ -43,6 +45,7 @@ i586:
     script:
         - ./check.sh --arch=i586
         - ./check.sh --arch=i586 --clippy
+        - ./check.sh --arch=i586 --clippy --all-features
 
 aarch64:
     stage: cross-build
@@ -50,12 +53,14 @@ aarch64:
     script:
         - ./check.sh --arch=aarch64
         - ./check.sh --arch=aarch64 --clippy
+        - ./check.sh --arch=aarch64 --clippy --all-features
 
 riscv64gc:
     stage: cross-build
     script:
         - ./check.sh --arch=riscv64gc
         - ./check.sh --arch=riscv64gc --clippy
+        - ./check.sh --arch=riscv64gc --clippy --all-features
 
 test:linux:
     stage: test
