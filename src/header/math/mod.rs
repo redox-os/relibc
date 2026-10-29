@@ -552,9 +552,10 @@ unsafe extern "C" fn logb(x: c_double) -> c_double {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/logbf.html>.
 #[unsafe(no_mangle)]
+#[expect(clippy::cast_precision_loss, reason = "cannot TryFrom")]
 unsafe extern "C" fn logbf(x: c_float) -> c_float {
     // TODO: errno
-    libm::ilogbf(x) as _
+    libm::ilogbf(x) as c_float
 }
 
 // TODO logbl (long double)
@@ -569,10 +570,9 @@ pub unsafe extern "C" fn logf(x: c_float) -> c_float {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lrint.html>.
 #[unsafe(no_mangle)]
-#[expect(clippy::cast_precision_loss, reason = "cannot TryFrom")]
 unsafe extern "C" fn lrint(x: c_double) -> c_long {
     // TODO: errno
-    libm::rint(x) as c_long
+    libm::rint(x) as _
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lrintf.html>.
