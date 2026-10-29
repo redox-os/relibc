@@ -9,7 +9,7 @@ int main() {
     char *p = mmap(NULL, page_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     assert(p != MAP_FAILED);
 
-    int valid_advices[5] = {POSIX_MADV_NORMAL, POSIX_MADV_RANDOM, POSIX_MADV_SEQUENTIAL, POSIX_MADV_WILLNEED, POSIX_MADV_WONTNEED};
+    int valid_advices[5] = {POSIX_MADV_NORMAL, POSIX_MADV_RANDOM, POSIX_MADV_SEQUENTIAL, POSIX_MADV_WILLNEED, POSIX_MADV_DONTNEED};
     for (size_t idx = 0; idx < sizeof(valid_advices) / sizeof(valid_advices[0]); idx++) {
         int advice = valid_advices[idx];
         assert(posix_madvise(p, page_size, advice) == 0);
