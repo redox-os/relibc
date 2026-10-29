@@ -118,7 +118,10 @@ fn inner_af_unix(buf: &[u8], address_dst: &mut [u8]) -> socklen_t {
     let dst_to_copy = address_dst.len().min(true_len as usize);
     address_dst[..dst_to_copy].copy_from_slice(&src_bytes[..dst_to_copy]);
 
-    true_len
+    // On Linux the length includes the NUL terminator. While latest libstd
+    // handles platforms where it doesn't, as of writing Redox still uses a
+    // libstd version from before this fix.
+    true_len + 1
 }
 
 /// Copies address data bytes to address_dst, truncating if necessary, and always returns the
