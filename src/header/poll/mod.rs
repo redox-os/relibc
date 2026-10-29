@@ -176,7 +176,8 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: Option<&sigset_t>
 /// Note: Uses epoll internally.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
-    let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
+    let fd_buf =
+        unsafe { slice::from_raw_parts_mut(fds, usize::try_from(nfds).expect("within bounds")) };
     trace_expr!(
         poll_epoll(fd_buf, timeout, None),
         "poll({:?}, {})",
@@ -208,10 +209,15 @@ pub unsafe extern "C" fn ppoll(
         if tmo.tv_sec > (c_int::MAX / 1000).into() {
             c_int::MAX
         } else {
-            ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
+            #[cfg(target_pointer_width = "64")]
+            let tv_nsec = c_int::try_from(tmo.tv_nsec).unwrap_or(c_int::MAX);
+            #[cfg(target_pointer_width = "32")]
+            let tv_nsec = tmo.tv_nsec;
+            (c_int::try_from(tmo.tv_sec).expect("within bounds") * 1000) + (tv_nsec / 1000000)
         }
     };
-    let fd_buf = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
+    let fd_buf =
+        unsafe { slice::from_raw_parts_mut(fds, usize::try_from(nfds).expect("within bounds")) };
     trace_expr!(
         poll_epoll(fd_buf, timeout, unsafe { sigmask.as_ref() }),
         "ppoll({:?}, {:?}, {:p})",

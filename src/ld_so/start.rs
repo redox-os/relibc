@@ -221,11 +221,13 @@ pub unsafe extern "C" fn relibc_ld_so_start(
             .iter()
             .find(|ph| ph.p_type(NativeEndian) == elf::PT_DYNAMIC)
             .expect("PT_DYNAMIC not found");
-        (self_base + dyn_ph.p_vaddr(NativeEndian) as usize) as *const Dyn
+        (self_base + usize::try_from(dyn_ph.p_vaddr(NativeEndian)).expect("always within bounds"))
+            as *const Dyn
     };
 
     #[cfg(target_arch = "x86")]
-    let ld_entry = self_base + ehdr.e_entry(NativeEndian) as usize;
+    let ld_entry =
+        self_base + usize::try_from(ehdr.e_entry(NativeEndian)).expect("always within bounds");
 
     let is_manual = at_entry == ld_entry; // Whether the dynamic linker was invoked as a command.
 
@@ -288,8 +290,10 @@ pub unsafe extern "C" fn relibc_ld_so_start(
 
         for ph in phdrs {
             if ph.p_type(NativeEndian) == elf::PT_LOAD {
-                let vaddr = ph.p_vaddr(NativeEndian) as usize;
-                let memsz = ph.p_memsz(NativeEndian) as usize;
+                let vaddr =
+                    usize::try_from(ph.p_vaddr(NativeEndian)).expect("always within bounds");
+                let memsz =
+                    usize::try_from(ph.p_memsz(NativeEndian)).expect("always within bounds");
                 let flags = ph.p_flags(NativeEndian);
 
                 let start = self_base + vaddr;

@@ -866,12 +866,12 @@ impl Pal for Sys {
         Ok(syscall::lseek(fd as usize, offset as isize, whence as usize)? as off_t)
     }
 
-    fn mkdirat(dir_fd: c_int, path_name: CStr, _mode: mode_t) -> Result<()> {
+    fn mkdirat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
         File::createat(
             dir_fd,
             path_name,
             fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
-            0o777,
+            mode,
         )?;
         Ok(())
     }

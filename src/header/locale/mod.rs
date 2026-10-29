@@ -173,7 +173,7 @@ pub unsafe extern "C" fn duplocale(loc: locale_t) -> locale_t {
 
 pub(crate) fn load_locale_file(name: &str) -> Result<Box<LocaleData>, Errno> {
     let path_env = stdlib::getenv_cstr(c"LOCPATH").unwrap_or(c"/usr/share/i18n/locales/".into());
-    for program_buf in PathSearchIter::new(name.as_bytes(), &path_env) {
+    if let Some(program_buf) = PathSearchIter::new(name.as_bytes(), &path_env).next() {
         // SAFETY: CStr::from_ptr().to_bytes() always stop at null, no need to check again
         let path_c = unsafe { CStr::from_bytes_with_nul_unchecked(program_buf.as_slice()) };
         let mut content = String::new();
