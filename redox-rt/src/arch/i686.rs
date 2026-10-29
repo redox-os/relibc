@@ -10,7 +10,8 @@ use syscall::*;
 use crate::{
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
     signal::{
-        PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_excp_fastcall, inner_fastcall,
+        PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, get_sigaltstack,
+        inner_excp_fastcall, inner_fastcall,
     },
 };
 use redox_protocols::protocol::{ProcCall, RtSigInfo};
@@ -471,11 +472,8 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     {
         stack.regs.eip = area.tmp_eip;
     }
-    PosixStackt {
-        sp: stack.regs.esp as *mut (),
-        size: 0,  // TODO
-        flags: 0, // TODO
-    }
+
+    get_sigaltstack(area, stack.regs.esp).into()
 }
 pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
     let orig_eip = core::mem::replace(

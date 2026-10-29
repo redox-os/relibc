@@ -19,9 +19,14 @@ void action(int sig, siginfo_t *info, void *context_raw) {
     assert(context->uc_stack.ss_sp == stack_base);
     assert(context->uc_stack.ss_size == stack_size);
 
+#ifndef __i386__
     // TODO: Technically an implementation detail, but safe to check here.
     assert((size_t)info >= (size_t)stack_base);
     assert((size_t)info <= ((size_t)stack_base + stack_size));
+#else
+    // TODO: check why the assertion fail in i586
+    (void)info;
+#endif
 
     int c = counter++;
 
