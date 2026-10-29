@@ -569,9 +569,10 @@ pub unsafe extern "C" fn logf(x: c_float) -> c_float {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lrint.html>.
 #[unsafe(no_mangle)]
+#[expect(clippy::cast_precision_loss, reason = "cannot TryFrom")]
 unsafe extern "C" fn lrint(x: c_double) -> c_long {
     // TODO: errno
-    libm::rint(x) as _
+    libm::rint(x) as c_long
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lrintf.html>.
