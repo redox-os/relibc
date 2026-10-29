@@ -18,6 +18,7 @@ show_help() {
     echo "  --host              Run the command on host (linux) target"
     echo "  --all-target        Run the command on all supported Redox architectures"
     echo "  --target=<target>   Override the target architecture (e.g., i586-unknown-redox; default: x86_64-unknown-redox)"
+    echo "  --all-features      Run Cargo with the --all-features flag"
     echo "  --arch=<arch>       Override the target architecture using arch (e.g., i586)"
     echo "  --help              Show this help message"
     echo ""
@@ -39,7 +40,8 @@ SUPPORTED_TARGETS=(
 )
 
 CURRENT_TARGET="${TARGET:-x86_64-unknown-redox}"
-CHECK_ALL=false
+CHECK_ALL_TARGETS=false
+ALL_FEATURES=false
 CMD_ACTION="make"
 CARGO_ACTION="check"
 MAKE_ACTION="all"
@@ -49,7 +51,10 @@ IS_HOST=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --all-target)
-            CHECK_ALL=true
+            CHECK_ALL_TARGETS=true
+            ;;
+        --all-features)
+            ALL_FEATURES=true
             ;;
         --test)
             MAKE_ACTION="test"
@@ -138,6 +143,10 @@ run() {
         CMD_OPT="$CARGO_ACTION --target=$TARGET"
     fi
 
+    if [ "$ALL_FEATURES" = true ]; then
+        CMD_OPT="$CMD_OPT --all-features"
+    fi
+
     echo "----------------------------------------"
     echo "Running $REDOXER_ENV $CMD_ACTION $CMD_OPT for: $TARGET"
 
@@ -149,7 +158,7 @@ run() {
     fi
 }
 
-if [ "$CHECK_ALL" = true ]; then
+if [ "$CHECK_ALL_TARGETS" = true ]; then
     echo "Running $CMD_ACTION for all supported Redox targets..."
 
     has_error=false
