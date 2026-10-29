@@ -19,8 +19,10 @@
 #![feature(sync_unsafe_cell)]
 #![feature(thread_local)]
 #![feature(negative_impls)]
-// https://github.com/rust-lang/rust-analyzer/issues/16628
-#![allow(non_camel_case_types)]
+#![expect(
+    non_camel_case_types,
+    reason = "https://github.com/rust-lang/rust-analyzer/issues/16628"
+)]
 
 #[macro_use]
 extern crate alloc;
@@ -88,7 +90,6 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
 }
 
 #[cfg(not(test))]
-#[allow(non_snake_case)]
 #[linkage = "weak"]
 #[unsafe(no_mangle)]
 pub extern "C" fn _Unwind_Resume() -> ! {
