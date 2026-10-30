@@ -572,7 +572,7 @@ impl Linker {
                 dlpi_adds: 0,
                 dlpi_subs: 0,
                 dlpi_tls_modid: 0,
-                dlpi_tls_data: ptr::null(),
+                dlpi_tls_data: ptr::null_mut(),
             };
 
             let res = unsafe { cb(&raw mut info, core::mem::size_of::<dl_phdr_info>(), data) };

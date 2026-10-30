@@ -12,7 +12,7 @@ pub struct dl_phdr_info {
     pub dlpi_adds: c_ulonglong,
     pub dlpi_subs: c_ulonglong,
     pub dlpi_tls_modid: size_t,
-    pub dlpi_tls_data: *const c_void,
+    pub dlpi_tls_data: *mut c_void,
 }
 
 pub type dl_iterate_phdr_callback =
