@@ -12,10 +12,9 @@ use super::{
 };
 use crate::{
     c_str::CStr,
-    casting::U8PtrToCCharPtr,
     error::{Errno, Result},
     header::{
-        arpa_inet::inet_aton,
+        arpa_inet::inet_aton_inner,
         bits_safamily_t::sa_family_t,
         bits_ucred::ucred,
         errno::{
@@ -127,6 +126,7 @@ fn inner_af_unix(buf: &[u8], address_dst: &mut [u8]) -> socklen_t {
 /// Copies address data bytes to address_dst, truncating if necessary, and always returns the
 /// length of the true value.
 fn inner_af_inet(local: bool, buf: &[u8], address_dst: &mut [u8]) -> socklen_t {
+    // TODO: any unwrap here is the result of bugs from netstack, but prefer to recover with EIO if possible
     let mut parts = buf.split(|c| *c == b'/');
     if local {
         // Skip the remote part
@@ -145,19 +145,15 @@ fn inner_af_inet(local: bool, buf: &[u8], address_dst: &mut [u8]) -> socklen_t {
     // Make address be followed by a NUL-byte
     colon[0] = b'\0';
 
-    log::trace!("address: {:?}, port: {:?}", str::from_utf8(raw_addr), port);
+    trace_log!("address: {:?}, port: {:?}", str::from_utf8(raw_addr), port);
 
-    let mut addr = in_addr::default();
-    assert_eq!(
-        unsafe { inet_aton(U8PtrToCCharPtr::cast_mut(raw_addr.as_ptr()), &raw mut addr) },
-        1,
-        "inet_aton might be broken, failed to parse netstack address"
-    );
+    let addr = inet_aton_inner(raw_addr)
+        .expect("inet_aton might be broken, failed to parse netstack address");
 
     let ret = sockaddr_in {
         sin_family: AF_INET as sa_family_t,
         sin_port: in_port_t::to_be(port),
-        sin_addr: addr,
+        sin_addr: in_addr { s_addr: addr },
 
         ..sockaddr_in::default()
     };
