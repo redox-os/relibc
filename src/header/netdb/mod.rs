@@ -12,7 +12,7 @@ use crate::{
     c_str::{CStr, OwnedThinCStr},
     error::{Errno, ResultExt},
     header::{
-        arpa_inet::inet_aton,
+        arpa_inet::inet_aton_inner,
         bits_arpainet::{htons, ntohl},
         bits_safamily_t::sa_family_t,
         errno::ENOENT,
@@ -563,12 +563,8 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
     let net_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     unsafe { NET_NAME.unsafe_set(Some(net_name)) };
 
-    let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
-    let addr_cstr = addr_vec.as_slice().as_ptr().cast::<c_char>();
-    let mut addr = mem::MaybeUninit::uninit();
-    unsafe { inet_aton(addr_cstr, addr.as_mut_ptr()) };
-    let addr = unsafe { addr.assume_init() };
-    unsafe { NET_ADDR = Some(ntohl(addr.s_addr)) };
+    let addr = inet_aton_inner(iter.next().unwrap().as_bytes()).unwrap();
+    unsafe { NET_ADDR = Some(ntohl(addr)) };
 
     let mut _net_aliases: Vec<Vec<u8>> = iter
         .map(|alias| alias.bytes().chain(Some(b'\0')).collect())

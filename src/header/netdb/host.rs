@@ -1,11 +1,11 @@
 use alloc::{boxed::Box, str::SplitWhitespace, vec::Vec};
-use core::{mem, ptr};
+use core::ptr;
 
 use crate::{
     error::ResultExt,
     header::{
-        arpa_inet::inet_aton, fcntl::O_RDONLY, netinet_in::in_addr, sys_socket::constants::AF_INET,
-        unistd::SEEK_SET,
+        arpa_inet::inet_aton_inner, fcntl::O_RDONLY, netinet_in::in_addr,
+        sys_socket::constants::AF_INET, unistd::SEEK_SET,
     },
     platform::{
         Pal, Sys,
@@ -77,17 +77,13 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     let mut iter: SplitWhitespace = r.split_whitespace();
 
-    let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
-    let addr_cstr = addr_vec.as_slice().as_ptr().cast::<c_char>();
-    let mut addr = mem::MaybeUninit::uninit();
-    unsafe { inet_aton(addr_cstr, addr.as_mut_ptr()) };
-    let addr = unsafe { addr.assume_init() };
+    let addr = inet_aton_inner(iter.next().unwrap().as_bytes()).unwrap();
 
     unsafe {
-        _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes();
+        _HOST_ADDR_LIST = addr.to_ne_bytes();
         HOST_ADDR_LIST = [(&raw mut _HOST_ADDR_LIST).cast::<c_char>(), ptr::null_mut()];
 
-        HOST_ADDR = Some(addr);
+        HOST_ADDR = Some(in_addr { s_addr: addr });
     }
 
     let host_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
