@@ -640,21 +640,9 @@ impl PalSocket for Sys {
                 let socket_file_fd = Sys::open(path_cstr, fcntl::O_RDWR, 0)?;
                 let socket_file_fd = FdGuard::new(socket_file_fd as usize);
 
-                const TOKEN_BUF_SIZE: usize = 16;
-
-                let mut token_buf = [0u8; TOKEN_BUF_SIZE];
-
-                redox_rt::sys::sys_call_ro(
-                    socket_file_fd.as_raw_fd(),
-                    &mut token_buf,
-                    CallFlags::empty(),
-                    &[SocketCall::GetToken as u64],
-                )
-                .unwrap();
-
                 redox_rt::sys::sys_call_wo(
-                    socket as usize,
-                    &token_buf,
+                    &[socket as usize, socket_file_fd.as_raw_fd() as usize][..],
+                    &[],
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],
                 )?;
