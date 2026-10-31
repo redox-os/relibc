@@ -1,7 +1,7 @@
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{cmp, mem, ptr, slice, str};
 use redox_path::RedoxStr;
-use redox_protocols::protocol::{FsCall, O_CLOEXEC, SocketCall};
+use redox_protocols::protocol::{O_CLOEXEC, SocketCall};
 use redox_rt::{proc::FdGuard, signal::tmp_disable_signals};
 use syscall::{self, flag::*};
 
@@ -592,10 +592,12 @@ impl PalSocket for Sys {
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | O_CLOEXEC,
                     )?;
-                    let fd_to_send =
-                        FdGuard::new(redox_rt::sys::dup_into_upper(socket as usize, &[])?)
-                            .to_upper()
-                            .unwrap();
+                    let fd_to_send = FdGuard::new(redox_rt::sys::dup_into_upper(
+                        socket as usize,
+                        b"entrypoint",
+                    )?)
+                    .to_upper()
+                    .unwrap();
                     dirfd.call_wo(
                         &fd_to_send.as_raw_fd().to_ne_bytes(),
                         syscall::CallFlags::FD,
@@ -650,8 +652,9 @@ impl PalSocket for Sys {
                     socket_file_fd.as_raw_fd(),
                     &mut token_buf,
                     CallFlags::empty(),
-                    &[FsCall::Connect as u64],
-                )?;
+                    &[SocketCall::GetToken as u64],
+                )
+                .unwrap();
 
                 redox_rt::sys::sys_call_wo(
                     socket as usize,
