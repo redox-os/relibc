@@ -58,9 +58,9 @@ pub struct ipv6_mreq {
 
 // Address String Lengths
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
-pub const INET_ADDRSTRLEN: c_int = 16;
+pub const INET_ADDRSTRLEN: usize = 16;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
-pub const INET6_ADDRSTRLEN: c_int = 46;
+pub const INET6_ADDRSTRLEN: usize = 46;
 
 // IP options
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/ip.7.html>.

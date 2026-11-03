@@ -20,7 +20,6 @@ pub const TIOCCONS: c_ulong = 0x541D;
 pub const TIOCGSERIAL: c_ulong = 0x541E;
 pub const TIOCSSERIAL: c_ulong = 0x541F;
 pub const TIOCPKT: c_ulong = 0x5420;
-pub const TIOCNOTTY: c_ulong = 0x5422;
 pub const TIOCSETD: c_ulong = 0x5423;
 pub const TIOCGETD: c_ulong = 0x5424;
 pub const TCSBRKP: c_ulong = 0x5425;
@@ -40,7 +39,6 @@ pub const TIOCGEXCL: c_ulong = 0x8004_5440;
 pub const TIOCGPTPEER: c_ulong = 0x5441;
 
 pub const FIONCLEX: c_ulong = 0x5450;
-pub const FIOCLEX: c_ulong = 0x5451;
 pub const FIOASYNC: c_ulong = 0x5452;
 pub const TIOCSERCONFIG: c_ulong = 0x5453;
 pub const TIOCSERGWILD: c_ulong = 0x5454;

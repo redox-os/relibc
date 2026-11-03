@@ -426,7 +426,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use crate::io::Cursor;
 
     use super::parse_interpreter;
 

@@ -40,7 +40,7 @@ pub extern "C" fn __fwriting(stream: *mut FILE) -> c_int {
     c_int::from(stream.flags & F_NOWR == 0)
 }
 
-/// Non_POSIX, from gnulib.
+/// Non-POSIX, from gnulib.
 ///
 /// Set the error indicator of a stream.
 #[unsafe(no_mangle)]
