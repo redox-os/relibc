@@ -142,12 +142,21 @@ impl addrinfo {
     }
 }
 
+/// Socket address is inteded for `bind()`.
 pub const AI_PASSIVE: c_int = 0x0001;
+/// Request for cannonical name.
 pub const AI_CANONNAME: c_int = 0x0002;
+/// Return numeric host address as name.
 pub const AI_NUMERICHOST: c_int = 0x0004;
+/// If no IPv6 addresses are found, query for IPv4 addresses and return them to
+/// the caller as IPv4-mapped IPv6 addresses.
 pub const AI_V4MAPPED: c_int = 0x0008;
+/// Query for both IPv4 and IPv6 addresses.
 pub const AI_ALL: c_int = 0x0010;
+/// Query for IPv4 addresses only when an IPv4 address is configured; query for
+/// IPv6 addresses only when an IPv6 address is configured.
 pub const AI_ADDRCONFIG: c_int = 0x0020;
+/// Inhibit service name resolution.
 pub const AI_NUMERICSERV: c_int = 0x0400;
 
 #[repr(i32)]
@@ -172,26 +181,56 @@ impl From<Errno> for AddrInfoErr {
     }
 }
 
+/// The flags had an invalid value.
 pub const EAI_BADFLAGS: c_int = -1;
+/// The name does not resolve for the supplied parameters.
+/// `NI_NAMEREQD` is set and the host's name cannot be located, or both
+/// `nodename` and `servname` were null.
 pub const EAI_NONAME: c_int = -2;
+/// The name could not be resolved at this time. Future attempts may succeed.
 pub const EAI_AGAIN: c_int = -3;
+/// A non-recoverable error occurred.
 pub const EAI_FAIL: c_int = -4;
+// TODO should be guarded by _GNU_SOURCE
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getaddrinfo.3.html>.
+/// The specified network host exists but does not have any network addresses
+/// defined.
 pub const EAI_NODATA: c_int = -5;
+/// The address family was not recognized or the address length was invalid for
+/// the specified family.
 pub const EAI_FAMILY: c_int = -6;
+/// The intended socket type was not recognized.
 pub const EAI_SOCKTYPE: c_int = -7;
+/// The service passed was not recognized for the specified socket type.
 pub const EAI_SERVICE: c_int = -8;
+// TODO should be guarded by _GNU_SOURCE
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getaddrinfo.3.html>.
+/// The specified network host does not have any network adresses in the
+/// requested address family.
 pub const EAI_ADDRFAMILY: c_int = -9;
+/// There was a memory allocation failure.
 pub const EAI_MEMORY: c_int = -10;
+/// A system error occurred. The error code can be found in errno.
 pub const EAI_SYSTEM: c_int = -11;
+/// An argument buffer overflowed.
 pub const EAI_OVERFLOW: c_int = -12;
 
+// TODO should be guarded by _GNU_SOURCE
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getnameinfo.3.html>.
 pub const NI_MAXHOST: c_int = 1025;
+// TODO should be guarded by _GNU_SOURCE
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getnameinfo.3.html>.
 pub const NI_MAXSERV: c_int = 32;
 
+/// The numeric form of the node's address is returned instead of its name.
 pub const NI_NUMERICHOST: c_int = 0x0001;
+/// The numeric form of the service address is returned instead of its name.
 pub const NI_NUMERICSERV: c_int = 0x0002;
+/// Only the nodename portion of the FQDN is returned for local hosts.
 pub const NI_NOFQDN: c_int = 0x0004;
+/// Return an error if the node's name cannot be located in the database.
 pub const NI_NAMEREQD: c_int = 0x0008;
+/// Indicates that the service is a datagram service (`SOCK_DGRAM`).
 pub const NI_DGRAM: c_int = 0x0010;
 
 static mut NETDB: c_int = 0;
@@ -210,9 +249,13 @@ static mut NET_STAYOPEN: c_int = 0;
 #[thread_local]
 pub static H_ERRNO: Cell<c_int> = Cell::new(0);
 const H_UNSET: c_int = 0;
+/// Removed in POSIX issue 7.
 pub const HOST_NOT_FOUND: c_int = 1;
+/// Removed in POSIX issue 7.
 pub const NO_DATA: c_int = 2;
+/// Removed in POSIX issue 7.
 pub const NO_RECOVERY: c_int = 3;
+/// Removed in POSIX issue 7.
 pub const TRY_AGAIN: c_int = 4;
 
 // Expected length of addresses

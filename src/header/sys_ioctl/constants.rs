@@ -37,6 +37,10 @@ pub const TIOCGWINSZ: c_ulong = 0x5413;
 /// Set window size.
 pub const TIOCSWINSZ: c_ulong = 0x5414;
 
+/// If the given terminal was the controlling terminal of the calling process,
+/// give up this controlling terminal.
+pub const TIOCNOTTY: c_ulong = 0x5422;
+
 /// When successful, equivalent to `*argp = tcgetsid(fd)`.
 /// Get the session ID of the given terminal.
 pub const TIOCGSID: c_ulong = 0x5429;
@@ -46,6 +50,9 @@ pub const FIONREAD: c_ulong = 0x541B;
 
 /// Not recommended, should use POSIX `O_NONBLOCK` instead.
 pub const FIONBIO: c_ulong = 0x5421;
+
+/// Set close-on-exec flag.
+pub const FIOCLEX: c_ulong = 0x5451;
 
 /// Set (if `*lock` is nonzero) or remove (if `*lock` is zero) the lock on
 /// the pseudoterminal slave device.

@@ -9,8 +9,9 @@ use crate::{
     header::{
         ctype::isspace,
         errno::{EILSEQ, EINVAL, ENOMEM, ERANGE},
+        limits::MB_LEN_MAX,
         stdio::*,
-        stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc},
+        stdlib::{MB_CUR_MAX, malloc},
         string,
         time::tm,
         wchar::reader::Reader,
