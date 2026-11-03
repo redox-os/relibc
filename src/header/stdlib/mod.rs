@@ -53,11 +53,8 @@ pub const EXIT_SUCCESS: c_int = 0;
 pub const RAND_MAX: c_int = 2_147_483_647;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdlib.h.html>.
-//Maximum number of bytes in a multibyte character for the current locale
+/// Maximum number of bytes in a character specified by the current locale.
 pub const MB_CUR_MAX: c_int = 4;
-/// Actually specified for `limits.h`?
-//Maximum number of bytes in a multibyte characters for any locale
-pub const MB_LEN_MAX: c_int = 4;
 
 static ATEXIT_FUNCS: RawCell<[Option<extern "C" fn()>; 32]> = RawCell::new([None; 32]);
 static AT_QUICK_EXIT_FUNCS: RawCell<[Option<extern "C" fn()>; 32]> = RawCell::new([None; 32]);

@@ -641,7 +641,7 @@ impl PalSocket for Sys {
                 let socket_file_fd = FdGuard::new(socket_file_fd as usize);
 
                 redox_rt::sys::sys_call_wo(
-                    &[socket as usize, socket_file_fd.as_raw_fd() as usize][..],
+                    &[socket as usize, socket_file_fd.as_raw_fd()][..],
                     &[],
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],

@@ -66,6 +66,9 @@ pub const INT_MIN: c_int = -INT_MAX - 1;
 // LONG_MIN is defined in cbindgen.toml
 pub const LLONG_MIN: c_longlong = -LLONG_MAX - 1;
 
+/// Maximum number of bytes in a character, for any supported locale.
+pub const MB_LEN_MAX: c_int = 4;
+
 // TODO: 4096 for most architectures as determined by a quick grep of musl's source; need a better
 // way to determine it for other archs or to hard code a value.
 #[cfg(target_os = "linux")]
