@@ -1,5 +1,5 @@
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
-use core::{cmp, mem, ptr, slice, str};
+use core::{cell::RefCell, cmp, mem, ptr, slice, str};
 use redox_path::RedoxStr;
 use redox_protocols::protocol::{O_CLOEXEC, SocketCall};
 use redox_rt::{proc::FdGuard, signal::tmp_disable_signals};
@@ -34,6 +34,9 @@ use crate::{
     },
     out::Out,
 };
+
+#[thread_local]
+static IPC_BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::new());
 
 fn extract_sa_family(address_raw: &[u8]) -> Result<c_int> {
     // TODO: It's likely a logic error (valid to panic) if smaller than sa_family_t, but checking
@@ -779,7 +782,9 @@ impl PalSocket for Sys {
         };
         let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
 
-        let mut msg_stream: Vec<u8> = Vec::new();
+        let mut msg_stream: Vec<u8> = IPC_BUFFER.take();
+        msg_stream.clear();
+
         {
             let _siglock = tmp_disable_signals();
             // Prepare space for the message stream.
@@ -815,8 +820,18 @@ impl PalSocket for Sys {
         // Read the message stream.
         let metadata = [SocketCall::RecvMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
-        let actual_read_len =
-            redox_rt::sys::sys_call_rw(socket as usize, &mut msg_stream, call_flags, &metadata)?;
+        let actual_read_len = match redox_rt::sys::sys_call_rw(
+            socket as usize,
+            &mut msg_stream,
+            call_flags,
+            &metadata,
+        ) {
+            Ok(len) => len,
+            Err(e) => {
+                IPC_BUFFER.replace(msg_stream);
+                return Err(Errno(e.errno));
+            }
+        };
 
         let _siglock = tmp_disable_signals();
         msg_stream.truncate(actual_read_len);
@@ -856,6 +871,8 @@ impl PalSocket for Sys {
         } else {
             mhdr.msg_controllen = 0; // No ancillary data
         }
+
+        IPC_BUFFER.replace(msg_stream);
         Ok(actual_payload_bytes_written_to_iov)
     }
 
@@ -874,7 +891,8 @@ impl PalSocket for Sys {
             unsafe { slice::from_raw_parts(mhdr.msg_iov, mhdr.msg_iovlen) }
         };
 
-        let mut msg_stream: Vec<u8> = Vec::new();
+        let mut msg_stream: Vec<u8> = IPC_BUFFER.take();
+        msg_stream.clear();
         let mut actual_payload_bytes_serialized = 0;
         {
             let _siglock = tmp_disable_signals();
@@ -905,13 +923,20 @@ impl PalSocket for Sys {
         let metadata = [SocketCall::SendMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         // FIXME use written to check against payload?
-        let _written = redox_rt::sys::sys_call_rw(
+        let _written = match redox_rt::sys::sys_call_rw(
             socket as usize,
             msg_stream.as_mut_slice(),
             call_flags,
             &metadata,
-        )?;
+        ) {
+            Ok(len) => len,
+            Err(e) => {
+                IPC_BUFFER.replace(msg_stream);
+                return Err(Errno(e.errno));
+            }
+        };
 
+        IPC_BUFFER.replace(msg_stream);
         Ok(actual_payload_bytes_serialized)
     }
 
