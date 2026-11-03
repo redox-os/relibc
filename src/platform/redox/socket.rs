@@ -281,13 +281,22 @@ unsafe fn serialize_ancillary_data_to_stream(
                 let fd_count = data_len / mem::size_of::<c_int>();
 
                 if fd_count > 0 {
+                    if fd_count > 256 {
+                        log::warn!("serialize_ancillary_buffer > 256");
+                        return Err(Errno(EINVAL));
+                    }
                     let fds_ptr = unsafe { CMSG_DATA(cmsg) } as *const c_int;
                     let c_fds = unsafe { slice::from_raw_parts(fds_ptr, fd_count) };
-                    let fds_usize: Vec<usize> = c_fds.iter().map(|&fd| fd as usize).collect();
+
+                    let mut fds_usize = [0usize; 256];
+                    for (i, &fd) in c_fds.iter().enumerate() {
+                        fds_usize[i] = fd as usize;
+                    }
+
                     let fds_slice = unsafe {
                         slice::from_raw_parts(
                             fds_usize.as_ptr().cast::<u8>(),
-                            fds_usize.len() * mem::size_of::<usize>(),
+                            fd_count * mem::size_of::<usize>(),
                         )
                     };
                     redox_rt::sys::sys_call_wo(socket as usize, fds_slice, CallFlags::FD, &[])?;
@@ -453,7 +462,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
         let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
         *cursor += cmsg_data_len_in_stream;
 
-        let mut temp_posix_cmsg_data_buf: Vec<u8> = Vec::new();
+        let mut temp_posix_cmsg_data_buf = [0u8; 256 * mem::size_of::<c_int>()];
 
         let actual_posix_cmsg_data_len = match (cmsg_level, cmsg_type) {
             (SOL_SOCKET, SCM_RIGHTS) => {
@@ -462,12 +471,18 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 }
                 let fd_count = read_num::<usize>(cmsg_data_from_stream)?;
 
-                let mut fds_usize = vec![usize::MAX; fd_count];
+                if fd_count > 256 {
+                    log::warn!("deserialize_ancillary_buffer > 256");
+                    return Err(Errno(EINVAL));
+                }
+
+                let mut fds_usize = [usize::MAX; 256];
+                let fds_slice = &mut fds_usize[..fd_count];
 
                 let fds_bytes = unsafe {
                     slice::from_raw_parts_mut(
-                        fds_usize.as_mut_ptr().cast::<u8>(),
-                        fds_usize.len() * mem::size_of::<usize>(),
+                        fds_slice.as_mut_ptr().cast::<u8>(),
+                        fd_count * mem::size_of::<usize>(),
                     )
                 };
 
@@ -478,10 +493,12 @@ unsafe fn deserialize_ancillary_data_from_stream(
 
                 redox_rt::sys::sys_call_ro(socket as usize, fds_bytes, call_flags, &[])?;
 
-                for fd in fds_usize {
-                    temp_posix_cmsg_data_buf.extend_from_slice(&(fd as c_int).to_le_bytes());
+                for (i, &fd) in fds_slice.iter().enumerate() {
+                    let offset = i * mem::size_of::<c_int>();
+                    temp_posix_cmsg_data_buf[offset..offset + mem::size_of::<c_int>()]
+                        .copy_from_slice(&(fd as c_int).to_le_bytes());
                 }
-                temp_posix_cmsg_data_buf.len()
+                fd_count * mem::size_of::<c_int>()
             }
             (SOL_SOCKET, SCM_CREDENTIALS) => {
                 if cmsg_data_len_in_stream
@@ -497,10 +514,11 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 let gid = read_num::<gid_t>(&cmsg_data_from_stream[gid_offset..])?;
                 let cred = ucred { pid, uid, gid };
 
-                temp_posix_cmsg_data_buf.extend_from_slice(unsafe {
+                let cred_bytes = unsafe {
                     slice::from_raw_parts((&raw const cred).cast::<u8>(), mem::size_of::<ucred>())
-                });
-                temp_posix_cmsg_data_buf.len()
+                };
+                temp_posix_cmsg_data_buf[..mem::size_of::<ucred>()].copy_from_slice(cred_bytes);
+                mem::size_of::<ucred>()
             }
             _ => {
                 return Err(Errno(EINVAL));
