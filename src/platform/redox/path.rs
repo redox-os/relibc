@@ -310,7 +310,7 @@ pub fn dir_path_and_fd_path(
     if ref_path.as_ref().is_empty() {
         return Err(Error::new(EINVAL));
     }
-    let ref_path = RedoxReference::new(ref_path.to_string()).unwrap();
+    let ref_path = ref_path.into_owned();
     let dir_to_open = ref_path.clone().dirname();
     Ok((scheme.canonicalize_as_scheme(dir_to_open.into()), ref_path))
 }
@@ -381,9 +381,10 @@ pub(super) fn openat2_path(
     } else {
         let mut buf = [0; limits::PATH_MAX];
         let len = Sys::fpath(dirfd, &mut buf)?;
-        // SAFETY: fpath checks then copies valid UTF8.
-        let dir = unsafe { str::from_utf8_unchecked(&buf[..len]) };
-        let dir = RedoxPath::from_absolute(dir).ok_or(Errno(EBADF))?;
+        let dir = RedoxStr::new_from_buf(&buf, len)
+            .and_then(|s| s.abs())
+            .ok_or(Errno(EBADF))?;
+
         Ok(dir.canonicalize_as_cwd(path))
     }
 }
