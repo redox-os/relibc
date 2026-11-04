@@ -15,12 +15,15 @@ use crate::{
         arpa_inet::inet_aton_inner,
         bits_arpainet::{htons, ntohl},
         bits_safamily_t::sa_family_t,
-        errno::ENOENT,
+        errno::{ENOENT, ETIMEDOUT},
         fcntl::O_RDONLY,
         netinet_in::{in_addr, sockaddr_in},
         stdlib::atoi,
         strings::strcasecmp,
-        sys_socket::{constants::AF_INET, sockaddr, socklen_t},
+        sys_socket::{
+            constants::{AF_INET, AF_INET6, AF_UNSPEC},
+            sockaddr, socklen_t,
+        },
         unistd::SEEK_SET,
     },
     platform::{
@@ -926,9 +929,14 @@ fn getaddrinfo_inner(
 ) -> Result<Box<addrinfo>, AddrInfoErr> {
     //TODO: Use hints
     let mut ai_flags = hints_opt.map_or(0, |hints| hints.ai_flags);
-    let mut ai_family; // = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
+    let mut ai_family = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
     let ai_socktype = hints_opt.map_or(0, |hints| hints.ai_socktype);
     let mut ai_protocol; // = hints_opt.map_or(0, |hints| hints.ai_protocol);
+
+    if ai_family == AF_INET6 && ai_flags == AI_ADDRCONFIG {
+        //TODO: support ipv6 lookup
+        return Err(AddrInfoErr::EAI_NONAME);
+    }
 
     let mut port = 0;
     if let Some(service) = service_opt {
@@ -954,7 +962,13 @@ fn getaddrinfo_inner(
 
         vec![in_addr { s_addr }]
     } else {
-        lookup_host(node)?
+        match lookup_host(node) {
+            Ok(hosts) => hosts,
+            Err(Errno(ETIMEDOUT)) => {
+                return Err(AddrInfoErr::EAI_AGAIN);
+            }
+            Err(_) => return Err(AddrInfoErr::EAI_FAIL),
+        }
     };
 
     let mut first_info: Option<Box<addrinfo>> = None;
