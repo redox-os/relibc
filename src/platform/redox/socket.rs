@@ -1,5 +1,5 @@
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
-use core::{cmp, mem, ptr, slice, str};
+use core::{cell::RefCell, cmp, mem, ptr, slice, str};
 use redox_path::RedoxStr;
 use redox_protocols::protocol::{O_CLOEXEC, SocketCall};
 use redox_rt::{proc::FdGuard, signal::tmp_disable_signals};
@@ -34,6 +34,9 @@ use crate::{
     },
     out::Out,
 };
+
+#[thread_local]
+static IPC_BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::new());
 
 fn extract_sa_family(address_raw: &[u8]) -> Result<c_int> {
     // TODO: It's likely a logic error (valid to panic) if smaller than sa_family_t, but checking
@@ -278,13 +281,22 @@ unsafe fn serialize_ancillary_data_to_stream(
                 let fd_count = data_len / mem::size_of::<c_int>();
 
                 if fd_count > 0 {
+                    if fd_count > 256 {
+                        log::warn!("serialize_ancillary_buffer > 256");
+                        return Err(Errno(EINVAL));
+                    }
                     let fds_ptr = unsafe { CMSG_DATA(cmsg) } as *const c_int;
                     let c_fds = unsafe { slice::from_raw_parts(fds_ptr, fd_count) };
-                    let fds_usize: Vec<usize> = c_fds.iter().map(|&fd| fd as usize).collect();
+
+                    let mut fds_usize = [0usize; 256];
+                    for (i, &fd) in c_fds.iter().enumerate() {
+                        fds_usize[i] = fd as usize;
+                    }
+
                     let fds_slice = unsafe {
                         slice::from_raw_parts(
                             fds_usize.as_ptr().cast::<u8>(),
-                            fds_usize.len() * mem::size_of::<usize>(),
+                            fd_count * mem::size_of::<usize>(),
                         )
                     };
                     redox_rt::sys::sys_call_wo(socket as usize, fds_slice, CallFlags::FD, &[])?;
@@ -450,7 +462,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
         let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
         *cursor += cmsg_data_len_in_stream;
 
-        let mut temp_posix_cmsg_data_buf: Vec<u8> = Vec::new();
+        let mut temp_posix_cmsg_data_buf = [0u8; 256 * mem::size_of::<c_int>()];
 
         let actual_posix_cmsg_data_len = match (cmsg_level, cmsg_type) {
             (SOL_SOCKET, SCM_RIGHTS) => {
@@ -459,12 +471,18 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 }
                 let fd_count = read_num::<usize>(cmsg_data_from_stream)?;
 
-                let mut fds_usize = vec![usize::MAX; fd_count];
+                if fd_count > 256 {
+                    log::warn!("deserialize_ancillary_buffer > 256");
+                    return Err(Errno(EINVAL));
+                }
+
+                let mut fds_usize = [usize::MAX; 256];
+                let fds_slice = &mut fds_usize[..fd_count];
 
                 let fds_bytes = unsafe {
                     slice::from_raw_parts_mut(
-                        fds_usize.as_mut_ptr().cast::<u8>(),
-                        fds_usize.len() * mem::size_of::<usize>(),
+                        fds_slice.as_mut_ptr().cast::<u8>(),
+                        fd_count * mem::size_of::<usize>(),
                     )
                 };
 
@@ -475,10 +493,12 @@ unsafe fn deserialize_ancillary_data_from_stream(
 
                 redox_rt::sys::sys_call_ro(socket as usize, fds_bytes, call_flags, &[])?;
 
-                for fd in fds_usize {
-                    temp_posix_cmsg_data_buf.extend_from_slice(&(fd as c_int).to_le_bytes());
+                for (i, &fd) in fds_slice.iter().enumerate() {
+                    let offset = i * mem::size_of::<c_int>();
+                    temp_posix_cmsg_data_buf[offset..offset + mem::size_of::<c_int>()]
+                        .copy_from_slice(&(fd as c_int).to_le_bytes());
                 }
-                temp_posix_cmsg_data_buf.len()
+                fd_count * mem::size_of::<c_int>()
             }
             (SOL_SOCKET, SCM_CREDENTIALS) => {
                 if cmsg_data_len_in_stream
@@ -494,10 +514,11 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 let gid = read_num::<gid_t>(&cmsg_data_from_stream[gid_offset..])?;
                 let cred = ucred { pid, uid, gid };
 
-                temp_posix_cmsg_data_buf.extend_from_slice(unsafe {
+                let cred_bytes = unsafe {
                     slice::from_raw_parts((&raw const cred).cast::<u8>(), mem::size_of::<ucred>())
-                });
-                temp_posix_cmsg_data_buf.len()
+                };
+                temp_posix_cmsg_data_buf[..mem::size_of::<ucred>()].copy_from_slice(cred_bytes);
+                mem::size_of::<ucred>()
             }
             _ => {
                 return Err(Errno(EINVAL));
@@ -779,7 +800,9 @@ impl PalSocket for Sys {
         };
         let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
 
-        let mut msg_stream: Vec<u8> = Vec::new();
+        let mut msg_stream: Vec<u8> = IPC_BUFFER.take();
+        msg_stream.clear();
+
         {
             let _siglock = tmp_disable_signals();
             // Prepare space for the message stream.
@@ -815,8 +838,18 @@ impl PalSocket for Sys {
         // Read the message stream.
         let metadata = [SocketCall::RecvMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
-        let actual_read_len =
-            redox_rt::sys::sys_call_rw(socket as usize, &mut msg_stream, call_flags, &metadata)?;
+        let actual_read_len = match redox_rt::sys::sys_call_rw(
+            socket as usize,
+            &mut msg_stream,
+            call_flags,
+            &metadata,
+        ) {
+            Ok(len) => len,
+            Err(e) => {
+                IPC_BUFFER.replace(msg_stream);
+                return Err(Errno(e.errno));
+            }
+        };
 
         let _siglock = tmp_disable_signals();
         msg_stream.truncate(actual_read_len);
@@ -856,6 +889,8 @@ impl PalSocket for Sys {
         } else {
             mhdr.msg_controllen = 0; // No ancillary data
         }
+
+        IPC_BUFFER.replace(msg_stream);
         Ok(actual_payload_bytes_written_to_iov)
     }
 
@@ -874,7 +909,8 @@ impl PalSocket for Sys {
             unsafe { slice::from_raw_parts(mhdr.msg_iov, mhdr.msg_iovlen) }
         };
 
-        let mut msg_stream: Vec<u8> = Vec::new();
+        let mut msg_stream: Vec<u8> = IPC_BUFFER.take();
+        msg_stream.clear();
         let mut actual_payload_bytes_serialized = 0;
         {
             let _siglock = tmp_disable_signals();
@@ -905,13 +941,20 @@ impl PalSocket for Sys {
         let metadata = [SocketCall::SendMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         // FIXME use written to check against payload?
-        let _written = redox_rt::sys::sys_call_rw(
+        let _written = match redox_rt::sys::sys_call_rw(
             socket as usize,
             msg_stream.as_mut_slice(),
             call_flags,
             &metadata,
-        )?;
+        ) {
+            Ok(len) => len,
+            Err(e) => {
+                IPC_BUFFER.replace(msg_stream);
+                return Err(Errno(e.errno));
+            }
+        };
 
+        IPC_BUFFER.replace(msg_stream);
         Ok(actual_payload_bytes_serialized)
     }
 
