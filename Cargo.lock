@@ -94,9 +94,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
+checksum = "375989decec1a0fa424442bed520fa12ede43a48475ce8c7417d2c69b32b5f6b"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -306,9 +306,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.34"
+version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "md-5"
@@ -481,8 +481,8 @@ checksum = "083c57139a99303d842a4cfe1f0fd6483d77d81eda1442be84bcb1a0f737ed96"
 
 [[package]]
 name = "redox-rings"
-version = "0.1.0"
-source = "git+https://gitlab.redox-os.org/redox-os/redox-rings.git#c56099c15a30636e7a528a6b37676daa7d9b6788"
+version = "0.2.0"
+source = "git+https://gitlab.redox-os.org/redox-os/redox-rings.git#d787c28c2dba79b9325d2a5a3e8c96dce4ebb2eb"
 dependencies = [
  "bitflags",
  "redox_syscall",
@@ -516,8 +516,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.9.6"
-source = "git+https://gitlab.redox-os.org/redox-os/kernel/#7824a967b630d4a81c0dbe75a3e50a2a3657cacd"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "580c875845b41ecb1564ad1ae4703044cef774145e3d7a94dc2b3fa7c97868fd"
 dependencies = [
  "bitflags",
 ]
@@ -821,3 +822,8 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[patch.unused]]
+name = "redox_syscall"
+version = "0.10.0"
+source = "git+https://gitlab.redox-os.org/redox-os/kernel/#01a2a31d9cdfc098c5bb8b8068986111f9c8f61c"

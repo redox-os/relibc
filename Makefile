@@ -52,7 +52,7 @@ endif
 	for header in $(HEADERS_UNPARSED); do \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
 			printf "\033[0;36;49mWriting Header $$header\033[0m\n"; \
-			out=`echo "$$header" | sed 's/_/\//g'`; \
+			out=`echo "$$header" | sed 's/_/\//g' | sed 's/nl\/types/nl_types/'`; \
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \

@@ -1,0 +1,15 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/nl_types.h.html
+#
+# This type is split out to prevent importing all of nl_types.h into other headers.
+#
+# POSIX headers that require nl_item:
+# - langinfo.h
+# - strftime.h
+# - nl_types.h (where it should be defined)
+include_guard = "_RELIBC_BITS_NL_ITEM_H"
+language = "C"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true

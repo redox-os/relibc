@@ -9,7 +9,7 @@
 include_guard = "_RELIBC_LANGINFO_H"
 after_includes = """
 #include <bits/locale-t.h> // for locale_t from locale.h
-#include <bits/size-t.h>   // for size_t frome sys/types.h
+#include <bits/size-t.h>   // for size_t from sys/types.h
 """
 language = "C"
 style = "tag"
