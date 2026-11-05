@@ -32,6 +32,7 @@ use crate::{
     error::{Errno, Result},
     fs::File,
     header::{
+        bits_sigset_t::sigset_t,
         errno::{
             EBADF, EBADFD, EFAULT, EFBIG, EINTR, EINVAL, EIO, EMFILE, ENAMETOOLONG, ENOENT,
             ENOEXEC, ENOMEM, ENOSYS, EOPNOTSUPP,
@@ -41,6 +42,7 @@ use crate::{
             F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
         limits::{self},
+        poll::pollfd,
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
         sys_file,
@@ -80,6 +82,7 @@ mod extra;
 mod libcscheme;
 mod libredox;
 pub(crate) mod path;
+mod poll;
 mod ptrace;
 pub mod ring;
 pub(crate) mod signal;
@@ -1041,6 +1044,33 @@ impl Pal for Sys {
         trace_log!("pipe2({flags:x}) = {:?}", r);
         fds.write(r?);
         Ok(())
+    }
+
+    fn poll(fds: &mut [pollfd], timeout: c_int) -> Result<c_int> {
+        Self::redox_poll(fds, timeout, None)
+    }
+
+    fn ppoll(
+        fds: &mut [pollfd],
+        tmo_opt: Option<&timespec>,
+        sigmask: Option<&sigset_t>,
+    ) -> Result<c_int> {
+        let timeout = match tmo_opt {
+            Some(tmo) => {
+                if tmo.tv_sec > (c_int::MAX / 1000).into() {
+                    c_int::MAX
+                } else {
+                    #[cfg(target_pointer_width = "64")]
+                    let tv_nsec = c_int::try_from(tmo.tv_nsec).unwrap_or(c_int::MAX);
+                    #[cfg(target_pointer_width = "32")]
+                    let tv_nsec = tmo.tv_nsec;
+                    (c_int::try_from(tmo.tv_sec).expect("within bounds") * 1000)
+                        + (tv_nsec / 1000000)
+                }
+            }
+            None => -1,
+        };
+        Self::redox_poll(fds, timeout, sigmask)
     }
 
     fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()> {
