@@ -38,6 +38,7 @@ pub struct fd_set {
     pub fds_bits: FdBitSet,
 }
 
+//TODO: replace with platform-specific select to avoid clashing file descriptors
 pub unsafe fn select_epoll(
     nfds: c_int,
     readfds: Option<&mut fd_set>,

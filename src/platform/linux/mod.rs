@@ -5,9 +5,11 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        bits_sigset_t::sigset_t,
         dirent::dirent,
         errno::{EINVAL, EIO, ENOSYS},
         fcntl::AT_EMPTY_PATH,
+        poll::pollfd,
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
@@ -22,7 +24,7 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
 };
-use core::{num::NonZeroU64, ptr};
+use core::{mem, num::NonZeroU64, ptr};
 use sc::nr::{CLONE, EXIT};
 
 mod epoll;
@@ -548,6 +550,30 @@ impl Pal for Sys {
 
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
+    }
+
+    fn poll(fds: &mut [pollfd], timeout: c_int) -> Result<c_int> {
+        e_raw(unsafe { syscall!(POLL, fds.as_mut_ptr(), fds.len(), timeout) })
+            .map(|count| count as c_int)
+    }
+
+    fn ppoll(
+        fds: &mut [pollfd],
+        timeout: Option<&timespec>,
+        sigmask: Option<&sigset_t>,
+    ) -> Result<c_int> {
+        let sigsetsize: size_t = mem::size_of::<sigset_t>();
+        e_raw(unsafe {
+            syscall!(
+                PPOLL,
+                fds.as_mut_ptr(),
+                fds.len(),
+                timeout.map(ptr::from_ref).unwrap_or(ptr::null()),
+                sigmask.map(ptr::from_ref).unwrap_or(ptr::null()),
+                sigsetsize
+            )
+        })
+        .map(|count| count as c_int)
     }
 
     fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()> {

@@ -5,19 +5,10 @@
 use core::slice;
 
 use crate::{
-    error::Errno,
-    fs::File,
-    header::{
-        bits_sigset_t::sigset_t,
-        errno::{EBADF, EINTR},
-        sys_epoll::{
-            EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT,
-            EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_data, epoll_event,
-        },
-        time::timespec,
-    },
+    error::ResultExt,
+    header::{bits_sigset_t::sigset_t, time::timespec},
     platform::{
-        ERRNO, PalEpoll, Sys,
+        Pal, Sys,
         types::{c_int, c_short, c_ulong},
     },
 };
@@ -65,105 +56,6 @@ impl core::fmt::Debug for pollfd {
     }
 }
 
-pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: Option<&sigset_t>) -> c_int {
-    let event_map = [
-        (POLLIN, EPOLLIN),
-        (POLLPRI, EPOLLPRI),
-        (POLLOUT, EPOLLOUT),
-        (POLLERR, EPOLLERR),
-        (POLLHUP, EPOLLHUP),
-        (POLLNVAL, EPOLLNVAL),
-        (POLLRDNORM, EPOLLRDNORM),
-        (POLLWRNORM, EPOLLWRNORM),
-        (POLLRDBAND, EPOLLRDBAND),
-        (POLLWRBAND, EPOLLWRBAND),
-    ];
-
-    let ep = {
-        let epfd = match Sys::epoll_create1(EPOLL_CLOEXEC) {
-            Ok(epfd) => epfd,
-            Err(Errno(err)) => {
-                ERRNO.set(err);
-                return -1;
-            }
-        };
-        File::new(epfd)
-    };
-
-    let mut closed = 0;
-    for (i, fd) in fds.iter_mut().enumerate() {
-        let pfd = fd;
-
-        pfd.revents = 0;
-
-        // Ignore the entry with negative fd
-        if pfd.fd < 0 {
-            continue;
-        }
-
-        let mut event = epoll_event::new(0, epoll_data { u64: i as u64 });
-
-        for (p, ep) in event_map.iter() {
-            if pfd.events & p > 0 {
-                event.events |= ep;
-            }
-        }
-
-        match Sys::epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, Some(&mut event)) {
-            Ok(()) => {}
-            Err(Errno(EBADF)) => {
-                pfd.revents |= POLLNVAL;
-                closed += 1;
-            }
-            Err(Errno(err)) => {
-                ERRNO.set(err);
-                return -1;
-            }
-        }
-    }
-
-    // Early exit if there are fds, and all are closed (revents = POLLNVAL)
-    if closed > 0 && closed == fds.len() {
-        // TODO should we panic if fd.len() is greater than i32::MAX instead?
-        // seems unlikely we'll be dealing with that many file descriptors
-        return i32::try_from(closed).unwrap_or(i32::MAX);
-    }
-
-    let mut events = [epoll_event::default(); 32];
-
-    match Sys::epoll_pwait(*ep, &mut events, timeout, sigmask) {
-        Ok(res) => {
-            for event in events.iter().take(res) {
-                let pi: usize = event.data.into();
-                // TODO: Error status when fd does not match?
-                if let Some(pfd) = fds.get_mut(pi) {
-                    for (p, ep) in event_map.iter() {
-                        if event.events & ep > 0 {
-                            pfd.revents |= p;
-                        }
-                    }
-                }
-            }
-        }
-        Err(Errno(err)) => {
-            if err == EINTR && closed > 0 {
-                // some fds are closed by signal
-            } else {
-                ERRNO.set(err);
-                return -1;
-            }
-        }
-    }
-
-    let mut count = 0;
-    for pfd in fds.iter() {
-        if pfd.revents > 0 {
-            count += 1;
-        }
-    }
-    count
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/poll.html>.
 ///
 /// Provides applications with a mechanism for multiplexing input/output
@@ -179,7 +71,7 @@ pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) ->
     let fd_buf =
         unsafe { slice::from_raw_parts_mut(fds, usize::try_from(nfds).expect("within bounds")) };
     trace_expr!(
-        poll_epoll(fd_buf, timeout, None),
+        Sys::poll(fd_buf, timeout).or_minus_one_errno(),
         "poll({:?}, {})",
         fd_buf,
         timeout,
@@ -202,27 +94,16 @@ pub unsafe extern "C" fn ppoll(
     tmo_p: *const timespec,
     sigmask: *const sigset_t,
 ) -> c_int {
-    let timeout = if tmo_p.is_null() {
-        -1
-    } else {
-        let tmo = unsafe { &*tmo_p };
-        if tmo.tv_sec > (c_int::MAX / 1000).into() {
-            c_int::MAX
-        } else {
-            #[cfg(target_pointer_width = "64")]
-            let tv_nsec = c_int::try_from(tmo.tv_nsec).unwrap_or(c_int::MAX);
-            #[cfg(target_pointer_width = "32")]
-            let tv_nsec = tmo.tv_nsec;
-            (c_int::try_from(tmo.tv_sec).expect("within bounds") * 1000) + (tv_nsec / 1000000)
-        }
-    };
     let fd_buf =
         unsafe { slice::from_raw_parts_mut(fds, usize::try_from(nfds).expect("within bounds")) };
     trace_expr!(
-        poll_epoll(fd_buf, timeout, unsafe { sigmask.as_ref() }),
-        "ppoll({:?}, {:?}, {:p})",
+        Sys::ppoll(fd_buf, unsafe { tmo_p.as_ref() }, unsafe {
+            sigmask.as_ref()
+        })
+        .or_minus_one_errno(),
+        "ppoll({:?}, {:p}, {:p})",
         fd_buf,
-        timeout,
+        tmo_p,
         sigmask
     )
 }

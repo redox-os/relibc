@@ -5,7 +5,9 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        bits_sigset_t::sigset_t,
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, F_DUPFD},
+        poll::pollfd,
         signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
@@ -360,6 +362,16 @@ pub trait Pal {
 
     /// Platform implementation of [`pipe2()`](crate::header::unistd::pipe2) from [`unistd.h`](crate::header::unistd).
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
+
+    /// Platform implementation of [`poll()`](crate::header::poll::poll) from [`poll.h`](crate::header::poll).
+    fn poll(fds: &mut [pollfd], timeout: c_int) -> Result<c_int>;
+
+    /// Platform implementation of [`ppoll()`](crate::header::poll::ppoll) from [`poll.h`](crate::header::poll).
+    fn ppoll(
+        fds: &mut [pollfd],
+        timeout: Option<&timespec>,
+        sigmask: Option<&sigset_t>,
+    ) -> Result<c_int>;
 
     /// Platform implementation of [`posix_fallocate()`](crate::header::fcntl::posix_fallocate) from [`fcntl.h`](crate::header::fcntl).
     fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()>;

@@ -1,6 +1,6 @@
 use super::{
     super::{
-        Pal, PalEpoll,
+        PalEpoll,
         types::{c_int, c_uint},
     },
     Sys,
@@ -63,16 +63,9 @@ fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
     epoll
 }
 
-impl PalEpoll for Sys {
-    fn epoll_create1(flags: c_int) -> Result<c_int, Errno> {
-        match redox_rt::sys::open("/scheme/event", (O_RDWR | flags) as usize) {
-            Ok(fd) => Ok(fd as c_int),
-            Err(e) => Err(Errno::from(e)),
-        }
-    }
-
-    fn epoll_ctl(
-        epfd: c_int,
+impl Sys {
+    pub(crate) fn redox_epoll_ctl(
+        epfd: usize,
         op: c_int,
         fd: c_int,
         event: Option<&mut epoll_event>,
@@ -82,7 +75,7 @@ impl PalEpoll for Sys {
                 let Some(event) = event else {
                     return Err(Errno(EINVAL));
                 };
-                Sys::write(
+                redox_rt::sys::posix_write(
                     epfd,
                     &Event {
                         id: fd as usize,
@@ -92,7 +85,7 @@ impl PalEpoll for Sys {
                 )?;
             }
             EPOLL_CTL_DEL => {
-                Sys::write(
+                redox_rt::sys::posix_write(
                     epfd,
                     &Event {
                         id: fd as usize,
@@ -107,8 +100,8 @@ impl PalEpoll for Sys {
         Ok(())
     }
 
-    fn epoll_pwait(
-        epfd: c_int,
+    pub(crate) fn redox_epoll_pwait(
+        epfd: usize,
         events: &mut [epoll_event],
         timeout: c_int,
         sigmask: Option<&sigset_t>,
@@ -120,7 +113,7 @@ impl PalEpoll for Sys {
         }
         let mut callback = || {
             syscall::read(
-                epfd as usize,
+                epfd,
                 // SAFETY: the const assert guarantees the same size
                 unsafe {
                     slice::from_raw_parts_mut(
@@ -166,16 +159,45 @@ impl PalEpoll for Sys {
     }
 }
 
-fn register_timeout(epfd: i32, timeout: i32) -> Result<usize, Errno> {
+impl PalEpoll for Sys {
+    fn epoll_create1(flags: c_int) -> Result<c_int, Errno> {
+        match redox_rt::sys::open("/scheme/event", (O_RDWR | flags) as usize) {
+            Ok(fd) => Ok(fd as c_int),
+            Err(e) => Err(Errno::from(e)),
+        }
+    }
+
+    fn epoll_ctl(
+        epfd: c_int,
+        op: c_int,
+        fd: c_int,
+        event: Option<&mut epoll_event>,
+    ) -> Result<(), Errno> {
+        let epfd = usize::try_from(epfd).map_err(|_| Errno(EBADFD))?;
+        Self::redox_epoll_ctl(epfd, op, fd, event)
+    }
+
+    fn epoll_pwait(
+        epfd: c_int,
+        events: &mut [epoll_event],
+        timeout: c_int,
+        sigmask: Option<&sigset_t>,
+    ) -> Result<usize, Errno> {
+        let epfd = usize::try_from(epfd).map_err(|_| Errno(EBADFD))?;
+        Self::redox_epoll_pwait(epfd, events, timeout, sigmask)
+    }
+}
+
+fn register_timeout(epfd: usize, timeout: i32) -> Result<usize, Errno> {
     if timeout < 0 {
         return Err(Errno(EINVAL));
     }
-    Sys::write(
+    Ok(redox_rt::sys::posix_write(
         epfd,
         &Event {
             id: syscall::EVENT_TIMEOUT_ID,
             flags: EVENT_READ,
             data: timeout as usize,
         },
-    )
+    )?)
 }
