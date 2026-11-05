@@ -155,7 +155,7 @@ impl Drop for File {
         if !self.reference
             && let Err(e) = Sys::close(self.fd)
         {
-            log::warn!("Close did not succeed: {e:?}");
+            log::warn!("Close {} did not succeed: {e:?}", self.fd);
         }
     }
 }
