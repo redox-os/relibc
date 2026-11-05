@@ -15,16 +15,18 @@ use crate::{
 };
 
 // We use the langinfo constants
-use crate::header::langinfo::{
-    ABDAY_1,
-    ABMON_1,
-    AM_STR,
-    DAY_1,
-    MON_1,
-    PM_STR,
-    // TODO : other constants if needed
-    nl_item,
-    nl_langinfo,
+use crate::header::{
+    bits_nl_item::nl_item,
+    langinfo::{
+        ABDAY_1,
+        ABMON_1,
+        AM_STR,
+        DAY_1,
+        MON_1,
+        PM_STR,
+        // TODO : other constants if needed
+        nl_langinfo,
+    },
 };
 
 /// A helper that calls `nl_langinfo(item)` and converts the returned pointer

@@ -4,15 +4,8 @@
 
 // TODO : involve loading locale data. Currently, the implementation only supports the "C" locale.
 
-use crate::{header::bits_locale_t::locale_t, platform::types::size_t};
+use crate::header::{bits_locale_t::locale_t, bits_nl_item::nl_item};
 use core::ffi::c_char;
-
-// TODO move `nl_item` to nl_types.h (not yet present in relibc) or bits header
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/langinfo.h.html>.
-///
-/// POSIX type for items used with `nl_langinfo`
-/// In practice, this is an index into the string table.
-pub type nl_item = size_t;
 
 // Static string table for langinfo constants
 /// cbindgen:ignore

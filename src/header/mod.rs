@@ -28,6 +28,8 @@ pub mod bits_limits_ptdi;
 pub mod bits_locale_t;
 #[path = "bits_mode-t/mod.rs"]
 pub mod bits_mode_t;
+#[path = "bits_nl-item/mod.rs"]
+pub mod bits_nl_item;
 #[path = "bits_nlink-t/mod.rs"]
 pub mod bits_nlink_t;
 pub mod bits_null;
@@ -124,7 +126,8 @@ pub mod netdb;
 pub mod netinet_in;
 pub mod netinet_ip;
 pub mod netinet_tcp;
-// TODO: nl_types.h
+// TODO: nl_types.h (currently contains only stubs)
+pub mod nl_types;
 // TODO: Remove C header paths.h when cbindgen can export C/Rust strs
 // pub mod paths;
 pub mod poll;

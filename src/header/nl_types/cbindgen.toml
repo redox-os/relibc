@@ -1,0 +1,14 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/nl_types.h.html
+#
+# There are no spec quotations relating to includes
+include_guard = "_RELIBC_NL_TYPES_H"
+language = "C"
+no_includes = true
+cpp_compat = true
+
+after_includes = """
+#include <bits/nl-item.h> // for nl_item from nl_types.h
+"""
+
+[enum]
+prefix_with_name = true
