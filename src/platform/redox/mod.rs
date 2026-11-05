@@ -1156,28 +1156,19 @@ impl Pal for Sys {
         // Since this is used by realpath, it converts from the old format to the new one for
         // compatibility reasons
         let mut buf = [0; limits::PATH_MAX];
-        let count = syscall::fpath(fildes as usize, &mut buf)?;
-
-        let redox_path = str::from_utf8(&buf[..count])
-            .ok()
-            .and_then(redox_path::RedoxPath::from_absolute)
-            .ok_or(Errno(EINVAL))?;
-
-        let (scheme, reference) = redox_path.as_parts().ok_or(Errno(EINVAL))?;
+        let redox_path = path::standard_fpath(fildes, &mut buf)?;
 
         let mut cursor = io::Cursor::new(out);
-        let res = match scheme.as_ref() {
-            "file" => write!(cursor, "/{}", reference.as_ref().trim_start_matches('/')),
-            _ => write!(
-                cursor,
-                "/scheme/{}/{}",
-                scheme.as_ref(),
-                reference.as_ref().trim_start_matches('/')
-            ),
-        };
-        match res {
+        match write!(cursor, "{}", redox_path.as_ref()) {
             Ok(()) => Ok(cursor.position() as usize),
-            Err(_err) => Err(Errno(ENAMETOOLONG)),
+            Err(err) => {
+                log::warn!(
+                    "fpath is too long for buffer: {:?} {:?}",
+                    redox_path.as_ref(),
+                    err
+                );
+                Err(Errno(ENAMETOOLONG))
+            }
         }
     }
 
