@@ -453,6 +453,7 @@ impl Pal for Sys {
             }
 
             F_SETLKW => log::warn!("F_SETLKW: not yet implemented"),
+            F_OFD_SETLKW => log::warn!("F_OFD_SETLKW: not yet implemented"),
 
             _ => {}
         }
