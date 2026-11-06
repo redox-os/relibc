@@ -2,7 +2,6 @@ use alloc::{borrow::Cow, string::ToString};
 use arrayvec::ArrayString;
 use core::{
     ffi::c_int,
-    mem::ManuallyDrop,
     str::{self, FromStr},
 };
 use redox_path::{RedoxReference, RedoxStr};
@@ -54,7 +53,7 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
             let link_path =
                 read_interscheme_link_content(None, redox.as_reference().as_ref(), false);
             let link_path = openat2_path(fcntl::AT_FDCWD, link_path?, 0)?;
-            FdGuard::new(resolve_interscheme_symlink(link_path, O_STAT)?).to_upper()?
+            FdGuard::new(resolve_interscheme_symlink(link_path, O_STAT, true)?).to_upper()?
         }
         Err(e) => return Err(e),
     };
@@ -69,7 +68,7 @@ pub fn chdir(path: RedoxStr<'_>) -> Result<()> {
 
 pub fn fchdir(fd: c_int) -> Result<()> {
     let mut buf = [0; limits::PATH_MAX];
-    let buf = standard_fpath(fd, &mut buf)?;
+    let buf = standard_fpath(fd as usize, &mut buf)?;
     let fd = FdGuard::new(redox_rt::sys::fcntl(
         fd as usize,
         syscall::F_DUPFD,
@@ -123,8 +122,8 @@ pub fn current_dir() -> Result<CwdGuard> {
 }
 
 /// Get standard UNIX path from fpath of a fildes
-pub fn standard_fpath<'a>(fildes: c_int, buf: &'a mut [u8]) -> Result<RedoxReference<'a>> {
-    let count = syscall::fpath(fildes as usize, &mut *buf)?;
+pub fn standard_fpath<'a>(fildes: usize, buf: &'a mut [u8]) -> Result<RedoxReference<'a>> {
+    let count = syscall::fpath(fildes, &mut *buf)?;
 
     let abs_path = redox_path::RedoxPath::from_absolute_buf(buf, count)
         .ok_or(Errno(EINVAL))?
@@ -177,19 +176,22 @@ fn open_absolute(path: &str, flags: usize) -> Result<usize> {
 
 // Read symlink across schemes content
 fn read_interscheme_link_content<'b>(
-    dirfd: Option<&FdGuard>,
+    dirfd: Option<usize>,
     path: &str,
     is_relative: bool,
 ) -> Result<RedoxStr<'b>> {
     let resolve_flags = O_CLOEXEC | O_SYMLINK;
     let fd = match (is_relative, dirfd) {
-        (false, _) => FdGuard::open(path, resolve_flags),
-        (true, None) => current_dir()?
-            .as_ref()
-            .unwrap()
-            .fd
-            .openat(path, resolve_flags, 0),
-        (true, Some(dirfd)) => dirfd.openat(path, resolve_flags, 0),
+        (false, _) => FdGuard::open_into_upper(path, resolve_flags),
+        (true, None) => {
+            current_dir()?
+                .as_ref()
+                .unwrap()
+                .fd
+                .openat_into_upper(path, resolve_flags, 0)
+        }
+        (true, Some(dirfd)) => redox_rt::sys::openat_into_upper(dirfd, path, resolve_flags, 0)
+            .and_then(|fd| FdGuard::new(fd).to_upper()),
     };
     log::trace!(
         "read_interscheme_link_content ({:?} {:?} {}): {:?}",
@@ -200,25 +202,26 @@ fn read_interscheme_link_content<'b>(
     );
 
     let mut resolve_buf = [0_u8; limits::PATH_MAX];
-    let count = Sys::fpath(fd?.as_c_fd().unwrap(), &mut resolve_buf)?;
-
-    // ENOENT: If the symbolic link path is non-UTF8, it cannot be opened,
-    // and is thus considered a "dangling symbolic link".
-    RedoxStr::new_from_buf(&resolve_buf, count)
-        .map(|s| s.into_owned())
-        .ok_or(Error::new(ENOENT))
+    let path: RedoxStr<'_> = standard_fpath(fd?.as_raw_fd(), &mut resolve_buf)?.into();
+    Ok(path.into_owned())
 }
 
 /// Resolve symlink across schemes and open as a fd. Requires `current_path_string` as canonicalized.
 fn resolve_interscheme_symlink<'a>(
     mut current_path_string: RedoxPath<'a>,
     flags: usize,
+    to_upper: bool,
 ) -> Result<usize> {
     // TODO: using SYMLOOP_MAX is incorrect, as this loop is only happening for symlink between schemes
     for _ in 0..limits::SYMLOOP_MAX {
         let dirname = current_path_string.dirname();
         let cow: Cow<'_, str> = current_path_string.into();
-        let initial_res = open_absolute(&cow, flags);
+        let initial_res = if to_upper {
+            // TODO: libc scheme?
+            redox_rt::sys::open_into_upper(&cow, flags)
+        } else {
+            open_absolute(&cow, flags)
+        };
         trace_log!(
             "resolve_interscheme_symlink({:?}, {}): {:?}",
             cow,
@@ -275,18 +278,19 @@ pub fn openat(dirfd: c_int, path: RedoxStr<'_>, flags: usize) -> Result<usize> {
     match initial_res {
         Ok(fd) => Ok(fd),
         Err(e) if e == Error::new(EXDEV) => {
-            let (link_path, dirfd) = if dirfd == fcntl::AT_FDCWD {
-                let link_path = read_interscheme_link_content(None, &path, true);
-                (link_path, dirfd)
-            } else {
-                let fd = ManuallyDrop::new(FdGuard::new(dirfd as usize));
-                let link_path = read_interscheme_link_content(Some(&fd), &path, true);
-                (link_path, ManuallyDrop::into_inner(fd).take() as i32)
-            };
+            let link_path = read_interscheme_link_content(dirfd_cwd(dirfd), &path, true);
             let link_path = openat2_path(dirfd, link_path?, 0)?;
-            resolve_interscheme_symlink(link_path, flags)
+            resolve_interscheme_symlink(link_path, flags, false)
         }
         Err(e) => Err(e),
+    }
+}
+
+fn dirfd_cwd(dirfd: i32) -> Option<usize> {
+    if dirfd == fcntl::AT_FDCWD {
+        None
+    } else {
+        Some(dirfd as usize)
     }
 }
 
@@ -325,7 +329,64 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
         Err(e) if e == Error::new(EXDEV) => {
             let link_path = read_interscheme_link_content(None, &path, is_relative);
             let link_path = openat2_path(fcntl::AT_FDCWD, link_path?, 0)?;
-            resolve_interscheme_symlink(link_path, flags)
+            resolve_interscheme_symlink(link_path, flags, false)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// "Normalize" `dir` fd to the parent of `path` to resolve all symlinks
+/// across schemes in-between and return the normalized dir fd and filename.
+pub fn resolve_open_to_dir<'a>(
+    dir: c_int,
+    path: &'a RedoxStr<'a>,
+) -> Result<(FdGuardUpper, RedoxReference<'a>)> {
+    let (dirname, Some(basename)) = path.dirname_split() else {
+        return Err(Error::new(EINVAL));
+    };
+    let (fd, newpath, is_rela) = match dirname.clone() {
+        RedoxStr::Absolute(abs) => (None, abs.to_standard(), false),
+        RedoxStr::Relative(mut rel) => {
+            if rel.as_ref().is_empty() {
+                rel = RedoxReference::new(".").unwrap();
+            }
+            (
+                Some(if dir == fcntl::AT_FDCWD {
+                    let cwd_guard = current_dir()?;
+                    let cwd = cwd_guard.as_ref().unwrap();
+                    cwd.fd.as_raw_fd()
+                } else {
+                    dir as usize
+                }),
+                rel,
+                true,
+            )
+        }
+    };
+    let flags = syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC;
+    let guard = match fd {
+        Some(fd) => redox_rt::sys::openat_into_upper(fd, newpath.as_ref(), flags, 0),
+        None => redox_rt::sys::open_into_upper(newpath.as_ref(), flags),
+    };
+    trace_log!(
+        "resolve_open_to_dir({:?}) = [{:?}, {:?}] {:?}",
+        path,
+        newpath.as_ref(),
+        basename.as_ref(),
+        guard
+    );
+
+    match guard {
+        Ok(fd) => Ok((FdGuard::new(fd).to_upper()?, basename)),
+        Err(e) if e == Error::new(EXDEV) => {
+            let link_path = read_interscheme_link_content(
+                dirfd_cwd(dir),
+                dirname.to_standard().as_ref(),
+                is_rela,
+            );
+            let link_path = openat2_path(dir, link_path?, 0)?;
+            let fd = resolve_interscheme_symlink(link_path, flags, true)?;
+            Ok((FdGuard::new(fd).to_upper()?, basename))
         }
         Err(e) => Err(e),
     }
