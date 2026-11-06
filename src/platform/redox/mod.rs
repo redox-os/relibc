@@ -35,7 +35,8 @@ use crate::{
         },
         fcntl::{
             self, AT_EACCESS, AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, F_GETLK,
-            F_OFD_GETLK, F_OFD_SETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
+            F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK,
+            flock,
         },
         limits::{self},
         poll::pollfd,
@@ -483,9 +484,9 @@ impl Pal for Sys {
         };
 
         let cmd = if (operation & sys_file::LOCK_NB) != 0 {
-            F_SETLK
+            F_OFD_SETLK
         } else {
-            F_SETLKW
+            F_OFD_SETLKW
         };
 
         let args = &raw mut fl as usize as c_ulonglong;
