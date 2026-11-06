@@ -1,15 +1,11 @@
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
 use core::{
     convert::TryFrom,
     mem::{self, size_of},
     num::NonZeroU64,
-    ptr, slice, str,
+    ptr, slice,
 };
 use object::bytes_of_slice_mut;
-use redox_path::{RedoxReference, RedoxStr, scheme_path};
+use redox_path::{RedoxReference, RedoxStr};
 use redox_protocols::protocol::{Rlimit, WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
@@ -17,7 +13,7 @@ use redox_rt::{
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, ESRCH, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
+    self, ESRCH, EXDEV, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
     data::{Map, TimeSpec as redox_timespec},
     dirent::DirentHeader,
 };
@@ -815,7 +811,6 @@ impl Pal for Sys {
         if (flags & !(AT_SYMLINK_FOLLOW)) != 0 {
             return Err(Errno(EINVAL));
         }
-        let newpath = RedoxStr::new_from_c(newpath.to_cstr()).ok_or(Errno(EINVAL))?;
 
         // By default, we don't follow the symlink if there is one.
         // We only follow it if AT_SYMLINK_FOLLOW is passed in flags.
@@ -828,41 +823,23 @@ impl Pal for Sys {
 
         let file = File::openat(fd1, oldpath, oflags)?;
 
-        match newpath {
-            RedoxStr::Absolute(abs_path) => {
-                let (scheme, reference) = abs_path.as_parts().ok_or(Errno(EINVAL))?;
-                let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
+        let new_path = RedoxStr::new_from_c(newpath.to_cstr()).ok_or(Error::new(EINVAL))?;
+        let (new_dfd, new_target) = path::resolve_open_to_dir(fd2, &new_path)?;
 
-                let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
-                let root_guard = FdGuard::new(redox_rt::sys::openat_into_upper(
-                    redox_rt::current_namespace_fd()?,
-                    &scheme_root_str,
-                    syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
-                    0,
-                )?);
+        let r = redox_rt::sys::flinkat(
+            *file as usize,
+            new_dfd.as_raw_fd(),
+            new_target.as_ref(),
+            flags as u32,
+        );
 
-                let newpath: Cow<'_, str> = reference.into();
-                redox_rt::sys::flinkat(
-                    *file as usize,
-                    root_guard.as_raw_fd(),
-                    &newpath,
-                    flags as u32,
-                )
-                .map_err(Into::into)
-            }
-            RedoxStr::Relative(rel_path) => {
-                let dirfd = if fd2 == fcntl::AT_FDCWD {
-                    let cwd_guard = path::current_dir()?;
-                    cwd_guard.as_ref().unwrap().fd.as_raw_fd() as usize
-                } else {
-                    fd2 as usize
-                };
+        trace_log!(
+            "flinkat({fd1}, {oldpath:?}, {fd2}, {newpath:?}, {flags:x}) = [{:?}] {:?}",
+            new_target.as_ref(),
+            r
+        );
 
-                let newpath: Cow<'_, str> = rel_path.into();
-                redox_rt::sys::flinkat(*file as usize, dirfd, &newpath, flags as u32)
-                    .map_err(Into::into)
-            }
-        }
+        r.map_err(Into::into)
     }
 
     fn lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
@@ -1186,7 +1163,7 @@ impl Pal for Sys {
         // Since this is used by realpath, it converts from the old format to the new one for
         // compatibility reasons
         let mut buf = [0; limits::PATH_MAX];
-        let redox_path = path::standard_fpath(fildes, &mut buf)?;
+        let redox_path = path::standard_fpath(fildes as usize, &mut buf)?;
 
         let mut cursor = io::Cursor::new(out);
         match write!(cursor, "{}", redox_path.as_ref()) {
@@ -1226,40 +1203,26 @@ impl Pal for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
 
-        let resolve = |path: &CStr, dir: c_int| -> Result<(usize, String, Option<FdGuard>)> {
-            let redox_path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
-            match redox_path {
-                RedoxStr::Absolute(abs) => {
-                    let (scheme, reference) = abs.as_parts().ok_or(Errno(EINVAL))?;
-                    let scheme_root_path = scheme_path(scheme.as_ref()).ok_or(Errno(EINVAL))?;
-                    let scheme_root_str: Cow<'_, str> = scheme_root_path.into();
-                    let guard = FdGuard::new(redox_rt::sys::openat_into_upper(
-                        redox_rt::current_namespace_fd()?,
-                        &scheme_root_str,
-                        syscall::O_DIRECTORY | redox_protocols::protocol::O_CLOEXEC,
-                        0,
-                    )?);
-                    let raw_fd = guard.as_raw_fd();
-                    Ok((raw_fd, reference.as_ref().to_string(), Some(guard)))
-                }
-                RedoxStr::Relative(rel) => {
-                    let dir_fd = if dir == fcntl::AT_FDCWD {
-                        let cwd_guard = path::current_dir()?;
-                        let cwd = cwd_guard.as_ref().unwrap();
-                        cwd.fd.as_raw_fd()
-                    } else {
-                        dir as usize
-                    };
-                    Ok((dir_fd, rel.as_ref().to_string(), None))
-                }
-            }
-        };
+        let oldpath = RedoxStr::new_from_c(old_path.to_cstr()).ok_or(Error::new(EINVAL))?;
+        let newpath = RedoxStr::new_from_c(new_path.to_cstr()).ok_or(Error::new(EINVAL))?;
+        let (old_dfd, old_target) = path::resolve_open_to_dir(old_dir, &oldpath)?;
+        let (new_dfd, new_target) = path::resolve_open_to_dir(new_dir, &newpath)?;
 
-        let (old_dfd, old_target, _old_guard) = resolve(&old_path, old_dir)?;
-        let (new_dfd, new_target, _new_guard) = resolve(&new_path, new_dir)?;
+        let r = redox_rt::sys::frenameat(
+            old_dfd.as_raw_fd(),
+            old_target.as_ref(),
+            new_dfd.as_raw_fd(),
+            new_target.as_ref(),
+            flags,
+        );
 
-        redox_rt::sys::frenameat(old_dfd, &old_target, new_dfd, &new_target, flags)
-            .map_err(Into::into)
+        trace_log!(
+            "frenameat({old_dir}, {old_path:?}, {new_dir}, {new_path:?}, {flags:x}) = [{:?}] {:?}",
+            new_target.as_ref(),
+            r
+        );
+
+        r.map_err(Into::into)
     }
 
     fn sched_yield() -> Result<()> {
@@ -1860,10 +1823,38 @@ impl Pal for Sys {
         if (flags & !AT_REMOVEDIR) != 0 {
             return Err(Errno(EINVAL));
         }
-        let path = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
-        let path = openat2_path(fd, path, 0)?;
-        let path: Cow<'_, str> = path.into();
-        redox_rt::sys::unlink(path, flags.try_into().map_err(|_| Errno(EINVAL))?)?;
+        let target = RedoxStr::new_from_c(path.to_cstr()).ok_or(Errno(EINVAL))?;
+        let target = openat2_path(fd, target, 0)?.to_standard();
+        let flags = flags.try_into().map_err(|_| Errno(EINVAL))?;
+        let r = redox_rt::sys::unlink(target.as_ref(), flags).map(|_| ());
+
+        if matches!(r, Err(Error { errno: EXDEV })) {
+            // slower path to make this work across scheme
+            let target: RedoxStr<'_> = target.into();
+            let (new_dfd, new_target) = path::resolve_open_to_dir(fd, &target)?;
+            let mut buf = [0; redox_path::PATH_MAX];
+            let target =
+                path::standard_fpath(new_dfd.as_raw_fd(), &mut buf)?.join_checked(new_target);
+            let r = redox_rt::sys::unlink(&target, flags).map(|_| ());
+            trace_log!(
+                "unlinkat ({fd}, {:?}, {:x}): [{}] {:?}",
+                path,
+                flags,
+                &target,
+                r
+            );
+            r?
+        } else {
+            trace_log!(
+                "unlinkat ({fd}, {:?}, {:x}): [{}] {:?}",
+                path,
+                flags,
+                &target,
+                r
+            );
+            r?
+        };
+
         Ok(())
     }
 
