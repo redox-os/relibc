@@ -465,9 +465,32 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn flock(_fd: c_int, _operation: c_int) -> Result<()> {
-        // TODO: Redox does not have file locking yet
-        Ok(())
+    fn flock(fd: c_int, operation: c_int) -> Result<()> {
+        let mut fl = flock {
+            l_type: 0,
+            l_whence: SEEK_SET as i16,
+            l_start: 0,
+            l_len: 0, // lock whole file
+            l_pid: 0,
+        };
+
+        let lock_type = operation & !(sys_file::LOCK_NB);
+        fl.l_type = match lock_type {
+            sys_file::LOCK_SH => F_RDLCK as i16,
+            sys_file::LOCK_EX => F_WRLCK as i16,
+            sys_file::LOCK_UN => F_UNLCK as i16,
+            _ => return Err(Errno(EINVAL)),
+        };
+
+        let cmd = if (operation & sys_file::LOCK_NB) != 0 {
+            F_SETLK
+        } else {
+            F_SETLKW
+        };
+
+        let args = &raw mut fl as usize as c_ulonglong;
+
+        Sys::fcntl(fd, cmd, args).map(|_| ())
     }
 
     unsafe fn fork() -> Result<pid_t> {

@@ -436,9 +436,6 @@ impl FileLock {
 
 impl Drop for FileLock {
     fn drop(&mut self) {
-        // FIXME should fd be fed into the flock call below?
-        let _fd = self.0;
-        self.0 = -1;
         let _ = Sys::flock(self.0, sys_file::LOCK_UN);
     }
 }
