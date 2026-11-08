@@ -1,112 +1,148 @@
 use crate::{
     error::{Errno, Result},
-    header::{
-        bits_sigset_t::sigset_t,
-        errno,
-        poll::{self, pollfd},
-        sys_epoll,
-    },
-    platform::{Sys, sys::FdGuard, types::c_int},
+    header::{bits_sigset_t::sigset_t, errno, poll},
+    platform::{Sys, types::c_int},
 };
+use alloc::vec::Vec;
+use core::{cell::Cell, mem::size_of};
 use redox_protocols::protocol::O_CLOEXEC;
+use syscall::{Event, EventFlags, O_NONBLOCK};
+
+// TODO: close on thread exit?
+#[thread_local]
+static CACHED_EVENT_FD: Cell<Option<usize>> = Cell::new(None);
 
 impl Sys {
     /// Wrapper to use epoll for poll
-    /// TODO: need to use /scheme/event directly with upper table
     pub(crate) fn redox_poll(
-        fds: &mut [pollfd],
+        fds: &mut [poll::pollfd],
         timeout: c_int,
         sigmask: Option<&sigset_t>,
     ) -> Result<c_int> {
         let event_map = [
-            (poll::POLLIN, sys_epoll::EPOLLIN),
-            (poll::POLLPRI, sys_epoll::EPOLLPRI),
-            (poll::POLLOUT, sys_epoll::EPOLLOUT),
-            (poll::POLLERR, sys_epoll::EPOLLERR),
-            (poll::POLLHUP, sys_epoll::EPOLLHUP),
-            (poll::POLLNVAL, sys_epoll::EPOLLNVAL),
-            (poll::POLLRDNORM, sys_epoll::EPOLLRDNORM),
-            (poll::POLLWRNORM, sys_epoll::EPOLLWRNORM),
-            (poll::POLLRDBAND, sys_epoll::EPOLLRDBAND),
-            (poll::POLLWRBAND, sys_epoll::EPOLLWRBAND),
+            (poll::POLLIN, EventFlags::EVENT_READ),
+            (poll::POLLOUT, EventFlags::EVENT_WRITE),
+            (poll::POLLERR, EventFlags::EVENT_ERR),
+            (poll::POLLHUP, EventFlags::EVENT_HUP),
+            // TODO: EventFlags::EVENT_NVAL
+            (poll::POLLNVAL, EventFlags::from_bits_retain(16)),
+            // TODO: 5 remaining poll flags...
         ];
 
-        let ep = FdGuard::open_into_upper("/scheme/event", syscall::O_RDWR | O_CLOEXEC)?;
+        let ep_fd = match CACHED_EVENT_FD.get() {
+            Some(fd) => fd,
+            None => {
+                let ep =
+                    redox_rt::sys::open_into_upper("/scheme/event", syscall::O_RDWR | O_CLOEXEC)?;
+                CACHED_EVENT_FD.set(Some(ep));
+                ep
+            }
+        };
 
-        let mut closed = 0;
-        for (i, fd) in fds.iter_mut().enumerate() {
-            let pfd = fd;
-
+        let mut valid_count = 0;
+        for pfd in fds.iter_mut() {
             pfd.revents = 0;
+            if pfd.fd >= 0 {
+                valid_count += 1;
+            }
+        }
 
-            // Ignore the entry with negative fd
+        let total_capacity = (valid_count + 1) * 2;
+
+        let mut stack_buf = [Event::default(); 64];
+        let mut heap_buf = Vec::new();
+
+        let buf_slice = if total_capacity <= 64 {
+            &mut stack_buf[..total_capacity]
+        } else {
+            heap_buf.resize(total_capacity, Event::default());
+            &mut heap_buf[..]
+        };
+
+        let mut input_idx = 0;
+        for (original_idx, pfd) in fds.iter().enumerate() {
             if pfd.fd < 0 {
                 continue;
             }
 
-            let mut event = sys_epoll::epoll_event::new(0, sys_epoll::epoll_data { u64: i as u64 });
-
-            for (p, ep) in event_map.iter() {
+            let mut flags = EventFlags::empty();
+            for (p, ep) in &event_map[..2] {
                 if pfd.events & p > 0 {
-                    event.events |= ep;
+                    flags |= *ep;
                 }
             }
 
-            match Self::redox_epoll_ctl(
-                ep.as_raw_fd(),
-                sys_epoll::EPOLL_CTL_ADD,
-                pfd.fd,
-                Some(&mut event),
-            ) {
-                Ok(()) => {}
-                Err(Errno(errno::EBADF)) => {
-                    pfd.revents |= poll::POLLNVAL;
-                    closed += 1;
+            buf_slice[input_idx] = Event {
+                id: pfd.fd as usize,
+                flags,
+                data: original_idx,
+            };
+            input_idx += 1;
+        }
+
+        if timeout >= 0 {
+            buf_slice[input_idx] = Event {
+                id: syscall::EVENT_TIMEOUT_ID,
+                flags: EventFlags::EVENT_READ,
+                data: timeout as usize,
+            };
+            input_idx += 1;
+        }
+
+        let read_flags = if timeout == 0 { O_NONBLOCK as u64 } else { 0 };
+        let write_len = input_idx * size_of::<Event>();
+
+        let metadata = [0, write_len as u64, read_flags];
+        let payload_ptr = buf_slice.as_mut_ptr().cast::<u8>();
+        let payload_len = buf_slice.len() * size_of::<Event>();
+
+        let callback = || {
+            redox_rt::sys::sys_call_rw(
+                ep_fd,
+                unsafe { core::slice::from_raw_parts_mut(payload_ptr, payload_len) },
+                syscall::CallFlags::empty(),
+                &metadata,
+            )
+        };
+
+        let bytes_read = match if let Some(sigmask) = sigmask {
+            let allowset = !*sigmask;
+            redox_rt::signal::callback_or_signal_async(allowset, callback)
+        } else {
+            callback()
+        } {
+            Ok(b) => b,
+            Err(err) => {
+                if err.errno == errno::EBADF {
+                    CACHED_EVENT_FD.set(None);
                 }
-                Err(Errno(err)) => {
-                    return Err(Errno(err));
-                }
+                return Err(Errno(err.errno));
             }
-        }
+        };
 
-        // Early exit if there are fds, and all are closed (revents = POLLNVAL)
-        if closed > 0 && closed == fds.len() {
-            // TODO should we panic if fd.len() is greater than i32::MAX instead?
-            // seems unlikely we'll be dealing with that many file descriptors
-            return Ok(i32::try_from(closed).unwrap_or(i32::MAX));
-        }
+        let event_read = bytes_read / size_of::<Event>();
+        let event_buf = &buf_slice[input_idx..input_idx + event_read];
+        let mut count = 0;
 
-        let mut events = [sys_epoll::epoll_event::default(); 32];
+        for event in event_buf {
+            if event.id == syscall::EVENT_TIMEOUT_ID {
+                continue;
+            }
 
-        match Self::redox_epoll_pwait(ep.as_raw_fd(), &mut events, timeout, sigmask) {
-            Ok(res) => {
-                for event in events.iter().take(res) {
-                    let pi: usize = event.data.into();
-                    // TODO: Error status when fd does not match?
-                    if let Some(pfd) = fds.get_mut(pi) {
-                        for (p, ep) in event_map.iter() {
-                            if event.events & ep > 0 {
-                                pfd.revents |= p;
-                            }
-                        }
+            let original_idx = event.data;
+            if let Some(pfd) = fds.get_mut(original_idx) {
+                for (p, ep) in &event_map {
+                    if event.flags.contains(*ep) {
+                        pfd.revents |= *p;
                     }
                 }
-            }
-            Err(Errno(err)) => {
-                if err == errno::EINTR && closed > 0 {
-                    // some fds are closed by signal
-                } else {
-                    return Err(Errno(err));
+
+                if pfd.revents > 0 {
+                    count += 1;
                 }
             }
         }
 
-        let mut count = 0;
-        for pfd in fds.iter() {
-            if pfd.revents > 0 {
-                count += 1;
-            }
-        }
-        Ok(count)
+        Ok(count as c_int)
     }
 }

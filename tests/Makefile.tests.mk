@@ -72,6 +72,7 @@ EXPECT_NAMES=\
 	locale/setlocale \
 	malloc/usable_size \
 	math \
+	poll/pollnval \
 	regex \
 	semaphore/lock \
 	setjmp \
@@ -236,6 +237,7 @@ VARIED_NAMES=\
 	link/dl-iterate-phdr \
 	limits \
 	limits_cpp \
+	poll/poll \
 	pthread/timedwait \
 	pty/forkpty \
 	psignal \
