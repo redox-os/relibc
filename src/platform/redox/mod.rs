@@ -1,4 +1,5 @@
 use core::{
+    cell::Cell,
     convert::TryFrom,
     mem::{self, size_of},
     num::NonZeroU64,
@@ -102,6 +103,10 @@ fn cvt_uid(id: c_int) -> Result<Option<u32>> {
 }
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
+
+// TODO: close on thread exit?
+#[thread_local]
+static CACHED_RANDOM_FD: Cell<Option<[usize; 2]>> = Cell::new(None);
 
 /// Redox syscall implementation of [`Pal`].
 pub struct Sys;
@@ -672,21 +677,42 @@ impl Pal for Sys {
     }
 
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
-        let path = if flags & sys_random::GRND_RANDOM != 0 {
-            //TODO: /dev/random equivalent
-            "/scheme/rand"
-        } else {
-            "/scheme/rand"
+        let rnd_fd = match CACHED_RANDOM_FD.get() {
+            Some(fd) => fd,
+            None => {
+                let path = if flags & sys_random::GRND_RANDOM != 0 {
+                    //TODO: /dev/random equivalent
+                    "/scheme/rand"
+                } else {
+                    "/scheme/rand"
+                };
+                let open_flags1 = syscall::O_RDONLY | redox_protocols::protocol::O_CLOEXEC;
+                let open_flags2 = open_flags1 | syscall::O_NONBLOCK;
+                let ep = [
+                    redox_rt::sys::open_into_upper(path, open_flags1)?,
+                    redox_rt::sys::open_into_upper(path, open_flags2)?,
+                ];
+                //TODO: different fd to save if /dev/random equivalent is used
+                CACHED_RANDOM_FD.set(Some(ep.clone()));
+                ep
+            }
         };
 
-        let mut open_flags = syscall::O_RDONLY | redox_protocols::protocol::O_CLOEXEC;
-        if flags & sys_random::GRND_NONBLOCK != 0 {
-            open_flags |= syscall::O_NONBLOCK;
-        }
+        let rnd_fd = if flags & sys_random::GRND_NONBLOCK != 0 {
+            rnd_fd[1]
+        } else {
+            rnd_fd[0]
+        };
 
-        //TODO: store fd internally
-        let fd = FdGuard::open(path, open_flags)?;
-        Ok(fd.read(buf)?)
+        match syscall::read(rnd_fd, buf) {
+            Ok(b) => Ok(b),
+            Err(err) => {
+                if err.errno == EBADF {
+                    CACHED_RANDOM_FD.set(None);
+                }
+                return Err(Errno(err.errno));
+            }
+        }
     }
 
     fn getresgid(
