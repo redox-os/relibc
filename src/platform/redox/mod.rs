@@ -1,4 +1,5 @@
 use core::{
+    cell::Cell,
     convert::TryFrom,
     mem::{self, size_of},
     num::NonZeroU64,
@@ -102,6 +103,10 @@ fn cvt_uid(id: c_int) -> Result<Option<u32>> {
 }
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
+
+// TODO: close on thread exit?
+#[thread_local]
+static CACHED_RANDOM_FD: Cell<Option<[usize; 2]>> = Cell::new(None);
 
 /// Redox syscall implementation of [`Pal`].
 pub struct Sys;
@@ -210,7 +215,7 @@ impl Pal for Sys {
             CLOCK_MONOTONIC => "/scheme/time/4/getres",
             _ => return Err(Errno(EINVAL)),
         };
-        let timerfd = FdGuard::open(path, syscall::O_RDONLY)?;
+        let timerfd = FdGuard::open_into_upper(path, syscall::O_RDONLY)?;
         let mut redox_res = syscall::TimeSpec::default();
         let buffer_len = mem::size_of::<syscall::TimeSpec>();
         let buffer =
@@ -672,21 +677,42 @@ impl Pal for Sys {
     }
 
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
-        let path = if flags & sys_random::GRND_RANDOM != 0 {
-            //TODO: /dev/random equivalent
-            "/scheme/rand"
-        } else {
-            "/scheme/rand"
+        let rnd_fd = match CACHED_RANDOM_FD.get() {
+            Some(fd) => fd,
+            None => {
+                let path = if flags & sys_random::GRND_RANDOM != 0 {
+                    //TODO: /dev/random equivalent
+                    "/scheme/rand"
+                } else {
+                    "/scheme/rand"
+                };
+                let open_flags1 = syscall::O_RDONLY | redox_protocols::protocol::O_CLOEXEC;
+                let open_flags2 = open_flags1 | syscall::O_NONBLOCK;
+                let ep = [
+                    redox_rt::sys::open_into_upper(path, open_flags1)?,
+                    redox_rt::sys::open_into_upper(path, open_flags2)?,
+                ];
+                //TODO: different fd to save if /dev/random equivalent is used
+                CACHED_RANDOM_FD.set(Some(ep.clone()));
+                ep
+            }
         };
 
-        let mut open_flags = syscall::O_RDONLY | redox_protocols::protocol::O_CLOEXEC;
-        if flags & sys_random::GRND_NONBLOCK != 0 {
-            open_flags |= syscall::O_NONBLOCK;
-        }
+        let rnd_fd = if flags & sys_random::GRND_NONBLOCK != 0 {
+            rnd_fd[1]
+        } else {
+            rnd_fd[0]
+        };
 
-        //TODO: store fd internally
-        let fd = FdGuard::open(path, open_flags)?;
-        Ok(fd.read(buf)?)
+        match syscall::read(rnd_fd, buf) {
+            Ok(b) => Ok(b),
+            Err(err) => {
+                if err.errno == EBADF {
+                    CACHED_RANDOM_FD.set(None);
+                }
+                return Err(Errno(err.errno));
+            }
+        }
     }
 
     fn getresgid(
@@ -1295,7 +1321,7 @@ impl Pal for Sys {
         use crate::header::spawn::Flags;
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
         let mut cwd = path::clone_cwd().unwrap_or_default();
-        let mut cwd_fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
+        let mut cwd_fd = FdGuard::open_into_upper(cwd.as_str(), syscall::O_STAT)?;
         let proc_fd = child.proc_fd.unwrap();
         let _curr_proc_fd = redox_rt::current_proc_fd(); // TODO use this variable?
         let cur_filetable_fd = RtTcb::current().thread_fd().dup_into_upper(b"filetable")?;
@@ -1360,7 +1386,7 @@ impl Pal for Sys {
                         let cwd_str =
                             core::str::from_utf8(path.as_bytes()).map_err(|_| Errno(EINVAL))?;
                         cwd = to_cwd_path(cwd_str)?;
-                        let fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
+                        let fd = FdGuard::open_into_upper(cwd.as_str(), syscall::O_STAT)?;
                         cwd_fd = fd;
                     }
                     crate::header::spawn::Action::FChdir(fd) => {
@@ -1371,7 +1397,7 @@ impl Pal for Sys {
                             buf.set_len(res);
                         }
                         cwd = buf;
-                        let fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
+                        let fd = FdGuard::open_into_upper(cwd.as_str(), syscall::O_STAT)?;
                         cwd_fd = fd;
                     }
                     crate::header::spawn::Action::Dup2(old, new) => {
@@ -1564,7 +1590,7 @@ impl Pal for Sys {
                 CStr::from_bytes_with_nul(&interp_path).map_err(|_| Errno(ENOEXEC))?;
             let interp_path =
                 RedoxReference::new_from_c(interp_path.to_cstr()).ok_or(Errno(ENOEXEC))?;
-            let interpreter = FdGuard::open(interp_path.as_ref(), syscall::O_RDONLY)?.to_upper()?;
+            let interpreter = FdGuard::open_into_upper(interp_path.as_ref(), syscall::O_RDONLY)?;
 
             redox_rt::proc::fexec_impl(
                 interpreter,

@@ -9,9 +9,10 @@ use crate::{
     fs::File,
     header::{limits::PATH_MAX, string::strlen},
     io::{BufReader, SeekFrom, prelude::*},
-    platform::types::*,
+    platform::{sys::path, types::*},
 };
 
+use redox_path::RedoxStr;
 use redox_rt::{
     RtTcb,
     proc::{ExtraInfo, FdGuard, FdGuardUpper, FexecResult, InterpOverride},
@@ -80,7 +81,7 @@ pub fn execve(
 ) -> Result<Infallible> {
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
-    let (mut image_file, stat, arg0) = match exec {
+    let (image_file, stat, arg0) = match exec {
         Executable::AtPath(path) => {
             let Ok(src_fd) = File::open(path, O_RDONLY as c_int) else {
                 return Err(Error::new(ENOENT));
@@ -97,6 +98,7 @@ pub fn execve(
             (file, stat, arg0)
         }
     };
+    let exec_fd_guard = FdGuard::new(image_file.fd as _).to_upper().unwrap();
 
     // With execve now being implemented in userspace, we need to check ourselves that this
     // file is actually executable. While checking for read permission is unnecessary as the
@@ -126,7 +128,9 @@ pub fn execve(
     let cwd = super::path::clone_cwd().unwrap_or_default();
 
     // Path to interpreter binary and args if found
-    let (interpreter_path, interpreter_args) = { parse_interpreter(&mut image_file)? };
+    let mut exec_fd_guard = ExecFdGuardWrapper::new(exec_fd_guard);
+    let (interpreter_path, interpreter_args) = { parse_interpreter(&mut exec_fd_guard)? };
+    let mut exec_fd_guard = exec_fd_guard.take();
 
     // Total number of arguments which includes the interpreter if interpreted and its args
     let mut len = 0;
@@ -163,8 +167,12 @@ pub fn execve(
     let mut args: Vec<&[u8]> = Vec::with_capacity(len);
 
     if let Some(interpreter) = &interpreter_path {
-        image_file = File::open(CStr::borrow(interpreter), O_RDONLY as c_int)
-            .map_err(|_| Error::new(ENOENT))?;
+        exec_fd_guard = FdGuard::new(path::open(
+            RedoxStr::new_from_c(interpreter.as_c_str()).ok_or(Error::new(EINVAL))?,
+            O_RDONLY,
+            true,
+        )?)
+        .to_upper()?;
 
         // Push interpreter to arguments
         args.push(interpreter.as_bytes());
@@ -174,8 +182,8 @@ pub fn execve(
             args.push(args_ref.as_bytes());
         }
     } else {
-        image_file
-            .seek(SeekFrom::Start(0))
+        exec_fd_guard
+            .lseek(0, SEEK_SET)
             .map_err(|_| Error::new(EIO))?;
     }
 
@@ -233,10 +241,6 @@ pub fn execve(
         }
     };
 
-    // TODO: Convert image_file to FdGuard earlier?
-    let exec_fd_guard = FdGuard::new(image_file.fd as usize).to_upper().unwrap();
-    core::mem::forget(image_file);
-
     let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
     let filetable_binary_fd = RtTcb::current()
@@ -267,6 +271,40 @@ pub fn execve(
     )
 }
 
+struct ExecFdGuardWrapper {
+    pub fd: FdGuardUpper,
+}
+
+impl ExecFdGuardWrapper {
+    pub fn new(fd: FdGuardUpper) -> Self {
+        Self { fd }
+    }
+    pub fn take(self) -> FdGuardUpper {
+        self.fd
+    }
+}
+
+impl Read for ExecFdGuardWrapper {
+    fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
+        self.fd
+            .read(buf)
+            .map_err(|e| crate::io::Error::from_raw_os_error(e.errno))
+    }
+}
+
+impl Seek for ExecFdGuardWrapper {
+    fn seek(&mut self, pos: SeekFrom) -> crate::io::Result<u64> {
+        let (pos, whence) = match pos {
+            SeekFrom::Start(p) => (p as isize, SEEK_SET),
+            SeekFrom::End(p) => (p as isize, SEEK_END),
+            SeekFrom::Current(p) => (p as isize, SEEK_CUR),
+        };
+        match self.fd.lseek(pos, whence) {
+            Ok(pos) => Ok(pos as u64),
+            Err(e) => Err(crate::io::Error::from_raw_os_error(e.errno)),
+        }
+    }
+}
 // Parse the interpreter and its args if `reader` starts with a shebang (#!).
 //
 // # Return
