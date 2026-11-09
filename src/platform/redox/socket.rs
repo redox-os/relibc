@@ -605,7 +605,7 @@ impl PalSocket for Sys {
 
                 let dir_path: Cow<'_, str> = dir_path.into();
                 let fs_bind_result = (|| -> Result<()> {
-                    let dirfd = FdGuard::open(
+                    let dirfd = FdGuard::open_into_upper(
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | O_CLOEXEC,
                     )?;
@@ -1105,7 +1105,7 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = FdGuard::open("/scheme/uds_stream", flags | O_CREAT)?;
+                let listener = FdGuard::open_into_upper("/scheme/uds_stream", flags | O_CREAT)?;
 
                 // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
@@ -1119,6 +1119,7 @@ impl PalSocket for Sys {
                 Ok(())
             }
             (AF_UNIX, SOCK_DGRAM) => {
+                // Not upper fd as this is part of the response
                 let listener = FdGuard::open("/scheme/uds_dgram", flags | O_CREAT)?;
 
                 // For now, uds_dgram: lets connects be instant, and instead blocks
