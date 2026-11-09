@@ -166,9 +166,11 @@ pub fn clone_cwd() -> Option<CwdPath> {
     CWD.read().as_ref().map(|cwd| cwd.path)
 }
 
-fn open_absolute(path: &str, flags: usize) -> Result<usize> {
-    if path.starts_with(libcscheme::LIBC_SCHEME) {
+fn open_absolute(path: &str, flags: usize, to_upper: bool) -> Result<usize> {
+    if path.starts_with(libcscheme::LIBC_SCHEME) && !to_upper {
         libcscheme::open(path, flags)
+    } else if to_upper {
+        redox_rt::sys::open_into_upper(path, flags)
     } else {
         redox_rt::sys::open(path, flags)
     }
@@ -220,7 +222,7 @@ fn resolve_interscheme_symlink<'a>(
             // TODO: libc scheme?
             redox_rt::sys::open_into_upper(&cow, flags)
         } else {
-            open_absolute(&cow, flags)
+            open_absolute(&cow, flags, to_upper)
         };
         trace_log!(
             "resolve_interscheme_symlink({:?}, {}): {:?}",
@@ -249,7 +251,7 @@ pub fn openat(dirfd: c_int, path: RedoxStr<'_>, flags: usize) -> Result<usize> {
     }
 
     if !path.is_relative() {
-        return open(path, flags);
+        return open(path, flags, false);
     }
 
     let _siglock = tmp_disable_signals();
@@ -295,7 +297,7 @@ fn dirfd_cwd(dirfd: i32) -> Option<usize> {
 }
 
 // TODO: Move to redox-rt, or maybe part of it?
-pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
+pub fn open(path: RedoxStr<'_>, flags: usize, to_upper: bool) -> Result<usize> {
     if path.is_empty() {
         return Err(Error::new(ENOENT));
     }
@@ -307,14 +309,22 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
     // First try
     let initial_res = if is_relative {
         let fcntl_flags = flags & syscall::O_FCNTL_MASK;
-        current_dir()?
-            .as_ref()
-            .unwrap()
-            .fd
-            .openat(&path, flags, fcntl_flags)
-            .map(|fd: FdGuard| fd.take())
+        let cwd = current_dir()?;
+        if to_upper {
+            cwd.as_ref()
+                .unwrap()
+                .fd
+                .openat(&path, flags, fcntl_flags)
+                .map(|fd| fd.take())
+        } else {
+            cwd.as_ref()
+                .unwrap()
+                .fd
+                .openat_into_upper(&path, flags, fcntl_flags)
+                .map(|fd| fd.take())
+        }
     } else {
-        open_absolute(&path, flags)
+        open_absolute(&path, flags, to_upper)
     };
 
     trace_log!(
@@ -329,7 +339,7 @@ pub fn open(path: RedoxStr<'_>, flags: usize) -> Result<usize> {
         Err(e) if e == Error::new(EXDEV) => {
             let link_path = read_interscheme_link_content(None, &path, is_relative);
             let link_path = openat2_path(fcntl::AT_FDCWD, link_path?, 0)?;
-            resolve_interscheme_symlink(link_path, flags, false)
+            resolve_interscheme_symlink(link_path, flags, to_upper)
         }
         Err(e) => Err(e),
     }
