@@ -210,7 +210,7 @@ impl Pal for Sys {
             CLOCK_MONOTONIC => "/scheme/time/4/getres",
             _ => return Err(Errno(EINVAL)),
         };
-        let timerfd = FdGuard::open(path, syscall::O_RDONLY)?;
+        let timerfd = FdGuard::open_into_upper(path, syscall::O_RDONLY)?;
         let mut redox_res = syscall::TimeSpec::default();
         let buffer_len = mem::size_of::<syscall::TimeSpec>();
         let buffer =
@@ -1295,7 +1295,7 @@ impl Pal for Sys {
         use crate::header::spawn::Flags;
         let child = redox_rt::proc::new_child_process(&redox_rt::proc::ForkArgs::Managed)?;
         let mut cwd = path::clone_cwd().unwrap_or_default();
-        let mut cwd_fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
+        let mut cwd_fd = FdGuard::open_into_upper(cwd.as_str(), syscall::O_STAT)?;
         let proc_fd = child.proc_fd.unwrap();
         let _curr_proc_fd = redox_rt::current_proc_fd(); // TODO use this variable?
         let cur_filetable_fd = RtTcb::current().thread_fd().dup_into_upper(b"filetable")?;
@@ -1360,7 +1360,7 @@ impl Pal for Sys {
                         let cwd_str =
                             core::str::from_utf8(path.as_bytes()).map_err(|_| Errno(EINVAL))?;
                         cwd = to_cwd_path(cwd_str)?;
-                        let fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
+                        let fd = FdGuard::open_into_upper(cwd.as_str(), syscall::O_STAT)?;
                         cwd_fd = fd;
                     }
                     crate::header::spawn::Action::FChdir(fd) => {
@@ -1371,7 +1371,7 @@ impl Pal for Sys {
                             buf.set_len(res);
                         }
                         cwd = buf;
-                        let fd = FdGuard::open(cwd.as_str(), syscall::O_STAT)?.to_upper()?;
+                        let fd = FdGuard::open_into_upper(cwd.as_str(), syscall::O_STAT)?;
                         cwd_fd = fd;
                     }
                     crate::header::spawn::Action::Dup2(old, new) => {
@@ -1564,7 +1564,7 @@ impl Pal for Sys {
                 CStr::from_bytes_with_nul(&interp_path).map_err(|_| Errno(ENOEXEC))?;
             let interp_path =
                 RedoxReference::new_from_c(interp_path.to_cstr()).ok_or(Errno(ENOEXEC))?;
-            let interpreter = FdGuard::open(interp_path.as_ref(), syscall::O_RDONLY)?.to_upper()?;
+            let interpreter = FdGuard::open_into_upper(interp_path.as_ref(), syscall::O_RDONLY)?;
 
             redox_rt::proc::fexec_impl(
                 interpreter,
