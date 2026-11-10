@@ -304,6 +304,7 @@ VARIED_NAMES=\
 	sys_epoll/epoll \
 	sys_epoll/epoll_del \
 	sys_epoll/epollet \
+	sys_ioctl/tiocsctty \
 	sys_mman/mmap \
 	sys_mman/posix_madvise \
 	sys_resource/constants \
