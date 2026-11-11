@@ -35,8 +35,9 @@ pub unsafe fn init() {
 
     let thread = Pthread {
         waitval: Waitval::new(),
-        has_enabled_cancelation: AtomicBool::new(false),
+        has_enabled_cancelation: AtomicBool::new(true),
         has_queued_cancelation: AtomicBool::new(false),
+        has_async_cancelation: AtomicBool::new(false),
         flags: PthreadFlags::empty().bits().into(),
 
         //index: FIRST_THREAD_IDX,
@@ -77,6 +78,7 @@ pub struct Pthread {
     pub(crate) waitval: Waitval<Retval>,
     pub(crate) has_queued_cancelation: AtomicBool,
     pub(crate) has_enabled_cancelation: AtomicBool,
+    pub(crate) has_async_cancelation: AtomicBool,
     pub(crate) flags: AtomicUsize,
 
     pub(crate) stack_base: *mut c_void,
@@ -369,7 +371,9 @@ pub unsafe fn cancel(thread: &Pthread) -> Result<(), Errno> {
     // TODO: What order should these atomic bools be accessed in?
     thread.has_queued_cancelation.store(true, Ordering::Release);
 
-    if thread.has_enabled_cancelation.load(Ordering::Acquire) {
+    if thread.has_enabled_cancelation.load(Ordering::Acquire)
+        && thread.has_async_cancelation.load(Ordering::Acquire)
+    {
         (unsafe { Sys::rlct_kill(thread.os_tid.get().read(), SIGRT_RLCT_CANCEL) })?;
     }
 
@@ -417,17 +421,23 @@ pub fn set_cancel_state(state: c_int) -> Result<c_int, Errno> {
     })
 }
 pub fn set_cancel_type(ty: c_int) -> Result<c_int, Errno> {
-    #[expect(unused_variables, reason = "function not yet fully implemented")]
     let this_thread = current_thread().expect("current thread not present");
 
-    // TODO
-    match ty {
-        header::PTHREAD_CANCEL_DEFERRED => (),
-        header::PTHREAD_CANCEL_ASYNCHRONOUS => (),
+    let new_async = match ty {
+        header::PTHREAD_CANCEL_DEFERRED => false,
+        header::PTHREAD_CANCEL_ASYNCHRONOUS => true,
 
         _ => return Err(Errno(EINVAL)),
-    }
-    Ok(header::PTHREAD_CANCEL_DEFERRED)
+    };
+
+    let was_async = this_thread
+        .has_async_cancelation
+        .swap(new_async, Ordering::AcqRel);
+
+    Ok(match was_async {
+        true => header::PTHREAD_CANCEL_ASYNCHRONOUS,
+        false => header::PTHREAD_CANCEL_DEFERRED,
+    })
 }
 #[expect(unused_variables, reason = "function not yet fully implemented")]
 pub fn get_cpu_clkid(thread: &Pthread) -> Result<clockid_t, Errno> {
