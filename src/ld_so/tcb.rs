@@ -99,8 +99,9 @@ impl Tcb {
                 pthread: Pthread {
                     waitval: Waitval::new(),
                     flags: Default::default(),
-                    has_enabled_cancelation: AtomicBool::new(false),
+                    has_enabled_cancelation: AtomicBool::new(true),
                     has_queued_cancelation: AtomicBool::new(false),
+                    has_async_cancelation: AtomicBool::new(false),
                     stack_base: core::ptr::null_mut(),
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
