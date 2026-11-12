@@ -1,19 +1,19 @@
 use core::{mem, ptr, slice};
-use redox_protocols::protocol::TtyCall;
+use redox_protocols::protocol::{ProcCall, TtyCall};
 use syscall::{self, flag::CallFlags};
 
 use crate::{
     error::{Errno, Result},
     header::{
         bits_winsize::winsize,
-        errno::EINVAL,
+        errno::{EINVAL, ENOTTY, EPERM},
         fcntl,
         sys_ioctl::constants::{
             FIONBIO, SIOCATMARK, TCFLSH, TCGETS, TCSBRK, TCSETS, TCSETSF, TCSETSW, TCXONC,
             TIOCGPGRP, TIOCGPTLCK, TIOCGPTN, TIOCGSID, TIOCGWINSZ, TIOCSCTTY, TIOCSPGRP,
             TIOCSPTLCK, TIOCSWINSZ,
         },
-        termios, unistd,
+        sys_wait, termios, unistd,
     },
     platform::{
         Pal, Sys,
@@ -138,7 +138,69 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             sys_call_write(fd, TtyCall::Flow, &arg)?;
         }
         TIOCSCTTY => {
-            todo_skip!(0, "ioctl TIOCSCTTY");
+            // fd, TIOCSCTTY, 0 (set cont term for caller session)
+            // fd, TIOCSCTTY, 1 (steal cont term from another session for caller session)
+            // both cases require caller to be session leader and caller session to have no cont term
+            let arg = out as c_int;
+            // only 0 and 1 are valid values for arg
+            let should_steal = match arg {
+                0 => 0, // don't steal
+                1 => 1, // steal
+                _ => return Err(Errno(EINVAL)),
+            };
+            let pid = unistd::getpid();
+            let sid = unistd::getsid(0);
+            // check if caller is session leader
+            if pid != sid {
+                return Err(Errno(EPERM));
+            }
+            // fd should refer to a terminal
+            // TODO: remove this check? seems to be assumed that caller should ensure this beforehand
+            if unistd::isatty(fd) == 0 {
+                return Err(Errno(ENOTTY));
+            }
+            let procfd_usize = redox_rt::current_proc_fd().as_raw_fd();
+            let target_group = usize::try_from(pid).expect("positive and within bounds");
+            match redox_rt::sys::openat(procfd_usize, format!("pgrp/{target_group}"), 0, 0) {
+                // caller session does not have a controlling terminal
+                Err(e) if Errno(ENOTTY) == e.into() => {
+                    // create a new process to assign the controlling terminal from
+                    let child = unsafe { unistd::fork() };
+                    // only executes in child process
+                    if child == 0 {
+                        let procfd_usize = redox_rt::current_proc_fd().as_raw_fd();
+                        let _ = unistd::setsid();
+                        // send pty to procmgr to become controlling terminal for the session
+                        redox_rt::sys::sys_call_wo(
+                            redox_rt::sys::dup(procfd_usize, b"proc-obj").expect("process exists"),
+                            &redox_rt::sys::dup(fd as usize, &[])
+                                .expect("exists")
+                                .to_ne_bytes(),
+                            CallFlags::FD | CallFlags::FD_CLONE, // on_sendfd in procmgr
+                            &[ProcCall::ControlTerm as u64, should_steal],
+                        )?;
+                        // send process group handle to ptyd
+                        redox_rt::sys::sys_call_wo(
+                            redox_rt::sys::dup(fd as usize, &[])
+                                .expect("positive and within bounds"), // the pty fd
+                            &redox_rt::sys::dup(procfd_usize, b"pgrp-obj")
+                                .expect("process exists")
+                                .to_ne_bytes(),
+                            CallFlags::FD | CallFlags::FD_CLONE, // on_sendfd in ptyd
+                            &[],
+                        )?;
+                        unistd::_exit(0);
+                    }
+                    // wait for child process to finish
+                    let _ = unsafe { sys_wait::waitpid(child, ptr::null_mut(), 0) };
+                }
+                // caller session already has a controlling terminal
+                Ok(pgrpobj_handle) => {
+                    let _ = unistd::close(pgrpobj_handle as c_int);
+                    return Err(Errno(EPERM));
+                }
+                Err(e) => return Err(Errno::from(e)),
+            }
         }
         // tcgetpgrp() and tcgetsid()
         TIOCGPGRP | TIOCGSID => {
@@ -152,7 +214,7 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
         TIOCSPGRP => {
             let pgrp = unsafe { *(out as *const pid_t) };
             sys_call_write(fd, TtyCall::Pgrp, &pgrp)?;
-            // TODO correct the below implementation
+            // TODO restore below after TIOCSCTTY
             /*
             if unistd::isatty(fd) == 0 {
                 return Err(Errno(ENOTTY));
@@ -162,10 +224,10 @@ pub unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Resu
             let target_group = pgrp as usize;
             let pgrpobj_handle =
                 redox_rt::sys::openat(procfd_usize, format!("pgrp/{target_group}"), 0, 0)?;
-            redox_rt::sys::sys_call_wo( // FIXME I think this must be incorrect
+            redox_rt::sys::sys_call_wo(
                 fd as usize,
                 &pgrpobj_handle.to_ne_bytes(),
-                CallFlags::FD,
+                CallFlags::FD, // on_sendfd in ptyd
                 &[],
             )?;
             */
