@@ -61,7 +61,6 @@ EXPECT_NAMES=\
 	fcntl/fcntl \
 	fcntl/open \
 	fcntl/openat \
-	fcntl/posix_fallocate \
 	features \
 	fnmatch \
 	glob \
@@ -232,6 +231,7 @@ EXPECT_NAMES=\
 VARIED_NAMES=\
 	dirent/main \
 	dirent/posix_getdents \
+	fcntl/posix_fallocate \
 	includes \
 	kill-waitpid \
 	link/dl-iterate-phdr \
