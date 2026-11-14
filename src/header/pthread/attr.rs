@@ -35,7 +35,7 @@ impl Default for RlctAttr {
             // TODO
             stack: 0,
             // TODO
-            stacksize: 1024 * 1024,
+            stacksize: 64 * 1024,
             param: sched_param {
                 // TODO
                 sched_priority: 0,

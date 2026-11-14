@@ -13,7 +13,7 @@ use super::ForkScratchpad;
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub const STACK_TOP: usize = 1 << 47;
-pub const STACK_SIZE: usize = 1024 * 1024;
+pub const STACK_SIZE: usize = 64 * 1024;
 
 #[derive(Debug, Default)]
 #[repr(C)]
