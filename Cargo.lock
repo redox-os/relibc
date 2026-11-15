@@ -286,7 +286,7 @@ dependencies = [
  "bitflags",
  "libc",
  "plain",
- "redox_syscall",
+ "redox_syscall 0.9.5",
 ]
 
 [[package]]
@@ -461,7 +461,7 @@ source = "git+https://gitlab.redox-os.org/redox-os/redox-buffer-pool.git#2597197
 dependencies = [
  "guard-trait",
  "log",
- "redox_syscall",
+ "redox_syscall 0.9.5",
  "spinning",
 ]
 
@@ -470,7 +470,7 @@ name = "redox-ioctl"
 version = "0.1.0"
 dependencies = [
  "drm-sys",
- "redox_syscall",
+ "redox_syscall 0.10.0",
 ]
 
 [[package]]
@@ -485,7 +485,7 @@ version = "0.1.0"
 source = "git+https://gitlab.redox-os.org/redox-os/redox-rings.git#c56099c15a30636e7a528a6b37676daa7d9b6788"
 dependencies = [
  "bitflags",
- "redox_syscall",
+ "redox_syscall 0.9.5",
  "zerocopy",
 ]
 
@@ -500,7 +500,7 @@ dependencies = [
  "libredox",
  "plain",
  "redox-path",
- "redox_syscall",
+ "redox_syscall 0.10.0",
 ]
 
 [[package]]
@@ -511,13 +511,23 @@ checksum = "c5018d583d6d2f5499352aea8d177e9067d1eb03ab17c78169d5ba7a30001b15"
 dependencies = [
  "bitflags",
  "libredox",
- "redox_syscall",
+ "redox_syscall 0.9.5",
 ]
 
 [[package]]
 name = "redox_syscall"
-version = "0.9.6"
-source = "git+https://gitlab.redox-os.org/redox-os/kernel/#7824a967b630d4a81c0dbe75a3e50a2a3657cacd"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "580c875845b41ecb1564ad1ae4703044cef774145e3d7a94dc2b3fa7c97868fd"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
+name = "redox_syscall"
+version = "0.10.0"
+# Study: Resolve this ABI package from the exact kernel priority branch revision.
+source = "git+https://gitlab.redox-os.org/nield/kernel.git?rev=d4fb889f62deec76fec372eb8966fef4f44f15f4#d4fb889f62deec76fec372eb8966fef4f44f15f4"
 dependencies = [
  "bitflags",
 ]
@@ -557,7 +567,7 @@ dependencies = [
  "redox-rings",
  "redox-rt",
  "redox_event",
- "redox_syscall",
+ "redox_syscall 0.10.0",
  "sc",
  "scrypt",
  "sha-crypt",
