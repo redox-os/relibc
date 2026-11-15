@@ -24,7 +24,7 @@ use crate::{
 };
 use alloc::{collections::btree_set::BTreeSet, vec::Vec};
 use redox_protocols::protocol::{
-    F_DUPFD_CLOEXEC, NsDup, O_CLOEXEC, ProcCall, ProcKillTarget, Rlimit, RtSigInfo, ThreadCall,
+    F_DUPFD_CLOEXEC, NsDup, O_CLOEXEC, ProcCall, ProcKillTarget, Rlimit, RtSigInfo, ThreadCall, SIGKILL, 
     WaitFlags,
 };
 
@@ -66,10 +66,21 @@ pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
     }
 
     match wrapper(false, true, || {
-        this_proc_call(
-            CallFlags::empty(),
-            &[ProcCall::Kill as u64, target.raw() as u64, sig as u64],
-        )
+        
+        let flags = if sig == SIGKILL {
+            CallFlags::PRIORITY
+        } else {
+            CallFlags::empty()
+        };
+
+        let metadata = [ProcCall::Kill as u64, target.raw() as u64, sig as u64];
+        let result = this_proc_call(flags, &metadata);
+
+        if flags.contains(CallFlags::PRIORITY) && result == Err(Error::new(EINVAL)) {
+            this_proc_call(CallFlags::empty(), &metadata)
+        } else {
+            result
+        }
     }) {
         Ok(_) | Err(Error { errno: ERESTART }) => Ok(()),
         Err(error) => Err(error),
