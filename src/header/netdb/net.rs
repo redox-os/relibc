@@ -137,6 +137,24 @@ impl NetState {
         }
     }
 
+    pub fn getnetbyaddr(&mut self, net: u32, net_type: c_int) -> Option<*mut netent> {
+        if net_type != AF_INET {
+            return None;
+        }
+
+        self.setnetent_def();
+
+        while let Some(n) = self.getnetent() {
+            if self.entry.n_net == net {
+                self.endnetent_def();
+                return Some(n);
+            }
+        }
+
+        self.endnetent_def();
+        None
+    }
+
     pub fn getnetbyname(&mut self, search_name: &[u8]) -> Option<*mut netent> {
         self.setnetent_def();
 

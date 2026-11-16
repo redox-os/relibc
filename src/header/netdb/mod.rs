@@ -554,9 +554,15 @@ pub unsafe extern "C" fn gethostbyname2(name: *const c_char, af: c_int) -> *mut 
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
-#[expect(unused_variables, reason = "function not yet implemented")]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getnetbyaddr(net: u32, net_type: c_int) -> *mut netent {
-    unimplemented!();
+    match NET_STATE.lock().getnetbyaddr(net, net_type) {
+        Some(n) => n,
+        None => {
+            crate::platform::ERRNO.set(ENOENT);
+            core::ptr::null_mut()
+        }
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
