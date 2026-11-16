@@ -77,7 +77,10 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     let mut iter: SplitWhitespace = r.split_whitespace();
 
-    let addr = inet_aton_inner(iter.next().unwrap().as_bytes()).unwrap();
+    let item = iter.next().unwrap();
+    let Ok(addr) = inet_aton_inner(item.as_bytes()) else {
+        return ptr::null_mut();
+    };
 
     unsafe {
         _HOST_ADDR_LIST = addr.to_ne_bytes();
