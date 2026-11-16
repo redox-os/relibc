@@ -1,21 +1,19 @@
-use alloc::{boxed::Box, str::SplitWhitespace, vec::Vec};
 use core::ptr;
 
+use alloc::{string::ToString, vec::Vec};
+
 use crate::{
-    error::ResultExt,
     header::{
-        arpa_inet::inet_aton_inner, fcntl::O_RDONLY, netinet_in::in_addr,
-        sys_socket::constants::AF_INET, unistd::SEEK_SET,
+        arpa_inet::inet_aton_inner, fcntl::O_RDONLY, netdb::hostent, netinet_in::in_addr,
+        stdio::SEEK_SET, sys_socket::constants::AF_INET,
     },
     platform::{
-        Pal, Sys,
-        rlb::{Line, RawLineBuffer},
+        Line, Pal, RawLineBuffer, Sys,
         types::{c_char, c_int},
     },
     raw_cell::RawCell,
+    sync::Mutex,
 };
-
-use super::{bytes_to_box_str, hostent};
 
 static mut HOSTDB: c_int = -1;
 pub static mut HOST_ENTRY: hostent = hostent {
@@ -34,98 +32,179 @@ pub static mut _HOST_ADDR_LIST: [u8; 4] = [0u8; 4];
 static mut H_POS: usize = 0;
 pub static mut HOST_STAYOPEN: c_int = 0;
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn endhostent() {
-    if unsafe { HOSTDB } >= 0
-        && let Ok(()) = Sys::close(unsafe { HOSTDB })
-    {} // TODO handle error
-    unsafe { HOSTDB = -1 };
+pub struct HostState {
+    db: Option<c_int>,
+    rlb: Option<RawLineBuffer>,
+    pub stayopen: bool,
+
+    name: Vec<u8>,
+    aliases: Vec<Vec<u8>>,
+    aliases_ptrs: Vec<*mut c_char>,
+    addr_bytes: [u8; 4],
+    addr_list: [*mut c_char; 2],
+    entry: hostent,
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn sethostent(stayopen: c_int) {
-    unsafe { HOST_STAYOPEN = stayopen };
-    if unsafe { HOSTDB } < 0 {
-        unsafe { HOSTDB = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0).or_minus_one_errno() }
-    } else if Sys::lseek(unsafe { HOSTDB }, 0, SEEK_SET).is_ok() {
-    } // TODO handle error
-    unsafe { H_POS = 0 };
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn gethostent() -> *mut hostent {
-    if unsafe { HOSTDB } < 0 {
-        unsafe { HOSTDB = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0).or_minus_one_errno() };
+impl HostState {
+    const fn new() -> Self {
+        Self {
+            db: None,
+            rlb: None,
+            stayopen: false,
+            name: Vec::new(),
+            aliases: Vec::new(),
+            aliases_ptrs: Vec::new(),
+            addr_bytes: [0; 4],
+            addr_list: [core::ptr::null_mut(); 2],
+            entry: hostent {
+                h_name: core::ptr::null_mut(),
+                h_aliases: core::ptr::null_mut(),
+                h_addrtype: 0,
+                h_length: 0,
+                h_addr_list: core::ptr::null_mut(),
+            },
+        }
     }
-    let mut rlb = RawLineBuffer::new(unsafe { HOSTDB });
-    rlb.seek(unsafe { H_POS });
 
-    let mut r: Box<str> = Box::default();
-    while r.is_empty() || r.split_whitespace().next().is_none() || r.starts_with('#') {
-        r = match rlb.next() {
-            Line::Some(s) => bytes_to_box_str(s),
-            _ => {
-                if unsafe { HOST_STAYOPEN } == 0 {
-                    unsafe { endhostent() };
-                }
-                return ptr::null_mut();
+    pub fn endhostent_def(&mut self) {
+        if !self.stayopen {
+            self.endhostent();
+        }
+    }
+
+    pub fn sethostent_def(&mut self) {
+        self.sethostent(self.stayopen);
+    }
+
+    pub fn endhostent(&mut self) {
+        self.rlb = None;
+        if let Some(fd) = self.db.take() {
+            let _ = Sys::close(fd);
+        }
+    }
+
+    pub fn sethostent(&mut self, stayopen: bool) {
+        self.stayopen = stayopen;
+        if self.db.is_none() {
+            if let Ok(fd) = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0) {
+                self.db = Some(fd);
+                self.rlb = Some(RawLineBuffer::new(fd));
             }
-        };
-    }
-    rlb.next();
-    unsafe { H_POS = rlb.line_pos() };
-
-    let mut iter: SplitWhitespace = r.split_whitespace();
-
-    let item = iter.next().unwrap();
-    let Ok(addr) = inet_aton_inner(item.as_bytes()) else {
-        return ptr::null_mut();
-    };
-
-    unsafe {
-        _HOST_ADDR_LIST = addr.to_ne_bytes();
-        HOST_ADDR_LIST = [(&raw mut _HOST_ADDR_LIST).cast::<c_char>(), ptr::null_mut()];
-
-        HOST_ADDR = Some(in_addr { s_addr: addr });
+        } else if let Some(fd) = self.db {
+            let _ = Sys::lseek(fd, 0, SEEK_SET);
+            self.rlb = Some(RawLineBuffer::new(fd));
+        }
     }
 
-    let host_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
+    pub fn gethostent(&mut self) -> Option<*mut hostent> {
+        if self.rlb.is_none() {
+            if let Ok(fd) = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0) {
+                self.db = Some(fd);
+                self.rlb = Some(RawLineBuffer::new(fd));
+            } else {
+                return None;
+            }
+        }
 
-    let mut _host_aliases: Vec<Vec<u8>> = iter
-        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
-        .collect();
-    unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
+        let mut parsed = None;
 
-    let mut host_aliases: Vec<*mut c_char> = unsafe {
-        HOST_ALIASES
-            .unsafe_mut()
-            .as_mut()
-            .unwrap()
-            .iter_mut()
-            .map(|x| x.as_mut_ptr().cast::<c_char>())
-            .chain([ptr::null_mut(), ptr::null_mut()])
-            .collect()
-    };
+        if let Some(rlb) = self.rlb.as_mut() {
+            while let Line::Some(line) = rlb.next() {
+                let s = core::str::from_utf8(line).unwrap_or("");
+                let s = s.split('#').next().unwrap_or("").trim();
+                if s.is_empty() {
+                    continue;
+                }
 
-    unsafe { HOST_NAME.unsafe_set(Some(host_name)) };
+                let mut iter = s.split_whitespace();
+                let ip_str = match iter.next() {
+                    Some(ip) => ip,
+                    None => continue,
+                };
 
-    unsafe {
-        HOST_ENTRY = hostent {
-            h_name: HOST_NAME
-                .unsafe_mut()
-                .as_mut()
-                .unwrap()
-                .as_mut_ptr()
-                .cast::<c_char>(),
-            h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
-            h_addrtype: AF_INET,
-            h_length: 4,
-            h_addr_list: (&raw mut HOST_ADDR_LIST).cast(),
-        };
-        _HOST_ALIASES.unsafe_set(Some(host_aliases));
+                let addr = match inet_aton_inner(ip_str.as_bytes()) {
+                    Ok(a) => a,
+                    Err(_) => continue,
+                };
+
+                let name = match iter.next() {
+                    Some(n) => n,
+                    None => continue,
+                };
+
+                let aliases: Vec<Vec<u8>> = iter
+                    .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
+                    .collect();
+
+                parsed = Some((addr, name.to_string(), aliases));
+                break;
+            }
+        }
+
+        if let Some((addr, name_str, aliases)) = parsed {
+            self.addr_bytes = addr.to_ne_bytes();
+            self.addr_list = [self.addr_bytes.as_mut_ptr().cast(), core::ptr::null_mut()];
+
+            self.name = name_str.bytes().chain(Some(b'\0')).collect();
+            self.aliases = aliases;
+            self.aliases_ptrs = self
+                .aliases
+                .iter_mut()
+                .map(|x| x.as_mut_ptr().cast::<c_char>())
+                .chain(Some(core::ptr::null_mut()))
+                .collect();
+
+            self.entry = hostent {
+                h_name: self.name.as_mut_ptr().cast(),
+                h_aliases: self.aliases_ptrs.as_mut_ptr(),
+                h_addrtype: AF_INET,
+                h_length: 4,
+                h_addr_list: self.addr_list.as_mut_ptr(),
+            };
+
+            Some(&raw mut self.entry)
+        } else {
+            if !self.stayopen {
+                self.endhostent();
+            }
+            None
+        }
     }
-    if unsafe { HOST_STAYOPEN } == 0 {
-        unsafe { endhostent() };
+
+    pub fn gethostbyname_local(&mut self, search_name: &[u8]) -> Option<*mut hostent> {
+        self.sethostent_def();
+
+        while let Some(h) = self.gethostent() {
+            if self.name.eq_ignore_ascii_case(search_name)
+                || self
+                    .aliases
+                    .iter()
+                    .any(|alias| alias.eq_ignore_ascii_case(search_name))
+            {
+                self.endhostent_def();
+                return Some(h);
+            }
+        }
+
+        self.endhostent_def();
+        None
     }
-    (&raw mut HOST_ENTRY).cast::<hostent>()
+
+    pub fn gethostbyaddr_local(&mut self, search_addr: u32) -> Option<*mut hostent> {
+        self.sethostent_def();
+
+        while let Some(h) = self.gethostent() {
+            let current_addr = u32::from_ne_bytes(self.addr_bytes);
+            if current_addr == search_addr {
+                self.endhostent_def();
+                return Some(h);
+            }
+        }
+
+        self.endhostent_def();
+        None
+    }
 }
+
+unsafe impl Send for HostState {}
+pub(crate) static HOST_STATE: Mutex<HostState> = Mutex::new(HostState::new());

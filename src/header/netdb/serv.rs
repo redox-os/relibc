@@ -157,7 +157,7 @@ impl ServState {
             if self.entry.s_port != port {
                 continue;
             }
-            if search_proto.is_none_or(|p| self.proto == p) {
+            if search_proto.is_none_or(|p| self.proto.eq_ignore_ascii_case(p)) {
                 self.endservent_def();
                 return Some(s);
             }
@@ -175,8 +175,13 @@ impl ServState {
         self.setservent_def();
 
         while let Some(s) = self.getservent() {
-            if self.name == search_name || self.aliases.iter().any(|alias| alias == search_name) {
-                if search_proto.is_none_or(|p| self.proto == p) {
+            if self.name.eq_ignore_ascii_case(search_name)
+                || self
+                    .aliases
+                    .iter()
+                    .any(|alias| alias.eq_ignore_ascii_case(search_name))
+            {
+                if search_proto.is_none_or(|p| self.proto.eq_ignore_ascii_case(p)) {
                     self.endservent_def();
                     return Some(s);
                 }

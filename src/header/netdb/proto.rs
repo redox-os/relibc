@@ -151,7 +151,12 @@ impl ProtoState {
         self.setprotoent_def();
 
         while let Some(p) = self.getprotoent() {
-            if self.name == search_name || self.aliases.iter().any(|alias| alias == search_name) {
+            if self.name.eq_ignore_ascii_case(search_name)
+                || self
+                    .aliases
+                    .iter()
+                    .any(|alias| alias.eq_ignore_ascii_case(search_name))
+            {
                 self.endprotoent_def();
                 return Some(p);
             }

@@ -160,7 +160,12 @@ impl NetState {
         self.setnetent_def();
 
         while let Some(n) = self.getnetent() {
-            if self.name == search_name || self.aliases.iter().any(|alias| alias == search_name) {
+            if self.name.eq_ignore_ascii_case(search_name)
+                || self
+                    .aliases
+                    .iter()
+                    .any(|alias| alias.eq_ignore_ascii_case(search_name))
+            {
                 self.endnetent_def();
                 return Some(n);
             }

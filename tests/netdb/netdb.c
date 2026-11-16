@@ -79,10 +79,12 @@ test_services (void)
   sptr = getservbyport (htons(1), "udp"); /* shouldn't exist */
   output_servent ("getservbyport (htons(1), \"udp\")", sptr);
   setservent (0);
+  int lim = 0;
   do
     {
       sptr = getservent ();
       output_servent ("getservent ()", sptr);
+      if (lim++ > 20) break; // too many records
     }
   while (sptr != NULL);
   endservent ();
@@ -129,7 +131,7 @@ test_hosts (void)
         }
       else if (strcmp (hptr1->h_name, hptr2->h_name) != 0)
         {
-          printf ("localhost and LocalHost have different canoncial name\n");
+          printf ("localhost and LocalHost have different canonical name\n");
           printf ("gethostbyname (\"localhost\")->%s\n", hptr1->h_name);
           printf ("gethostbyname (\"LocalHost\")->%s\n", hptr2->h_name);
           ++error_count;

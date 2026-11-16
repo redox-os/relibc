@@ -16,7 +16,6 @@ use crate::{
         bits_safamily_t::sa_family_t,
         errno::{ENOENT, ETIMEDOUT},
         netinet_in::{in_addr, sockaddr_in},
-        strings::strcasecmp,
         sys_socket::{
             constants::{AF_INET, AF_INET6, AF_UNSPEC},
             sockaddr, socklen_t,
@@ -297,6 +296,12 @@ fn bytes_to_box_str(bytes: &[u8]) -> Box<str> {
     Box::from(core::str::from_utf8(bytes).unwrap_or(""))
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endhostent.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn endhostent() {
+    HOST_STATE.lock().endhostent();
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endnetent() {
@@ -357,32 +362,8 @@ pub unsafe extern "C" fn gethostbyaddr(
     let addr: in_addr = unsafe { (*(v as *mut in_addr)).clone() };
 
     // check the hosts file first
-    let mut p: *mut hostent;
-    unsafe { sethostent(HOST_STAYOPEN) };
-    while {
-        p = unsafe { gethostent() };
-        !p.is_null()
-    } {
-        let mut cp = unsafe { (*p).h_addr_list };
-        loop {
-            if cp.is_null() {
-                break;
-            }
-            if (unsafe { *cp }).is_null() {
-                break;
-            }
-            let mut cp_slice: [c_char; 4] = [0; 4];
-            unsafe { (*cp).copy_to(cp_slice.as_mut_ptr(), 4) };
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            let cp_s_addr = unsafe { mem::transmute::<[c_char; 4], u32>(cp_slice) };
-            #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
-            let cp_s_addr = u32::from_ne_bytes(cp_slice);
-            if cp_s_addr == addr.s_addr {
-                unsafe { sethostent(HOST_STAYOPEN) };
-                return p;
-            }
-            cp = unsafe { cp.add(1) };
-        }
+    if let Some(h) = HOST_STATE.lock().gethostbyaddr_local(addr.s_addr) {
+        return h;
     }
 
     //TODO actually get aliases
@@ -486,30 +467,11 @@ pub unsafe extern "C" fn gethostbyname2(name: *const c_char, af: c_int) -> *mut 
     }
 
     // check the hosts file first
-    let mut p: *mut hostent;
-    unsafe { sethostent(HOST_STAYOPEN) };
-    while {
-        p = unsafe { gethostent() };
-        !p.is_null()
-    } {
-        if unsafe { strcasecmp((*p).h_name, name) } == 0 {
-            unsafe { sethostent(HOST_STAYOPEN) };
-            return p;
-        }
-        let mut cp = unsafe { (*p).h_aliases };
-        loop {
-            if cp.is_null() {
-                break;
-            }
-            if (unsafe { *cp }).is_null() {
-                break;
-            }
-            if unsafe { strcasecmp(*cp, name) } == 0 {
-                unsafe { sethostent(HOST_STAYOPEN) };
-                return p;
-            }
-            cp = unsafe { cp.add(1) };
-        }
+    if let Some(h) = HOST_STATE
+        .lock()
+        .gethostbyname_local(name_cstr.to_bytes_with_nul())
+    {
+        return h;
     }
 
     let Ok(host) = lookup_host(name_str) else {
@@ -521,7 +483,7 @@ pub unsafe extern "C" fn gethostbyname2(name: *const c_char, af: c_int) -> *mut 
         return ptr::null_mut();
     };
 
-    let host_name: Vec<u8> = name_cstr.to_bytes().to_vec();
+    let host_name: Vec<u8> = name_cstr.to_bytes_with_nul().to_vec();
     unsafe { HOST_NAME.unsafe_set(Some(host_name)) };
     unsafe { _HOST_ADDR_LIST = host_addr.s_addr.to_ne_bytes() };
     unsafe { HOST_ADDR_LIST = [(&raw mut _HOST_ADDR_LIST).cast::<c_char>(), ptr::null_mut()] };
@@ -548,6 +510,15 @@ pub unsafe extern "C" fn gethostbyname2(name: *const c_char, af: c_int) -> *mut 
     };
     unsafe { sethostent(HOST_STAYOPEN) };
     (&raw mut HOST_ENTRY).cast::<hostent>()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endhostent.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gethostent() -> *mut hostent {
+    HOST_STATE
+        .lock()
+        .gethostent()
+        .unwrap_or(core::ptr::null_mut())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
@@ -651,6 +622,12 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
         .lock()
         .getservent()
         .unwrap_or(core::ptr::null_mut())
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endhostent.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sethostent(stayopen: c_int) {
+    HOST_STATE.lock().sethostent(stayopen != 0);
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
