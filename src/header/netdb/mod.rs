@@ -6,7 +6,7 @@ mod dns;
 
 use core::{cell::Cell, fmt::Write, mem, net::Ipv4Addr, ptr, str};
 
-use alloc::{boxed::Box, str::SplitWhitespace, string::ToString, vec::Vec};
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 
 use crate::{
     c_str::{CStr, OwnedThinCStr},
@@ -49,6 +49,9 @@ pub mod net;
 
 pub use self::lookup::*;
 pub mod lookup;
+
+pub use self::proto::*;
+pub mod proto;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
@@ -307,8 +310,7 @@ pub unsafe extern "C" fn endnetent() {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endprotoent() {
-    if let Ok(()) = Sys::close(unsafe { PROTODB }) {}; // TODO handle error
-    unsafe { PROTODB = 0 };
+    PROTO_STATE.lock().endprotoent();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
@@ -587,125 +589,35 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *mut protoent {
-    let mut p: *mut protoent;
-    unsafe { setprotoent(PROTO_STAYOPEN) };
-    while {
-        p = unsafe { getprotoent() };
-        !p.is_null()
-    } {
-        if unsafe { strcasecmp((*p).p_name, name) } == 0 {
-            unsafe { setprotoent(PROTO_STAYOPEN) };
-            return p;
-        }
-
-        let mut cp = unsafe { (*p).p_aliases };
-        loop {
-            if cp.is_null() {
-                unsafe { setprotoent(PROTO_STAYOPEN) };
-                break;
-            }
-            if (unsafe { *cp }).is_null() {
-                unsafe { setprotoent(PROTO_STAYOPEN) };
-                break;
-            }
-            if unsafe { strcasecmp(*cp, name) } == 0 {
-                unsafe { setprotoent(PROTO_STAYOPEN) };
-                return p;
-            }
-            cp = unsafe { cp.add(1) };
+    let name_bytes = unsafe { CStr::from_ptr(name) }.to_bytes_with_nul();
+    match PROTO_STATE.lock().getprotobyname(name_bytes) {
+        Some(p) => p,
+        None => {
+            crate::platform::ERRNO.set(ENOENT);
+            core::ptr::null_mut()
         }
     }
-    unsafe { setprotoent(PROTO_STAYOPEN) };
-
-    platform::ERRNO.set(ENOENT);
-    ptr::null_mut::<protoent>()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
-    unsafe { setprotoent(PROTO_STAYOPEN) };
-    let mut p: *mut protoent;
-    while {
-        p = unsafe { getprotoent() };
-        !p.is_null()
-    } {
-        if unsafe { (*p).p_proto } == number {
-            unsafe { setprotoent(PROTO_STAYOPEN) };
-            return p;
+    match PROTO_STATE.lock().getprotobynumber(number) {
+        Some(p) => p,
+        None => {
+            crate::platform::ERRNO.set(ENOENT);
+            core::ptr::null_mut()
         }
     }
-    unsafe { setprotoent(PROTO_STAYOPEN) };
-    platform::ERRNO.set(ENOENT);
-    ptr::null_mut::<protoent>()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getprotoent() -> *mut protoent {
-    if unsafe { PROTODB } == 0 {
-        unsafe { PROTODB = Sys::open(c"/etc/protocols".into(), O_RDONLY, 0).or_minus_one_errno() };
-    }
-
-    let mut rlb = RawLineBuffer::new(unsafe { PROTODB });
-    rlb.seek(unsafe { P_POS });
-
-    let mut r: Box<str> = Box::default();
-    while r.is_empty() || r.split_whitespace().next().is_none() || r.starts_with('#') {
-        r = match rlb.next() {
-            Line::Some(s) => bytes_to_box_str(s),
-            _ => {
-                if unsafe { PROTO_STAYOPEN } == 0 {
-                    unsafe { endprotoent() };
-                }
-                return ptr::null_mut();
-            }
-        };
-    }
-    rlb.next();
-    unsafe { P_POS = rlb.line_pos() };
-
-    let mut iter: SplitWhitespace = r.split_whitespace();
-
-    let mut proto_name: Vec<u8> = iter.next().unwrap().as_bytes().to_vec();
-    proto_name.push(b'\0');
-
-    let mut num = iter.next().unwrap().as_bytes().to_vec();
-    num.push(b'\0');
-    unsafe { PROTO_NUM = Some(atoi(num.as_mut_slice().as_mut_ptr().cast::<c_char>())) };
-
-    let mut _proto_aliases: Vec<Vec<u8>> = iter
-        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
-        .collect();
-    let mut proto_aliases: Vec<*mut i8> = _proto_aliases
-        .iter_mut()
-        .map(|x| x.as_mut_ptr().cast::<i8>())
-        .chain(Some(ptr::null_mut()))
-        .collect();
-
-    unsafe { PROTO_ALIASES.unsafe_set(Some(_proto_aliases)) };
-    unsafe { PROTO_NAME.unsafe_set(Some(proto_name)) };
-
-    unsafe {
-        PROTO_ENTRY = protoent {
-            p_name: PROTO_NAME
-                .unsafe_mut()
-                .as_mut()
-                .unwrap()
-                .as_mut_slice()
-                .as_mut_ptr()
-                .cast::<c_char>(),
-            p_aliases: proto_aliases
-                .as_mut_slice()
-                .as_mut_ptr()
-                .cast::<*mut c_char>(),
-            p_proto: PROTO_NUM.unwrap(),
-        }
-    };
-    if unsafe { PROTO_STAYOPEN } == 0 {
-        unsafe { endprotoent() };
-    }
-    (&raw mut PROTO_ENTRY).cast::<protoent>()
+    PROTO_STATE
+        .lock()
+        .getprotoent()
+        .unwrap_or(core::ptr::null_mut())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
@@ -884,13 +796,7 @@ pub unsafe extern "C" fn setnetent(stayopen: c_int) {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
-    unsafe { PROTO_STAYOPEN = stayopen };
-    if unsafe { PROTODB } == 0 {
-        unsafe { PROTODB = Sys::open(c"/etc/protocols".into(), O_RDONLY, 0).or_minus_one_errno() }
-    } else {
-        if Sys::lseek(unsafe { PROTODB }, 0, SEEK_SET).is_ok() {}; // TODO handle error
-        unsafe { P_POS = 0 };
-    }
+    PROTO_STATE.lock().setprotoent(stayopen != 0);
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.

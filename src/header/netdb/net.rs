@@ -85,8 +85,9 @@ impl NetState {
         let mut parsed = None;
         if let Some(rlb) = self.rlb.as_mut() {
             while let Line::Some(line) = rlb.next() {
-                let s = core::str::from_utf8(line).unwrap_or("").trim_start();
-                if s.is_empty() || s.starts_with('#') {
+                let s = core::str::from_utf8(line).unwrap_or("");
+                let s = s.split('#').next().unwrap_or("").trim();
+                if s.is_empty() {
                     continue;
                 }
 
