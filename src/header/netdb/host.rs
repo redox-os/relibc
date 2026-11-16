@@ -98,19 +98,16 @@ impl HostState {
                 }
 
                 let mut iter = s.split_whitespace();
-                let ip_str = match iter.next() {
-                    Some(ip) => ip,
-                    None => continue,
+                let Some(ip_str) = iter.next() else {
+                    continue;
                 };
 
-                let addr = match inet_aton_inner(ip_str.as_bytes()) {
-                    Ok(a) => a,
-                    Err(_) => continue,
+                let Ok(addr) = inet_aton_inner(ip_str.as_bytes()) else {
+                    continue;
                 };
 
-                let name = match iter.next() {
-                    Some(n) => n,
-                    None => continue,
+                let Some(name) = iter.next() else {
+                    continue;
                 };
 
                 let aliases: Vec<Vec<u8>> = iter

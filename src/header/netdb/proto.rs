@@ -88,17 +88,14 @@ impl ProtoState {
                 }
 
                 let mut iter = s.split_whitespace();
-                let name = match iter.next() {
-                    Some(n) => n,
-                    None => continue,
+                let Some(name) = iter.next() else {
+                    continue;
                 };
-                let num_str = match iter.next() {
-                    Some(n) => n,
-                    None => continue,
+                let Some(num_str) = iter.next() else {
+                    continue;
                 };
-                let num = match num_str.parse::<c_int>() {
-                    Ok(n) => n,
-                    Err(_) => continue,
+                let Ok(num) = num_str.parse::<c_int>() else {
+                    continue;
                 };
 
                 let aliases: Vec<Vec<u8>> = iter

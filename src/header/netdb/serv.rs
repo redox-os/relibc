@@ -91,23 +91,19 @@ impl ServState {
                 }
 
                 let mut iter = s.split_whitespace();
-                let name = match iter.next() {
-                    Some(n) => n,
-                    None => continue,
+                let Some(name) = iter.next() else {
+                    continue;
                 };
-                let port_proto = match iter.next() {
-                    Some(p) => p,
-                    None => continue,
+                let Some(port_proto) = iter.next() else {
+                    continue;
                 };
 
                 let mut split = port_proto.split('/');
-                let port_u16 = match split.next().and_then(|p| p.parse::<u16>().ok()) {
-                    Some(p) => p,
-                    None => continue,
+                let Some(port_u16) = split.next().and_then(|p| p.parse::<u16>().ok()) else {
+                    continue;
                 };
-                let proto = match split.next() {
-                    Some(p) => p,
-                    None => continue,
+                let Some(proto) = split.next() else {
+                    continue;
                 };
 
                 let aliases: Vec<Vec<u8>> = iter
@@ -133,7 +129,7 @@ impl ServState {
             self.entry = servent {
                 s_name: self.name.as_mut_ptr().cast(),
                 s_aliases: self.aliases_ptrs.as_mut_ptr(),
-                s_port: htons(port_u16) as c_int,
+                s_port: c_int::from(htons(port_u16)),
                 s_proto: self.proto.as_mut_ptr().cast(),
             };
 
@@ -175,16 +171,15 @@ impl ServState {
         self.setservent_def();
 
         while let Some(s) = self.getservent() {
-            if self.name.eq_ignore_ascii_case(search_name)
+            if (self.name.eq_ignore_ascii_case(search_name)
                 || self
                     .aliases
                     .iter()
-                    .any(|alias| alias.eq_ignore_ascii_case(search_name))
+                    .any(|alias| alias.eq_ignore_ascii_case(search_name)))
+                && search_proto.is_none_or(|p| self.proto.eq_ignore_ascii_case(p))
             {
-                if search_proto.is_none_or(|p| self.proto.eq_ignore_ascii_case(p)) {
-                    self.endservent_def();
-                    return Some(s);
-                }
+                self.endservent_def();
+                return Some(s);
             }
         }
 

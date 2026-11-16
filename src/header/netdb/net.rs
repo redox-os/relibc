@@ -92,17 +92,14 @@ impl NetState {
                 }
 
                 let mut iter = s.split_whitespace();
-                let name = match iter.next() {
-                    Some(n) => n,
-                    None => continue,
+                let Some(name) = iter.next() else {
+                    continue;
                 };
-                let addr_str = match iter.next() {
-                    Some(a) => a,
-                    None => continue,
+                let Some(addr_str) = iter.next() else {
+                    continue;
                 };
-                let addr = match inet_aton_inner(addr_str.as_bytes()) {
-                    Ok(a) => a,
-                    Err(_) => continue,
+                let Ok(addr) = inet_aton_inner(addr_str.as_bytes()) else {
+                    continue;
                 };
 
                 let aliases: Vec<Vec<u8>> = iter
@@ -128,7 +125,7 @@ impl NetState {
                 n_name: self.name.as_mut_ptr().cast(),
                 n_aliases: self.aliases_ptrs.as_mut_ptr(),
                 n_addrtype: AF_INET,
-                n_net: ntohl(addr).into(),
+                n_net: ntohl(addr),
             };
 
             Some(&raw mut self.entry)
