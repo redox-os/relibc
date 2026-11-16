@@ -6,7 +6,7 @@ mod dns;
 
 use core::{cell::Cell, fmt::Write, mem, net::Ipv4Addr, ptr, str};
 
-use alloc::{boxed::Box, string::ToString, vec::Vec};
+use alloc::{boxed::Box, string::ToString};
 
 use crate::{
     c_str::{CStr, OwnedThinCStr},
@@ -22,7 +22,6 @@ use crate::{
         },
     },
     platform::types::{c_char, c_int, c_void, uint32_t},
-    raw_cell::RawCell,
 };
 
 #[cfg(target_os = "linux")]
@@ -237,19 +236,6 @@ pub const NI_NAMEREQD: c_int = 0x0008;
 /// Indicates that the service is a datagram service (`SOCK_DGRAM`).
 pub const NI_DGRAM: c_int = 0x0010;
 
-static mut NETDB: c_int = 0;
-pub static mut NET_ENTRY: netent = netent {
-    n_name: ptr::null_mut(),
-    n_aliases: ptr::null_mut(),
-    n_addrtype: 0,
-    n_net: 0,
-};
-pub static NET_NAME: RawCell<Option<Vec<u8>>> = RawCell::new(None);
-pub static NET_ALIASES: RawCell<Option<Vec<Vec<u8>>>> = RawCell::new(None);
-pub static mut NET_ADDR: Option<u32> = None;
-static mut N_POS: usize = 0;
-static mut NET_STAYOPEN: c_int = 0;
-
 #[thread_local]
 pub static H_ERRNO: Cell<c_int> = Cell::new(0);
 const H_UNSET: c_int = 0;
@@ -265,36 +251,6 @@ pub const TRY_AGAIN: c_int = 4;
 // Expected length of addresses
 const SOCKLEN_AF_INET4: socklen_t = 4;
 const SOCKLEN_AF_INET6: socklen_t = 16;
-
-static mut PROTODB: c_int = 0;
-static mut PROTO_ENTRY: protoent = protoent {
-    p_name: ptr::null_mut(),
-    p_aliases: ptr::null_mut(),
-    p_proto: 0 as c_int,
-};
-static PROTO_NAME: RawCell<Option<Vec<u8>>> = RawCell::new(None);
-static PROTO_ALIASES: RawCell<Option<Vec<Vec<u8>>>> = RawCell::new(None);
-static mut PROTO_NUM: Option<c_int> = None;
-static mut P_POS: usize = 0;
-static mut PROTO_STAYOPEN: c_int = 0;
-
-static mut SERVDB: c_int = 0;
-static mut SERV_ENTRY: servent = servent {
-    s_name: ptr::null_mut(),
-    s_aliases: ptr::null_mut(),
-    s_port: 0 as c_int,
-    s_proto: ptr::null_mut(),
-};
-static SERV_NAME: RawCell<Option<Vec<u8>>> = RawCell::new(None);
-static SERV_ALIASES: RawCell<Option<Vec<Vec<u8>>>> = RawCell::new(None);
-static mut SERV_PORT: Option<c_int> = None;
-static SERV_PROTO: RawCell<Option<Vec<u8>>> = RawCell::new(None);
-static mut S_POS: usize = 0;
-static mut SERV_STAYOPEN: c_int = 0;
-
-fn bytes_to_box_str(bytes: &[u8]) -> Box<str> {
-    Box::from(core::str::from_utf8(bytes).unwrap_or(""))
-}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endhostent.html>.
 #[unsafe(no_mangle)]
@@ -355,7 +311,7 @@ pub unsafe extern "C" fn gethostbyaddr(
     //     H_ERRNO.set(NO_RECOVERY);
     //     return ptr::null_mut();
     // }
-    if length != SOCKLEN_AF_INET4 {
+    if length != SOCKLEN_AF_INET4 || format != AF_INET {
         H_ERRNO.set(NO_RECOVERY);
         return ptr::null_mut();
     }
@@ -366,44 +322,12 @@ pub unsafe extern "C" fn gethostbyaddr(
         return h;
     }
 
-    //TODO actually get aliases
-    let mut _host_aliases: Vec<Vec<u8>> = vec![vec![b'\0']];
-    let mut host_aliases: Vec<*mut c_char> = vec![ptr::null_mut()];
-    unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
-
-    match lookup_addr(&addr).map(|host_names| host_names.into_iter().next()) {
-        Ok(Some(host_name)) => {
-            unsafe { _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes() };
-            unsafe {
-                HOST_ADDR_LIST = [(&raw mut _HOST_ADDR_LIST).cast::<c_char>(), ptr::null_mut()]
-            };
-            unsafe { HOST_NAME.unsafe_set(Some(host_name)) };
-            unsafe {
-                HOST_ENTRY = hostent {
-                    h_name: HOST_NAME
-                        .unsafe_mut()
-                        .as_mut()
-                        .unwrap()
-                        .as_mut_ptr()
-                        .cast::<c_char>(),
-                    h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
-                    h_addrtype: format,
-                    h_length: i32::try_from(length).expect("guaranteed to be 4 or 16"),
-                    h_addr_list: (&raw mut HOST_ADDR_LIST).cast(),
-                }
-            };
-            &raw mut HOST_ENTRY
-        }
-        // `glibc` sets errno if an address doesn't have a host name
-        // `musl` uses the address as the host name in said case
-        Ok(None) => {
-            H_ERRNO.set(HOST_NOT_FOUND);
-            ptr::null_mut()
-        }
-        Err(_) => {
-            // TODO: Better error separation in lookup_addr
-            H_ERRNO.set(NO_RECOVERY);
-            ptr::null_mut()
+    let r = lookup_addr(&addr);
+    match HOST_STATE.lock().gethostbyaddr_external(r, addr) {
+        Ok(h) => h,
+        Err(e) => {
+            H_ERRNO.set(e);
+            core::ptr::null_mut()
         }
     }
 }
@@ -474,42 +398,17 @@ pub unsafe extern "C" fn gethostbyname2(name: *const c_char, af: c_int) -> *mut 
         return h;
     }
 
-    let Ok(host) = lookup_host(name_str) else {
-        H_ERRNO.set(NO_RECOVERY);
-        return ptr::null_mut();
-    };
-    let Some(host_addr) = host.into_iter().next() else {
-        H_ERRNO.set(HOST_NOT_FOUND);
-        return ptr::null_mut();
-    };
-
-    let host_name: Vec<u8> = name_cstr.to_bytes_with_nul().to_vec();
-    unsafe { HOST_NAME.unsafe_set(Some(host_name)) };
-    unsafe { _HOST_ADDR_LIST = host_addr.s_addr.to_ne_bytes() };
-    unsafe { HOST_ADDR_LIST = [(&raw mut _HOST_ADDR_LIST).cast::<c_char>(), ptr::null_mut()] };
-    unsafe { HOST_ADDR = Some(host_addr) };
-
-    //TODO actually get aliases
-    let mut _host_aliases: Vec<Vec<u8>> = vec![vec![b'\0']];
-    let mut host_aliases: Vec<*mut c_char> = vec![ptr::null_mut(); 2];
-    unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
-
-    unsafe {
-        HOST_ENTRY = hostent {
-            h_name: HOST_NAME
-                .unsafe_mut()
-                .as_mut()
-                .unwrap()
-                .as_mut_ptr()
-                .cast::<c_char>(),
-            h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
-            h_addrtype: AF_INET,
-            h_length: 4,
-            h_addr_list: (&raw mut HOST_ADDR_LIST).cast(),
+    let r = lookup_host(name_str);
+    match HOST_STATE
+        .lock()
+        .gethostbyname_external(r, name_cstr.to_bytes_with_nul())
+    {
+        Ok(h) => h,
+        Err(e) => {
+            H_ERRNO.set(e);
+            core::ptr::null_mut()
         }
-    };
-    unsafe { sethostent(HOST_STAYOPEN) };
-    (&raw mut HOST_ENTRY).cast::<hostent>()
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endhostent.html>.

@@ -1,8 +1,7 @@
-use core::ptr;
-
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
+    error::Errno,
     header::{
         arpa_inet::inet_aton_inner, fcntl::O_RDONLY, netdb::hostent, netinet_in::in_addr,
         stdio::SEEK_SET, sys_socket::constants::AF_INET,
@@ -11,26 +10,8 @@ use crate::{
         Line, Pal, RawLineBuffer, Sys,
         types::{c_char, c_int},
     },
-    raw_cell::RawCell,
     sync::Mutex,
 };
-
-static mut HOSTDB: c_int = -1;
-pub static mut HOST_ENTRY: hostent = hostent {
-    h_name: ptr::null_mut(),
-    h_aliases: ptr::null_mut(),
-    h_addrtype: 0,
-    h_length: 0,
-    h_addr_list: ptr::null_mut(),
-};
-pub static HOST_NAME: RawCell<Option<Vec<u8>>> = RawCell::new(None);
-pub static HOST_ALIASES: RawCell<Option<Vec<Vec<u8>>>> = RawCell::new(None);
-static _HOST_ALIASES: RawCell<Option<Vec<*mut c_char>>> = RawCell::new(None);
-pub static mut HOST_ADDR: Option<in_addr> = None;
-pub static mut HOST_ADDR_LIST: [*mut c_char; 2] = [ptr::null_mut(); 2];
-pub static mut _HOST_ADDR_LIST: [u8; 4] = [0u8; 4];
-static mut H_POS: usize = 0;
-pub static mut HOST_STAYOPEN: c_int = 0;
 
 pub struct HostState {
     db: Option<c_int>,
@@ -203,6 +184,77 @@ impl HostState {
 
         self.endhostent_def();
         None
+    }
+
+    pub fn gethostbyname_external(
+        &mut self,
+        lookup_host_res: Result<Vec<in_addr>, Errno>,
+        search_bytes: &[u8],
+    ) -> Result<*mut hostent, c_int> {
+        match lookup_host_res {
+            Ok(host) => {
+                if let Some(host_addr) = host.into_iter().next() {
+                    self.name = search_bytes.to_vec();
+
+                    self.addr_bytes = host_addr.s_addr.to_ne_bytes();
+                    self.addr_list = [self.addr_bytes.as_mut_ptr().cast(), core::ptr::null_mut()];
+
+                    //TODO actually get aliases
+                    self.aliases.clear();
+                    self.aliases_ptrs = vec![core::ptr::null_mut(), core::ptr::null_mut()];
+
+                    self.entry = hostent {
+                        h_name: self.name.as_mut_ptr().cast(),
+                        h_aliases: self.aliases_ptrs.as_mut_ptr(),
+                        h_addrtype: AF_INET,
+                        h_length: 4,
+                        h_addr_list: self.addr_list.as_mut_ptr(),
+                    };
+
+                    Ok(&raw mut self.entry)
+                } else {
+                    Err(super::HOST_NOT_FOUND)
+                }
+            }
+            Err(_) => Err(super::NO_RECOVERY),
+        }
+    }
+
+    pub fn gethostbyaddr_external(
+        &mut self,
+        lookup_addr_res: Result<Vec<Vec<u8>>, Errno>,
+        addr: in_addr,
+    ) -> Result<*mut hostent, c_int> {
+        match lookup_addr_res {
+            Ok(host_names) => {
+                if let Some(host_name) = host_names.into_iter().next() {
+                    self.name = host_name;
+
+                    self.addr_bytes = addr.s_addr.to_ne_bytes();
+                    self.addr_list = [self.addr_bytes.as_mut_ptr().cast(), core::ptr::null_mut()];
+
+                    //TODO actually get aliases
+                    self.aliases.clear();
+                    self.aliases_ptrs = vec![core::ptr::null_mut(), core::ptr::null_mut()];
+
+                    self.entry = hostent {
+                        h_name: self.name.as_mut_ptr().cast(),
+                        h_aliases: self.aliases_ptrs.as_mut_ptr(),
+                        h_addrtype: AF_INET,
+                        h_length: 4,
+                        h_addr_list: self.addr_list.as_mut_ptr(),
+                    };
+
+                    Ok(&raw mut self.entry)
+                } else {
+                    // `glibc` sets errno if an address doesn't have a host name
+                    // `musl` uses the address as the host name in said case
+                    Err(super::HOST_NOT_FOUND)
+                }
+            }
+            // TODO: Better error separation in lookup_addr
+            Err(_) => Err(super::NO_RECOVERY),
+        }
     }
 }
 
