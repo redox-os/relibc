@@ -309,7 +309,7 @@ impl Scope {
     fn debug(&self) {
         match self {
             Self::Global { objs } => {
-                println!(
+                eprintln!(
                     "[@global] {:?}",
                     objs.iter()
                         .map(|x| x.upgrade().unwrap().name.clone())
@@ -319,7 +319,7 @@ impl Scope {
 
             Self::Local { owner, objs } => {
                 let owner = owner.as_ref().unwrap().upgrade().unwrap();
-                println!(
+                eprintln!(
                     "[{}] {:?}",
                     owner.name,
                     objs.iter().map(|x| x.name.clone()).collect::<Vec<_>>()
@@ -1068,12 +1068,12 @@ impl Linker {
 
     fn scope_debug(&self) {
         if self.config.debug_flags.contains(DebugFlags::SCOPES) {
-            println!("[ld.so]: =========== SCOPES ==========");
+            eprintln!("[ld.so]: =========== SCOPES ==========");
             GLOBAL_SCOPE.read().debug();
             for obj in self.objects.values() {
                 obj.scope().debug();
             }
-            println!("[ld.so]: ==============================");
+            eprintln!("[ld.so]: ==============================");
         }
     }
 }
