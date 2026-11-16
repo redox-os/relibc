@@ -553,8 +553,20 @@ impl Pal for Sys {
     }
 
     fn poll(fds: &mut [pollfd], timeout: c_int) -> Result<c_int> {
-        e_raw(unsafe { syscall!(POLL, fds.as_mut_ptr(), fds.len(), timeout) })
-            .map(|count| count as c_int)
+        #[cfg(target_arch = "x86_64")]
+        {
+            e_raw(unsafe { syscall!(POLL, fds.as_mut_ptr(), fds.len(), timeout) })
+                .map(|count| count as c_int)
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            let ts = (timeout >= 0).then(|| timespec {
+                tv_sec: (timeout / 1000) as time_t,
+                tv_nsec: ((timeout % 1000) * 1_000_000) as c_long,
+            });
+
+            Sys::ppoll(fds, ts.as_ref(), None)
+        }
     }
 
     fn ppoll(
