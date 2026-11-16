@@ -12,8 +12,7 @@ use crate::{
     c_str::{CStr, OwnedThinCStr},
     error::{Errno, ResultExt},
     header::{
-        arpa_inet::inet_aton_inner,
-        bits_arpainet::{htons, ntohl},
+        bits_arpainet::htons,
         bits_safamily_t::sa_family_t,
         errno::{ENOENT, ETIMEDOUT},
         fcntl::O_RDONLY,
@@ -45,6 +44,9 @@ pub mod sys;
 pub use self::host::*;
 pub mod host;
 
+pub use self::net::*;
+pub mod net;
+
 pub use self::lookup::*;
 pub mod lookup;
 
@@ -60,6 +62,7 @@ pub struct hostent {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
+#[derive(Default)]
 pub struct netent {
     n_name: *mut c_char,         /* official name of net */
     n_aliases: *mut *mut c_char, /* alias list */
@@ -298,8 +301,7 @@ fn bytes_to_box_str(bytes: &[u8]) -> Box<str> {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endnetent() {
-    if let Ok(()) = Sys::close(unsafe { NETDB }) {}; // TODO handle error
-    unsafe { NETDB = 0 };
+    NET_STATE.lock().endnetent();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
@@ -560,82 +562,20 @@ pub unsafe extern "C" fn getnetbyaddr(net: u32, net_type: c_int) -> *mut netent 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
-    let mut n: *mut netent;
-    unsafe { setnetent(NET_STAYOPEN) };
-    while {
-        n = unsafe { getnetent() };
-        !n.is_null()
-    } {
-        if unsafe { strcasecmp((*n).n_name, name) } == 0 {
-            unsafe { setnetent(NET_STAYOPEN) };
-            return n;
+    let name_bytes = unsafe { CStr::from_ptr(name) }.to_bytes_with_nul();
+    match NET_STATE.lock().getnetbyname(name_bytes) {
+        Some(n) => n,
+        None => {
+            crate::platform::ERRNO.set(ENOENT);
+            core::ptr::null_mut()
         }
     }
-    unsafe { setnetent(NET_STAYOPEN) };
-
-    platform::ERRNO.set(ENOENT);
-    ptr::null_mut::<netent>()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getnetent() -> *mut netent {
-    // TODO: Rustify implementation
-
-    if unsafe { NETDB } == 0 {
-        unsafe { NETDB = Sys::open(c"/etc/networks".into(), O_RDONLY, 0).or_minus_one_errno() };
-    }
-
-    let mut rlb = RawLineBuffer::new(unsafe { NETDB });
-    rlb.seek(unsafe { N_POS });
-
-    let mut r: Box<str> = Box::default();
-    while r.is_empty() || r.split_whitespace().next().is_none() || r.starts_with('#') {
-        r = match rlb.next() {
-            Line::Some(s) => bytes_to_box_str(s),
-            _ => {
-                if unsafe { NET_STAYOPEN } == 0 {
-                    unsafe { endnetent() };
-                }
-                return ptr::null_mut();
-            }
-        };
-    }
-    rlb.next();
-    unsafe { N_POS = rlb.line_pos() };
-
-    let mut iter: SplitWhitespace = r.split_whitespace();
-
-    let net_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
-    unsafe { NET_NAME.unsafe_set(Some(net_name)) };
-
-    let addr = inet_aton_inner(iter.next().unwrap().as_bytes()).unwrap();
-    unsafe { NET_ADDR = Some(ntohl(addr)) };
-
-    let mut _net_aliases: Vec<Vec<u8>> = iter
-        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
-        .collect();
-    let mut net_aliases: Vec<*mut c_char> = _net_aliases
-        .iter_mut()
-        .map(|x| x.as_mut_ptr().cast::<c_char>())
-        .chain(Some(ptr::null_mut()))
-        .collect();
-    unsafe { NET_ALIASES.unsafe_set(Some(_net_aliases)) };
-
-    unsafe {
-        NET_ENTRY = netent {
-            n_name: NET_NAME
-                .unsafe_mut()
-                .as_mut()
-                .unwrap()
-                .as_mut_ptr()
-                .cast::<c_char>(),
-            n_aliases: net_aliases.as_mut_slice().as_mut_ptr(),
-            n_addrtype: AF_INET,
-            n_net: uint32_t::from(NET_ADDR.unwrap()),
-        }
-    };
-    (&raw mut NET_ENTRY).cast::<netent>()
+    NET_STATE.lock().getnetent().unwrap_or(ptr::null_mut())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
@@ -932,13 +872,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setnetent(stayopen: c_int) {
-    unsafe { NET_STAYOPEN = stayopen };
-    if unsafe { NETDB } == 0 {
-        unsafe { NETDB = Sys::open(c"/etc/networks".into(), O_RDONLY, 0).or_minus_one_errno() }
-    } else {
-        if Sys::lseek(unsafe { NETDB }, 0, SEEK_SET).is_ok() {}; // TODO handle errror
-        unsafe { N_POS = 0 };
-    }
+    NET_STATE.lock().setnetent(stayopen != 0);
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.

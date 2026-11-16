@@ -218,9 +218,11 @@ test_protocols (void)
 static void
 test_network (void)
 {
-  struct netent *nptr = getnetbyname ("loopback");
+// redox have no entry
+#ifndef __redox__
+  struct netent *nptr = getnetbyname ("link-local");
   if (nptr != NULL) {
-    printf("network name %d", nptr->n_net);
+    printf("network net %x\n", nptr->n_net);
   } else {
     ++error_count;
   }
@@ -228,11 +230,12 @@ test_network (void)
     {
       nptr = getnetent();
       if (nptr != NULL) {
-          printf("network name %s", nptr->n_name);
+          printf("network name %s\n", nptr->n_name);
       }
     }
   while (nptr != NULL);
   setnetent (0);
+#endif
 }
 static void
 test_h_errno (void) {
