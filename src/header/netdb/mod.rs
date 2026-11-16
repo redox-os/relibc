@@ -10,26 +10,19 @@ use alloc::{boxed::Box, string::ToString, vec::Vec};
 
 use crate::{
     c_str::{CStr, OwnedThinCStr},
-    error::{Errno, ResultExt},
+    error::Errno,
     header::{
         bits_arpainet::htons,
         bits_safamily_t::sa_family_t,
         errno::{ENOENT, ETIMEDOUT},
-        fcntl::O_RDONLY,
         netinet_in::{in_addr, sockaddr_in},
-        stdlib::atoi,
         strings::strcasecmp,
         sys_socket::{
             constants::{AF_INET, AF_INET6, AF_UNSPEC},
             sockaddr, socklen_t,
         },
-        unistd::SEEK_SET,
     },
-    platform::{
-        self, Pal, Sys,
-        rlb::{Line, RawLineBuffer},
-        types::{c_char, c_int, c_void, uint32_t},
-    },
+    platform::types::{c_char, c_int, c_void, uint32_t},
     raw_cell::RawCell,
 };
 
@@ -52,6 +45,9 @@ pub mod lookup;
 
 pub use self::proto::*;
 pub mod proto;
+
+pub use self::serv::*;
+pub mod serv;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
@@ -316,8 +312,7 @@ pub unsafe extern "C" fn endprotoent() {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endservent() {
-    if let Ok(()) = Sys::close(unsafe { SERVDB }) {}; // TODO handle error
-    unsafe { SERVDB = 0 };
+    SERV_STATE.lock().endservent();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/009696799/functions/gethostbyaddr.html>.
@@ -623,168 +618,39 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getservbyname(name: *const c_char, proto: *const c_char) -> *mut servent {
-    unsafe { setservent(SERV_STAYOPEN) };
-    let mut p: *mut servent;
-    if proto.is_null() {
-        while {
-            p = unsafe { getservent() };
-            !p.is_null()
-        } {
-            if unsafe { strcasecmp((*p).s_name, name) } == 0 {
-                unsafe { setservent(SERV_STAYOPEN) };
-                return p;
-            }
-        }
-    } else {
-        while {
-            p = unsafe { getservent() };
-            !p.is_null()
-        } {
-            if unsafe { strcasecmp((*p).s_name, name) } == 0
-                && unsafe { strcasecmp((*p).s_proto, proto) } == 0
-            {
-                unsafe { setservent(SERV_STAYOPEN) };
-                return p;
-            }
+    let name_bytes = unsafe { CStr::from_ptr(name) }.to_bytes_with_nul();
+    let proto_bytes =
+        (!proto.is_null()).then(|| unsafe { CStr::from_ptr(proto) }.to_bytes_with_nul());
+    match SERV_STATE.lock().getservbyname(name_bytes, proto_bytes) {
+        Some(s) => s,
+        None => {
+            crate::platform::ERRNO.set(ENOENT);
+            core::ptr::null_mut()
         }
     }
-    unsafe { setservent(SERV_STAYOPEN) };
-    platform::ERRNO.set(ENOENT);
-    ptr::null_mut::<servent>()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mut servent {
-    unsafe { setservent(SERV_STAYOPEN) };
-    let mut p: *mut servent;
-    if proto.is_null() {
-        while {
-            p = unsafe { getservent() };
-            !p.is_null()
-        } {
-            if unsafe { (*p).s_port } == port {
-                unsafe { setservent(SERV_STAYOPEN) };
-                return p;
-            }
-        }
-    } else {
-        while {
-            p = unsafe { getservent() };
-            !p.is_null()
-        } {
-            if unsafe { (*p).s_port } == port && unsafe { strcasecmp((*p).s_proto, proto) } == 0 {
-                unsafe { setservent(SERV_STAYOPEN) };
-                return p;
-            }
+    let proto_bytes =
+        (!proto.is_null()).then(|| unsafe { CStr::from_ptr(proto) }.to_bytes_with_nul());
+    match SERV_STATE.lock().getservbyport(port, proto_bytes) {
+        Some(s) => s,
+        None => {
+            crate::platform::ERRNO.set(ENOENT);
+            core::ptr::null_mut()
         }
     }
-    unsafe { setservent(SERV_STAYOPEN) };
-    platform::ERRNO.set(ENOENT);
-    ptr::null_mut()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getservent() -> *mut servent {
-    if unsafe { SERVDB } == 0 {
-        // TODO: Rustify
-        unsafe { SERVDB = Sys::open(c"/etc/services".into(), O_RDONLY, 0).or_minus_one_errno() };
-    }
-    let mut rlb = RawLineBuffer::new(unsafe { SERVDB });
-    rlb.seek(unsafe { S_POS });
-
-    loop {
-        let r = match rlb.next() {
-            Line::Some(s) => bytes_to_box_str(s),
-            _ => {
-                if unsafe { SERV_STAYOPEN } == 0 {
-                    unsafe { endservent() };
-                }
-                return ptr::null_mut();
-            }
-        };
-
-        let mut iter = r.split_whitespace();
-        let serv_name = match iter.next() {
-            Some(serv_name) => serv_name.bytes().chain(Some(b'\0')).collect(),
-            None => continue,
-        };
-        let Some(port_proto) = iter.next() else {
-            continue;
-        };
-        let mut split = port_proto.split('/');
-        let mut port: Vec<u8> = match split.next() {
-            Some(port) => port.bytes().chain(Some(b'\0')).collect(),
-            None => continue,
-        };
-        unsafe {
-            SERV_PORT = Some(
-                c_int::try_from(u32::from(htons(
-                    u16::try_from(atoi(port.as_mut_slice().as_mut_ptr().cast::<c_char>()))
-                        .expect("port number should not exceed u16::MAX"),
-                )))
-                .expect("port number should not exceed u16::MAX"),
-            )
-        };
-        let proto = match split.next() {
-            Some(proto) => proto.bytes().chain(Some(b'\0')).collect(),
-            None => continue,
-        };
-
-        rlb.next();
-        unsafe { S_POS = rlb.line_pos() };
-
-        /*
-         *let mut _serv_aliases: Vec<Vec<u8>> = Vec::new();
-         *loop {
-         *    let mut alias = match iter.next() {
-         *        Some(s) => s.as_bytes().to_vec(),
-         *        _ => break
-         *    };
-         *    alias.push(b'\0');
-         *    _serv_aliases.push(alias);
-         *}
-         *let mut serv_aliases: Vec<*mut i8> = _serv_aliases.iter_mut().map(|x| x.as_mut_ptr() as *mut i8).collect();
-         *serv_aliases.push(ptr::null_mut());
-         *
-         */
-        let mut _serv_aliases: Vec<Vec<u8>> = vec![vec![b'\0']];
-        let mut serv_aliases: Vec<*mut i8> = vec![ptr::null_mut(); 2];
-
-        unsafe { SERV_ALIASES.unsafe_set(Some(_serv_aliases)) };
-        unsafe { SERV_NAME.unsafe_set(Some(serv_name)) };
-        unsafe { SERV_PROTO.unsafe_set(Some(proto)) };
-
-        unsafe {
-            SERV_ENTRY = servent {
-                s_name: SERV_NAME
-                    .unsafe_mut()
-                    .as_mut()
-                    .unwrap()
-                    .as_mut_slice()
-                    .as_mut_ptr()
-                    .cast::<c_char>(),
-                s_aliases: serv_aliases
-                    .as_mut_slice()
-                    .as_mut_ptr()
-                    .cast::<*mut c_char>(),
-                s_port: SERV_PORT.unwrap(),
-                s_proto: SERV_PROTO
-                    .unsafe_mut()
-                    .as_mut()
-                    .unwrap()
-                    .as_mut_slice()
-                    .as_mut_ptr()
-                    .cast::<c_char>(),
-            }
-        };
-
-        if unsafe { SERV_STAYOPEN } == 0 {
-            unsafe { endservent() };
-        }
-        break (&raw mut SERV_ENTRY).cast::<servent>();
-    }
+    SERV_STATE
+        .lock()
+        .getservent()
+        .unwrap_or(core::ptr::null_mut())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
@@ -802,13 +668,7 @@ pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setservent(stayopen: c_int) {
-    unsafe { SERV_STAYOPEN = stayopen };
-    if unsafe { SERVDB } == 0 {
-        unsafe { SERVDB = Sys::open(c"/etc/services".into(), O_RDONLY, 0).or_minus_one_errno() }
-    } else {
-        if Sys::lseek(unsafe { SERVDB }, 0, SEEK_SET).is_ok() {}; // TODO handle error
-        unsafe { S_POS = 0 };
-    }
+    SERV_STATE.lock().setservent(stayopen != 0);
 }
 
 fn getaddrinfo_inner(
@@ -1119,7 +979,7 @@ pub extern "C" fn herror(prefix: *const c_char) {
         str::from_utf8_unchecked(msg_cstr.to_bytes())
     };
 
-    let mut writer = platform::FileWriter::new(2);
+    let mut writer = crate::platform::FileWriter::new(2);
     // Prefix is optional
     match unsafe { CStr::from_nullable_ptr(prefix) }
         .and_then(|prefix| str::from_utf8(prefix.to_bytes()).ok())
