@@ -31,8 +31,6 @@ FAILING_TESTS += pthread/customstack
 FAILING_TESTS += sys_resource/getrusage
 # No times.h header
 #FAILING_TESTS += time/times
-# Outdated test
-#FAILING_TESTS += netdb/netdb
 # Incomplete in redox, ENOSYS in linux, EACCESS in glibc
 #FAILING_TESTS += spawn
 
@@ -342,6 +340,7 @@ VARIED_NAMES=\
 	net/if \
 	netdb/getaddrinfo \
 	netdb/getaddrinfo_null \
+	netdb/netdb \
 	waitpid \
 	waitpid_multiple \
 	$(FAILING_TESTS)
