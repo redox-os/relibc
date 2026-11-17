@@ -48,18 +48,20 @@ pub struct utimbuf {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn utime(path: *const c_char, times: *const utimbuf) -> c_int {
     let filename_cstr = unsafe { CStr::from_ptr(path) };
-    let times_ref = unsafe { &*times };
-    let times_spec = [
-        timespec {
-            tv_sec: times_ref.actime,
-            tv_nsec: 0,
-        },
-        timespec {
-            tv_sec: times_ref.modtime,
-            tv_nsec: 0,
-        },
-    ];
-    Sys::utimens(filename_cstr, Some(&times_spec))
+    let times_spec = unsafe { times.as_ref() }.map(|times_ref| {
+        [
+            timespec {
+                tv_sec: times_ref.actime,
+                tv_nsec: 0,
+            },
+            timespec {
+                tv_sec: times_ref.modtime,
+                tv_nsec: 0,
+            },
+        ]
+    });
+
+    Sys::utimens(filename_cstr, times_spec.as_ref())
         .map(|()| 0)
         .or_minus_one_errno()
 }
