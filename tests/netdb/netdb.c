@@ -60,29 +60,31 @@ test_services (void)
 {
   struct servent *sptr;
   sptr = getservbyname ("domain", "tcp");
-  // output_servent ("getservbyname (\"domain\", \"tcp\")", sptr);
+  output_servent ("getservbyname (\"domain\", \"tcp\")", sptr);
   sptr = getservbyname ("domain", "udp");
-  // output_servent ("getservbyname (\"domain\", \"udp\")", sptr);
+  output_servent ("getservbyname (\"domain\", \"udp\")", sptr);
   sptr = getservbyname ("domain", NULL);
-  // output_servent ("getservbyname (\"domain\", NULL)", sptr);
+  output_servent ("getservbyname (\"domain\", NULL)", sptr);
   sptr = getservbyname ("not-existant", NULL);
-  // output_servent ("getservbyname (\"not-existant\", NULL)", sptr);
+  output_servent ("getservbyname (\"not-existant\", NULL)", sptr);
   /* This shouldn't return anything.  */
   sptr = getservbyname ("", "");
-  // output_servent ("getservbyname (\"\", \"\")", sptr);
+  output_servent ("getservbyname (\"\", \"\")", sptr);
   sptr = getservbyname ("", "tcp");
-  // output_servent ("getservbyname (\"\", \"tcp\")", sptr);
+  output_servent ("getservbyname (\"\", \"tcp\")", sptr);
   sptr = getservbyport (htons(53), "tcp");
-  // output_servent ("getservbyport (htons(53), \"tcp\")", sptr);
+  output_servent ("getservbyport (htons(53), \"tcp\")", sptr);
   sptr = getservbyport (htons(53), NULL);
-  // output_servent ("getservbyport (htons(53), NULL)", sptr);
+  output_servent ("getservbyport (htons(53), NULL)", sptr);
   sptr = getservbyport (htons(1), "udp"); /* shouldn't exist */
-  // output_servent ("getservbyport (htons(1), \"udp\")", sptr);
+  output_servent ("getservbyport (htons(1), \"udp\")", sptr);
   setservent (0);
+  int lim = 0;
   do
     {
       sptr = getservent ();
-      //output_servent ("getservent ()", sptr);
+      output_servent ("getservent ()", sptr);
+      if (lim++ > 20) break; // too many records
     }
   while (sptr != NULL);
   endservent ();
@@ -129,16 +131,16 @@ test_hosts (void)
         }
       else if (strcmp (hptr1->h_name, hptr2->h_name) != 0)
         {
-          printf ("localhost and LocalHost have different canoncial name\n");
+          printf ("localhost and LocalHost have different canonical name\n");
           printf ("gethostbyname (\"localhost\")->%s\n", hptr1->h_name);
           printf ("gethostbyname (\"LocalHost\")->%s\n", hptr2->h_name);
           ++error_count;
         }
-       //else
-       //  output_hostent ("gethostbyname(\"localhost\")", hptr1);
+      else
+       output_hostent ("gethostbyname(\"localhost\")", hptr1);
     }
   hptr1 = gethostbyname ("127.0.0.1");
-  //output_hostent ("gethostbyname (\"127.0.0.1\")", hptr1);
+  output_hostent ("gethostbyname (\"127.0.0.1\")", hptr1);
   while (gethostname (name, namelen) < 0 && errno == ENAMETOOLONG)
     {
       namelen += 2;                /* tiny increments to test a lot */
@@ -146,11 +148,11 @@ test_hosts (void)
     }
   if (gethostname (name, namelen) == 0)
     {
-      // printf ("Hostname: %s\n", name);
+       printf("Hostname: %s\n", name);
       if (name != NULL)
         {
           hptr1 = gethostbyname (name);
-        //  output_hostent ("gethostbyname (gethostname(...))", hptr1);
+        output_hostent ("gethostbyname (gethostname(...))", hptr1);
         }
     }
   ip.s_addr = htonl (INADDR_LOOPBACK);
@@ -158,28 +160,30 @@ test_hosts (void)
   hptr1 = gethostbyaddr ((char *) &ip, sizeof(ip), AF_INET);
   if (hptr1 != NULL)
     {
-     // printf ("official name of 127.0.0.1: %s\n", hptr1->h_name);
+      printf("official name of 127.0.0.1: %s\n", hptr1->h_name);
     }
   sethostent (0);
   do
     {
       hptr1 = gethostent ();
-      //output_hostent ("gethostent ()", hptr1);
+      output_hostent ("gethostent ()", hptr1);
     }
   while (hptr1 != NULL);
   endhostent ();
+  /* disabled: the test should remain offline
   struct hostent* redox = gethostbyname("redox-os.org");
   if (redox == NULL) {
       ++error_count;
   }
-  //output_hostent("gethostbyname(\"redox-os.org\")", redox);
+  output_hostent("gethostbyname(\"redox-os.org\")", redox);
   struct in_addr el_goog;
   inet_aton("8.8.4.4", &el_goog);
   struct hostent* google = gethostbyaddr(&el_goog, 4, AF_INET);
   if (google == NULL) {
       ++error_count;
   }
-  //output_hostent("gethostbyaddr(\"8.8.4.4\")",google);
+  output_hostent("gethostbyaddr(\"8.8.4.4\")",google);
+  */
 }
 
 static void
@@ -201,14 +205,14 @@ test_protocols (void)
 {
   struct protoent *prptr;
   prptr = getprotobyname ("ICMP");
- // output_protoent ("getprotobyname (\"ICMP\")", prptr);
+  output_protoent ("getprotobyname (\"ICMP\")", prptr);
   prptr = getprotobynumber (1);
- // output_protoent ("getprotobynumber (1)", prptr);
+  output_protoent ("getprotobynumber (1)", prptr);
   setprotoent (0);
   do
     {
       prptr = getprotoent ();
-     // output_protoent ("getprotoent ()", prptr);
+      output_protoent ("getprotoent ()", prptr);
     }
   while (prptr != NULL);
   endprotoent ();
@@ -216,9 +220,11 @@ test_protocols (void)
 static void
 test_network (void)
 {
-  struct netent *nptr = getnetbyname ("loopback");
+// redox have no entry
+#ifndef __redox__
+  struct netent *nptr = getnetbyname ("link-local");
   if (nptr != NULL) {
-    printf("network name %d", nptr->n_net);
+    printf("network net %x\n", nptr->n_net);
   } else {
     ++error_count;
   }
@@ -226,11 +232,12 @@ test_network (void)
     {
       nptr = getnetent();
       if (nptr != NULL) {
-          printf("network name %s", nptr->n_name);
+          printf("network name %s\n", nptr->n_name);
       }
     }
   while (nptr != NULL);
   setnetent (0);
+#endif
 }
 static void
 test_h_errno (void) {
@@ -241,7 +248,7 @@ test_h_errno (void) {
   }
 
   int err = h_errno;
-  herror("Prefix test");
+  herror("Prefix test 1");
   if (err != HOST_NOT_FOUND) {
     ++error_count;
   }
@@ -252,7 +259,7 @@ test_h_errno (void) {
   }
 
   err = h_errno;
-  herror("");
+  herror("Prefix test 2");
   if (err != HOST_NOT_FOUND) {
     ++error_count;
   }
@@ -276,5 +283,5 @@ do_test (void)
 }
 
 int main(void) {
-    do_test();
+    return do_test();
 }

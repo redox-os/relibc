@@ -29,6 +29,9 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, Errno> {
             s_addr: host_direct_addr,
         }]);
     }
+    if host.is_empty() {
+        return Ok(vec![]);
+    }
 
     let dns_string = get_dns_server()?;
 
@@ -113,6 +116,9 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, Errno> {
 }
 
 pub fn lookup_addr(addr: &in_addr) -> Result<Vec<Vec<u8>>, Errno> {
+    if addr.s_addr == 0 {
+        return Ok(vec![]);
+    }
     let dns_string = get_dns_server()?;
 
     if let Some(dns_addr) = parse_ipv4_string(&dns_string) {
