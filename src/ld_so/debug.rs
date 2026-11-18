@@ -1,4 +1,4 @@
-use crate::{c_str::CString, platform::types::c_char};
+use crate::{c_str::CStr, platform::types::c_char};
 use alloc::boxed::Box;
 use core::ptr;
 
@@ -45,20 +45,41 @@ impl RTLDDebug {
         r_ldbase: 0,
     };
 
-    pub fn insert(&mut self, l_addr: usize, name: &str, l_ld: usize) {
-        if self.r_map.is_null() {
+    pub fn insert(&mut self, l_addr: usize, name: &CStr, l_ld: usize) -> LinkMapGuard {
+        let node = if self.r_map.is_null() {
             self.r_map = LinkMap::new_with_args(l_addr, name, l_ld);
+            self.r_map
         } else {
-            unsafe { (*self.r_map).add_object(l_addr, name, l_ld) };
-        }
+            unsafe { (*self.r_map).add_object(l_addr, name, l_ld) }
+        };
+        LinkMapGuard(node)
     }
-    pub fn insert_first(&mut self, l_addr: usize, name: &str, l_ld: usize) {
+    pub fn insert_first(&mut self, l_addr: usize, name: &CStr, l_ld: usize) -> LinkMapGuard {
         if self.r_map.is_null() {
             self.r_map = LinkMap::new_with_args(l_addr, name, l_ld);
         } else {
             let tmp = self.r_map;
             self.r_map = LinkMap::new_with_args(l_addr, name, l_ld);
             unsafe { (*self.r_map).link(&mut *tmp) };
+        }
+        LinkMapGuard(self.r_map)
+    }
+    unsafe fn remove(&mut self, node: *mut LinkMap) {
+        unsafe {
+            let prev = (*node).l_prev;
+            let next = (*node).l_next;
+
+            if !prev.is_null() {
+                (*prev).l_next = next;
+            } else {
+                self.r_map = next;
+            }
+
+            if !next.is_null() {
+                (*next).l_prev = prev;
+            }
+
+            LinkMap::remove(node);
         }
     }
 }
@@ -102,18 +123,17 @@ impl LinkMap {
         map.l_prev = ptr::from_mut::<LinkMap>(self);
         self.l_next = ptr::from_mut::<LinkMap>(map);
     }
-    fn new_with_args(l_addr: usize, name: &str, l_ld: usize) -> *mut Self {
+    fn new_with_args(l_addr: usize, name: &CStr, l_ld: usize) -> *mut Self {
         let map = LinkMap::new();
         unsafe {
             (*map).l_addr = l_addr;
             (*map).l_ld = l_ld;
-            let c_name = CString::new(name).unwrap();
-            (*map).l_name = c_name.into_raw().cast_const();
+            (*map).l_name = name.as_ptr();
         }
         map
     }
 
-    fn add_object(&mut self, l_addr: usize, name: &str, l_ld: usize) {
+    fn add_object(&mut self, l_addr: usize, name: &CStr, l_ld: usize) -> *mut Self {
         let node = LinkMap::new_with_args(l_addr, name, l_ld);
         let mut last = self;
         while !last.l_next.is_null() {
@@ -123,6 +143,31 @@ impl LinkMap {
             (*node).l_prev = last;
             last.l_next = node;
         }
+        node
+    }
+    unsafe fn remove(node: *mut Self) {
+        // SAFETY: caller handle linked list removal already
+        unsafe { drop(Box::from_raw(node)) };
+    }
+}
+
+pub struct LinkMapGuard(*mut LinkMap);
+
+unsafe impl Send for LinkMapGuard {}
+unsafe impl Sync for LinkMapGuard {}
+
+impl Drop for LinkMapGuard {
+    fn drop(&mut self) {
+        if self.0.is_null() {
+            return;
+        }
+        _r_debug.lock().state = RTLDState::RtDelete;
+        _dl_debug_state();
+
+        unsafe { _r_debug.lock().remove(self.0) };
+
+        _r_debug.lock().state = RTLDState::RtConsistent;
+        _dl_debug_state();
     }
 }
 
