@@ -729,8 +729,8 @@ pub unsafe fn manually_enter_trampoline() {
 
 /// map to `si_signo` and `si_code`.
 pub(crate) fn map_err_code(excp: &syscall::Exception) -> (i32, i32) {
-    use redox_protocols::flag::*;
-    match excp.kind {
+    use redox_protocols::protocol::*;
+    let (signal, code) = match excp.kind {
         0  /* divide_by_zero */  => (SIGFPE, 1 /* todo */),
         3  /* breakpoint */  => (SIGTRAP, 1 /* TRAP_BRKPT */),
         6  /* invalid_opcode */  => (SIGILL, 1 /* todo */),
@@ -738,7 +738,9 @@ pub(crate) fn map_err_code(excp: &syscall::Exception) -> (i32, i32) {
         17  /* alignment_check */  => (SIGBUS, 1 /* BUS_ADRALN */),
         18  /* machine_check */  => (SIGBUS, 3 /* BUS_OBJERR */),
         _  => (SIGABRT, 0 /* todo */),
-    }
+    };
+
+    (signal as i32, code)
 }
 
 /// Get current stack pointer, weak granularity guarantees.

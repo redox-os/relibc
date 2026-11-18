@@ -612,11 +612,11 @@ fn sigaction_inner(
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn update_excp_stack_bitset(sig_num: i32, flags: SigactionFlags) {
-    use redox_protocols::flag::*;
+    use redox_protocols::protocol::*;
     let onstack = flags.contains(SigactionFlags::ONSTACK);
 
     // see map_err_code
-    let vectors: &[u32] = match sig_num {
+    let vectors: &[u32] = match sig_num as usize {
         SIGSEGV => &[14][..],
         SIGILL => &[6][..],
         SIGFPE => &[0][..],

@@ -72,7 +72,8 @@ ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.4.1"
 redox_protocols = { package = "libredox", version = "0.1.25", default-features = false, features = ["protocol"] }
-redox_syscall = "0.9.5"
+# Study: Match the ABI version provided by the current kernel priority branch.
+redox_syscall = "0.10.0"
 
 [build-dependencies]
 cc = "1"
@@ -152,4 +153,5 @@ panic = "abort"
 panic = "abort"
 
 [patch.crates-io]
-redox_syscall = {git = "https://gitlab.redox-os.org/redox-os/kernel/"}
+# Study: Pin the syscall ABI to the current kernel priority prototype.
+redox_syscall = { git = "https://gitlab.redox-os.org/nield/kernel.git", rev = "d4fb889f62deec76fec372eb8966fef4f44f15f4" }
