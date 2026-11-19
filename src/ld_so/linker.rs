@@ -25,7 +25,10 @@ use crate::{
         sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::{Dyn, SymbolBinding},
+    ld_so::{
+        debug::LinkMapGuard,
+        dso::{Dyn, ElfFile, MemoryMapHandle, SymbolBinding},
+    },
     out::Out,
     platform::{
         Pal, Sys,
@@ -338,6 +341,8 @@ bitflags::bitflags! {
         const SEARCH = 1 << 2;
         /// Display scope information.
         const SCOPES = 1 << 3;
+        /// Load debugging symbols into memory.
+        const SYMBOLS = 1 << 4;
     }
 }
 
@@ -360,6 +365,7 @@ impl Config {
                         "load" => DebugFlags::LOAD,
                         "search" => DebugFlags::SEARCH,
                         "scopes" => DebugFlags::SCOPES,
+                        "symbols" => DebugFlags::SYMBOLS,
                         "all" => DebugFlags::all(),
                         _ => {
                             eprintln!("[ld.so]: unknown debug flag '{}'", opt);
@@ -371,7 +377,6 @@ impl Config {
                 flags
             })
             .unwrap_or(DebugFlags::empty());
-
         Self {
             debug_flags,
             library_path: env.get("LD_LIBRARY_PATH").cloned(),
@@ -387,6 +392,8 @@ pub struct Me {
     pub base: *const u8,
     pub phdrs: &'static [ProgramHeader],
     pub dyns: &'static [Dyn],
+    pub link: Option<LinkMapGuard>,
+    pub mmap_symbols: Option<MemoryMapHandle>,
 }
 
 pub struct Linker {
@@ -803,6 +810,22 @@ impl Linker {
         self.objects.insert(obj.id, obj);
     }
 
+    pub fn load_my_symbols(&mut self) {
+        if !self.config.debug_flags.contains(DebugFlags::SYMBOLS) {
+            return;
+        }
+        let file = self
+            .search_object("/lib/libc.so.6", None)
+            .ok()
+            .and_then(|s| self.read_file(&s).ok());
+        if let Some(data) = file.as_ref().map(|s| s.data())
+            && let Some(link) = self.me.link.as_mut()
+            && let Ok(elf) = ElfFile::parse(data)
+        {
+            self.me.mmap_symbols = DSO::map_debug_symbols_raw(link, &elf, data)
+        }
+    }
+
     /// Loads the specified object and all of its dependencies.
     ///
     /// `new_objects` contains any new objects that were loaded. Order is
@@ -856,6 +879,7 @@ impl Linker {
         }
 
         let debug = self.config.debug_flags.contains(DebugFlags::LOAD);
+        let load_symbols = self.config.debug_flags.contains(DebugFlags::SYMBOLS);
 
         if name == "libc.so.6" || name == "libc.so" || name == "/lib/libc.so.1" {
             let (me, master) = DSO::from_raw(
@@ -865,6 +889,8 @@ impl Linker {
                 self.next_object_id,
                 self.next_tls_module_id,
                 self.tls_size.next_multiple_of(16),
+                self.me.link.take(),
+                self.me.mmap_symbols.take(),
             );
 
             if debug {
@@ -910,6 +936,7 @@ impl Linker {
             data,
             base_addr,
             dlopened,
+            load_symbols,
             self.next_object_id,
             self.next_tls_module_id,
             // Ensure TLS is aligned to 16 bytes for SSE

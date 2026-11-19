@@ -13,7 +13,7 @@ use object::{
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use super::tcb::Tcb;
 use super::{
-    debug::{_r_debug, RTLDDebug},
+    debug::_r_debug,
     linker::{__plt_resolve_trampoline, GLOBAL_SCOPE, Resolve, Scope, Symbol},
     tcb::Master,
 };
@@ -377,6 +377,7 @@ pub struct DSO {
     pub entry_point: usize,
     pub base: *const u8,
     pub mmap: Option<MemoryMapHandle>,
+    pub mmap_symbols: Option<MemoryMapHandle>,
     pub link: Option<LinkMapGuard>,
     pub tls_module_id: usize,
     pub tls_offset: usize,
@@ -398,6 +399,7 @@ pub struct DSO {
 
 impl DSO {
     #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "see FIXME note")]
+    #[expect(clippy::too_many_arguments)]
     pub fn from_raw(
         base: *const u8,
         dyns: &[Dyn],
@@ -405,6 +407,8 @@ impl DSO {
         id: usize,
         tls_module_id: usize,
         tls_offset: usize,
+        link: Option<LinkMapGuard>,
+        mmap_symbols: Option<MemoryMapHandle>,
     ) -> (Self, Master) {
         // FIXME: What should `path` be set to?
         // FIXME: this function and `parse_dynamic` should be unsafe.
@@ -433,37 +437,39 @@ impl DSO {
             })
             .unwrap();
 
-        (
-            Self {
-                name: String::from("libc.so.6"),
-                // TODO: actually resolve the path to libc
-                path_c: CString::from_str("/lib/libc.so.6").unwrap(),
-                id,
-                tls_offset: tcb_master.offset,
-                tls_module_id,
-                // TODO: add libc to DT_DEBUG
-                link: None,
-                phdrs: phdrs.as_ptr(),
-                phnum: phdrs.len(),
-                dlopened: false,
-                entry_point: 0,
-                base,
-                mmap: None,
-                dynamic,
-                scope: spin::Once::new(),
-                pie: true,
-                is_ready: AtomicBool::new(false),
-                is_me: true,
-            },
-            tcb_master,
-        )
+        // TODO: actually resolve the path to libc
+        let path = "/lib/libc.so.6";
+        let dso = Self {
+            name: String::from("libc.so.6"),
+            path_c: CString::from_str(path).unwrap(),
+            id,
+            tls_offset: tcb_master.offset,
+            tls_module_id,
+            link,
+            mmap_symbols,
+            phdrs: phdrs.as_ptr(),
+            phnum: phdrs.len(),
+            dlopened: false,
+            entry_point: 0,
+            base,
+            mmap: None,
+            dynamic,
+            scope: spin::Once::new(),
+            pie: true,
+            is_ready: AtomicBool::new(false),
+            is_me: true,
+        };
+
+        (dso, tcb_master)
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         path: &str,
         data: &[u8],
         base_addr: Option<usize>,
         dlopened: bool,
+        load_symbols: bool,
         id: usize,
         tls_module_id: usize,
         tls_offset: usize,
@@ -495,7 +501,7 @@ impl DSO {
         let phnum = elf.elf_header().e_phnum(object::NativeEndian) as usize;
         let phdrs_ptr = unsafe { mmap.as_ptr().add(phoff) }.cast();
 
-        let dso = DSO {
+        let mut dso = DSO {
             name,
             path_c,
             id,
@@ -507,6 +513,7 @@ impl DSO {
 
             base: mmap.as_ptr(),
             mmap: Some(mmap),
+            mmap_symbols: None,
 
             tls_module_id: if tcb_master.is_some() {
                 tls_module_id
@@ -521,6 +528,10 @@ impl DSO {
             is_ready: AtomicBool::new(false),
             is_me: false,
         };
+
+        if load_symbols {
+            dso.mmap_symbols = dso.map_debug_symbols(&elf, data);
+        }
 
         Ok((dso, tcb_master, elf.elf_program_headers().to_vec()))
     }
@@ -859,8 +870,11 @@ impl DSO {
             // FIXME: cleanup
             let (ph, _) = dynamic;
             let vaddr = usize::try_from(ph.p_vaddr(endian)).expect("always within bounds");
-            let bytes: [u8; size_of::<Dyn>() / 2] =
-                ((&raw const _r_debug).cast::<*const RTLDDebug>() as usize).to_ne_bytes();
+            let rdebug_addr = {
+                let guard = _r_debug.lock();
+                (&raw const *guard).addr()
+            };
+            let bytes: [u8; size_of::<Dyn>() / 2] = rdebug_addr.to_ne_bytes();
             let start = if is_pie_enabled(elf) {
                 vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
             } else {
@@ -885,6 +899,68 @@ impl DSO {
             tcb_master,
             parsed_dynamic,
         ))
+    }
+
+    fn map_debug_symbols(&mut self, elf: &ElfFile<'_>, data: &[u8]) -> Option<MemoryMapHandle> {
+        let link = self.link.as_mut()?;
+        Self::map_debug_symbols_raw(link, elf, data)
+    }
+
+    pub(crate) fn map_debug_symbols_raw(
+        link: &mut LinkMapGuard,
+        elf: &ElfFile<'_>,
+        data: &[u8],
+    ) -> Option<MemoryMapHandle> {
+        use object::read::elf::SectionHeader as _;
+
+        let endian = elf.endian();
+        let sections = elf.elf_section_table();
+        let (symtab_sh, strtab_sh) = sections.iter().find_map(|sh| {
+            if sh.sh_type(endian) == elf::SHT_SYMTAB {
+                let link = object::SectionIndex(sh.sh_link(endian) as usize);
+                sections.section(link).ok().map(|strtab| (sh, strtab))
+            } else {
+                None
+            }
+        })?;
+
+        let symtab = symtab_sh.data(endian, data).ok()?;
+        let strtab = strtab_sh.data(endian, data).ok()?;
+        let total = symtab.len().checked_add(strtab.len())?;
+        if total == 0 {
+            return None;
+        }
+
+        let map_size = total.next_multiple_of(syscall::PAGE_SIZE);
+        let ptr = unsafe {
+            Sys::mmap(
+                core::ptr::null_mut(),
+                map_size,
+                sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+                sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+                -1,
+                0,
+            )
+        }
+        .ok()?;
+
+        unsafe {
+            let base = ptr.cast::<u8>();
+            core::ptr::copy_nonoverlapping(symtab.as_ptr(), base, symtab.len());
+            core::ptr::copy_nonoverlapping(strtab.as_ptr(), base.add(symtab.len()), strtab.len());
+            let _ = Sys::mprotect(ptr, map_size, sys_mman::PROT_READ);
+        }
+
+        let symtab_addr = ptr.addr();
+        let symtab_count = symtab.len() / size_of::<crate::ld_so::dso::Sym>();
+        let strtab_addr = symtab_addr + symtab.len();
+
+        unsafe { link.add_symtab(symtab_addr, symtab_count, strtab_addr) };
+
+        Some(MemoryMapHandle {
+            ptr: ptr.cast::<u8>(),
+            size: map_size,
+        })
     }
 
     pub fn find_bounds(&self, phdrs: &[ProgramHeader]) -> (usize, usize) {

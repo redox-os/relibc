@@ -2,6 +2,8 @@ use crate::{c_str::CStr, platform::types::c_char};
 use alloc::boxed::Box;
 use core::ptr;
 
+// TODO: use libredox structs instead?
+
 #[repr(C)]
 pub enum RTLDState {
     /// Mapping change is complete.
@@ -106,6 +108,11 @@ struct LinkMap {
     l_ld: usize,
     l_next: *mut LinkMap,
     l_prev: *mut LinkMap,
+
+    // these are internally known to procmgr
+    l_symtab: usize,
+    l_symtab_count: usize,
+    l_strtab: usize,
 }
 
 impl LinkMap {
@@ -116,6 +123,9 @@ impl LinkMap {
             l_ld: 0,
             l_next: ptr::null_mut(),
             l_prev: ptr::null_mut(),
+            l_symtab: 0,
+            l_symtab_count: 0,
+            l_strtab: 0,
         });
         Box::into_raw(map)
     }
@@ -155,6 +165,15 @@ pub struct LinkMapGuard(*mut LinkMap);
 
 unsafe impl Send for LinkMapGuard {}
 unsafe impl Sync for LinkMapGuard {}
+
+impl LinkMapGuard {
+    pub unsafe fn add_symtab(&self, l_symtab: usize, l_symtab_count: usize, l_strtab: usize) {
+        let node = unsafe { &mut *self.0 };
+        node.l_symtab = l_symtab;
+        node.l_symtab_count = l_symtab_count;
+        node.l_strtab = l_strtab;
+    }
+}
 
 impl Drop for LinkMapGuard {
     fn drop(&mut self) {

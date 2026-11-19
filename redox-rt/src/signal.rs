@@ -18,8 +18,8 @@ use crate::{
 };
 
 use redox_protocols::protocol::{
-    ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
-    SIGWINCH, ThreadCall,
+    CrashDumpContext, ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN,
+    SIGTTOU, SIGURG, SIGWINCH, ThreadCall,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -339,7 +339,9 @@ unsafe fn inner_excp(stack: &mut SigStack) {
             handler(si_signo);
         }
     } else {
-        let _ = sys_call(
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        crash_dump(stack, excp, si_signo, si_code);
+        let _ = crate::sys::sys_call(
             current_proc_fd().as_raw_fd(),
             CallFlags::empty(),
             &[
@@ -359,6 +361,29 @@ unsafe fn inner_excp(stack: &mut SigStack) {
     );
 }
 
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+fn crash_dump(stack: &mut SigStack, excp: syscall::Exception, si_signo: i32, si_code: i32) {
+    #[cfg(target_arch = "x86_64")]
+    let (pc, fp, sp) = (stack.regs.rip, stack.regs.rbp, stack.regs.rsp);
+    #[cfg(target_arch = "x86")]
+    let (pc, fp, sp) = (stack.regs.eip, stack.regs.ebp, stack.regs.esp);
+
+    let ctx = CrashDumpContext {
+        pc,
+        fp,
+        sp,
+        fault_addr: excp.address,
+        si_signo: si_signo as u32,
+        si_code: si_code as u32,
+    };
+    let _ = crate::sys::sys_call_wo(
+        current_proc_fd().as_raw_fd(),
+        unsafe { plain::as_bytes(&ctx) },
+        CallFlags::empty(),
+        &[ProcCall::CrashDump as u64],
+    );
+}
+
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_excp_c(stack: usize) {
     unsafe { inner_excp(&mut *(stack as *mut SigStack)) }
@@ -366,6 +391,15 @@ pub(crate) unsafe extern "C" fn inner_excp_c(stack: usize) {
 #[cfg(target_arch = "x86")]
 pub(crate) unsafe extern "fastcall" fn inner_excp_fastcall(stack: usize) {
     unsafe { inner_excp(&mut *(stack as *mut SigStack)) }
+}
+
+pub fn set_rdebug(rdebug_addr: usize) -> Result<()> {
+    crate::sys::sys_call(
+        current_proc_fd().as_raw_fd(),
+        CallFlags::empty(),
+        &[ProcCall::RDebug as u64, rdebug_addr as u64],
+    )?;
+    Ok(())
 }
 
 pub fn get_sigmask() -> Result<u64> {
