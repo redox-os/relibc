@@ -18,7 +18,9 @@ use super::{
     tcb::Master,
 };
 use crate::{
+    c_str::CStr,
     header::{dl_tls::__tls_get_addr, sys_mman},
+    ld_so::debug::LinkMapGuard,
     platform::{Pal, Sys, types::c_void},
 };
 use alloc::{
@@ -375,6 +377,7 @@ pub struct DSO {
     pub entry_point: usize,
     pub base: *const u8,
     pub mmap: Option<MemoryMapHandle>,
+    pub link: Option<LinkMapGuard>,
     pub tls_module_id: usize,
     pub tls_offset: usize,
     pub phdrs: *const ProgramHeader,
@@ -438,6 +441,8 @@ impl DSO {
                 id,
                 tls_offset: tcb_master.offset,
                 tls_module_id,
+                // TODO: add libc to DT_DEBUG
+                link: None,
                 phdrs: phdrs.as_ptr(),
                 phnum: phdrs.len(),
                 dlopened: false,
@@ -465,15 +470,16 @@ impl DSO {
     ) -> Result<(DSO, Option<Master>, Vec<ProgramHeader>), String> {
         let elf = ElfFile::parse(data).map_err(|err| err.to_string())?;
 
-        let (mmap, tcb_master, dynamic) =
-            DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
+        let path_c = CString::new(path).map_err(|err| err.to_string())?;
+        let path_cc = CStr::borrow(&path_c);
+        let (mmap, link_guard, tcb_master, dynamic) =
+            DSO::mmap_and_copy(path, &path_cc, &elf, data, base_addr, tls_offset)?;
 
         let name = match dynamic.soname {
             Some(soname) => soname,
             _ => basename(path),
         }
         .to_string();
-        let path_c = CString::new(path).map_err(|err| err.to_string())?;
         let tls_offset = match tcb_master {
             Some(ref master) => master.offset,
             _ => 0,
@@ -497,6 +503,7 @@ impl DSO {
             phnum,
             dlopened,
             entry_point,
+            link: Some(link_guard),
 
             base: mmap.as_ptr(),
             mmap: Some(mmap),
@@ -647,11 +654,20 @@ impl DSO {
 
     fn mmap_and_copy<'a>(
         path: &str,
+        path_c: &CStr,
         elf: &ElfFile<'a>,
         data: &'a [u8],
         base_addr: Option<usize>,
         tls_offset: usize,
-    ) -> Result<(MemoryMapHandle, Option<Master>, Dynamic<'static>), String> {
+    ) -> Result<
+        (
+            MemoryMapHandle,
+            LinkMapGuard,
+            Option<Master>,
+            Dynamic<'static>,
+        ),
+        String,
+    > {
         let endian = elf.endian();
         log::trace!("# {}", path);
         // data for struct LinkMap
@@ -674,7 +690,7 @@ impl DSO {
 
                 match ph.p_type(endian) {
                     elf::PT_DYNAMIC => {
-                        l_ld = ph.p_vaddr(endian);
+                        l_ld = usize::try_from(ph.p_vaddr(endian)).expect("always within bounds");
                     }
                     elf::PT_LOAD => {
                         log::trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
@@ -696,19 +712,19 @@ impl DSO {
         };
         log::trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
         // Allocate memory
-        let mmap = unsafe {
+        let (link_guard, mmap) = unsafe {
             if let Some(addr) = base_addr {
                 let size = if is_pie_enabled(elf) {
                     bounds.1
                 } else {
                     bounds.1 - bounds.0
                 };
-                _r_debug.lock().insert_first(
-                    addr + bounds.0,
-                    path,
-                    addr + usize::try_from(l_ld).expect("always within bounds"),
-                );
-                slice::from_raw_parts_mut((addr + bounds.0) as *mut u8, size)
+                (
+                    _r_debug
+                        .lock()
+                        .insert_first(addr + bounds.0, path_c, addr + l_ld),
+                    slice::from_raw_parts_mut((addr + bounds.0) as *mut u8, size),
+                )
             } else {
                 let (start, end) = bounds;
                 let size = end - start;
@@ -735,12 +751,12 @@ impl DSO {
                     );
                 }
                 log::trace!("    = {:p}", ptr);
-                _r_debug.lock().insert(
-                    ptr as usize,
-                    path,
-                    ptr as usize + usize::try_from(l_ld).expect("always within bounds"),
-                );
-                slice::from_raw_parts_mut(ptr.cast::<u8>(), size)
+                (
+                    _r_debug
+                        .lock()
+                        .insert(ptr.addr(), path_c, ptr.addr() + l_ld),
+                    slice::from_raw_parts_mut(ptr.cast::<u8>(), size),
+                )
             }
         };
 
@@ -865,6 +881,7 @@ impl DSO {
                 ptr: mmap.as_ptr(),
                 size: mmap.len(),
             },
+            link_guard,
             tcb_master,
             parsed_dynamic,
         ))
