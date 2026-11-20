@@ -693,7 +693,7 @@ impl Pal for Sys {
                     redox_rt::sys::open_into_upper(path, open_flags2)?,
                 ];
                 //TODO: different fd to save if /dev/random equivalent is used
-                CACHED_RANDOM_FD.set(Some(ep.clone()));
+                CACHED_RANDOM_FD.set(Some(ep));
                 ep
             }
         };
@@ -710,7 +710,7 @@ impl Pal for Sys {
                 if err.errno == EBADF {
                     CACHED_RANDOM_FD.set(None);
                 }
-                return Err(Errno(err.errno));
+                Err(Errno(err.errno))
             }
         }
     }
