@@ -94,7 +94,7 @@ impl Sys {
 
         let metadata = [0, write_len as u64, read_flags];
         let payload_ptr = buf_slice.as_mut_ptr().cast::<u8>();
-        let payload_len = buf_slice.len() * size_of::<Event>();
+        let payload_len = core::mem::size_of_val(buf_slice);
 
         let callback = || {
             redox_rt::sys::sys_call_rw(
