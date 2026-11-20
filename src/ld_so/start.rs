@@ -466,8 +466,18 @@ fn stage2(
         );
     }
 
-    // we might need global lock for this kind of stuff
-    _r_debug.lock().r_ldbase = self_base;
+    let (rdebug_addr, my_link) = {
+        let mut guard = _r_debug.lock();
+        guard.r_ldbase = self_base;
+        let link = guard.insert(
+            self_base,
+            &(c"/lib/libc.so.6".into()),
+            my_dyns.as_ptr().addr(),
+        );
+        (&raw const *guard, link)
+    };
+
+    let _ = redox_rt::signal::set_rdebug(rdebug_addr.addr());
 
     let name_or_path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
@@ -517,9 +527,12 @@ fn stage2(
             base: self_base as *const u8,
             phdrs: my_phdrs,
             dyns: my_dyns,
+            link: Some(my_link),
+            mmap_symbols: None,
         },
         config,
     );
+    linker.load_my_symbols();
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {
